@@ -14,10 +14,6 @@ const clienteSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  pacote: {
-    type: String,
-    default: null
-  },
   sessoesRestantes: {
     type: Number,
     default: 0
@@ -25,6 +21,11 @@ const clienteSchema = new mongoose.Schema({
   criadoEm: {
     type: Date,
     default: Date.now
+  },
+  pacote: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Pacote',
+    default: null
   }
 });
 

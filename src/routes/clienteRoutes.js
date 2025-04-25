@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const clienteController = require('../controllers/clienteController');
+
 const validateObjectId = require('../middlewares/validateObjectId');
 
 
@@ -19,6 +20,8 @@ router.post('/', clienteController.createCliente);
 router.get('/:id', validateObjectId, clienteController.buscarClientePorId);
 
 router.delete('/:id', validateObjectId, clienteController.deletarCliente);
+
+
 
 
 

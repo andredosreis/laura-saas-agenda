@@ -15,6 +15,8 @@ app.use(cors());
 app.use(logger);
 app.use(errorHandler);
 app.use('/api/clientes', require('./routes/clienteRoutes'));
+app.use('/api/pacotes', require('./routes/pacoteRoutes'));
+
 
 // Routes test
 app.get ('/' , (req, res) => {
