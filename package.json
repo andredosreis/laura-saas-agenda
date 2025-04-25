@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "cross-env NODE_ENV=test jest --runInBand",
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
-      
-    
+"start": "node src/server.js",
+"dev": "nodemon src/server.js",
+"seed": "node seeds/seedPacotes.js",
+"test": "echo \"Error: no test specified\" && exit 1"
+
   },
   "keywords": [],
   "author": "",
