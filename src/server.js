@@ -14,8 +14,12 @@ app.use(express.json());
 app.use(cors());
 app.use(logger);
 app.use(errorHandler);
+
+// Routes
 app.use('/api/clientes', require('./routes/clienteRoutes'));
 app.use('/api/pacotes', require('./routes/pacoteRoutes'));
+app.use('/api/agendamentos', require('./routes/agendamentoRoutes'));
+
 
 
 // Routes test
