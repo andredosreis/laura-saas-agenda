@@ -1,24 +1,24 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-
-import Header from './components/Header';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Home from './pages/Home';
 import Agendamentos from './pages/Agendamentos';
-import Pacotes from './pages/Pacotes';
 import Clientes from './pages/Clientes';
-import Dashboard from './pages/Dashboard';
-
+import Pacotes from './pages/Pacotes';
 
 function App() {
   return (
     <Router>
-      <Header />
+    <Navbar />
+    <main>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<Home />} />
         <Route path="/agendamentos" element={<Agendamentos />} />
-        <Route path="/pacotes" element={<Pacotes />} />
         <Route path="/clientes" element={<Clientes />} />
+        <Route path="/pacotes" element={<Pacotes />} />
       </Routes>
-    </Router>
+    </main>
+  </Router>
+  
   );
 }
 
