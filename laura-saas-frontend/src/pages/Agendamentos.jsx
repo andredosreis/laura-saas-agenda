@@ -20,9 +20,11 @@ function Agendamentos() {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Lista de Agendamentos</h1>
+      
 
       {agendamentos.length === 0 ? (
         <p>Nenhum agendamento encontrado.</p>
+        
       ) : (
         <ul className="space-y-4">
           {agendamentos.map((agendamento) => (
