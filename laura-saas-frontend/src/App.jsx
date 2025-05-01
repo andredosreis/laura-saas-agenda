@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import Agendamentos from './pages/Agendamentos';
 import Clientes from './pages/Clientes';
 import Pacotes from './pages/Pacotes';
+import CriarCliente from './pages/CriarCliente';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/pacotes" element={<Pacotes />} />
+        <Route path="/criar-cliente" element={<CriarCliente />} />
       </Routes>
     </main>
   </Router>
