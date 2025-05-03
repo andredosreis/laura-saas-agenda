@@ -26,7 +26,8 @@ function CriarCliente() {
   }, []);
 
   return (
-    <div className="max-w-xl mx-auto mt-10 p-6 bg-white shadow rounded-lg">
+<div className="max-w-xl mx-auto mt-10 p-6 bg-white border border-gray-300 shadow-lg rounded-lg">
+
       <h1 className="text-2xl font-bold mb-4">Cadastrar Novo Cliente</h1>
 
       <form
