@@ -6,6 +6,7 @@ import Clientes from './pages/Clientes';
 import Pacotes from './pages/Pacotes';
 import CriarCliente from './pages/CriarCliente';
 import CriarAgendamento from './pages/CriarAgendamento';
+import CriarPacote from './pages/CriarPacote';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/pacotes" element={<Pacotes />} />
         <Route path="/criar-cliente" element={<CriarCliente />} />
         <Route path="/agendar" element={<CriarAgendamento />} />
+        <Route path="/criar-pacote" element={<CriarPacote />} />
       </Routes>
     </main>
   </Router>
