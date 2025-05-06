@@ -16,7 +16,6 @@ function EditarCliente() {
 
   const [pacotes, setPacotes] = useState([]);
 
-
   useEffect(() => {
     async function fetchData() {
       try {
