@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { toast } from 'react-toastify';
 
 function EditarCliente() {
   const { id } = useParams(); // pegamos o id da URL
@@ -33,8 +34,10 @@ function EditarCliente() {
         const pacotesRes = await api.get('/pacotes');
         setPacotes(pacotesRes.data);
       } catch (err) {
-        console.error('Erro ao carregar dados:', err);
-        alert('Erro ao buscar dados do cliente.');
+        //console.error('Erro ao carregar dados:', err);
+        toast.error('Erro ao carregar dados do cliente.');
+        toast.alert('Verifique se o ID do cliente está correto.');
+        //alert('Erro ao buscar dados do cliente.');
       }
     }
   
@@ -45,11 +48,13 @@ function EditarCliente() {
     e.preventDefault();
     try {
       await api.put(`/clientes/${id}`, formData);
-      alert('Cliente atualizado com sucesso!');
+      toast.success('Cliente atualizado com sucesso!');
       navigate('/clientes'); // Redireciona para a lista de clientes após sucesso
     } catch (err) {
-      console.error('Erro ao atualizar cliente:', err);
-      alert('Erro ao atualizar cliente.');
+      // Handle error
+      //console.error('Erro ao atualizar cliente:', err);
+      toast.error('Erro ao atualizar cliente.');
+      toast.alert('Verifique se todos os campos estão preenchidos corretamente.');
     }
   };
 

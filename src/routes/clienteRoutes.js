@@ -20,6 +20,8 @@ router.post('/', clienteController.createCliente);
 router.get('/:id', validateObjectId, clienteController.buscarClientePorId);
 
 router.delete('/:id', validateObjectId, clienteController.deletarCliente);
+// src/routes/clienteRoutes.js
+router.put('/:id', validateObjectId, clienteController.atualizarCliente);
 
 
 

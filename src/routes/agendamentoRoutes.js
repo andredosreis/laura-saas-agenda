@@ -2,16 +2,19 @@ const express = require('express');
 const router = express.Router();
 const agendamentoController = require('../controllers/agendamentoController');
 
-// POST - Criar agendamento
+// Criar agendamento
 router.post('/', agendamentoController.createAgendamento);
 
-// GET - Listar agendamentos
+// Listar todos os agendamentos
 router.get('/', agendamentoController.getAllAgendamentos);
 
-// PUT - Atualizar status do agendamento
+// Buscar um agendamento específico
+router.get('/:id', agendamentoController.getAgendamento);
+
+// Atualizar status do agendamento
 router.put('/:id/status', agendamentoController.atualizarStatusAgendamento);
 
-
-
+// Deletar agendamento
+router.delete('/:id', agendamentoController.deleteAgendamento);
 
 module.exports = router;
