@@ -15,15 +15,45 @@ exports.getAllClientes = async (req, res) => {
 // Criar um novo cliente
 exports.createCliente = async (req, res) => {
   try {
+    // Log dos dados recebidos (para debug)
+    console.log('Dados recebidos:', req.body);
+
     const novoCliente = new Cliente(req.body);
     const salvo = await novoCliente.save();
+    
     res.status(201).json(salvo);
   } catch (error) {
-    console.error('Erro ao criar cliente:', error.message);
-    res.status(400).json({ error: 'Erro ao criar cliente.' });
+    console.error('Erro ao criar cliente:', error);
+
+    // Tratamento específico para erro de duplicidade (unique: true)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        error: 'Erro de validação',
+        message: 'Já existe um cliente com este telefone.'
+      });
+    }
+
+    // Tratamento para erros de validação do Mongoose
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      
+      return res.status(400).json({
+        error: 'Erro de validação',
+        message: 'Dados inválidos',
+        details: errors
+      });
+    }
+
+    // Erro genérico
+    res.status(500).json({
+      error: 'Erro ao criar cliente',
+      message: error.message
+    });
   }
 };
-
 // Buscar um cliente pelo ID
 exports.buscarClientePorId = async (req, res) => {
   try {
