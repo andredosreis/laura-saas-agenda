@@ -69,24 +69,50 @@ exports.buscarClientePorId = async (req, res) => {
     res.status(400).json({ error: 'Erro ao buscar cliente.' });
   }
 };
+// No teu src/controllers/clienteController.js
 
-// Atualizar um cliente pelo ID
 exports.atualizarCliente = async (req, res) => {
   try {
-    const atualizado = await Cliente.findByIdAndUpdate(
+    const clienteAtualizado = await Cliente.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true }
+      {
+        new: true, // Retorna o documento atualizado
+        runValidators: true, // MUITO IMPORTANTE: Força o Mongoose a rodar as validações do schema
+      }
     );
 
-    if (!atualizado) {
-      return res.status(404).json({ error: 'Cliente não encontrado.' });
+    if (!clienteAtualizado) {
+      return res.status(404).json({ message: 'Cliente não encontrado.' });
+    }
+    res.status(200).json(clienteAtualizado);
+  } catch (error) {
+    console.error('Erro ao atualizar cliente:', error); // Para debug no servidor
+
+    if (error.name === 'ValidationError') {
+      // Erro de validação do Mongoose
+      const mensagens = Object.values(error.errors).map(err => ({
+        field: err.path, // Campo que falhou na validação
+        message: err.message // Mensagem de erro específica do schema
+      }));
+      return res.status(400).json({
+        message: 'Dados inválidos. Verifique os campos e tente novamente.',
+        details: mensagens // Array com os detalhes de cada campo que falhou
+      });
     }
 
-    res.status(200).json(atualizado);
-  } catch (error) {
-    console.error('Erro ao atualizar cliente:', error.message);
-    res.status(400).json({ error: 'Erro ao atualizar cliente.' });
+    if (error.code === 11000) {
+      // Erro de chave duplicada (ex: telefone único)
+      // Extrai o campo que causou a duplicidade (pode variar um pouco dependendo da versão do Mongoose/MongoDB)
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({
+        message: `O campo ${field} informado já existe no sistema.`,
+        details: [{ field, message: `O ${field} '${error.keyValue[field]}' já está em uso.` }]
+      });
+    }
+
+    // Outros erros
+    res.status(500).json({ message: 'Erro interno ao atualizar o cliente.' });
   }
 };
 
