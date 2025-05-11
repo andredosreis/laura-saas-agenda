@@ -1,5 +1,6 @@
 const Cliente = require('../models/Clientes');
 const Pacote = require('../models/Pacote');
+const Agendamento = require('../models/Agendamento');
 
 // Listar todos os clientes
 exports.getAllClientes = async (req, res) => {
@@ -119,16 +120,29 @@ exports.atualizarCliente = async (req, res) => {
 // Deletar um cliente pelo ID
 exports.deletarCliente = async (req, res) => {
   try {
-    console.log('Tentando deletar cliente:', req.params.id);
-    const excluido = await Cliente.findByIdAndDelete(req.params.id);
+    const clienteId = req.params.id;
 
-    if (!excluido) {
-      return res.status(404).json({ error: 'Cliente não encontrado.' });
+    // 1. Opcional, mas bom: Verificar se o cliente existe
+    const clienteParaDeletar = await Cliente.findById(clienteId);
+    if (!clienteParaDeletar) {
+      return res.status(404).json({ message: 'Cliente não encontrado para deleção.' });
     }
 
-    res.status(200).json({ mensagem: 'Cliente removido com sucesso.' });
+    // 2. Deletar todos os agendamentos associados a este cliente
+    const resultadoDelecaoAgendamentos = await Agendamento.deleteMany({ cliente: clienteId });
+    // Log para o servidor (podes remover depois de testar)
+    console.log(`Para o cliente ${clienteId}, foram deletados ${resultadoDelecaoAgendamentos.deletedCount} agendamentos.`);
+
+    // 3. Deletar o cliente
+    await Cliente.deleteOne({ _id: clienteId });
+
+    res.status(200).json({ message: 'Cliente e seus agendamentos associados foram removidos com sucesso.' });
+
   } catch (error) {
-    console.error('Erro ao deletar cliente:', error.message);
-    res.status(500).json({ error: 'Erro ao deletar cliente.' });
+    console.error('Erro ao deletar cliente e seus agendamentos:', error);
+    if (error.name === 'CastError') { // Se o ID fornecido não for um ObjectId válido
+        return res.status(400).json({ message: 'ID do cliente inválido para deleção.', details: error.message });
+    }
+    res.status(500).json({ message: 'Erro interno ao deletar o cliente.', details: error.message });
   }
 };

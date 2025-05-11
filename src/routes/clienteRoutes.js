@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const clienteController = require('../controllers/clienteController');
-
+console.log('OBJETO clienteController IMPORTADO NAS ROTAS:', clienteController);
 const validateObjectId = require('../middlewares/validateObjectId');
+
 
 
 // Aqui futuramente vamos importar o controller e middlewares
