@@ -10,6 +10,7 @@ import CriarCliente from './pages/CriarCliente';
 import CriarAgendamento from './pages/CriarAgendamento';
 import CriarPacote from './pages/CriarPacote';
 import EditarCliente from './pages/EditarCliente';
+import EditarPacote from './pages/EditarPacote';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/criar-agendamento" element={<CriarAgendamento />} />
           <Route path="/criar-pacote" element={<CriarPacote />} />
           <Route path="/clientes/editar/:id" element={<EditarCliente />} />
+          <Route path="/pacotes/editar/:id" element={<EditarPacote />} />
         </Routes>
         <ToastContainer />  {/* Movido para dentro do Router e corrigido o nome */}
       </main>

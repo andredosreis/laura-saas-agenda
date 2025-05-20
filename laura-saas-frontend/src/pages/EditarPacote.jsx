@@ -1,20 +1,57 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import api from '../services/api';
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 
-function CriarPacote() {
-  const navigate = useNavigate();
+function EditarPacote() {
+ const { id } = useParams(); // Obter o ID do pacote da URL
+ const navigate = useNavigate(); // Hook para navegação
+
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
-    sessoes: 1,
-    valor: '',
+    sessoes: '', // Será preenchido com o valor do pacote
+    valor: '',   // Será preenchido com o valor do pacote
     descricao: '',
     ativo: true,
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial dos dados
+  const [isSubmitting, setIsSubmitting] = useState(false); // Para o estado de submissão do formulário
   const [fieldErrors, setFieldErrors] = useState({});
+
+
+
+ useEffect(() => {
+    async function fetchPacoteData() {
+      setIsLoading(true);
+      setFieldErrors({});
+      try {
+        const response = await api.get(`/pacotes/${id}`);
+        const pacoteData = response.data;
+        setFormData({
+          nome: pacoteData.nome || '',
+          categoria: pacoteData.categoria || '',
+          sessoes: pacoteData.sessoes !== undefined ? String(pacoteData.sessoes) : '', // Inputs esperam string
+          valor: pacoteData.valor !== undefined ? String(pacoteData.valor) : '',     // Inputs esperam string
+          descricao: pacoteData.descricao || '',
+          ativo: pacoteData.ativo !== undefined ? pacoteData.ativo : true,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar dados do pacote:', error);
+        toast.error('Erro ao carregar dados do pacote.');
+        if (error.response && error.response.status === 404) {
+          toast.error('Pacote não encontrado.');
+          navigate('/pacotes'); // Volta para a lista se o pacote não existir
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (id) {
+      fetchPacoteData();
+    }
+  }, [id, navigate]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -34,11 +71,21 @@ function CriarPacote() {
     const newErrors = {};
     if (!formData.nome.trim()) newErrors.nome = 'O nome do pacote é obrigatório.';
     if (!formData.categoria.trim()) newErrors.categoria = 'A categoria é obrigatória.';
-    if (formData.sessoes === '' || formData.sessoes < 1) newErrors.sessoes = 'O número de sessões deve ser pelo menos 1.';
+    
+    const sessoesNum = parseInt(formData.sessoes, 10);
+    if (isNaN(sessoesNum) || sessoesNum < 1) {
+      newErrors.sessoes = 'O número de sessões deve ser pelo menos 1.';
+    }
+
     if (formData.valor === '') {
         newErrors.valor = 'O valor do pacote é obrigatório.';
-    } else if (isNaN(parseFloat(formData.valor)) || parseFloat(formData.valor) < 0) {
-        newErrors.valor = 'O valor deve ser um número positivo.';
+    } else {
+        const valorNum = parseFloat(formData.valor);
+        if (isNaN(valorNum)) {
+            newErrors.valor = 'O valor deve ser um número válido.';
+        } else if (valorNum < 0) {
+            newErrors.valor = 'O valor não pode ser negativo.';
+        }
     }
     setFieldErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -53,17 +100,20 @@ function CriarPacote() {
 
     setIsSubmitting(true);
     const dadosParaEnviar = {
-      ...formData,
-      valor: parseFloat(formData.valor),
+      nome: formData.nome.trim(),
+      categoria: formData.categoria.trim(),
       sessoes: parseInt(formData.sessoes, 10),
+      valor: parseFloat(formData.valor),
+      descricao: formData.descricao.trim(),
+      ativo: formData.ativo,
     };
 
     try {
-      await api.post('/pacotes', dadosParaEnviar);
-      toast.success('Pacote criado com sucesso!');
+      await api.put(`/pacotes/${id}`, dadosParaEnviar); // Usa o ID da URL para a rota PUT
+      toast.success('Pacote atualizado com sucesso! ✨');
       navigate('/pacotes'); // Redireciona para a lista de pacotes
     } catch (error) {
-      console.error('Erro ao criar pacote:', error.response?.data || error.message);
+      console.error('Erro ao atualizar pacote:', error.response?.data || error.message);
       const errorData = error.response?.data;
       if (errorData?.details && Array.isArray(errorData.details)) {
         const backendErrors = {};
@@ -71,19 +121,28 @@ function CriarPacote() {
           backendErrors[detail.field] = detail.message;
         });
         setFieldErrors(prevErrors => ({ ...prevErrors, ...backendErrors }));
-        toast.error(errorData.message || 'Erro de validação do servidor.');
+        toast.error(errorData.message || 'Erro de validação do servidor ao atualizar.');
       } else {
-        toast.error(errorData?.message || 'Erro ao criar pacote. Tente novamente.');
+        toast.error(errorData?.message || 'Erro ao atualizar pacote. Tente novamente.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+        <p className="ml-3 mt-3 text-gray-700 text-lg">A carregar dados do pacote...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-2xl mx-auto">
-        <button
+         <button
             onClick={() => navigate('/pacotes')}
             className="mb-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
@@ -91,7 +150,7 @@ function CriarPacote() {
         </button>
         <div className="bg-white text-black border border-gray-200 shadow-xl rounded-lg p-6 sm:p-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-8">
-            Criar Novo Pacote
+            Editar Pacote
           </h1>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Campo Nome */}
@@ -189,10 +248,10 @@ function CriarPacote() {
             {/* Botão */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoading} // Desabilita se estiver a carregar dados ou a submeter
               className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
             >
-              {isSubmitting ? 'A criar pacote...' : 'Criar Pacote'}
+              {isSubmitting ? 'A guardar alterações...' : 'Salvar Alterações'}
             </button>
           </form>
         </div>
@@ -201,4 +260,5 @@ function CriarPacote() {
   );
 }
 
-export default CriarPacote;
+export default EditarPacote;
+//
