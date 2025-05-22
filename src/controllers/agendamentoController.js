@@ -1,5 +1,6 @@
 const Agendamento = require('../models/Agendamento');
 const Cliente = require('../models/Clientes');
+const Pacote = require('../models/Pacote');
 
 // Criar novo agendamento
 const createAgendamento = async (req, res) => {
@@ -16,6 +17,69 @@ const createAgendamento = async (req, res) => {
         error: 'Cliente não possui sessões disponíveis no pacote' 
       });
     }
+    exports.atualizarAgendamento = async (req, res) => {
+  try {
+    const { id } = req.params; // Pega o ID do agendamento da URL
+    const dadosDoFormulario = req.body; // Pega os novos dados do corpo da requisição
+
+    // Opcional: Validações extras no backend antes de atualizar
+    // Ex: Verificar se o clienteId ou pacoteId (se fornecidos) existem no banco
+    // Ex: Verificar se o novo horário não conflita com outros agendamentos (lógica mais complexa)
+
+    const agendamentoAtualizado = await Agendamento.findByIdAndUpdate(
+      id,
+      dadosDoFormulario,
+      {
+        new: true, // Retorna o documento modificado (em vez do original)
+        runValidators: true, // Roda as validações definidas no seu AgendamentoSchema
+      }
+    );
+
+    if (!agendamentoAtualizado) {
+      return res.status(404).json({ message: 'Agendamento não encontrado para atualização.' });
+    }
+
+    // Lógica Pós-Atualização (Exemplo: se mudar status para "Realizado", ajustar sessões)
+    // Esta lógica pode ser complexa e depende das suas regras de negócio.
+    // Se a função 'atualizarStatusAgendamento' já lida com isso, e o status é atualizado aqui,
+    // pode ser que precise chamar parte dessa lógica ou refatorar.
+    // Por agora, vamos focar na atualização simples dos dados do formulário.
+    // Se o status foi alterado para 'Realizado' através deste formulário,
+    // e você tem uma lógica de débito de sessão de pacote, ela precisaria ser chamada aqui.
+    // Exemplo simplificado:
+    // if (dadosDoFormulario.status === 'Realizado' && agendamentoAtualizado.pacote) {
+    //   // Lógica para decrementar sessão do pacote do cliente
+    //   // (seria preciso buscar o cliente, o pacote do cliente, decrementar e salvar)
+    //   console.log('Status mudou para Realizado, lógica de sessão de pacote a ser implementada aqui se necessário.');
+    // }
+
+    res.status(200).json(agendamentoAtualizado);
+
+  } catch (error) {
+    console.error('Erro ao atualizar agendamento (completo):', error);
+
+    if (error.name === 'ValidationError') {
+      const mensagens = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message,
+      }));
+      return res.status(400).json({
+        message: 'Dados inválidos na atualização do agendamento. Verifique os campos.',
+        details: mensagens,
+      });
+    }
+    if (error.name === 'CastError') {
+      return res.status(400).json({ message: 'ID do agendamento inválido para atualização.', details: error.message });
+    }
+    // Adicionar tratamento para chave duplicada se houver campos únicos no agendamento (menos comum)
+    // if (error.code === 11000) { ... } 
+
+    res.status(500).json({
+      message: 'Erro interno ao atualizar o agendamento.',
+      details: error.message,
+    });
+  }
+};
 
     const novoAgendamento = new Agendamento({
       cliente: clienteId,
@@ -150,5 +214,6 @@ module.exports = {
   getAllAgendamentos,
   getAgendamento,
   atualizarStatusAgendamento,
-  deleteAgendamento
+  deleteAgendamento,
+  atualizarAgendamento,
 };

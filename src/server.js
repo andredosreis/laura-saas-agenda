@@ -4,6 +4,7 @@ const connectDB = require('./config/db');
 const cors = require('cors');
 const logger = require('./middlewares/requestLogger');
 const errorHandler = require('./middlewares/errorHandler');
+const validateObjectId = require('../middlewares/validateObjectId');
 
 
 
