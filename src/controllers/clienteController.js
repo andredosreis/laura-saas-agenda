@@ -1,6 +1,8 @@
 const Cliente = require('../models/Clientes');
 const Pacote = require('../models/Pacote');
+console.log('CONTROLLER: Tentando carregar agendamentoController.js')
 const Agendamento = require('../models/Agendamento');
+console.log('CONTROLLER: Modelo Agendamento deveria ter sido carregado aqui.')
 
 // Listar todos os clientes
 exports.getAllClientes = async (req, res) => {

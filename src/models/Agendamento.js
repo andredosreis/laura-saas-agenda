@@ -1,5 +1,15 @@
 const mongoose = require('mongoose');
+console.log('CONTROLLER: Iniciando carregamento de agendamentoController.js');
 
+let Agendamento;
+try {
+  console.log('CONTROLLER: Tentando fazer require de ../models/Agendamento');
+  Agendamento = require('../models/Agendamento');
+  console.log('CONTROLLER: Modelo Agendamento CARREGADO COM SUCESSO');
+} catch (err) {
+  console.error('CONTROLLER: FALHA AO FAZER REQUIRE DE AGENDAMENTO:', err);
+  throw err; // Importante para parar a execução se o modelo não carregar
+}
 const agendamentoSchema = new mongoose.Schema({
   cliente: {
     type: mongoose.Schema.Types.ObjectId,

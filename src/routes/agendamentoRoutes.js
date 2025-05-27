@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const agendamentoController = require('../controllers/agendamentoController');
+console.log('DIAGNÓSTICO ROUTER - agendamentoController é:', agendamentoController);
 
 // Criar agendamento
 router.post('/', agendamentoController.createAgendamento);
@@ -22,6 +23,6 @@ router.put(
   agendamentoController.atualizarAgendamento // Usaremos uma função chamada 'atualizarAgendamento' no controller
 );
 // Deletar agendamento
-router.delete('/:id', agendamentoController.deleteAgendamento);
+router.delete('/:id', agendamentoController.deletarAgendamento);
 
 module.exports = router;

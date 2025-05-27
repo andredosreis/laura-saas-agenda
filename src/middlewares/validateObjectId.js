@@ -1,6 +1,7 @@
 // src/middlewares/validateObjectId.js
 const mongoose = require('mongoose');
 
+
 // Middleware que valida se req.params.id é um ObjectId válido
 module.exports = (req, res, next) => {
   const { id } = req.params;
