@@ -1,6 +1,6 @@
 // src/controllers/agendamentoController.js
-console.log('CONTROLLER: Iniciando carregamento de agendamentoController.js');
-
+/*console.log('CONTROLLER: Iniciando carregamento de agendamentoController.js');
+*/
 let Agendamento; // Declarar fora para que seja acessível em todo o módulo
 try {
   console.log('CONTROLLER (agendamentoCtrl): Tentando fazer require de ../models/Agendamento');

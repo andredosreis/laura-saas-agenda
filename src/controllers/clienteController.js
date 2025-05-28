@@ -1,5 +1,5 @@
 // src/controllers/clienteController.js
-console.log('CONTROLLER: Iniciando carregamento de clienteController.js');
+
 
 let Agendamento;
 try {
