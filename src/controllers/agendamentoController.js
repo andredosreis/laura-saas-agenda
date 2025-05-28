@@ -3,18 +3,15 @@ console.log('CONTROLLER: Iniciando carregamento de agendamentoController.js');
 
 let Agendamento; // Declarar fora para que seja acessível em todo o módulo
 try {
-  console.log('CONTROLLER: Tentando fazer require de ../models/Agendamento');
+  console.log('CONTROLLER (agendamentoCtrl): Tentando fazer require de ../models/Agendamento');
   Agendamento = require('../models/Agendamento'); // Atribui à variável do escopo superior
-  console.log('CONTROLLER: Modelo Agendamento CARREGADO COM SUCESSO');
+  console.log('CONTROLLER (agendamentoCtrl): Modelo Agendamento CARREGADO COM SUCESSO');
 } catch (err) {
-  console.error('CONTROLLER: FALHA AO FAZER REQUIRE DE AGENDAMENTO:', err);
-  // Se não conseguir carregar o modelo Agendamento, não adianta continuar.
-  // Lançar o erro impede que o controller seja carregado incorretamente.
-  throw err;
+  console.error('CONTROLLER (agendamentoCtrl): FALHA AO FAZER REQUIRE DE AGENDAMENTO:', err);
+  throw err; // Re-lança o erro para parar o processo
 }
 
-// Os outros modelos podem ser importados normalmente
-const Cliente = require('../models/Clientes');
+const Cliente = require('../models/Clientes'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
 const Pacote = require('../models/Pacote');
 
 // 1. Criar novo agendamento
@@ -36,7 +33,6 @@ const createAgendamento = async (req, res) => {
       if (!pacote) {
         return res.status(404).json({ message: 'Pacote não encontrado.' });
       }
-      // Lógica de sessões se um pacote for selecionado
       if ((!servicoAvulsoNome || servicoAvulsoNome.trim() === '') && (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0)) {
         return res.status(400).json({ 
           message: 'Cliente não possui sessões disponíveis no pacote ou o campo sessoesRestantes não está definido no modelo Cliente.' 
@@ -49,7 +45,7 @@ const createAgendamento = async (req, res) => {
       pacote: pacoteId || null,
       dataHora,
       observacoes,
-      status: status || 'Agendado',
+      status: status || 'Agendado', // Seu schema padroniza para 'AGENDADO', então pode ser redundante
       servicoAvulsoNome: servicoAvulsoNome || null,
       servicoAvulsoValor: servicoAvulsoValor || null,
     });
@@ -149,9 +145,11 @@ const atualizarStatusAgendamento = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    const statusValidos = ['Agendado', 'Confirmado', 'Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu']; 
-    if (!status || !statusValidos.includes(status)) {
-      return res.status(400).json({ message: 'Status fornecido é inválido.', statusValidos });
+    // A sua lista de status válidos do schema Agendamento.js é: ['AGENDADO', 'CONCLUIDO', 'CANCELADO']
+    // Ajuste esta lista se tiver mais status válidos que a Laura usa.
+    const statusValidos = ['AGENDADO', 'CONCLUIDO', 'CANCELADO', 'Confirmado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu']; 
+    if (!status || !statusValidos.includes(status.toUpperCase())) { // Garante comparação em maiúsculas
+      return res.status(400).json({ message: 'Status fornecido é inválido.', statusRecebido: status, statusValidos });
     }
 
     const agendamento = await Agendamento.findById(id);
@@ -160,33 +158,35 @@ const atualizarStatusAgendamento = async (req, res) => {
     }
 
     const statusAnterior = agendamento.status;
-    if (statusAnterior !== status) {
+    const novoStatusUpper = status.toUpperCase(); // Trabalhar com status em maiúsculas
+
+    if (statusAnterior !== novoStatusUpper) {
         if (agendamento.pacote && (agendamento.servicoAvulsoNome == null || agendamento.servicoAvulsoNome.trim() === '')) {
             const cliente = await Cliente.findById(agendamento.cliente);
             if (!cliente) {
                 return res.status(404).json({ message: "Cliente associado ao agendamento não encontrado." });
             }
-            if (status === 'Realizado' && statusAnterior !== 'Realizado') {
+            if (novoStatusUpper === 'CONCLUIDO' && statusAnterior !== 'CONCLUIDO') { // Ajustado para 'CONCLUIDO' (maiúsculas)
                 if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
                     return res.status(400).json({ message: 'Cliente não possui sessões de pacote disponíveis para debitar.' });
                 }
                 cliente.sessoesRestantes -= 1;
                 await cliente.save();
             }
-            else if ((status === 'Cancelado Pelo Cliente' || status === 'Cancelado Pelo Salão') && statusAnterior === 'Realizado') {
+            else if ((novoStatusUpper === 'CANCELADO') && statusAnterior === 'CONCLUIDO') { // Ajustado para 'CANCELADO'
                 cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;
                 await cliente.save();
             }
         }
     }
 
-    agendamento.status = status;
+    agendamento.status = novoStatusUpper; // Salva o status em maiúsculas
     await agendamento.save();
     
-    const agendamentoPopuladov2 = await Agendamento.findById(agendamento._id)
+    const agendamentoPopulado = await Agendamento.findById(agendamento._id)
                                       .populate('cliente', 'nome telefone')
                                       .populate('pacote', 'nome');
-    res.status(200).json(agendamentoPopuladov2);
+    res.status(200).json(agendamentoPopulado);
   } catch (error) {
     console.error('Erro ao atualizar status do agendamento:', error);
     if (error.name === 'CastError') {
@@ -206,7 +206,7 @@ const deleteAgendamento = async (req, res) => {
       return res.status(404).json({ message: 'Agendamento não encontrado para deleção.' });
     }
 
-    if (agendamento.pacote && (agendamento.servicoAvulsoNome == null || agendamento.servicoAvulsoNome.trim() === '') && agendamento.status !== 'Realizado') {
+    if (agendamento.pacote && (agendamento.servicoAvulsoNome == null || agendamento.servicoAvulsoNome.trim() === '') && agendamento.status !== 'CONCLUIDO') {
       const cliente = await Cliente.findById(agendamento.cliente);
       if (cliente) {
         cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;

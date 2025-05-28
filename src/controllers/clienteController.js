@@ -1,150 +1,131 @@
-const Cliente = require('../models/Clientes');
+// src/controllers/clienteController.js
+console.log('CONTROLLER: Iniciando carregamento de clienteController.js');
+
+let Agendamento;
+try {
+  console.log('CONTROLLER (clienteCtrl): Tentando fazer require de ../models/Agendamento');
+  Agendamento = require('../models/Agendamento');
+  console.log('CONTROLLER (clienteCtrl): Modelo Agendamento CARREGADO COM SUCESSO');
+} catch (err) {
+  console.error('CONTROLLER (clienteCtrl): FALHA AO FAZER REQUIRE DE AGENDAMENTO:', err);
+  throw err;
+}
+
+const Cliente = require('../models/Clientes'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
 const Pacote = require('../models/Pacote');
-console.log('CONTROLLER: Tentando carregar agendamentoController.js')
-const Agendamento = require('../models/Agendamento');
-console.log('CONTROLLER: Modelo Agendamento deveria ter sido carregado aqui.')
 
 // Listar todos os clientes
-exports.getAllClientes = async (req, res) => {
+const getAllClientes = async (req, res) => { // Mudado de exports. para const
   try {
     const clientes = await Cliente.find().populate('pacote');
     res.status(200).json(clientes);
   } catch (error) {
     console.error('Erro ao listar clientes:', error.message);
-    res.status(500).json({ error: 'Erro interno ao listar clientes.' });
+    res.status(500).json({ message: 'Erro interno ao listar clientes.', details: error.message });
   }
 };
 
 // Criar um novo cliente
-exports.createCliente = async (req, res) => {
+const createCliente = async (req, res) => { // Mudado de exports. para const
   try {
-    // Log dos dados recebidos (para debug)
-    console.log('Dados recebidos:', req.body);
-
+    console.log('Dados recebidos para criar cliente:', req.body);
     const novoCliente = new Cliente(req.body);
     const salvo = await novoCliente.save();
-    
     res.status(201).json(salvo);
   } catch (error) {
     console.error('Erro ao criar cliente:', error);
-
-    // Tratamento específico para erro de duplicidade (unique: true)
     if (error.code === 11000) {
       return res.status(400).json({
-        error: 'Erro de validação',
-        message: 'Já existe um cliente com este telefone.'
+        message: 'Já existe um cliente com este telefone ou outro campo único.',
+        // details: [{ field: Object.keys(error.keyValue)[0], message: 'Valor duplicado.' }] // Mais genérico
       });
     }
-
-    // Tratamento para erros de validação do Mongoose
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => ({
         field: err.path,
         message: err.message
       }));
-      
-      return res.status(400).json({
-        error: 'Erro de validação',
-        message: 'Dados inválidos',
-        details: errors
-      });
+      return res.status(400).json({ message: 'Dados inválidos ao criar cliente.', details: errors });
     }
-
-    // Erro genérico
-    res.status(500).json({
-      error: 'Erro ao criar cliente',
-      message: error.message
-    });
+    res.status(500).json({ message: 'Erro interno ao criar cliente.', details: error.message });
   }
 };
+
 // Buscar um cliente pelo ID
-exports.buscarClientePorId = async (req, res) => {
+const buscarClientePorId = async (req, res) => { // Mudado de exports. para const
   try {
     const cliente = await Cliente.findById(req.params.id).populate('pacote');
-
     if (!cliente) {
-      return res.status(404).json({ error: 'Cliente não encontrado.' });
+      return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
-
     res.status(200).json(cliente);
   } catch (error) {
-    console.error('Erro ao buscar cliente:', error.message);
-    res.status(400).json({ error: 'Erro ao buscar cliente.' });
+    console.error('Erro ao buscar cliente por ID:', error.message);
+     if (error.name === 'CastError') {
+        return res.status(400).json({ message: 'ID do cliente inválido.', details: error.message });
+    }
+    res.status(500).json({ message: 'Erro interno ao buscar cliente.', details: error.message });
   }
 };
-// No teu src/controllers/clienteController.js
 
-exports.atualizarCliente = async (req, res) => {
+// Atualizar um cliente pelo ID
+const atualizarCliente = async (req, res) => { // Mudado de exports. para const
   try {
     const clienteAtualizado = await Cliente.findByIdAndUpdate(
       req.params.id,
       req.body,
-      {
-        new: true, // Retorna o documento atualizado
-        runValidators: true, // MUITO IMPORTANTE: Força o Mongoose a rodar as validações do schema
-      }
-    );
+      { new: true, runValidators: true }
+    ).populate('pacote');
 
     if (!clienteAtualizado) {
-      return res.status(404).json({ message: 'Cliente não encontrado.' });
+      return res.status(404).json({ message: 'Cliente não encontrado para atualização.' });
     }
     res.status(200).json(clienteAtualizado);
   } catch (error) {
-    console.error('Erro ao atualizar cliente:', error); // Para debug no servidor
-
+    console.error('Erro ao atualizar cliente:', error);
     if (error.name === 'ValidationError') {
-      // Erro de validação do Mongoose
-      const mensagens = Object.values(error.errors).map(err => ({
-        field: err.path, // Campo que falhou na validação
-        message: err.message // Mensagem de erro específica do schema
-      }));
-      return res.status(400).json({
-        message: 'Dados inválidos. Verifique os campos e tente novamente.',
-        details: mensagens // Array com os detalhes de cada campo que falhou
-      });
+      const mensagens = Object.values(error.errors).map(err => ({ field: err.path, message: err.message }));
+      return res.status(400).json({ message: 'Dados inválidos na atualização.', details: mensagens });
     }
-
     if (error.code === 11000) {
-      // Erro de chave duplicada (ex: telefone único)
-      // Extrai o campo que causou a duplicidade (pode variar um pouco dependendo da versão do Mongoose/MongoDB)
       const field = Object.keys(error.keyValue)[0];
       return res.status(400).json({
-        message: `O campo ${field} informado já existe no sistema.`,
+        message: `Na atualização, o campo ${field} com valor '${error.keyValue[field]}' já existe.`,
         details: [{ field, message: `O ${field} '${error.keyValue[field]}' já está em uso.` }]
       });
     }
-
-    // Outros erros
-    res.status(500).json({ message: 'Erro interno ao atualizar o cliente.' });
+     if (error.name === 'CastError') {
+        return res.status(400).json({ message: 'ID do cliente inválido para atualização.', details: error.message });
+    }
+    res.status(500).json({ message: 'Erro interno ao atualizar o cliente.', details: error.message });
   }
 };
 
 // Deletar um cliente pelo ID
-exports.deletarCliente = async (req, res) => {
+const deletarCliente = async (req, res) => { // Mudado de exports. para const
   try {
     const clienteId = req.params.id;
-
-    // 1. Opcional, mas bom: Verificar se o cliente existe
     const clienteParaDeletar = await Cliente.findById(clienteId);
     if (!clienteParaDeletar) {
       return res.status(404).json({ message: 'Cliente não encontrado para deleção.' });
     }
-
-    // 2. Deletar todos os agendamentos associados a este cliente
     const resultadoDelecaoAgendamentos = await Agendamento.deleteMany({ cliente: clienteId });
-    // Log para o servidor (podes remover depois de testar)
-    console.log(`Para o cliente ${clienteId}, foram deletados ${resultadoDelecaoAgendamentos.deletedCount} agendamentos.`);
-
-    // 3. Deletar o cliente
+    console.log(`AGENDAMENTOS DELETADOS (clienteCtrl) para o cliente ${clienteId}: ${resultadoDelecaoAgendamentos.deletedCount}`);
     await Cliente.deleteOne({ _id: clienteId });
-
     res.status(200).json({ message: 'Cliente e seus agendamentos associados foram removidos com sucesso.' });
-
   } catch (error) {
     console.error('Erro ao deletar cliente e seus agendamentos:', error);
-    if (error.name === 'CastError') { // Se o ID fornecido não for um ObjectId válido
+    if (error.name === 'CastError') {
         return res.status(400).json({ message: 'ID do cliente inválido para deleção.', details: error.message });
     }
     res.status(500).json({ message: 'Erro interno ao deletar o cliente.', details: error.message });
   }
+};
+
+module.exports = {
+    getAllClientes,
+    createCliente,
+    buscarClientePorId,
+    atualizarCliente,
+    deletarCliente
 };

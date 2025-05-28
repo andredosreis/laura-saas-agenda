@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const agendamentoController = require('../controllers/agendamentoController');
-console.log('DIAGNÓSTICO ROUTER - agendamentoController é:', agendamentoController);
+console.log('DIAGNÓSTICO ROUTER (agendamentoRoutes) - agendamentoController é:', agendamentoController);
+
+const validateObjectId = require('../middlewares/validateObjectId'); // Adicionado se você for usar
 
 // Criar agendamento
 router.post('/', agendamentoController.createAgendamento);
@@ -10,19 +12,19 @@ router.post('/', agendamentoController.createAgendamento);
 router.get('/', agendamentoController.getAllAgendamentos);
 
 // Buscar um agendamento específico
-router.get('/:id', agendamentoController.getAgendamento);
+router.get('/:id', validateObjectId, agendamentoController.getAgendamento); // Adicionado validateObjectId
 
-// Atualizar status do agendamento
-router.put('/:id/status', agendamentoController.atualizarStatusAgendamento);
+// Atualizar um agendamento completo
 router.put(
   '/:id',
-  // Se você estiver usando o middleware validateObjectId em outras rotas com :id,
-  // é uma boa prática adicioná-lo aqui também.
-  // Se não o tiver ou não quiser usar agora, pode remover a linha abaixo.
-  // validateObjectId, 
-  agendamentoController.atualizarAgendamento // Usaremos uma função chamada 'atualizarAgendamento' no controller
+  validateObjectId, // Adicionado validateObjectId
+  agendamentoController.atualizarAgendamento
 );
+
+// Atualizar status do agendamento
+router.put('/:id/status', validateObjectId, agendamentoController.atualizarStatusAgendamento); // Adicionado validateObjectId
+
 // Deletar agendamento
-router.delete('/:id', agendamentoController.deletarAgendamento);
+router.delete('/:id', validateObjectId, agendamentoController.deleteAgendamento); // Adicionado validateObjectId
 
 module.exports = router;
