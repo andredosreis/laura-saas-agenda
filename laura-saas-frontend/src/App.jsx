@@ -12,6 +12,7 @@ import CriarPacote from './pages/CriarPacote';
 import EditarCliente from './pages/EditarCliente';
 import EditarPacote from './pages/EditarPacote';
 import EditarAgendamento from './pages/EditarAgendamento'; // Corrigido
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
@@ -19,7 +20,7 @@ function App() {
       <Navbar />
       <main>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Dashboard/>} />
           <Route path="/agendamentos" element={<Agendamentos />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/pacotes" element={<Pacotes />} />

@@ -105,6 +105,51 @@ const atualizarAgendamento = async (req, res) => {
   try {
     const { id } = req.params;
     const dadosDoFormulario = req.body;
+    
+    // Buscar o agendamento atual para verificar mudança de status
+    const agendamentoAtual = await Agendamento.findById(id);
+    if (!agendamentoAtual) {
+      return res.status(404).json({ message: 'Agendamento não encontrado para atualização.' });
+    }
+    
+    const statusAnterior = agendamentoAtual.status;
+    const novoStatus = dadosDoFormulario.status;
+    
+    // Verificar se o status mudou para "Realizado" e se é um agendamento de pacote
+    if (novoStatus === 'Realizado' && statusAnterior !== 'Realizado' && 
+        agendamentoAtual.pacote && 
+        (!agendamentoAtual.servicoAvulsoNome || agendamentoAtual.servicoAvulsoNome.trim() === '')) {
+      
+      // Buscar o cliente para atualizar as sessões restantes
+      const cliente = await Cliente.findById(agendamentoAtual.cliente);
+      if (!cliente) {
+        return res.status(404).json({ message: "Cliente associado ao agendamento não encontrado." });
+      }
+      
+      // Verificar se o cliente tem sessões disponíveis
+      if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
+        return res.status(400).json({ message: 'Cliente não possui sessões de pacote disponíveis para debitar.' });
+      }
+      
+      // Diminuir uma sessão
+      cliente.sessoesRestantes -= 1;
+      await cliente.save();
+      console.log(`Sessão debitada do cliente ${cliente.nome}. Sessões restantes: ${cliente.sessoesRestantes}`);
+    }
+    
+    // Verificar se o status mudou de "Realizado" para outro status
+    if (statusAnterior === 'Realizado' && novoStatus !== 'Realizado' && 
+        agendamentoAtual.pacote && 
+        (!agendamentoAtual.servicoAvulsoNome || agendamentoAtual.servicoAvulsoNome.trim() === '')) {
+      
+      // Buscar o cliente para restaurar a sessão
+      const cliente = await Cliente.findById(agendamentoAtual.cliente);
+      if (cliente) {
+        cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;
+        await cliente.save();
+        console.log(`Sessão restaurada para o cliente ${cliente.nome}. Sessões restantes: ${cliente.sessoesRestantes}`);
+      }
+    }
 
     if (dadosDoFormulario.pacoteId === '' || dadosDoFormulario.pacoteId === undefined) {
         dadosDoFormulario.pacoteId = null;
@@ -122,9 +167,6 @@ const atualizarAgendamento = async (req, res) => {
       { new: true, runValidators: true }
     ).populate('cliente', 'nome telefone').populate('pacote', 'nome');
 
-    if (!agendamentoAtualizado) {
-      return res.status(404).json({ message: 'Agendamento não encontrado para atualização.' });
-    }
     res.status(200).json(agendamentoAtualizado);
   } catch (error) {
     console.error('Erro ao atualizar agendamento (completo):', error);
@@ -145,10 +187,9 @@ const atualizarStatusAgendamento = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    // A sua lista de status válidos do schema Agendamento.js é: ['AGENDADO', 'CONCLUIDO', 'CANCELADO']
-    // Ajuste esta lista se tiver mais status válidos que a Laura usa.
-    const statusValidos = ['AGENDADO', 'CONCLUIDO', 'CANCELADO', 'Confirmado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu']; 
-    if (!status || !statusValidos.includes(status.toUpperCase())) { // Garante comparação em maiúsculas
+    // Lista de status válidos, incluindo 'Realizado' (equivalente a 'CONCLUIDO')
+    const statusValidos = ['Agendado', 'Realizado', 'Cancelado', 'Confirmado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu']; 
+    if (!status || !statusValidos.includes(status)) {
       return res.status(400).json({ message: 'Status fornecido é inválido.', statusRecebido: status, statusValidos });
     }
 
@@ -158,29 +199,41 @@ const atualizarStatusAgendamento = async (req, res) => {
     }
 
     const statusAnterior = agendamento.status;
-    const novoStatusUpper = status.toUpperCase(); // Trabalhar com status em maiúsculas
+    const novoStatus = status;
 
-    if (statusAnterior !== novoStatusUpper) {
-        if (agendamento.pacote && (agendamento.servicoAvulsoNome == null || agendamento.servicoAvulsoNome.trim() === '')) {
-            const cliente = await Cliente.findById(agendamento.cliente);
-            if (!cliente) {
-                return res.status(404).json({ message: "Cliente associado ao agendamento não encontrado." });
-            }
-            if (novoStatusUpper === 'CONCLUIDO' && statusAnterior !== 'CONCLUIDO') { // Ajustado para 'CONCLUIDO' (maiúsculas)
-                if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
-                    return res.status(400).json({ message: 'Cliente não possui sessões de pacote disponíveis para debitar.' });
-                }
-                cliente.sessoesRestantes -= 1;
-                await cliente.save();
-            }
-            else if ((novoStatusUpper === 'CANCELADO') && statusAnterior === 'CONCLUIDO') { // Ajustado para 'CANCELADO'
-                cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;
-                await cliente.save();
-            }
+    // Verificar se o status mudou para "Realizado"
+    if (novoStatus === 'Realizado' && statusAnterior !== 'Realizado') {
+      if (agendamento.pacote && (!agendamento.servicoAvulsoNome || agendamento.servicoAvulsoNome.trim() === '')) {
+        const cliente = await Cliente.findById(agendamento.cliente);
+        if (!cliente) {
+          return res.status(404).json({ message: "Cliente associado ao agendamento não encontrado." });
         }
+        
+        // Verificar se o cliente tem sessões disponíveis
+        if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
+          return res.status(400).json({ message: 'Cliente não possui sessões de pacote disponíveis para debitar.' });
+        }
+        
+        // Diminuir uma sessão
+        cliente.sessoesRestantes -= 1;
+        await cliente.save();
+        console.log(`Sessão debitada do cliente ${cliente.nome}. Sessões restantes: ${cliente.sessoesRestantes}`);
+      }
+    }
+    
+    // Verificar se o status mudou de "Realizado" para outro status
+    if (statusAnterior === 'Realizado' && novoStatus !== 'Realizado') {
+      if (agendamento.pacote && (!agendamento.servicoAvulsoNome || agendamento.servicoAvulsoNome.trim() === '')) {
+        const cliente = await Cliente.findById(agendamento.cliente);
+        if (cliente) {
+          cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;
+          await cliente.save();
+          console.log(`Sessão restaurada para o cliente ${cliente.nome}. Sessões restantes: ${cliente.sessoesRestantes}`);
+        }
+      }
     }
 
-    agendamento.status = novoStatusUpper; // Salva o status em maiúsculas
+    agendamento.status = novoStatus;
     await agendamento.save();
     
     const agendamentoPopulado = await Agendamento.findById(agendamento._id)
@@ -206,11 +259,15 @@ const deleteAgendamento = async (req, res) => {
       return res.status(404).json({ message: 'Agendamento não encontrado para deleção.' });
     }
 
-    if (agendamento.pacote && (agendamento.servicoAvulsoNome == null || agendamento.servicoAvulsoNome.trim() === '') && agendamento.status !== 'CONCLUIDO') {
+    // Se o agendamento for de pacote e estiver marcado como Realizado, restaurar a sessão ao cliente
+    if (agendamento.pacote && 
+        (!agendamento.servicoAvulsoNome || agendamento.servicoAvulsoNome.trim() === '') && 
+        agendamento.status === 'Realizado') {
       const cliente = await Cliente.findById(agendamento.cliente);
       if (cliente) {
         cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;
         await cliente.save();
+        console.log(`Sessão restaurada para o cliente ${cliente.nome} ao deletar agendamento. Sessões restantes: ${cliente.sessoesRestantes}`);
       }
     }
 
