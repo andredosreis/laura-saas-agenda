@@ -1,6 +1,12 @@
 // src/controllers/dashboardController.js
-
+const Cliente = require('../models/Clientes');
+const Pacote = require('../models/Pacote'); // Importando Pacote para usar no populate
 const Agendamento = require('../models/Agendamento');
+const { get } = require('mongoose');
+
+
+
+
 // Não precisamos de Cliente e Pacote aqui se o populate já resolve os nomes.
 // Se precisarmos de mais campos ou lógica específica, podemos importá-los.
 
@@ -84,10 +90,83 @@ const getClientesAtendidosSemana = async (req, res) => {
     res.status(500).json({ message: 'Erro interno ao contar clientes atendidos na semana.', details: error.message });
   }
 };
+const getTotaisSistema= async (req, res) => {
+  try {
+    const totalClientes = await Cliente.countDocuments();
+    const totalPacotes = await Pacote.countDocuments();
+    const totalAgendamentos = await Agendamento.countDocuments();
+
+    const agora = new Date();
+    const totalAgendamentosFuturo = await Agendamento.countDocuments({
+      dataHora: {
+        $gte: agora // Contar apenas agendamentos futuros
+      }
+    });
+
+    res.status(200).json({
+      totalClientes,
+      totalPacotes,
+      totalAgendamentos
+    });
+  } catch (error) {
+    console.error('Erro ao buscar totais do sistema:', error);
+    res.status(500).json({ message: 'Erro interno ao buscar totais do sistema.', details: error.message });
+  }
+};
+
+const getClientesComSessoesBaixas = async (req, res) => {
+  try {
+    // Permite personalizar o limite pelo front (ex: ?limite=2)
+    const limite = parseInt(req.query.limite, 10) || 2;
+
+    // Busca todos os clientes com sessoesRestantes <= limite
+    const clientesBaixos = await Cliente.find({
+      sessoesRestantes: { $lte: limite }
+    }).select('nome telefone sessoesRestantes');
+
+    res.status(200).json({
+      total: clientesBaixos.length,
+      clientes: clientesBaixos
+    });
+  } catch (error) {
+    console.error('Erro ao buscar clientes com sessões baixas:', error);
+    res.status(500).json({ message: 'Erro interno ao buscar clientes com sessões baixas.', details: error.message });
+  }
+};
+
+const getProximosAgendamentos = async (req, res) => {
+  try {
+    // Permite personalizar o limite pelo front (?limit=5), padrão 5
+    const limit = parseInt(req.query.limit, 10) || 5;
+    const agora = new Date();
+
+    const agendamentos = await Agendamento.find({
+      dataHora: { $gt: agora }
+    })
+      .populate('cliente', 'nome')
+      .populate('pacote', 'nome')
+      .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
+      .sort({ dataHora: 1 })
+      .limit(limit);
+
+    res.status(200).json({
+      total: agendamentos.length,
+      agendamentos
+    });
+  } catch (error) {
+    console.error('Erro ao buscar próximos agendamentos:', error);
+    res.status(500).json({ message: 'Erro interno ao buscar próximos agendamentos.', details: error.message });
+  }
+};
+
 
 module.exports = {
   getAgendamentosDeHoje,
   getContagemAgendamentosAmanha,
-  getClientesAtendidosSemana
+  getClientesAtendidosSemana,
+  getTotaisSistema,
+  getClientesComSessoesBaixas, 
+  getProximosAgendamentos,
+  // Exportando a nova função
   // Adicionaremos mais funções exportadas aqui
 };

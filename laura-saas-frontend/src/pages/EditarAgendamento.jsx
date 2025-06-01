@@ -1,12 +1,11 @@
-// Em src/pages/EditarAgendamento.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import api from '../services/api'; // Corrigido para importação padrão (verifique seu arquivo api.js)
+import api from '../services/api';
 
 function EditarAgendamento() {
-  const { id } = useParams(); // <<--- ADICIONADO: Pegar o ID da URL
-  const navigate = useNavigate(); // <<--- ADICIONADO: Para navegação
+  const { id } = useParams();
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     clienteId: '',
@@ -16,15 +15,16 @@ function EditarAgendamento() {
     dataHora: '',
     observacoes: '',
     status: 'Agendado',
+    tipoServico: 'pacote' // 'pacote' ou 'avulso'
   });
 
-  // CORRIGIDO: "clientes" em vez de "cleintes"
   const [clientes, setClientes] = useState([]);
   const [pacotes, setPacotes] = useState([]);
+  const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  // ADICIONADO: Estado para controlar o envio do formulário
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [agendamentoOriginal, setAgendamentoOriginal] = useState(null);
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -33,11 +33,15 @@ function EditarAgendamento() {
       try {
         const agendamentoResponse = await api.get(`/agendamentos/${id}`);
         const agendamentoData = agendamentoResponse.data;
+        setAgendamentoOriginal(agendamentoData);
 
         const [clientesResponse, pacotesResponse] = await Promise.all([
           api.get('/clientes'),
           api.get('/pacotes')
         ]);
+
+        // Determinar o tipo de serviço
+        const isAvulso = agendamentoData.servicoAvulsoNome && agendamentoData.servicoAvulsoNome.trim() !== '';
 
         setFormData({
           clienteId: agendamentoData.cliente?._id || agendamentoData.cliente || '',
@@ -47,10 +51,17 @@ function EditarAgendamento() {
           dataHora: agendamentoData.dataHora ? agendamentoData.dataHora.substring(0, 16) : '',
           observacoes: agendamentoData.observacoes || '',
           status: agendamentoData.status || 'Agendado',
+          tipoServico: isAvulso ? 'avulso' : 'pacote'
         });
 
         setClientes(clientesResponse.data || []);
         setPacotes(pacotesResponse.data || []);
+
+        // Carregar dados do cliente selecionado
+        if (agendamentoData.cliente) {
+          const clienteId = agendamentoData.cliente._id || agendamentoData.cliente;
+          await loadClienteData(clienteId);
+        }
 
       } catch (error) {
         console.error('Erro ao carregar dados iniciais para edição do agendamento:', error);
@@ -73,12 +84,107 @@ function EditarAgendamento() {
     }
   }, [id, navigate]);
 
+  // Carregar dados do cliente
+  const loadClienteData = async (clienteId) => {
+    try {
+      const response = await api.get(`/clientes/${clienteId}`);
+      setClienteSelecionado(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar dados do cliente:', error);
+    }
+  };
+
+  // Atualizar cliente selecionado quando mudar a seleção
+  const handleClienteChange = async (clienteId) => {
+    if (!clienteId) {
+      setClienteSelecionado(null);
+      setFormData(prev => ({
+        ...prev,
+        clienteId: '',
+        pacoteId: '',
+        tipoServico: 'avulso'
+      }));
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await loadClienteData(clienteId);
+      
+      // Manter o mesmo pacote se for o mesmo cliente
+      if (clienteId === formData.clienteId) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Se for um cliente diferente
+      if (clienteSelecionado && clienteSelecionado.pacote) {
+        const pacoteId = clienteSelecionado.pacote._id || clienteSelecionado.pacote;
+        setFormData(prev => ({
+          ...prev,
+          clienteId: clienteId,
+          pacoteId: pacoteId,
+          tipoServico: 'pacote'
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          clienteId: clienteId,
+          pacoteId: '',
+          tipoServico: 'avulso'
+        }));
+      }
+    } catch (error) {
+      toast.error('Erro ao carregar dados do cliente');
+      console.error('Erro ao carregar cliente:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Alternar entre pacote e serviço avulso
+  const handleTipoServicoChange = (tipo) => {
+    // Se o cliente já tem pacote e está tentando mudar para 'pacote', não permitimos
+    // O cliente só pode usar o pacote que já tem contratado
+    if (tipo === 'pacote' && clienteSelecionado && !clienteSelecionado.pacote) {
+      toast.warning('Este cliente não possui pacote ativo. Selecione Serviço Avulso.');
+      return;
+    }
+
+    setFormData(prev => {
+      // Se está mudando para 'pacote' e o cliente tem pacote, usamos o pacote do cliente
+      if (tipo === 'pacote' && clienteSelecionado && clienteSelecionado.pacote) {
+        const pacoteId = clienteSelecionado.pacote._id || clienteSelecionado.pacote;
+        return {
+          ...prev,
+          tipoServico: tipo,
+          pacoteId: pacoteId
+        };
+      }
+      
+      // Se está mudando para 'avulso', limpa o pacote
+      return {
+        ...prev,
+        tipoServico: tipo,
+        pacoteId: ''
+      };
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    // Se estiver tentando mudar o pacote e o cliente já tem um pacote contratado, não permitir
+    if (name === 'pacoteId' && clienteSelecionado?.pacote && formData.tipoServico === 'pacote') {
+      toast.warning('Não é possível alterar o pacote contratado. Use Serviço Avulso para outros serviços.');
+      return;
+    }
+    
     setFormData(prevFormData => ({
       ...prevFormData,
       [name]: type === 'checkbox' ? checked : value
     }));
+    
     if (fieldErrors[name]) {
       setFieldErrors(prevErrors => ({
         ...prevErrors,
@@ -87,7 +193,6 @@ function EditarAgendamento() {
     }
   };
 
-  // <<--- ADICIONADA: Função validateForm que estava faltando --- >>
   const validateForm = () => {
     const newErrors = {};
     if (!formData.clienteId) {
@@ -106,33 +211,69 @@ function EditarAgendamento() {
     if (!formData.status || formData.status.trim() === '') {
       newErrors.status = 'Por favor, selecione um status para o agendamento.';
     }
-    // Adicionar outras validações se necessário
+    
+    // Validar campos de serviço avulso
+    if (formData.tipoServico === 'avulso') {
+      if (!formData.pacoteId) {
+        newErrors.pacoteId = 'Por favor, selecione um serviço.';
+      }
+    }
+    
     setFieldErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) { // Agora validateForm() existe
+  const handleStatusChange = async (newStatus) => {
+    setFormData(prev => ({
+      ...prev,
+      status: newStatus
+    }));
+    
+    // Se for uma ação rápida, podemos submeter o formulário automaticamente
+    if (newStatus === 'Realizado' || newStatus.includes('Cancelado')) {
+      const shouldProceed = window.confirm(`Deseja realmente marcar este agendamento como "${newStatus}"?`);
+      if (shouldProceed) {
+        await handleSubmit(null, true, newStatus);
+      }
+    }
+  };
+
+  const handleSubmit = async (e, isQuickAction = false, quickActionStatus = null) => {
+    if (e && !isQuickAction) e.preventDefault();
+    
+    // Se for ação rápida, não validamos o formulário completo
+    if (!isQuickAction && !validateForm()) {
       toast.error('Por favor, corrija os erros indicados no formulário.');
       return;
     }
 
-    setIsSubmitting(true); // Agora setIsSubmitting está definida
-    const dadosParaEnviar = {
+    setIsSubmitting(true);
+    
+    // Se for ação rápida, usamos apenas os dados necessários
+    const dadosParaEnviar = isQuickAction ? {
+      status: quickActionStatus,
       clienteId: formData.clienteId,
-      pacoteId: formData.pacoteId || null,
-      servicoAvulsoNome: formData.servicoAvulsoNome.trim(),
-      servicoAvulsoValor: formData.servicoAvulsoValor !== '' && !isNaN(parseFloat(formData.servicoAvulsoValor)) 
-                          ? parseFloat(formData.servicoAvulsoValor) 
-                          : null,
+      dataHora: formData.dataHora
+    } : {
+      clienteId: formData.clienteId,
+      pacoteId: formData.tipoServico === 'pacote' ? formData.pacoteId : null,
+      servicoAvulsoNome: formData.tipoServico === 'avulso' ? 
+        (pacotes.find(p => p._id === formData.pacoteId)?.nome || formData.servicoAvulsoNome) : '',
+      servicoAvulsoValor: formData.tipoServico === 'avulso' ? 
+        (pacotes.find(p => p._id === formData.pacoteId)?.valor || 
+         (formData.servicoAvulsoValor !== '' && !isNaN(parseFloat(formData.servicoAvulsoValor)) ? 
+          parseFloat(formData.servicoAvulsoValor) : null)) : null,
       dataHora: formData.dataHora,
       observacoes: formData.observacoes.trim(),
       status: formData.status,
     };
-    if (!dadosParaEnviar.pacoteId) delete dadosParaEnviar.pacoteId;
-    if (dadosParaEnviar.servicoAvulsoNome === '') delete dadosParaEnviar.servicoAvulsoNome;
-    if (dadosParaEnviar.servicoAvulsoValor === null) delete dadosParaEnviar.servicoAvulsoValor;
+
+    // Limpar campos vazios ou nulos
+    Object.keys(dadosParaEnviar).forEach(key => {
+      if (dadosParaEnviar[key] === null || dadosParaEnviar[key] === '') {
+        delete dadosParaEnviar[key];
+      }
+    });
 
     try {
       await api.put(`/agendamentos/${id}`, dadosParaEnviar);
@@ -156,7 +297,6 @@ function EditarAgendamento() {
     }
   };
 
-  // <<--- CORRIGIDA E SIMPLIFICADA: Estrutura do JSX --- >>
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
@@ -165,6 +305,9 @@ function EditarAgendamento() {
       </div>
     );
   }
+
+  // Verifica se o cliente tem pacote ativo
+  const clienteTemPacote = clienteSelecionado && clienteSelecionado.pacote;
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -177,139 +320,240 @@ function EditarAgendamento() {
         </button>
 
         <div className="bg-white text-black border border-gray-200 shadow-xl rounded-lg p-6 sm:p-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-8">
-            Editar Agendamento (ID: {id}) {/* Mostrando o ID para referência */}
+          <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-6">
+            Editar Agendamento
           </h1>
           
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Campo Cliente */}
-            <div>
-              <label htmlFor="clienteId" className="block text-sm font-medium text-gray-700">Cliente</label>
-              <select
-                name="clienteId"
-                id="clienteId"
-                value={formData.clienteId}
-                onChange={handleChange}
-                className={`mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${fieldErrors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
-              >
-                <option value="">Selecione um cliente</option>
-                {clientes.map((cliente) => (
-                  <option key={cliente._id} value={cliente._id}>
-                    {cliente.nome}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.clienteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.clienteId}</p>}
-            </div>
-            
-            {/* Campo Data e Hora */}
-            <div>
-              <label htmlFor="dataHora" className="block text-sm font-medium text-gray-700">Data e Hora</label>
-              <input
-                type="datetime-local"
-                name="dataHora"
-                id="dataHora"
-                value={formData.dataHora}
-                onChange={handleChange}
-                className={`mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${fieldErrors.dataHora ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {fieldErrors.dataHora && <p className="mt-1 text-sm text-red-500">{fieldErrors.dataHora}</p>}
-            </div>
-
-            {/* Campo Pacote */}
-            <div>
-              <label htmlFor="pacoteId" className="block text-sm font-medium text-gray-700">Pacote (Opcional)</label>
-              <select
-                name="pacoteId"
-                id="pacoteId"
-                value={formData.pacoteId}
-                onChange={handleChange}
-                className={`mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${fieldErrors.pacoteId ? 'border-red-500' : 'border-gray-300'}`}
-              >
-                <option value="">Nenhum / Definir como Serviço Avulso</option>
-                {pacotes.map((pacote) => (
-                  <option key={pacote._id} value={pacote._id}>
-                    {pacote.nome} ({pacote.sessoes} sessões)
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.pacoteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.pacoteId}</p>}
-            </div>
-
-            {/* Campo Nome do Serviço Avulso */}
-            <div>
-              <label htmlFor="servicoAvulsoNome" className="block text-sm font-medium text-gray-700">Nome do Serviço Avulso (se não for pacote)</label>
-              <input
-                type="text"
-                name="servicoAvulsoNome"
-                id="servicoAvulsoNome"
-                value={formData.servicoAvulsoNome}
-                onChange={handleChange}
-                placeholder="Ex: Limpeza de Pele Profunda"
-                className={`mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${fieldErrors.servicoAvulsoNome ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {fieldErrors.servicoAvulsoNome && <p className="mt-1 text-sm text-red-500">{fieldErrors.servicoAvulsoNome}</p>}
-            </div>
-
-            {/* Campo Valor do Serviço Avulso */}
-            <div>
-              <label htmlFor="servicoAvulsoValor" className="block text-sm font-medium text-gray-700">Valor do Serviço Avulso (€)</label>
-              <input
-                type="number"
-                name="servicoAvulsoValor"
-                id="servicoAvulsoValor"
-                value={formData.servicoAvulsoValor}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                placeholder="Ex: 35.50"
-                className={`mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${fieldErrors.servicoAvulsoValor ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {fieldErrors.servicoAvulsoValor && <p className="mt-1 text-sm text-red-500">{fieldErrors.servicoAvulsoValor}</p>}
-            </div>
-            
-            {/* Campo Status do Agendamento */}
-            <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status do Agendamento</label>
-              <select
-                name="status"
-                id="status"
-                value={formData.status}
-                onChange={handleChange}
-                className={`mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${fieldErrors.status ? 'border-red-500' : 'border-gray-300'}`}
-              >
-                <option value="Agendado">Agendado</option>
-                <option value="Confirmado">Confirmado pelo Cliente</option>
-                <option value="Realizado">Realizado</option>
-                <option value="Cancelado Pelo Cliente">Cancelado Pelo Cliente</option>
-                <option value="Cancelado Pelo Salão">Cancelado Pelo Salão</option>
-                <option value="Não Compareceu">Não Compareceu (No-Show)</option>
-              </select>
-              {fieldErrors.status && <p className="mt-1 text-sm text-red-500">{fieldErrors.status}</p>}
-            </div>
-
-            {/* Campo Observações */}
-            <div>
-              <label htmlFor="observacoes" className="block text-sm font-medium text-gray-700">Observações (Opcional)</label>
-              <textarea
-                name="observacoes"
-                id="observacoes"
-                rows="3"
-                value={formData.observacoes}
-                onChange={handleChange}
-                placeholder="Ex: Cliente prefere produto X, chegar 10 minutos antes, etc."
-                className="mt-1 block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring-amber-500 border-gray-300"
-              ></textarea>
-            </div>
-
-            {/* Botão de Submissão */}
+          {/* Botões de Ação Rápida */}
+          <div className="mb-8 flex flex-wrap gap-2 justify-center">
             <button
-              type="submit"
-              disabled={isSubmitting || isLoading}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
+              type="button"
+              onClick={() => handleStatusChange('Realizado')}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors"
             >
-              {isSubmitting ? 'Salvando alterações...' : 'Salvar Alterações'}
+              ✓ Marcar como Realizado
             </button>
+            <button
+              type="button"
+              onClick={() => handleStatusChange('Cancelado Pelo Cliente')}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition-colors"
+            >
+              ✗ Cancelar (Cliente)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleStatusChange('Cancelado Pelo Salão')}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors"
+            >
+              ✗ Cancelar (Salão)
+            </button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Seção 1: Informações Básicas */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Informações Básicas</h2>
+              
+              {/* Campo Cliente */}
+              <div className="mb-4">
+                <label htmlFor="clienteId" className="block text-sm font-medium text-gray-700 mb-1">
+                  Cliente <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="clienteId"
+                  id="clienteId"
+                  value={formData.clienteId}
+                  onChange={(e) => handleClienteChange(e.target.value)}
+                  disabled={isSubmitting}
+                  className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Selecione um cliente</option>
+                  {clientes.map((cliente) => (
+                    <option key={cliente._id} value={cliente._id}>
+                      {cliente.nome}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.clienteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.clienteId}</p>}
+              </div>
+              
+              {/* Informações do cliente selecionado */}
+              {clienteSelecionado && (
+                <div className="p-3 bg-blue-50 rounded-lg mb-4 border border-blue-100">
+                  <p className="text-sm text-blue-800 font-medium">
+                    Cliente: {clienteSelecionado.nome}
+                  </p>
+                  {clienteTemPacote && (
+                    <>
+                      <p className="text-sm text-blue-800">
+                        Pacote atual: {clienteSelecionado.pacote.nome}
+                      </p>
+                      <p className="text-sm text-blue-800">
+                        Sessões restantes: {clienteSelecionado.sessoesRestantes}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Campo Data e Hora */}
+              <div>
+                <label htmlFor="dataHora" className="block text-sm font-medium text-gray-700 mb-1">
+                  Data e Hora <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  name="dataHora"
+                  id="dataHora"
+                  value={formData.dataHora}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                  className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.dataHora ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {fieldErrors.dataHora && <p className="mt-1 text-sm text-red-500">{fieldErrors.dataHora}</p>}
+              </div>
+            </div>
+          
+            {/* Seção 2: Detalhes do Serviço */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Detalhes do Serviço</h2>
+
+              {/* Tipo de Serviço (Radio buttons) */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Serviço <span className="text-red-500">*</span>
+                </label>
+                <div className="flex space-x-4">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="tipoPacote"
+                      name="tipoServico"
+                      value="pacote"
+                      checked={formData.tipoServico === 'pacote'}
+                      onChange={() => handleTipoServicoChange('pacote')}
+                      disabled={!clienteTemPacote || isSubmitting}
+                      className={`h-4 w-4 ${!clienteTemPacote ? 'opacity-50 cursor-not-allowed' : ''} text-amber-600 focus:ring-amber-500 border-gray-300`}
+                    />
+                    <label
+                      htmlFor="tipoPacote"
+                      className={`ml-2 text-sm ${!clienteTemPacote ? 'text-gray-400' : 'text-gray-700'}`}
+                    >
+                      Usar Pacote Contratado
+                      {!clienteTemPacote && <span className="text-xs ml-1">(Cliente sem pacote)</span>}
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="tipoAvulso"
+                      name="tipoServico"
+                      value="avulso"
+                      checked={formData.tipoServico === 'avulso'}
+                      onChange={() => handleTipoServicoChange('avulso')}
+                      disabled={isSubmitting}
+                      className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300"
+                    />
+                    <label htmlFor="tipoAvulso" className="ml-2 text-sm text-gray-700">
+                      Serviço Avulso
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Campo Pacote/Serviço */}
+              <div>
+                <label htmlFor="pacoteId" className="block text-sm font-medium text-gray-700 mb-1">
+                  {formData.tipoServico === 'pacote' ? 'Pacote Contratado' : 'Serviço'} <span className="text-red-500">*</span>
+                </label>
+
+                {/* Se for pacote e o cliente tem pacote, mostramos o pacote fixo */}
+                {formData.tipoServico === 'pacote' && clienteTemPacote ? (
+                  <div className="p-2 bg-gray-100 border border-gray-300 rounded text-gray-700">
+                    {clienteSelecionado.pacote.nome}
+                  </div>
+                ) : (
+                  /* Se for serviço avulso ou cliente sem pacote, mostramos seleção de serviços */
+                  <select
+                    name="pacoteId"
+                    id="pacoteId"
+                    value={formData.pacoteId}
+                    onChange={handleChange}
+                    disabled={isSubmitting || (formData.tipoServico === 'pacote' && clienteTemPacote)}
+                    className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.pacoteId ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">Selecione um serviço</option>
+                    {pacotes.map((pacote) => (
+                      <option key={pacote._id} value={pacote._id}>
+                        {pacote.nome} - {pacote.valor} R$
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {fieldErrors.pacoteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.pacoteId}</p>}
+              </div>
+            </div>
+
+            {/* Seção 3: Observações e Status */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Detalhes Adicionais</h2>
+
+              {/* Campo Observações */}
+              <div className="mb-4">
+                <label htmlFor="observacoes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações (opcional)
+                </label>
+                <textarea
+                  name="observacoes"
+                  id="observacoes"
+                  value={formData.observacoes}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                  className="block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 border-gray-300"
+                  rows="3"
+                  placeholder="Ex: Cliente quer massagem com pressão leve."
+                ></textarea>
+              </div>
+
+              {/* Campo Status */}
+              <div>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="status"
+                  id="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                  className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.status ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="Agendado">Agendado</option>
+                  <option value="Confirmado">Confirmado</option>
+                  <option value="Realizado">Realizado</option>
+                  <option value="Cancelado Pelo Cliente">Cancelado Pelo Cliente</option>
+                  <option value="Cancelado Pelo Salão">Cancelado Pelo Salão</option>
+                </select>
+                {fieldErrors.status && <p className="mt-1 text-sm text-red-500">{fieldErrors.status}</p>}
+              </div>
+            </div>
+
+            {/* Botão de Salvar */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full py-3 px-4 rounded-md font-semibold text-white transition-colors ${
+                  isSubmitting ? 'bg-amber-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500'
+                }`}
+              >
+                {isSubmitting ? 'A guardar...' : 'Salvar Alterações'}
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -318,3 +562,4 @@ function EditarAgendamento() {
 }
 
 export default EditarAgendamento;
+

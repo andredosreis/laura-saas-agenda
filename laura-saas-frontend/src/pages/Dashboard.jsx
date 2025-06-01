@@ -13,11 +13,13 @@ function Dashboard() {
 
   //Estado para armazenar os dados do dashboard
   const [agendamentosHoje, setAgendamentosHoje] = useState([]); // Estado para agendamentos de hoje
-  // const [agendamento, setAgendamentos] = useState([]); // Removido ou renomear se for para outro propósito
-  // const [contagemAmanha, setContagemAmanha] = useState(0); // Removido - não utilizado no trecho
-  // const [concluidosSemana, setConcluidosSemana] = useState(0); // Removido - não utilizado no trecho
-  // const [alertaSessoes, setAlertaSessoes] = useState([]); // Removido - não utilizado no trecho
+  const [agendamento, setAgendamentos] = useState([]); // Removido ou renomear se for para outro propósito
+  const [contagemAmanha, setContagemAmanha] = useState(0); // Removido - não utilizado no trecho
+  const [concluidosSemana, setConcluidosSemana] = useState(0); // Removido - não utilizado no trecho
+  const [alertaSessoes, setAlertaSessoes] = useState([]); // Removido - não utilizado no trecho
   const [isLoading, setIsLoading] = useState(true);
+  const [totais, setTotais] = useState({});
+
 
   //vamos fazer o fetch dos dados do dashboard
   useEffect (() => {
@@ -119,8 +121,33 @@ function Dashboard() {
       </div>
 
       {/* Aqui adicionaremos os outros cards/widgets depois */}
-
-    </div> // Fechamento da div principal do dashboard
+      
+      
+    </div>
+    
   );
 }
+
+// Função e useEffect para buscar totais do dashboard
+useEffect(() => {
+  const fetchTotais = async () => {
+    try {
+      const response = await api.get('/dashboard/totais');
+      setTotais(response.data || {});
+    } catch (error) {
+      // toast.error("Erro ao buscar totais");
+    }
+  };
+  fetchTotais();
+
+}, []);
+<div className="bg-white p-6 rounded-xl shadow-lg mb-8">
+  <h2 className="text-2xl font-semibold text-gray-700 mb-4">📊 Totais do Sistema</h2>
+  <p>Clientes: {totais.totalClientes ?? 0}</p>
+  <p>Pacotes: {totais.totalPacotes ?? 0}</p>
+  <p>Agendamentos: {totais.totalAgendamentos ?? 0}</p>
+</div>
+
+
+
 export default Dashboard;
