@@ -14,7 +14,7 @@ router.get('/agendamentoshoje', dashboardController.getAgendamentosDeHoje);
  router.get('/totais', dashboardController.getTotaisSistema);
  router.get('/sessoes-baixas', dashboardController.getClientesComSessoesBaixas);
  router.get('/proximos-agendamentos', dashboardController.getProximosAgendamentos);
-
+router.get('/agendamentosAmanha', dashboardController.getAgendamentosAmanha);
 
 
 module.exports = router;
