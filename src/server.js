@@ -6,9 +6,12 @@ const logger = require('./middlewares/requestLogger');
 const errorHandler = require('./middlewares/errorHandler');
 const validateObjectId = require('./middlewares/validateObjectId');
 
-
-
 const app = express();
+app.use(cors({
+  origin: ['https://laura-frontend.vercel.app'],
+  credentials: true,
+}));
+
 
 // Middleware
 app.use(express.json());
