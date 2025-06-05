@@ -8,7 +8,7 @@ const validateObjectId = require('./middlewares/validateObjectId');
 
 const app = express();
 app.use(cors({
-  origin: ['laura-saas-agenda-mfqt.vercel.app'],
+  origin: ['https://laura-saas-agenda-mfqt.vercel.app'],
   credentials: true,
 }));
 
@@ -16,7 +16,7 @@ app.use(cors({
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+//app.use(cors());
 app.use(logger);
 app.use(errorHandler);
 
