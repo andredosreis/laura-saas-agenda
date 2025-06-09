@@ -27,7 +27,7 @@ app.use('/api/agendamentos', require('./routes/agendamentoRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'))
 //app.use('/api/financeiro', require('./routes/financeiroRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
-
+app.use('/api/whatsapp', require('./routes/whatsappRoutes'));
 
 
 // Routes test
