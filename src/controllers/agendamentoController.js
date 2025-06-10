@@ -1,4 +1,5 @@
 // src/controllers/agendamentoController.js
+
 /*console.log('CONTROLLER: Iniciando carregamento de agendamentoController.js');
 */
 let Agendamento; // Declarar fora para que seja acessível em todo o módulo
@@ -13,48 +14,71 @@ try {
 
 const Cliente = require('../models/Clientes'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
 const Pacote = require('../models/Pacote');
+const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage'); // Importa a função de envio de WhatsApp
 
 // 1. Criar novo agendamento
 const createAgendamento = async (req, res) => {
   try {
     const { clienteId, pacoteId, dataHora, observacoes, status, servicoAvulsoNome, servicoAvulsoValor } = req.body;
 
+    // 1. Validações iniciais
     if (!clienteId || !dataHora || !status) {
         return res.status(400).json({ message: "Cliente, data/hora e status são obrigatórios." });
     }
     
+    // 2. Buscar o cliente
     const cliente = await Cliente.findById(clienteId);
     if (!cliente) {
       return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
 
-    if (pacoteId) {
+    // 3. Lógica para agendamento com pacote (verificação de sessões)
+    // Se for agendamento com pacote E NÃO for serviço avulso, verifica sessões.
+    if (pacoteId && (!servicoAvulsoNome || servicoAvulsoNome.trim() === '')) {
       const pacote = await Pacote.findById(pacoteId);
       if (!pacote) {
         return res.status(404).json({ message: 'Pacote não encontrado.' });
       }
-      if ((!servicoAvulsoNome || servicoAvulsoNome.trim() === '') && (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0)) {
+      if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
         return res.status(400).json({ 
-          message: 'Cliente não possui sessões disponíveis no pacote ou o campo sessoesRestantes não está definido no modelo Cliente.' 
+          message: 'Cliente não possui sessões disponíveis no pacote.' 
         });
       }
+      // NOTA: A lógica de decrementar a sessão deve ocorrer quando o agendamento é 'Realizado',
+      // não na criação. Seu código já faz isso em atualizarAgendamento/atualizarStatusAgendamento.
     }
     
+    // 4. Cria o novo agendamento
     const novoAgendamento = new Agendamento({
       cliente: clienteId,
       pacote: pacoteId || null,
       dataHora,
       observacoes,
-      status: status || 'Agendado', // Seu schema padroniza para 'AGENDADO', então pode ser redundante
+      status: status || 'Agendado', 
       servicoAvulsoNome: servicoAvulsoNome || null,
       servicoAvulsoValor: servicoAvulsoValor || null,
     });
 
+    // 5. Salva o agendamento no banco de dados
     const agendamentoSalvo = await novoAgendamento.save();
+
+    // 6. ENVIAR MENSAGEM DE CONFIRMAÇÃO VIA WHATSAPP (AQUI É O LUGAR CERTO!)
+    // Esta parte é executada uma única vez após o agendamento ser salvo.
+    if (cliente && cliente.telefone) { // Garante que o cliente e o telefone existem
+        const mensagem = `Olá ${cliente.nome}! Seu agendamento na La Estetica Avançada para ${new Date(agendamentoSalvo.dataHora).toLocaleDateString('pt-BR')} às ${new Date(agendamentoSalvo.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} foi confirmado! Qualquer dúvida, responda por aqui.`;
+        
+        // Chama a função de envio de WhatsApp. É uma operação assíncrona, mas não precisa bloquear a resposta da API.
+        sendWhatsAppMessage(cliente.telefone, mensagem)
+            .then(resWhatsapp => console.log('Mensagem de confirmação de agendamento enviada para o WhatsApp:', resWhatsapp))
+            .catch(errWhatsapp => console.error('ERRO ao enviar WhatsApp na criação de agendamento:', errWhatsapp));
+    }
+
+    // 7. Popula o agendamento salvo para retornar dados completos na resposta da API
     const agendamentoPopulado = await Agendamento.findById(agendamentoSalvo._id)
       .populate('cliente', 'nome telefone')
       .populate('pacote', 'nome');
 
+    // 8. Envia a resposta final da API
     res.status(201).json(agendamentoPopulado);
 
   } catch (error) {
