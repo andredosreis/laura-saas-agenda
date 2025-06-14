@@ -17,6 +17,13 @@ const clienteSchema = new mongoose.Schema({
     // Função para limpar o telefone antes de salvar
     set: v => v.replace(/\s+/g, '').trim() // Remove espaços extras
   },
+   email: { // <-- Adicione aqui, se desejar
+    type: String,
+    trim: true,
+    lowercase: true,
+    match: [/^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$/, 'Email inválido.'],
+    sparse: true // Permite valores nulos, mas impõe unicidade para não nulos
+  },
   dataNascimento: {
     type: Date,
     required: [true, 'Data de nascimento é obrigatória'],
@@ -95,7 +102,31 @@ clienteSchema.virtual('idade').get(function() {
   return idade;
 });
 
-// Índices
+clienteSchema.add({
+  // --- CAMPOS DA FICHA DE ANAMNESE ---
+  costumaPermanecerMuitoTempoSentada: { type: Boolean, default: false },
+  alergias: { type: String, trim: true, default: '' },
+  historicoMedico: { type: String, trim: true, default: '' },
+  medicamentosEmUso: { type: String, trim: true, default: '' },
+  antecedentesCirurgicos: { type: String, trim: true, default: '' },
+  cicloMenstrualRegular: { type: String, enum: ['Sim', 'Não', 'N/A', ''], default: '' }, // Adicionei '' para o default se não preenchido
+  usaAnticoncepcional: { type: Boolean, default: false },
+  temHipertensao: { type: Boolean, default: false },
+  temDiabetes: { type: Boolean, default: false },
+  temEpilepsia: { type: Boolean, default: false },
+  temMarcapasso: { type: Boolean, default: false },
+  temMetais: { type: Boolean, default: false },
+  // Campos de observação mais específicos da anamnese
+  qualAlergia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da alergia
+  qualHistorico: { type: String, trim: true, default: '' }, // Campo para "Qual?" do histórico
+  qualMedicamento: { type: String, trim: true, default: '' }, // Campo para "Qual?" do medicamento
+  qualCirurgia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da cirurgia
+  qualAnticoncepcional: { type: String, trim: true, default: '' }, // Campo para "Qual?" do anticoncepcional
+  grauHipertensao: { type: String, trim: true, default: '' }, // Campo para "Grau?" da hipertensão
+  tipoDiabetes: { type: String, trim: true, default: '' }, // Campo para "Tipo?" da diabetes
+  qualEpilepsia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da epilepsia
+  observacoesAdicionaisAnamnese: { type: String, trim: true, default: '' } // Para observações gerais da anamnese
+});
 
 clienteSchema.index({ nome: 1 });
 
