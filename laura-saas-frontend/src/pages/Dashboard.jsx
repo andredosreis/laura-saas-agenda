@@ -58,7 +58,7 @@ function Dashboard() {
   const formatarDataHora = (dataIso) => {
     if (!dataIso) return '';
     const data = new Date(dataIso);
-    return data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+    return data.toLocaleTimeString('pt-PT', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit' });
   };
 
   if (isLoading) {
