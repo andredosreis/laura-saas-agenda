@@ -214,7 +214,7 @@ function Dashboard() {
               <div key={ag._id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
                 <div className="flex justify-between items-center p-2 bg-gray-50 border-b border-gray-100">
                   <span className="font-medium text-gray-700">
-                    {new Date(ag.dataHora).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })} às {formatarDataHora(ag.dataHora)}
+                    {new Date(ag.dataHora).toLocaleDateString('pt-PT', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit' })} às {formatarDataHora(ag.dataHora)}
                   </span>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                     ag.status === 'Realizado' ? 'bg-green-100 text-green-700' :
