@@ -1,4 +1,7 @@
 const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage');
+const Agendamento = require('../models/Agendamento');
+const Cliente = require('../models/Clientes');
+
 const axios = require('axios');
 const qs = require('qs');
 
@@ -40,7 +43,46 @@ async function enviarMensagemDireta(req, res) {
   }
 }
 
+// Enviar mensagem de WhatsApp para clientes com agendamentos amanha
+
+async function notificarAgendamentosAmanha(req, res) {
+  try {
+    const hoje = new Date();
+    const amanha = new Date();
+    amanha.setDate(hoje.getDate() + 1);
+    amanha.setHours(0, 0, 0, 0);
+    const fimAmanha = new Date(amanha);
+    fimAmanha.setHours(23, 59, 59, 999);
+
+    const agendamentos = await Agendamento.find({
+      dataHora: { $gte: amanha, $lte: fimAmanha },
+      status: { $ne: 'Cancelado' }
+    }).populate('cliente');
+
+    const resultados = [];
+
+    for (const ag of agendamentos) {
+      const telefone = ag.cliente?.telefone;
+      if (!telefone) continue;
+
+      const hora = new Date(ag.dataHora).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+
+      const mensagem = `Olá ${ag.cliente.nome}, tudo bem? Este é um lembrete do seu atendimento marcado para amanhã às ${hora}. Qualquer dúvida, estamos à disposição.`;
+
+      const resultado = await sendWhatsAppMessage(telefone, mensagem);
+      resultados.push({ cliente: ag.cliente.nome, status: resultado.success });
+    }
+
+    return res.status(200).json({ ok: true, enviados: resultados.length, detalhes: resultados });
+
+  } catch (error) {
+    console.error('Erro ao enviar lembretes:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+}
+
 module.exports = {
   notificarCliente,
-  enviarMensagemDireta
+  enviarMensagemDireta,
+  notificarAgendamentosAmanha
 };

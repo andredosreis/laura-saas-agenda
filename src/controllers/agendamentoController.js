@@ -65,7 +65,7 @@ const createAgendamento = async (req, res) => {
     // 6. ENVIAR MENSAGEM DE CONFIRMAÇÃO VIA WHATSAPP (AQUI É O LUGAR CERTO!)
     // Esta parte é executada uma única vez após o agendamento ser salvo.
     if (cliente && cliente.telefone) { // Garante que o cliente e o telefone existem
-        const mensagem = `Olá ${cliente.nome}! Seu agendamento na La Estetica Avançada para ${new Date(agendamentoSalvo.dataHora).toLocaleDateString('pt-BR')} às ${new Date(agendamentoSalvo.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} foi confirmado! Qualquer dúvida, responda por aqui.`;
+        const mensagem = `Olá ${cliente.nome}! Seu agendamento na La Estetica Avançada para ${new Date(agendamentoSalvo.dataHora).toLocaleDateString('pt-pt')} às ${new Date(agendamentoSalvo.dataHora).toLocaleTimeString('pt-pt', { hour: '2-digit', minute: '2-digit' })} foi confirmado! Qualquer dúvida, responda por aqui.`;
         
         // Chama a função de envio de WhatsApp. É uma operação assíncrona, mas não precisa bloquear a resposta da API.
         sendWhatsAppMessage(cliente.telefone, mensagem)
