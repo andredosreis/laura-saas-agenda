@@ -1,179 +1,143 @@
 // src/controllers/dashboardController.js
+const { DateTime } = require('luxon');
 const Cliente = require('../models/Clientes');
 const Pacote = require('../models/Pacote');
 const Agendamento = require('../models/Agendamento');
-// const { get } = require('mongoose'); // Removido, pois não estava a ser usado
 
-// Função para buscar agendamentos de hoje para o dashboard
+// Agendamentos de hoje
 const getAgendamentosDeHoje = async (req, res) => {
   try {
-    const hoje = new Date();
-    const inicioDoDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0, 0);
-    const fimDoDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
-
-    // console.log(`Buscando agendamentos entre ${inicioDoDia.toISOString()} e ${fimDoDia.toISOString()}`);
+    const inicioDoDia = DateTime.now().setZone('Europe/Lisbon').startOf('day').toJSDate();
+    const fimDoDia = DateTime.now().setZone('Europe/Lisbon').endOf('day').toJSDate();
 
     const agendamentos = await Agendamento.find({
       dataHora: { $gte: inicioDoDia, $lte: fimDoDia }
     })
-    .populate('cliente', 'nome')
-    .populate('pacote', 'nome')
-    .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
-    .sort({ dataHora: 1 });
+      .populate('cliente', 'nome')
+      .populate('pacote', 'nome')
+      .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
+      .sort({ dataHora: 1 });
 
-    res.status(200).json(agendamentos); // Retorna a lista, frontend pode usar .length para o total
-
+    res.status(200).json(agendamentos);
   } catch (error) {
-    console.error('Erro ao buscar agendamentos de hoje para o dashboard:', error);
     res.status(500).json({ message: 'Erro interno ao buscar agendamentos de hoje.', details: error.message });
   }
 };
 
-// Função para buscar a CONTAGEM de agendamentos de amanhã (para o mini-card)
+// Contagem de agendamentos de amanhã
 const getContagemAgendamentosAmanha = async (req, res) => {
   try {
-    const amanhaDate = new Date();
-    amanhaDate.setDate(amanhaDate.getDate() + 1);
-
-    const inicioDeAmanha = new Date(amanhaDate.getFullYear(), amanhaDate.getMonth(), amanhaDate.getDate(), 0, 0, 0, 0);
-    const fimDeAmanha = new Date(amanhaDate.getFullYear(), amanhaDate.getMonth(), amanhaDate.getDate(), 23, 59, 59, 999);
-
-    // console.log(`Contando agendamentos entre ${inicioDeAmanha.toISOString()} e ${fimDeAmanha.toISOString()}`);
+    const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
+    const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
 
     const contagem = await Agendamento.countDocuments({
       dataHora: { $gte: inicioDeAmanha, $lte: fimDeAmanha }
     });
 
-    res.status(200).json({ contagem: contagem });
-
+    res.status(200).json({ contagem });
   } catch (error) {
-    console.error('Erro ao contar agendamentos de amanhã para o dashboard:', error);
     res.status(500).json({ message: 'Erro interno ao contar agendamentos de amanhã.', details: error.message });
   }
 };
 
-// Função para buscar a LISTA DETALHADA de agendamentos de amanhã (para o card maior)
+// Lista de agendamentos de amanhã
 const getAgendamentosAmanha = async (req, res) => {
   try {
-    const hoje = new Date(); // Usar uma nova instância para não modificar a data de `getContagemAgendamentosAmanha` se forem chamadas próximas
-    const inicioDeAmanha = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1, 0, 0, 0, 0);
-    const fimDeAmanha = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1, 23, 59, 59, 999);
-
-    // console.log(`Buscando LISTA de agendamentos entre ${inicioDeAmanha.toISOString()} e ${fimDeAmanha.toISOString()}`);
+    const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
+    const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
 
     const agendamentos = await Agendamento.find({
       dataHora: { $gte: inicioDeAmanha, $lte: fimDeAmanha }
     })
-    .populate('cliente', 'nome')
-    .populate('pacote', 'nome')
-    .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
-    .sort({ dataHora: 1 });
+      .populate('cliente', 'nome')
+      .populate('pacote', 'nome')
+      .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
+      .sort({ dataHora: 1 });
 
-    res.status(200).json(agendamentos); // Retorna a LISTA
-
+    res.status(200).json(agendamentos);
   } catch (error) {
-    console.error('Erro ao buscar a lista de agendamentos de amanhã:', error);
     res.status(500).json({ message: 'Erro interno ao buscar a lista de agendamentos de amanhã.', details: error.message });
   }
 };
 
-// Função para buscar a contagem de clientes atendidos na semana
+// Clientes atendidos na semana
 const getClientesAtendidosSemana = async (req, res) => {
   try {
-    const hoje = new Date();
-    const fimDoDiaDeHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
-
-    const seteDiasAtras = new Date(hoje);
-    seteDiasAtras.setDate(hoje.getDate() - 7);
-    const inicioDosSeteDias = new Date(seteDiasAtras.getFullYear(), seteDiasAtras.getMonth(), seteDiasAtras.getDate(), 0, 0, 0, 0);
-
-    // console.log(`Contando agendamentos CONCLUIDOS entre ${inicioDosSeteDias.toISOString()} e ${fimDoDiaDeHoje.toISOString()}`);
+    const agora = DateTime.now().setZone('Europe/Lisbon');
+    const fimDoDia = agora.endOf('day').toJSDate();
+    const inicioDosSeteDias = agora.minus({ days: 7 }).startOf('day').toJSDate();
 
     const contagem = await Agendamento.countDocuments({
       status: 'Realizado',
-      dataHora: { $gte: inicioDosSeteDias, $lte: fimDoDiaDeHoje }
+      dataHora: { $gte: inicioDosSeteDias, $lte: fimDoDia }
     });
 
-    res.status(200).json({ contagem: contagem });
-
+    res.status(200).json({ contagem });
   } catch (error) {
-    console.error('Erro ao contar clientes atendidos na semana:', error);
     res.status(500).json({ message: 'Erro interno ao contar clientes atendidos na semana.', details: error.message });
   }
 };
 
-// Função para buscar totais gerais do sistema
+// Totais gerais
 const getTotaisSistema = async (req, res) => {
   try {
     const totalClientes = await Cliente.countDocuments();
-    const totalPacotes = await Pacote.countDocuments(); // Mantido, caso precises para outros fins
+    const totalPacotes = await Pacote.countDocuments();
     const totalAgendamentosGeral = await Agendamento.countDocuments();
+    const agora = DateTime.now().setZone('Europe/Lisbon').toJSDate();
 
-    const agora = new Date();
     const totalAgendamentosFuturos = await Agendamento.countDocuments({
       dataHora: { $gte: agora }
     });
 
     res.status(200).json({
       totalClientes,
-      totalPacotes, // O frontend pode ignorar se não precisar
+      totalPacotes,
       totalAgendamentosGeral,
-      totalAgendamentosFuturos // Adicionado para dar mais opções ao frontend
+      totalAgendamentosFuturos
     });
   } catch (error) {
-    console.error('Erro ao buscar totais do sistema:', error);
     res.status(500).json({ message: 'Erro interno ao buscar totais do sistema.', details: error.message });
   }
 };
 
-// Função para buscar clientes com sessões baixas
+// Clientes com sessões baixas
 const getClientesComSessoesBaixas = async (req, res) => {
   try {
     const limite = parseInt(req.query.limite, 10) || 2;
     const clientesBaixos = await Cliente.find({
       sessoesRestantes: { $lte: limite }
-    }).select('nome telefone sessoesRestantes'); // Adicionei _id implicitamente, é bom para keys no React
+    }).select('nome telefone sessoesRestantes');
 
-    res.status(200).json({
-      total: clientesBaixos.length,
-      clientes: clientesBaixos
-    });
+    res.status(200).json({ total: clientesBaixos.length, clientes: clientesBaixos });
   } catch (error) {
-    console.error('Erro ao buscar clientes com sessões baixas:', error);
     res.status(500).json({ message: 'Erro interno ao buscar clientes com sessões baixas.', details: error.message });
   }
 };
 
-// Função para buscar os próximos X agendamentos
+// Próximos agendamentos
 const getProximosAgendamentos = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 5;
-    const agora = new Date();
+    const agora = DateTime.now().setZone('Europe/Lisbon').toJSDate();
 
-    const agendamentos = await Agendamento.find({
-      dataHora: { $gt: agora }
-    })
+    const agendamentos = await Agendamento.find({ dataHora: { $gt: agora } })
       .populate('cliente', 'nome')
       .populate('pacote', 'nome')
       .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
       .sort({ dataHora: 1 })
       .limit(limit);
 
-    res.status(200).json({ // Retorna o total e a lista
-      total: agendamentos.length,
-      agendamentos
-    });
+    res.status(200).json({ total: agendamentos.length, agendamentos });
   } catch (error) {
-    console.error('Erro ao buscar próximos agendamentos:', error);
     res.status(500).json({ message: 'Erro interno ao buscar próximos agendamentos.', details: error.message });
   }
 };
 
-// Exporta TODAS as funções de uma só vez no final
 module.exports = {
   getAgendamentosDeHoje,
-  getContagemAgendamentosAmanha,    // Para o mini-card (número)
-  getAgendamentosAmanha,            // Para o card detalhado (lista)
+  getContagemAgendamentosAmanha,
+  getAgendamentosAmanha,
   getClientesAtendidosSemana,
   getTotaisSistema,
   getClientesComSessoesBaixas,
