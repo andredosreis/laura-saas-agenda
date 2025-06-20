@@ -3,6 +3,7 @@
 /*console.log('CONTROLLER: Iniciando carregamento de agendamentoController.js');
 */
 let Agendamento; // Declarar fora para que seja acessível em todo o módulo
+const {DateTime} = require('luxon'); // Importa Luxon para manipulação de datas
 try {
   console.log('CONTROLLER (agendamentoCtrl): Tentando fazer require de ../models/Agendamento');
   Agendamento = require('../models/Agendamento'); // Atribui à variável do escopo superior
@@ -15,6 +16,19 @@ try {
 const Cliente = require('../models/Clientes'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
 const Pacote = require('../models/Pacote');
 const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage'); // Importa a função de envio de WhatsApp
+/**
+ * Converte uma string de data local (enviada pelo frontend) para um objeto Date em UTC,
+ * assumindo que a string original estava no fuso horário de Lisboa.
+ * @param {string} dateString - A string de data, ex: "2024-06-20T15:00"
+ * @returns {Date} - O objeto Date correspondente em UTC.
+ */
+const parseDateInLisbon = (dateString) => {
+  if (!dateString) return null;
+  // Diz ao Luxon que a string de data/hora é do fuso 'Europe/Lisbon'
+  const dt = DateTime.fromISO(dateString, { zone: 'Europe/Lisbon' });
+  // Converte para um objeto Date JavaScript padrão (que é sempre em UTC)
+  return dt.toJSDate();
+};
 
 // 1. Criar novo agendamento
 const createAgendamento = async (req, res) => {
@@ -30,6 +44,13 @@ const createAgendamento = async (req, res) => {
     const cliente = await Cliente.findById(clienteId);
     if (!cliente) {
       return res.status(404).json({ message: 'Cliente não encontrado.' });
+    }
+    
+    // --- ALTERAÇÃO AQUI ---
+    // A data recebida é convertida para o fuso horário correto antes de qualquer operação
+    const dataHoraCorrigida = parseDateInLisbon(dataHora);
+    if (!dataHoraCorrigida) {
+        return res.status(400).json({ message: "Formato de data e hora inválido." });
     }
 
     // 3. Lógica para agendamento com pacote (verificação de sessões)
@@ -52,7 +73,9 @@ const createAgendamento = async (req, res) => {
     const novoAgendamento = new Agendamento({
       cliente: clienteId,
       pacote: pacoteId || null,
-      dataHora,
+      // --- ALTERAÇÃO PRINCIPAL ---
+      // Utiliza a variável com a data já corrigida para o fuso horário certo
+      dataHora: dataHoraCorrigida,
       observacoes,
       status: status || 'Agendado', 
       servicoAvulsoNome: servicoAvulsoNome || null,
@@ -65,7 +88,9 @@ const createAgendamento = async (req, res) => {
     // 6. ENVIAR MENSAGEM DE CONFIRMAÇÃO VIA WHATSAPP (AQUI É O LUGAR CERTO!)
     // Esta parte é executada uma única vez após o agendamento ser salvo.
     if (cliente && cliente.telefone) { // Garante que o cliente e o telefone existem
-        const mensagem = `Olá ${cliente.nome}! Seu agendamento na La Estetica Avançada para ${new Date(agendamentoSalvo.dataHora).toLocaleDateString('pt-pt')} às ${new Date(agendamentoSalvo.dataHora).toLocaleTimeString('pt-pt', { hour: '2-digit', minute: '2-digit' })} foi confirmado! Qualquer dúvida, responda por aqui.`;
+        // --- ALTERAÇÃO AQUI ---
+        // Garante que a data exibida na mensagem de WhatsApp também respeite o fuso horário de Lisboa
+        const mensagem = `Olá ${cliente.nome}! Seu agendamento na La Estetica Avançada para ${new Date(agendamentoSalvo.dataHora).toLocaleDateString('pt-pt', { timeZone: 'Europe/Lisbon' })} às ${new Date(agendamentoSalvo.dataHora).toLocaleTimeString('pt-pt', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Lisbon' })} foi confirmado! Qualquer dúvida, responda por aqui.`;
         
         // Chama a função de envio de WhatsApp. É uma operação assíncrona, mas não precisa bloquear a resposta da API.
         sendWhatsAppMessage(cliente.telefone, mensagem)
@@ -128,7 +153,13 @@ const getAgendamento = async (req, res) => {
 const atualizarAgendamento = async (req, res) => {
   try {
     const { id } = req.params;
-    const dadosDoFormulario = req.body;
+    const dadosDoFormulario = { ...req.body };
+    
+    // --- ALTERAÇÃO AQUI ---
+    // Aplica a mesma correção de fuso se o campo dataHora for alterado
+    if (dadosDoFormulario.dataHora) {
+        dadosDoFormulario.dataHora = parseDateInLisbon(dadosDoFormulario.dataHora);
+    }
     
     // Buscar o agendamento atual para verificar mudança de status
     const agendamentoAtual = await Agendamento.findById(id);
