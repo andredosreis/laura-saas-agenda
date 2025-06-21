@@ -16,6 +16,7 @@ try {
 const Cliente = require('../models/Clientes'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
 const Pacote = require('../models/Pacote');
 const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage'); // Importa a função de envio de WhatsApp
+
 /**
  * Converte uma string de data local (enviada pelo frontend) para um objeto Date em UTC,
  * assumindo que a string original estava no fuso horário de Lisboa.
@@ -45,16 +46,13 @@ const createAgendamento = async (req, res) => {
     if (!cliente) {
       return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
-    
-    // --- ALTERAÇÃO AQUI ---
-    // A data recebida é convertida para o fuso horário correto antes de qualquer operação
+
     const dataHoraCorrigida = parseDateInLisbon(dataHora);
     if (!dataHoraCorrigida) {
         return res.status(400).json({ message: "Formato de data e hora inválido." });
     }
 
     // 3. Lógica para agendamento com pacote (verificação de sessões)
-    // Se for agendamento com pacote E NÃO for serviço avulso, verifica sessões.
     if (pacoteId && (!servicoAvulsoNome || servicoAvulsoNome.trim() === '')) {
       const pacote = await Pacote.findById(pacoteId);
       if (!pacote) {
@@ -65,16 +63,12 @@ const createAgendamento = async (req, res) => {
           message: 'Cliente não possui sessões disponíveis no pacote.' 
         });
       }
-      // NOTA: A lógica de decrementar a sessão deve ocorrer quando o agendamento é 'Realizado',
-      // não na criação. Seu código já faz isso em atualizarAgendamento/atualizarStatusAgendamento.
     }
     
-    // 4. Cria o novo agendamento
+    // 4. Cria o novo agendamento com a data corrigida
     const novoAgendamento = new Agendamento({
       cliente: clienteId,
       pacote: pacoteId || null,
-      // --- ALTERAÇÃO PRINCIPAL ---
-      // Utiliza a variável com a data já corrigida para o fuso horário certo
       dataHora: dataHoraCorrigida,
       observacoes,
       status: status || 'Agendado', 
@@ -84,24 +78,26 @@ const createAgendamento = async (req, res) => {
 
     // 5. Salva o agendamento no banco de dados
     const agendamentoSalvo = await novoAgendamento.save();
-
-    // 6. ENVIAR MENSAGEM DE CONFIRMAÇÃO VIA WHATSAPP (AQUI É O LUGAR CERTO!)
-    // Esta parte é executada uma única vez após o agendamento ser salvo.
-    if (cliente && cliente.telefone) { // Garante que o cliente e o telefone existem
-        // --- ALTERAÇÃO AQUI ---
-        // Garante que a data exibida na mensagem de WhatsApp também respeite o fuso horário de Lisboa
-        const mensagem = `Olá ${cliente.nome}! Seu agendamento na La Estetica Avançada para ${new Date(agendamentoSalvo.dataHora).toLocaleDateString('pt-pt', { timeZone: 'Europe/Lisbon' })} às ${new Date(agendamentoSalvo.dataHora).toLocaleTimeString('pt-pt', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Lisbon' })} foi confirmado! Qualquer dúvida, responda por aqui.`;
-        
-        // Chama a função de envio de WhatsApp. É uma operação assíncrona, mas não precisa bloquear a resposta da API.
-        sendWhatsAppMessage(cliente.telefone, mensagem)
-            .then(resWhatsapp => console.log('Mensagem de confirmação de agendamento enviada para o WhatsApp:', resWhatsapp))
-            .catch(errWhatsapp => console.error('ERRO ao enviar WhatsApp na criação de agendamento:', errWhatsapp));
-    }
-
-    // 7. Popula o agendamento salvo para retornar dados completos na resposta da API
+    
+    // --- ALTERAÇÃO IMPORTANTE ---
+    // 6. Popula o agendamento para ter acesso aos nomes do cliente e do pacote para a mensagem
     const agendamentoPopulado = await Agendamento.findById(agendamentoSalvo._id)
       .populate('cliente', 'nome telefone')
       .populate('pacote', 'nome');
+
+    // 7. ENVIAR MENSAGEM DE CONFIRMAÇÃO PERSONALIZADA VIA WHATSAPP
+    if (agendamentoPopulado.cliente && agendamentoPopulado.cliente.telefone) {
+        // --- LÓGICA CORRIGIDA PARA PERSONALIZAR A MENSAGEM ---
+        const nomeDoServico = agendamentoPopulado.pacote?.nome || agendamentoPopulado.servicoAvulsoNome || 'o seu atendimento';
+        const dataFormatada = DateTime.fromJSDate(agendamentoPopulado.dataHora, { zone: 'Europe/Lisbon' }).toFormat('dd/MM/yyyy');
+        const horaFormatada = DateTime.fromJSDate(agendamentoPopulado.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm');
+        
+        const mensagem = `Olá ${agendamentoPopulado.cliente.nome}! A sua sessão de "${nomeDoServico}" foi confirmada para ${dataFormatada} às ${horaFormatada}. Qualquer dúvida, responda por aqui.`;
+        
+        sendWhatsAppMessage(agendamentoPopulado.cliente.telefone, mensagem)
+            .then(resWhatsapp => console.log('Mensagem de confirmação personalizada enviada:', resWhatsapp))
+            .catch(errWhatsapp => console.error('ERRO ao enviar WhatsApp personalizado:', errWhatsapp));
+    }
 
     // 8. Envia a resposta final da API
     res.status(201).json(agendamentoPopulado);
@@ -155,13 +151,10 @@ const atualizarAgendamento = async (req, res) => {
     const { id } = req.params;
     const dadosDoFormulario = { ...req.body };
     
-    // --- ALTERAÇÃO AQUI ---
-    // Aplica a mesma correção de fuso se o campo dataHora for alterado
     if (dadosDoFormulario.dataHora) {
         dadosDoFormulario.dataHora = parseDateInLisbon(dadosDoFormulario.dataHora);
     }
     
-    // Buscar o agendamento atual para verificar mudança de status
     const agendamentoAtual = await Agendamento.findById(id);
     if (!agendamentoAtual) {
       return res.status(404).json({ message: 'Agendamento não encontrado para atualização.' });
@@ -170,34 +163,28 @@ const atualizarAgendamento = async (req, res) => {
     const statusAnterior = agendamentoAtual.status;
     const novoStatus = dadosDoFormulario.status;
     
-    // Verificar se o status mudou para "Realizado" e se é um agendamento de pacote
     if (novoStatus === 'Realizado' && statusAnterior !== 'Realizado' && 
         agendamentoAtual.pacote && 
         (!agendamentoAtual.servicoAvulsoNome || agendamentoAtual.servicoAvulsoNome.trim() === '')) {
       
-      // Buscar o cliente para atualizar as sessões restantes
       const cliente = await Cliente.findById(agendamentoAtual.cliente);
       if (!cliente) {
         return res.status(404).json({ message: "Cliente associado ao agendamento não encontrado." });
       }
       
-      // Verificar se o cliente tem sessões disponíveis
       if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
         return res.status(400).json({ message: 'Cliente não possui sessões de pacote disponíveis para debitar.' });
       }
       
-      // Diminuir uma sessão
       cliente.sessoesRestantes -= 1;
       await cliente.save();
       console.log(`Sessão debitada do cliente ${cliente.nome}. Sessões restantes: ${cliente.sessoesRestantes}`);
     }
     
-    // Verificar se o status mudou de "Realizado" para outro status
     if (statusAnterior === 'Realizado' && novoStatus !== 'Realizado' && 
         agendamentoAtual.pacote && 
         (!agendamentoAtual.servicoAvulsoNome || agendamentoAtual.servicoAvulsoNome.trim() === '')) {
       
-      // Buscar o cliente para restaurar a sessão
       const cliente = await Cliente.findById(agendamentoAtual.cliente);
       if (cliente) {
         cliente.sessoesRestantes = (cliente.sessoesRestantes || 0) + 1;
@@ -242,7 +229,6 @@ const atualizarStatusAgendamento = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    // Lista de status válidos, incluindo 'Realizado' (equivalente a 'CONCLUIDO')
     const statusValidos = ['Agendado', 'Realizado', 'Cancelado', 'Confirmado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu']; 
     if (!status || !statusValidos.includes(status)) {
       return res.status(400).json({ message: 'Status fornecido é inválido.', statusRecebido: status, statusValidos });
@@ -256,7 +242,6 @@ const atualizarStatusAgendamento = async (req, res) => {
     const statusAnterior = agendamento.status;
     const novoStatus = status;
 
-    // Verificar se o status mudou para "Realizado"
     if (novoStatus === 'Realizado' && statusAnterior !== 'Realizado') {
       if (agendamento.pacote && (!agendamento.servicoAvulsoNome || agendamento.servicoAvulsoNome.trim() === '')) {
         const cliente = await Cliente.findById(agendamento.cliente);
@@ -264,19 +249,16 @@ const atualizarStatusAgendamento = async (req, res) => {
           return res.status(404).json({ message: "Cliente associado ao agendamento não encontrado." });
         }
         
-        // Verificar se o cliente tem sessões disponíveis
         if (cliente.sessoesRestantes === undefined || cliente.sessoesRestantes <= 0) {
           return res.status(400).json({ message: 'Cliente não possui sessões de pacote disponíveis para debitar.' });
         }
         
-        // Diminuir uma sessão
         cliente.sessoesRestantes -= 1;
         await cliente.save();
         console.log(`Sessão debitada do cliente ${cliente.nome}. Sessões restantes: ${cliente.sessoesRestantes}`);
       }
     }
     
-    // Verificar se o status mudou de "Realizado" para outro status
     if (statusAnterior === 'Realizado' && novoStatus !== 'Realizado') {
       if (agendamento.pacote && (!agendamento.servicoAvulsoNome || agendamento.servicoAvulsoNome.trim() === '')) {
         const cliente = await Cliente.findById(agendamento.cliente);
@@ -314,7 +296,6 @@ const deleteAgendamento = async (req, res) => {
       return res.status(404).json({ message: 'Agendamento não encontrado para deleção.' });
     }
 
-    // Se o agendamento for de pacote e estiver marcado como Realizado, restaurar a sessão ao cliente
     if (agendamento.pacote && 
         (!agendamento.servicoAvulsoNome || agendamento.servicoAvulsoNome.trim() === '') && 
         agendamento.status === 'Realizado') {
