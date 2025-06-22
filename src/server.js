@@ -28,6 +28,8 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'))
 //app.use('/api/financeiro', require('./routes/financeiroRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/whatsapp', require('./routes/whatsappRoutes'));
+//server agent ia
+app.use('/api/agente', require('./routes/agenteRoutes'));
 
 
 // Routes test
