@@ -1,86 +1,96 @@
-// src/controllers/agenteController.js
-
-const { DateTime } = require('luxon');
 const Agendamento = require('../models/Agendamento');
-const Cliente = require('../models/Clientes');
-const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage');
-// Futuramente, podemos adicionar a integração com a OpenAI aqui.
 
-console.log('CONTROLLER: Carregando agenteController.js');
-
-/**
- * LÓGICA PRINCIPAL - Passo 3 do Plano de Ação
- * Procura agendamentos para o dia seguinte e envia lembretes personalizados.
- */
-const enviarLembretes24h = async (req, res) => {
-  console.log('AGENTE: Iniciando tarefa de enviar lembretes de 24h...');
+// Criar novo agendamento
+async function createAgendamento(req, res) {
   try {
-    // 1. Calcular o intervalo de tempo para "amanhã"
-    const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
-    const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
-
-    // 2. Buscar agendamentos que precisam de lembrete
-    const agendamentosParaLembrar = await Agendamento.find({
-      dataHora: { $gte: inicioDeAmanha, $lte: fimDeAmanha },
-      status: { $in: ['Agendado', 'Confirmado'] }, // Envia lembrete se estiver agendado ou já confirmado
-      // Futuramente, podemos adicionar: lembreteEnviado: false
-    }).populate('cliente pacote');
-
-    if (agendamentosParaLembrar.length === 0) {
-      console.log('AGENTE: Nenhum agendamento para lembrar amanhã.');
-      return res.status(200).json({ message: 'Nenhum agendamento para lembrar amanhã.' });
-    }
-
-    // 3. Enviar as mensagens
-    const resultados = [];
-    for (const ag of agendamentosParaLembrar) {
-      if (ag.cliente && ag.cliente.telefone) {
-        const nomeDoServico = ag.pacote?.nome || ag.servicoAvulsoNome || 'o seu atendimento';
-        const horaFormatada = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm');
-        
-        const mensagem = `Olá ${ag.cliente.nome}! Este é um lembrete da sua sessão de "${nomeDoServico}" agendada para amanhã às ${horaFormatada}. Por favor, responda com "Sim" para confirmar.`;
-        
-        await sendWhatsAppMessage(ag.cliente.telefone, mensagem);
-        resultados.push({ cliente: ag.cliente.nome, status: 'Lembrete enviado' });
-      }
-    }
-
-    console.log(`AGENTE: Lembretes de 24h enviados para ${resultados.length} clientes.`);
-    res.status(200).json({
-      success: true,
-      message: `Lembretes enviados para ${resultados.length} agendamentos.`,
-      detalhes: resultados,
-    });
-
+    const novoAgendamento = new Agendamento(req.body);
+    await novoAgendamento.save();
+    return res.status(201).json(novoAgendamento);
   } catch (error) {
-    console.error('AGENTE: Erro ao enviar lembretes de 24h:', error);
-    res.status(500).json({ success: false, message: 'Ocorreu um erro no servidor do agente.' });
+    return res.status(400).json({ error: 'Erro ao criar agendamento', detalhes: error.message });
   }
-};
+}
 
-/**
- * LÓGICA FUTURA - Passo 6 do Plano de Ação
- * Recebe uma resposta do cliente via webhook e inicia o processamento.
- */
-const processarRespostaWhatsapp = async (req, res) => {
-    const { telefoneCliente, mensagem } = req.body;
-    console.log(`AGENTE: Mensagem recebida de ${telefoneCliente}: "${mensagem}"`);
+// Listar todos os agendamentos
+async function getAllAgendamentos(req, res) {
+  try {
+    const agendamentos = await Agendamento.find().populate('cliente pacote');
+    return res.status(200).json(agendamentos);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar agendamentos', detalhes: error.message });
+  }
+}
 
-    // --- LÓGICA FUTURA COM IA SERÁ ADICIONADA AQUI ---
-    // 1. Encontrar cliente e agendamento.
-    // 2. Enviar mensagem para a OpenAI para obter a intenção.
-    // 3. Tomar ação (confirmar/cancelar agendamento).
-    // 4. Notificar Laura.
-    // ------------------------------------------------
+// Buscar um agendamento por ID
+async function getAgendamento(req, res) {
+  try {
+    const agendamento = await Agendamento.findById(req.params.id).populate('cliente pacote');
+    if (!agendamento) {
+      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    }
+    return res.status(200).json(agendamento);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar agendamento', detalhes: error.message });
+  }
+}
 
-    // Por agora, apenas confirmamos o recebimento.
-    res.status(200).json({ 
-        status: 'Mensagem recebida pelo agente.',
-        dados: { telefoneCliente, mensagem }
-    });
-};
+// Atualizar agendamento completo
+async function atualizarAgendamento(req, res) {
+  try {
+    const agendamentoAtualizado = await Agendamento.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!agendamentoAtualizado) {
+      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    }
+    return res.status(200).json(agendamentoAtualizado);
+  } catch (error) {
+    return res.status(400).json({ error: 'Erro ao atualizar agendamento', detalhes: error.message });
+  }
+}
 
+// Atualizar status do agendamento (opcional, se tiver campo status)
+async function atualizarStatusAgendamento(req, res) {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'Campo status é obrigatório.' });
+    }
+    const agendamentoAtualizado = await Agendamento.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    if (!agendamentoAtualizado) {
+      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    }
+    return res.status(200).json(agendamentoAtualizado);
+  } catch (error) {
+    return res.status(400).json({ error: 'Erro ao atualizar status', detalhes: error.message });
+  }
+}
+
+// Deletar agendamento
+async function deleteAgendamento(req, res) {
+  try {
+    const agendamentoDeletado = await Agendamento.findByIdAndDelete(req.params.id);
+    if (!agendamentoDeletado) {
+      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    }
+    return res.status(200).json({ message: 'Agendamento deletado com sucesso.' });
+  } catch (error) {
+    return res.status(400).json({ error: 'Erro ao deletar agendamento', detalhes: error.message });
+  }
+}
+
+// Exportação padrão
 module.exports = {
-  enviarLembretes24h,
-  processarRespostaWhatsapp,
+  createAgendamento,
+  getAllAgendamentos,
+  getAgendamento,
+  atualizarAgendamento,
+  atualizarStatusAgendamento,
+  deleteAgendamento,
 };

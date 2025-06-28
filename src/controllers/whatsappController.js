@@ -1,12 +1,14 @@
-const { sendZapiWhatsAppMessage } = require('../utils/sendZapiWhatsAppMessage');
 const Agendamento = require('../models/Agendamento');
-const Cliente = require('../models/Cliente');
+const Cliente = require('../models/Cliente'); // ou Cliente, conforme seu arquivo
+const { sendZapiWhatsAppMessage } = require('../utils/sendZapiWhatsAppMessage');
 
-// Rota formal para notificar cliente individual
+// Função para notificar cliente individual
 async function notificarCliente(req, res) {
   const { telefone, mensagem } = req.body;
+  if (!telefone || !mensagem) {
+    return res.status(400).json({ ok: false, error: 'Telefone e mensagem são obrigatórios.' });
+  }
   const result = await sendZapiWhatsAppMessage(telefone, mensagem);
-
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {
@@ -14,11 +16,10 @@ async function notificarCliente(req, res) {
   }
 }
 
-// Rota para enviar mensagem de teste livremente (também usando Z-API)
+// Função para enviar mensagem de teste
 async function enviarMensagemDireta(req, res) {
   const { to, body } = req.body;
   const result = await sendZapiWhatsAppMessage(to, body);
-
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {
@@ -63,7 +64,7 @@ async function notificarAgendamentosAmanha(req, res) {
 }
 
 // Webhook Z-API para confirmação automática de agendamento
-exports.zapiWebhook = async (req, res) => {
+async function zapiWebhook(req, res) {
   try {
     const phone = req.body.body.phone;
     const texto = req.body.body.text?.message?.trim().toLowerCase();
@@ -102,8 +103,9 @@ exports.zapiWebhook = async (req, res) => {
     console.error('Erro ao processar webhook Z-API:', err);
     res.status(500).json({ error: 'Erro interno' });
   }
-};
+}
 
+// Exporte tudo no final:
 module.exports = {
   notificarCliente,
   enviarMensagemDireta,

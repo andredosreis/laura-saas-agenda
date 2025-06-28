@@ -11,7 +11,7 @@ try {
   throw err;
 }
 
-const Cliente = require('../models/Clientes'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
+const Cliente = require('../models/Cliente'); // Verifique se o nome do arquivo é Clientes.js ou Cliente.js
 const Pacote = require('../models/Pacote');
 
 // Listar todos os clientes

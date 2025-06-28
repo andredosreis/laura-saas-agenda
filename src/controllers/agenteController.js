@@ -2,7 +2,7 @@
 
 const { DateTime } = require('luxon');
 const Agendamento = require('../models/Agendamento');
-const Cliente = require('../models/Clientes');
+const Cliente = require('../models/Cliente');
 const { sendZapiWhatsAppMessage } = require('../utils/sendZapiWhatsAppMessage');
 
 // Futuramente, podemos adicionar a integração com a OpenAI aqui.

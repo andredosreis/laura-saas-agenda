@@ -1,6 +1,6 @@
 // src/controllers/dashboardController.js
 const { DateTime } = require('luxon');
-const Cliente = require('../models/Clientes');
+const Cliente = require('../models/Cliente');
 const Pacote = require('../models/Pacote');
 const Agendamento = require('../models/Agendamento');
 

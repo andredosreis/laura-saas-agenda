@@ -1,6 +1,6 @@
 // src/controllers/analyticsController.js
 console.log('CONTROLLER: Iniciando carregamento de analyticsController.js');
-const Cliente = require('../models/Clientes'); // Precisamos do modelo Cliente
+const Cliente = require('../models/Cliente'); // Precisamos do modelo Cliente
 // O modelo Pacote será acessado através do populate em Cliente
 
 const getAlertaSessoesBaixas = async (req, res) => {
