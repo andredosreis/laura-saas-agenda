@@ -1,14 +1,11 @@
-const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage');
+const { sendZapiWhatsAppMessage } = require('../utils/sendZapiWhatsAppMessage');
 const Agendamento = require('../models/Agendamento');
-const Cliente = require('../models/Clientes');
+const Cliente = require('../models/Cliente');
 
-const axios = require('axios');
-const qs = require('qs');
-
-// Rota mais "formal", voltada para integração real
+// Rota formal para notificar cliente individual
 async function notificarCliente(req, res) {
   const { telefone, mensagem } = req.body;
-  const result = await sendWhatsAppMessage(telefone, mensagem);
+  const result = await sendZapiWhatsAppMessage(telefone, mensagem);
 
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
@@ -17,34 +14,19 @@ async function notificarCliente(req, res) {
   }
 }
 
-// Rota mais "livre", útil para testes manuais
+// Rota para enviar mensagem de teste livremente (também usando Z-API)
 async function enviarMensagemDireta(req, res) {
   const { to, body } = req.body;
-  const token = process.env.ULTRAMSG_TOKEN;
-  const instanceId = process.env.ULTRAMSG_INSTANCE_ID;
+  const result = await sendZapiWhatsAppMessage(to, body);
 
-  try {
-    const data = qs.stringify({ token, to, body });
-
-    const config = {
-      method: 'post',
-      url: `https://api.ultramsg.com/${instanceId}/messages/chat`,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      data
-    };
-
-    const response = await axios(config);
-    return res.status(200).json({ ok: true, result: response.data });
-
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: err.toString() });
+  if (result.success) {
+    return res.status(200).json({ ok: true, result: result.result });
+  } else {
+    return res.status(500).json({ ok: false, error: result.error });
   }
 }
 
-// Enviar mensagem de WhatsApp para clientes com agendamentos amanha
-
+// Enviar mensagem para todos com agendamento amanhã
 async function notificarAgendamentosAmanha(req, res) {
   try {
     const hoje = new Date();
@@ -66,10 +48,9 @@ async function notificarAgendamentosAmanha(req, res) {
       if (!telefone) continue;
 
       const hora = new Date(ag.dataHora).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-
       const mensagem = `Olá ${ag.cliente.nome}, tudo bem? Este é um lembrete do seu atendimento marcado para amanhã às ${hora}. Qualquer dúvida, estamos à disposição.`;
 
-      const resultado = await sendWhatsAppMessage(telefone, mensagem);
+      const resultado = await sendZapiWhatsAppMessage(telefone, mensagem);
       resultados.push({ cliente: ag.cliente.nome, status: resultado.success });
     }
 
@@ -81,8 +62,51 @@ async function notificarAgendamentosAmanha(req, res) {
   }
 }
 
+// Webhook Z-API para confirmação automática de agendamento
+exports.zapiWebhook = async (req, res) => {
+  try {
+    const phone = req.body.body.phone;
+    const texto = req.body.body.text?.message?.trim().toLowerCase();
+
+    if (!phone || !texto) {
+      return res.status(400).json({ error: 'Dados insuficientes' });
+    }
+
+    if (texto !== "confirmo") {
+      console.log(`Mensagem ignorada de ${phone}: "${texto}"`);
+      return res.json({ status: 'ignorada', motivo: 'mensagem não é confirmação' });
+    }
+
+    const cliente = await Cliente.findOne({ telefone: phone });
+    if (!cliente) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+
+    const agendamento = await Agendamento.findOne({
+      cliente: cliente._id,
+      status: { $ne: 'confirmado' }
+    }).sort({ data: -1 });
+
+    if (!agendamento) {
+      return res.status(404).json({ error: 'Agendamento pendente não encontrado' });
+    }
+
+    agendamento.status = 'confirmado';
+    agendamento.confirmadoEm = new Date();
+    await agendamento.save();
+
+    console.log(`Agendamento ${agendamento._id} confirmado pelo WhatsApp (Z-API)!`);
+    res.json({ status: 'ok' });
+
+  } catch (err) {
+    console.error('Erro ao processar webhook Z-API:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+};
+
 module.exports = {
   notificarCliente,
   enviarMensagemDireta,
-  notificarAgendamentosAmanha
+  notificarAgendamentosAmanha,
+  zapiWebhook
 };

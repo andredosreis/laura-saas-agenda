@@ -3,7 +3,8 @@
 const { DateTime } = require('luxon');
 const Agendamento = require('../models/Agendamento');
 const Cliente = require('../models/Clientes');
-const { sendWhatsAppMessage } = require('../utils/sendWhatsAppMessage');
+const { sendZapiWhatsAppMessage } = require('../utils/sendZapiWhatsAppMessage');
+
 // Futuramente, podemos adicionar a integração com a OpenAI aqui.
 
 console.log('CONTROLLER: Carregando agenteController.js');
@@ -40,7 +41,7 @@ const enviarLembretes24h = async (req, res) => {
         
         const mensagem = `Olá ${ag.cliente.nome}! Este é um lembrete da sua sessão de "${nomeDoServico}" agendada para amanhã às ${horaFormatada}. Por favor, responda com "Sim" para confirmar.`;
         
-        await sendWhatsAppMessage(ag.cliente.telefone, mensagem);
+        await sendZapiWhatsAppMessage(ag.cliente.telefone, mensagem);
         resultados.push({ cliente: ag.cliente.nome, status: 'Lembrete enviado' });
       }
     }
