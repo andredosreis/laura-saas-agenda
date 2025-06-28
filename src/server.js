@@ -2,10 +2,13 @@ require('dotenv-flow').config();
 const express = require('express');
 const connectDB = require('./config/db');
 const cors = require('cors');
+const cron = require('node-cron');
 const logger = require('./middlewares/requestLogger');
 const errorHandler = require('./middlewares/errorHandler');
 const validateObjectId = require('./middlewares/validateObjectId');
+const agenteController = require('./controllers/agenteController');
 
+// Configuração do servidor Express
 const app = express();
 app.use(cors({
   origin: ['https://laura-saas-agenda-mfqt.vercel.app'],
@@ -49,3 +52,16 @@ app.get ('/' , (req, res) => {
 
 
 
+// Configurar cron para enviar lembretes todos os dias às 19h (hora de Lisboa)
+cron.schedule('0 19 * * *', async () => {
+  console.log('⏰ CRON: Executando lembretes de 24h...');
+  try {
+    await agenteController.enviarLembretes24h({ method: 'CRON' }, {
+      status: () => ({ json: console.log }) // simula res.json
+    });
+  } catch (error) {
+    console.error('CRON: Falha ao executar tarefa de lembrete:', error);
+  }
+}, {
+  timezone: "Europe/Lisbon"
+});
