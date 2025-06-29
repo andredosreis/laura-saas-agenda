@@ -1,14 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { notificarCliente, enviarMensagemDireta } = require('../controllers/whatsappController');
-const { notificarAgendamentosAmanha } = require('../controllers/whatsappController');
+
+const {
+  notificarCliente,
+  enviarMensagemDireta,
+  notificarAgendamentosAmanha,
+  zapiWebhook
+} = require('../controllers/whatsappController');
 
 // Rota para notificar cliente (com lógica de negócio)
 router.post('/notificar', notificarCliente);
 router.post('/notificar-agendamentos-amanha', notificarAgendamentosAmanha);
+router.post('/zapi-webhook', zapiWebhook);
 
 // Rota para envio direto (debug/testes manuais)
 router.post('/send', enviarMensagemDireta);
-
 
 module.exports = router;

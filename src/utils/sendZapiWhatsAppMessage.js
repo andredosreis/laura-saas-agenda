@@ -4,8 +4,8 @@ const axios = require('axios');
 // Função assíncrona para enviar mensagem pelo WhatsApp usando a Z-API
 async function sendZapiWhatsAppMessage(phone, message) {
   // Pega as credenciais da Z-API do arquivo .env ou, se não tiver, usa os valores fixos (só para testes!)
-  const instanceId = process.env.ZAPI_INSTANCE_ID || '3E34E13FC965B0D13ECE2A88B4975A95';
-  const token = process.env.ZAPI_TOKEN || '4AE171061B08EF4E77E010A3';
+  const instanceId = process.env.ZAPI_INSTANCE_ID 
+  const token = process.env.ZAPI_TOKEN 
 
   // Monta a URL de envio de texto da Z-API
   const url = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`;
