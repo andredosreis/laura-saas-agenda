@@ -1,4 +1,6 @@
 const Agendamento = require('../models/Agendamento');
+const { sendWhatsAppMessage } = require('../utils/zapi_client'); // ajuste o caminho!
+
 
 // Criar novo agendamento
 async function createAgendamento(req, res) {
