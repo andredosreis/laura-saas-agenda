@@ -67,8 +67,8 @@ async function notificarAgendamentosAmanha(req, res) {
 }
 
 async function zapiWebhook(req, res) {
-  const phone = req.body.body.phone;
-  const texto = req.body.body.text?.message?.trim();
+const phone = req.body?.phone || req.body?.body?.phone || req.body?.data?.phone;
+const texto = req.body?.text?.message || req.body?.body?.text?.message || req.body?.message;
 
   let cliente = await Cliente.findOne({ telefone: phone });
 

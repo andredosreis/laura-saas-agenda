@@ -11,7 +11,7 @@ const {
 // Rota para notificar cliente (com lógica de negócio)
 router.post('/notificar', notificarCliente);
 router.post('/notificar-agendamentos-amanha', notificarAgendamentosAmanha);
-router.post('/zapi-webhook', zapiWebhook);
+
 
 // Rota para envio direto (debug/testes manuais)
 router.post('/send', enviarMensagemDireta);

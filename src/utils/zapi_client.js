@@ -1,4 +1,3 @@
-
 const axios = require('axios');
 const dotenv = require('dotenv');
 
@@ -13,16 +12,20 @@ class ZAPIClient {
      * Inicializa o cliente ZAPI com configurações do ambiente
      */
     constructor() {
-        this.baseUrl = process.env.ZAPI_BASE_URL || 'https://api.z-api.io/instances/3E34E13FC965B0D13ECE2A88B4975A95/tc';
-        this.token = process.env.ZAPI_TOKEN || '4AE171061B08EF4E77E010A3';
-        this.instanceId = process.env.ZAPI_INSTANCE_ID || '3E34E13FC965B0D13ECE2A88B';
-        
+        // Pegando as variáveis do ambiente ou valores padrão
+        this.instanceId = process.env.ZAPI_INSTANCE_ID || '3E34E13FC965B0D13ECE2A88B4975A95';
+        this.instanceToken = process.env.ZAPI_INSTANCE_TOKEN || '4AE171061B08EF4E77E010A3';
+        this.securityToken = process.env.ZAPI_SECURITY_TOKEN || 'Faea87dee35294aff8e386f2633cf79c0S';
+
+        // baseUrl SEM /send-text no final!
+        this.baseUrl = `https://api.z-api.io/instances/${this.instanceId}/token/${this.instanceToken}`;
+
         // Headers padrão para todas as requisições
         this.headers = {
             'Content-Type': 'application/json',
-            'Client-Token': this.token
+            'Client-Token': this.securityToken // Aqui vai o token de segurança da conta!
         };
-        
+        console.log('Token de segurança:', this.securityToken);
         console.log(`ZAPI Client inicializado - Instance: ${this.instanceId}`);
     }
 
@@ -34,7 +37,7 @@ class ZAPIClient {
      * @returns {Promise<Object>} Resposta da API
      */
     async sendTextMessage(phone, message) {
-        // URL completa para envio de texto
+        // URL correta para envio de texto
         const url = `${this.baseUrl}/send-text`;
         
         // Payload da requisição
@@ -194,7 +197,7 @@ if (require.main === module) {
         console.log('Status da conexão:', JSON.stringify(status, null, 2));
         
         // Exemplo de envio (descomente para testar)
-        // const result = await client.sendTextMessage("5511999999999", "Teste de mensagem da LA Estética Avançada!");
-        // console.log('Resultado:', JSON.stringify(result, null, 2));
+        const result = await client.sendTextMessage("5511999999999", "Teste de mensagem da LA Estética Avançada!");
+        console.log('Resultado:', JSON.stringify(result, null, 2));
     })();
 }
