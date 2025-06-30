@@ -64,8 +64,10 @@ const enviarLembretes24h = async (req, res) => {
  */
 const processarRespostaWhatsapp = async (req, res) => {
     try {
-        const { telefoneCliente, mensagem } = req.body;
-        console.log(`AGENTE: Mensagem recebida de ${telefoneCliente}: "${mensagem}"`);
+       const telefoneCliente = req.body.telefoneCliente || req.body.phone;
+       const mensagem = req.body.mensagem || req.body.text?.message;
+
+      console.log(`AGENTE: Mensagem recebida de ${telefoneCliente}: "${mensagem}"`);
 
         // 1. Identificar o cliente
         const cliente = await Cliente.findOne({ telefone: telefoneCliente });
