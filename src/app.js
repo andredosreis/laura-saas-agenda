@@ -13,10 +13,10 @@ const app = express();
 app.use(cors());
 
 // Em produção, use assim:
-// app.use(cors({
-//   origin: ['https://laura-saas-agenda-mfqt.vercel.app'],
-//   credentials: true,
-// }));
+ app.use(cors({
+  origin: ['https://laura-saas-agenda-mfqt.vercel.app'],
+  credentials: true,
+ }));
 
 // ===============================
 
