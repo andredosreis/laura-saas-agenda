@@ -1,0 +1,43 @@
+
+
+[
+  {
+    "name": "create_client",
+    "description": "Cria um novo cliente na base de dados e devolve o ID",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "birthDate": { "type": "string", "format": "date" }
+      },
+      "required": ["name","phone","birthDate"]
+    }
+  },
+  {
+    "name": "create_appointment",
+    "description": "Marca uma sessão para o cliente num slot específico",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "slot_id":   { "type": "string" },
+        "package_id":{ "type": "string" }
+      },
+      "required": ["client_id","slot_id","package_id"]
+    }
+  },
+  {
+    "name": "update_appointment",
+    "description": "Reagenda ou cancela um agendamento existente",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "appointment_id":{ "type": "string" },
+        "action": { "type":"string", "enum":["reschedule","cancel"] },
+        "new_slot_id": { "type":"string" }
+      },
+      "required": ["appointment_id","action"]
+    }
+  }
+]

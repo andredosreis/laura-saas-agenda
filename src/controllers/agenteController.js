@@ -1,398 +1,240 @@
-// src/controllers/agenteController.js
+// src/controllers/agenteController.js – versão ajustada (v2) com melhor detecção de nome+data
 
 const { DateTime } = require('luxon');
 const Agendamento = require('../models/Agendamento');
-const Cliente = require('../models/Cliente');
-const Conversa = require('../models/Conversa');
-const Pacote = require('../models/Pacote');
+const { chatWithLaura }       = require('../utils/openaiHelper');
+const { dispatch }            = require('../services/functionDispatcher');
+const Cliente     = require('../models/Cliente');
+const Conversa    = require('../models/Conversa');
+const Pacote      = require('../models/Pacote');
 const { sendWhatsAppMessage } = require('../utils/zapi_client');
-const { classificarIntencaoCliente, gerarRespostaLaura } = require('../utils/openaiHelper');
 
-console.log('CONTROLLER: Carregando agenteController.js');
+const Mensagem   = require('../models/Mensagem');
+const { detectarPalavraChave } = require('../utils/notificacaoHelper');
 
-/**
- * LÓGICA PRINCIPAL - Passo 3 do Plano de Ação
- * Procura agendamentos para o dia seguinte e envia lembretes personalizados.
- */
+console.log('CONTROLLER: agenteController.js carregado (v2)');
+
+//---------------------------------------------------------------------
+// 1. Lembretes 24 h
+//---------------------------------------------------------------------
 const enviarLembretes24h = async (req, res) => {
-  console.log('AGENTE: Iniciando tarefa de enviar lembretes de 24h...');
+  console.log('AGENTE: A enviar lembretes de 24 h…');
   try {
-    // 1. Calcular o intervalo de tempo para "amanhã"
-    const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
-    const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
+    const inicio = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
+    const fim    = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
 
-    // 2. Buscar agendamentos que precisam de lembrete
-    const agendamentosParaLembrar = await Agendamento.find({
-      dataHora: { $gte: inicioDeAmanha, $lte: fimDeAmanha },
-      status: { $in: ['Agendado', 'Confirmado'] },
-    }).populate('cliente pacote');
+    const ags = await Agendamento.find({ dataHora: { $gte: inicio, $lte: fim }, status: { $in: ['Agendado', 'Confirmado'] } })
+      .populate('cliente pacote');
 
-    if (agendamentosParaLembrar.length === 0) {
-      console.log('AGENTE: Nenhum agendamento para lembrar amanhã.');
-      return res.status(200).json({ message: 'Nenhum agendamento para lembrar amanhã.' });
+    if (!ags.length) {
+      console.log('AGENTE: Nada para lembrar amanhã.');
+      return res.status(200).json({ message: 'Sem lembretes.' });
     }
 
-    // 3. Enviar as mensagens
     const resultados = [];
-    for (const ag of agendamentosParaLembrar) {
-      if (ag.cliente && ag.cliente.telefone) {
-        const nomeDoServico = ag.pacote?.nome || ag.servicoAvulsoNome || 'o seu atendimento';
-        const horaFormatada = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm');
-        
-        const mensagem = `Olá ${ag.cliente.nome}! Este é um lembrete da sua sessão de "${nomeDoServico}" agendada para amanhã às ${horaFormatada}. Por favor, responda com "Sim" para confirmar.`;
-        
-        await sendWhatsAppMessage(ag.cliente.telefone, mensagem);
-        resultados.push({ cliente: ag.cliente.nome, status: 'Lembrete enviado' });
-      }
+    for (const ag of ags) {
+      if (!ag.cliente?.telefone) continue;
+      const serv  = ag.pacote?.nome || ag.servicoAvulsoNome || 'o teu atendimento';
+      const hora  = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm');
+      const msg   = `Olá ${ag.cliente.nome}! Só para lembrar que amanhã, às ${hora}, tens a sessão de "${serv}". Responde "Sim" para confirmares.`;
+      await sendWhatsAppMessage(ag.cliente.telefone, msg);
+      resultados.push({ cliente: ag.cliente.nome, status: 'enviado' });
     }
 
-    console.log(`AGENTE: Lembretes de 24h enviados para ${resultados.length} clientes.`);
-    res.status(200).json({
-      success: true,
-      message: `Lembretes enviados para ${resultados.length} agendamentos.`,
-      detalhes: resultados,
-    });
-
-  } catch (error) {
-    console.error('AGENTE: Erro ao enviar lembretes de 24h:', error);
-    res.status(500).json({ success: false, message: 'Ocorreu um erro no servidor do agente.' });
+    res.status(200).json({ success: true, enviados: resultados.length });
+  } catch (e) {
+    console.error('AGENTE: Erro nos lembretes →', e);
+    res.status(500).json({ success: false });
   }
 };
 
-/**
- * MVP - Processa resposta do cliente via webhook com IA
- */
-const processarRespostaWhatsapp = async (req, res) => {
+//---------------------------------------------------------------------
+// 2. Reagendamento (primeiro passo)
+//---------------------------------------------------------------------
+async function processarReagendamento(telefone, cliente, conversa) {
+  if (!cliente) {
+    return 'Ainda não encontrei o teu registo. Já és cliente da Laura ou é a tua primeira visita?';
+  }
+
+  const futuros = await Agendamento.find({ cliente: cliente._id, dataHora: { $gte: new Date() }, status: { $in: ['Agendado', 'Confirmado'] } })
+    .populate('pacote').sort({ dataHora: 1 });
+
+  if (!futuros.length) {
+    return 'Não encontrei marcações futuras para reagendar. Queres marcar uma nova?';
+  }
+
+  const opcoes = futuros.map((ag, i) => {
+    const dt    = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' });
+    const dia   = dt.toFormat('cccc', { locale: 'pt' });
+    const hora  = dt.toFormat("dd/MM 'às' HH:mm");
+    return { indice: i, agendamentoId: ag._id, servico: ag.pacote?.nome || ag.servicoAvulsoNome, diaSemana: dia, dataHora: hora, descricao: `${dia}, ${hora}` };
+  });
+
+  await Conversa.findOneAndUpdate({ telefone }, { estado: 'aguardando_escolha_reagendamento', opcoesReagendamento: opcoes }, { upsert: true });
+
+  if (opcoes.length === 1) {
+    const o = opcoes[0];
+    return `Encontrei o teu agendamento de "${o.servico}" para ${o.descricao}. É este que queres remarcar?`;
+  }
+
+  let msg = 'Encontrei estas marcações:\n\n';
+  opcoes.forEach(o => { msg += `• ${o.servico} – ${o.descricao}\n`; });
+  msg += '\nQual queres remarcar?';
+  return msg;
+}
+
+//---------------------------------------------------------------------
+// 3. Gera horários disponíveis (mock)
+//---------------------------------------------------------------------
+async function gerarOpcoesHorarios() {
+  const hoje = new Date();
+  const op   = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(hoje); d.setDate(hoje.getDate() + i);
+    ['09:00', '14:00', '16:00'].forEach(h => {
+      const [H, M] = h.split(':');
+      const dt = new Date(d); dt.setHours(+H, +M, 0, 0);
+      const dia = DateTime.fromJSDate(dt, { zone: 'Europe/Lisbon' }).toFormat('cccc', { locale: 'pt' });
+      op.push({ diaSemana: dia, data: dt.toISOString().split('T')[0], hora: h, dataCompleta: dt, descricao: `${dia} às ${h}` });
+    });
+  }
+  return op.slice(0, 5);
+}
+
+//---------------------------------------------------------------------
+// 2. Webhook principal com LLM + Function‑Calling
+//---------------------------------------------------------------------
+async function processarRespostaWhatsapp(req, res) {
+  try {
+    const telefone = req.body.phone || req.body.telefoneCliente;
+    const texto    = (req.body.text && req.body.text.message) || req.body.mensagem;
+    if (!telefone || !texto) return res.status(400).json({ error: 'Dados incompletos' });
+
+    const cliente  = await Cliente.findOne({ telefone });
+    const contexto = { cliente };
+
+    let resposta = await chatWithLaura({ userMsg: texto, ctx: contexto });
+
+    if (resposta.function_call) {
+      const { name, arguments: args } = resposta.function_call;
+      const result = await dispatch(name, JSON.parse(args));
+
+      resposta = await chatWithLaura({
+        userMsg: texto,
+        ctx: contexto,
+        functionResponse: { name, result },
+      });
+    }
+
+    await sendWhatsAppMessage(telefone, resposta.content);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook erro →', err);
     try {
-       const telefoneCliente = req.body.telefoneCliente || req.body.phone;
-       const mensagem = req.body.mensagem || req.body.text?.message;
-
-      console.log(`AGENTE: Mensagem recebida de ${telefoneCliente}: "${mensagem}"`);
-
-        // 1. Identificar o cliente
-        const cliente = await Cliente.findOne({ telefone: telefoneCliente });
-        
-        if (!cliente) {
-            // FLUXO PARA CLIENTES NOVOS
-            await processarClienteNovo(telefoneCliente, mensagem);
-            return res.status(200).json({ status: 'Processando cliente novo' });
-        }
-
-        // 2. FLUXO PARA CLIENTES EXISTENTES COM IA
-        console.log(`AGENTE: Cliente encontrado: ${cliente.nome}`);
-        
-        // Buscar agendamentos próximos do cliente
-        const agendamentosProximos = await buscarAgendamentosProximos(cliente._id);
-
-        // 3. Analisar intenção da mensagem com IA
-        const intencao = await analisarIntencaoComIA(mensagem);
-
-        // 4. Processar baseado na intenção
-        await processarIntencaoComIA(cliente, agendamentosProximos, intencao, mensagem);
-
-        res.status(200).json({ 
-            status: 'Mensagem processada com sucesso',
-            cliente: cliente.nome,
-            intencao: intencao
-        });
-
-    } catch (error) {
-        console.error('AGENTE: Erro ao processar resposta WhatsApp:', error);
-        res.status(500).json({ success: false, message: 'Erro interno do agente' });
-    }
-};
-
-/**
- * Analisa intenção da mensagem usando OpenAI
- */
-async function analisarIntencaoComIA(mensagem) {
-    try {
-        const intencao = await classificarIntencaoCliente(mensagem);
-        console.log(`AGENTE: Intenção classificada pela IA: ${intencao}`);
-        return intencao.toLowerCase();
-    } catch (error) {
-        console.error('AGENTE: Erro ao classificar intenção com IA:', error);
-        // Fallback para análise manual se a IA falhar
-        return analisarIntencaoManual(mensagem);
-    }
+      await sendWhatsAppMessage(req.body.phone, 'Desculpa, houve um problema, estaremos a resolver  😊');
+    } catch (_) {}
+    res.status(500).json({ success: false });
+  }
 }
 
-/**
- * Processa a ação baseada na intenção (com IA)
- */
-async function processarIntencaoComIA(cliente, agendamentos, intencao, mensagemOriginal) {
-    console.log(`AGENTE: Processando intenção "${intencao}" para cliente ${cliente.nome}`);
-    
-    switch (intencao) {
-        case 'confirmar':
-            await processarConfirmacao(cliente, agendamentos);
-            break;
-        
-        case 'cancelar':
-            await processarCancelamento(cliente, agendamentos);
-            break;
-        
-        case 'remarcar':
-            await processarReagendamento(cliente, agendamentos);
-            break;
-        
-        case 'pergunta':
-        case 'outro':
-            // Usa a IA para gerar resposta personalizada
-            await processarComIA(cliente, mensagemOriginal);
-            break;
-        
-        default:
-            await processarNaoIdentificado(cliente, mensagemOriginal);
-            break;
+//---------------------------------------------------------------------
+// 5. Montar contexto dinâmico para a IA
+//---------------------------------------------------------------------
+async function montarContexto(cliente, conversa) {
+  let ctx = '';
+  const pacotes = await Pacote.find({ ativo: true });
+  const lista   = pacotes.map(p => `• ${p.nome} — €${p.preco}`).join('\n');
+
+  if (cliente) {
+    ctx = `CLIENTE: ${cliente.nome} (${cliente.telefone})\nAniversário: ${cliente.dataNascimento ? cliente.dataNascimento.toLocaleDateString('pt-PT') : '—'}\n\nPacotes:\n${lista}`;
+    const prox = await buscarAgendamentosProximos(cliente._id);
+    if (prox.length) {
+      const ag = prox[0];
+      const dt = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat("dd/MM/yyyy 'às' HH:mm");
+      ctx += `\nPróxima sessão: ${ag.pacote?.nome || ag.servicoAvulsoNome} em ${dt}`;
     }
+  } else {
+    ctx = `NOVO CONTACTO – estado: ${conversa?.estado || 'aguardando_nome'}\nUsa tom informal (PT‑PT). Só pedes preços depois de concluir registo.\nPacotes disponíveis:\n${pacotes.map(p => `• ${p.nome}`).join('\n')}`;
+  }
+  return ctx;
 }
 
-/**
- * Usa a IA para gerar resposta personalizada
- */
-async function processarComIA(cliente, mensagemOriginal) {
-    try {
-        console.log(`AGENTE: Gerando resposta com IA para ${cliente.nome}`);
-        const respostaIA = await gerarRespostaLaura(mensagemOriginal, cliente.nome);
-        console.log(`AGENTE: Resposta gerada pela IA: ${respostaIA}`);
-        await sendWhatsAppMessage(cliente.telefone, respostaIA);
-    } catch (error) {
-        console.error('AGENTE: Erro ao gerar resposta com IA:', error);
-        // Fallback para resposta padrão
-        await processarNaoIdentificado(cliente, mensagemOriginal);
+//---------------------------------------------------------------------
+// 6. Gestão de estado da conversa / criação de cliente
+//---------------------------------------------------------------------
+async function atualizarEstadoConversa(telefone, mensagem, cliente, conversa) {
+  if (cliente) return cliente; // já existe
+
+  // garante ter conversa
+  if (!conversa) {
+    conversa = await Conversa.create({ telefone, estado: 'aguardando_nome' });
+  }
+
+  const dateRegex = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})/;
+  const dateMatch = mensagem.match(dateRegex);
+  const temData   = Boolean(dateMatch);
+  let dataNasc    = null;
+
+  if (temData) {
+    const dStr = dateMatch[0].replace(/-/g, '/');
+    const [dd, mm, aaaa] = dStr.split('/');
+    dataNasc = new Date(`${aaaa}-${mm}-${dd}`);
+    if (isNaN(dataNasc)) dataNasc = null;
+  }
+
+  // Se ainda falta nome
+  if (conversa.estado === 'aguardando_nome') {
+    if (temData) {
+      // mensagem traz nome + data
+      const nomeParte = mensagem.replace(dateRegex, '').replace(/\s+/g, ' ').trim();
+      if (nomeParte.length >= 3 && dataNasc) {
+        return await criarClienteEFecharConversa(conversa, telefone, nomeParte, dataNasc);
+      }
+    } else {
+      // apenas nome
+      if (!conversa.nomeTemporario) {
+        const partes = mensagem.trim().split(' ');
+        if (partes[0].length > 2) {
+          conversa.nomeTemporario = mensagem.trim();
+          conversa.estado = 'aguardando_data_nascimento';
+          await conversa.save();
+        }
+      }
+      return null;
     }
+  }
+
+  // se estamos à espera de data
+  if (conversa.estado === 'aguardando_data_nascimento') {
+    if (temData && dataNasc) {
+      conversa.dataNascimentoTemporaria = dataNasc;
+      await conversa.save();
+
+      if (conversa.nomeTemporario) {
+        return await criarClienteEFecharConversa(conversa, telefone, conversa.nomeTemporario, dataNasc);
+      }
+    }
+  }
+
+  return null;
 }
 
-/**
- * Processa clientes novos (não cadastrados)
- */
-async function processarClienteNovo(telefoneCliente, mensagem) {
-    let conversa = await Conversa.findOne({ telefone: telefoneCliente });
-
-    if (!conversa) {
-        // Primeira interação: pede o nome
-        await sendWhatsAppMessage(telefoneCliente, 
-            "Vejo que você ainda não é nossa cliente 😊. Eu sou a assistente da Laura e estou aqui para tirar qualquer dúvida e marcar uma sessão de teste. Para melhor te atender, poderia me dizer seu nome?");
-        await Conversa.create({ telefone: telefoneCliente, estado: 'aguardando_nome' });
-        return;
-    }
-
-    if (conversa.estado === 'aguardando_nome') {
-        // Recebeu o nome, salva temporariamente e pergunta sobre objetivo/dor
-        const nome = mensagem.trim().split(' ')[0]; // Pega só o primeiro nome para soar mais natural
-        conversa.nomeTemporario = nome;
-        conversa.estado = 'aguardando_objetivo';
-        await conversa.save();
-
-        await sendWhatsAppMessage(telefoneCliente, 
-            `Prazer, ${nome}! Agora me conta: qual seu principal objetivo ou dúvida em relação à estética? Assim posso te explicar nossos serviços e te ajudar a escolher o melhor para você! 💕`);
-        return;
-    }
-
-    if (conversa.estado === 'aguardando_objetivo') {
-        // Recebeu o objetivo/dor, apresenta os serviços
-        const nome = conversa.nomeTemporario || 'querida';
-        // Busca os serviços do banco (model Pacote)
-        const pacotes = await Pacote.find({});
-        
-        if (pacotes.length === 0) {
-            await sendWhatsAppMessage(telefoneCliente, 
-                `${nome}, no momento estou organizando nossa lista de serviços. Vou encaminhar sua mensagem para a Laura, que entrará em contato com todos os detalhes! 💕`);
-            return;
-        }
-
-        let listaServicos = pacotes.map((p, i) => `${i + 1}. ${p.nome}`).join('\n');
-        await sendWhatsAppMessage(telefoneCliente, 
-            `Entendi, ${nome}! Olha só, temos esses serviços que podem te ajudar:\n\n${listaServicos}\n\nMe fala o número ou nome do serviço que você quer saber mais! 😊`);
-        conversa.estado = 'aguardando_escolha_servico';
-        await conversa.save();
-        return;
-    }
-
-    if (conversa.estado === 'aguardando_escolha_servico') {
-        // Cliente escolheu um serviço, explica o serviço
-        const nome = conversa.nomeTemporario || 'querida';
-        const pacotes = await Pacote.find({});
-        const escolha = mensagem.trim().toLowerCase();
-
-        // Tenta identificar o serviço pelo número ou nome
-        let pacoteEscolhido = null;
-        if (!isNaN(escolha)) {
-            const idx = parseInt(escolha, 10) - 1;
-            if (pacotes[idx]) pacoteEscolhido = pacotes[idx];
-        } else {
-            pacoteEscolhido = pacotes.find(p => 
-                p.nome.toLowerCase().includes(escolha) || 
-                escolha.includes(p.nome.toLowerCase())
-            );
-        }
-
-        if (pacoteEscolhido) {
-            const explicacao = pacoteEscolhido.descricao || 
-                `O serviço "${pacoteEscolhido.nome}" é um dos nossos mais procurados!`;
-            
-            await sendWhatsAppMessage(telefoneCliente, 
-                `Ótima escolha, ${nome}! 😍\n\n"${pacoteEscolhido.nome}"\n${explicacao}\n\nSe quiser agendar uma sessão de teste ou saber mais sobre outros serviços, é só me avisar! Estou aqui para te ajudar 💕`);
-            
-            // Cria o cliente no banco de dados
-            await Cliente.create({ 
-                nome: conversa.nomeTemporario, 
-                telefone: telefoneCliente,
-                observacoes: `Interessada em: ${pacoteEscolhido.nome}`
-            });
-            
-            conversa.estado = 'finalizado';
-            await conversa.save();
-        } else {
-            await sendWhatsAppMessage(telefoneCliente, 
-                `Não consegui identificar o serviço, ${nome}. Pode me dizer o número ou nome certinho? Ou se preferir, posso te passar para a Laura! 😊`);
-        }
-        return;
-    }
+async function criarClienteEFecharConversa(conversa, telefone, nome, dataNascimento) {
+  const cli = await Cliente.create({ nome, telefone, dataNascimento, observacoes: 'Criado via WhatsApp' });
+  await Conversa.deleteOne({ _id: conversa._id });
+  console.log(`AGENTE: Cliente criado – ${nome}`);
+  return cli;
 }
 
-/**
- * Busca agendamentos próximos do cliente (próximos 7 dias)
- */
+//---------------------------------------------------------------------
+// 7. Agendamentos próximos (7 dias)
+//---------------------------------------------------------------------
 async function buscarAgendamentosProximos(clienteId) {
-    const hoje = new Date();
-    const proximosSete = new Date();
-    proximosSete.setDate(hoje.getDate() + 7);
-
-    return await Agendamento.find({
-        cliente: clienteId,
-        dataHora: { $gte: hoje, $lte: proximosSete },
-        status: { $in: ['Agendado', 'Confirmado'] }
-    }).populate('pacote');
+  const hoje = new Date();
+  const fim  = new Date(); fim.setDate(hoje.getDate() + 7);
+  return Agendamento.find({ cliente: clienteId, dataHora: { $gte: hoje, $lte: fim }, status: { $in: ['Agendado', 'Confirmado'] } }).populate('pacote');
 }
 
-/**
- * Analisa intenção da mensagem (fallback manual)
- */
-function analisarIntencaoManual(mensagem) {
-    const msg = mensagem.toLowerCase().trim();
+//---------------------------------------------------------------------
+module.exports = { enviarLembretes24h, processarRespostaWhatsapp };
 
-    // Confirmação
-    if (msg.includes('sim') || msg.includes('confirmo') || msg.includes('confirmar') || 
-        msg.includes('ok') || msg.includes('certo') || msg.includes('perfeito')) {
-        return 'confirmar';
-    }
-
-    // Cancelamento
-    if (msg.includes('cancelar') || msg.includes('não vou') || msg.includes('nao vou') || 
-        msg.includes('desmarcar') || msg.includes('não posso') || msg.includes('nao posso') ||
-        msg.includes('não consigo') || msg.includes('nao consigo')) {
-        return 'cancelar';
-    }
-
-    // Reagendamento
-    if (msg.includes('remarcar') || msg.includes('mudar') || msg.includes('outro dia') || 
-        msg.includes('outro horário') || msg.includes('outro horario') || msg.includes('reagendar')) {
-        return 'remarcar';
-    }
-
-    // Dúvidas
-    if (msg.includes('dúvida') || msg.includes('duvida') || msg.includes('pergunta') || 
-        msg.includes('?') || msg.includes('como') || msg.includes('quando') || msg.includes('onde') ||
-        msg.includes('quanto') || msg.includes('preço') || msg.includes('preco') || msg.includes('valor')) {
-        return 'pergunta';
-    }
-
-    // Não identificado
-    return 'outro';
-}
-
-/**
- * Processa confirmação de agendamento
- */
-async function processarConfirmacao(cliente, agendamentos) {
-    if (agendamentos.length === 0) {
-        const mensagem = `Olá ${cliente.nome}! 😊
-
-Não encontrei nenhum agendamento próximo para confirmar. Se você tem algum agendamento marcado, vou encaminhar para a Laura verificar.
-
-Qualquer coisa, estou aqui! 💕`;
-        
-        await sendWhatsAppMessage(cliente.telefone, mensagem);
-        return;
-    }
-
-    // Confirma o primeiro agendamento encontrado
-    const agendamento = agendamentos[0];
-    agendamento.status = 'Confirmado';
-    await agendamento.save();
-
-    const dataFormatada = DateTime.fromJSDate(agendamento.dataHora, { zone: 'Europe/Lisbon' })
-        .toFormat('dd/MM/yyyy \'às\' HH:mm');
-    const servico = agendamento.pacote?.nome || agendamento.servicoAvulsoNome || 'seu atendimento';
-
-    const mensagem = `Perfeito, ${cliente.nome}! ✅
-
-Seu agendamento está confirmado:
-📅 ${servico}
-🕐 ${dataFormatada}
-
-Nos vemos em breve! Se precisar de algo, é só chamar 💕`;
-
-    await sendWhatsAppMessage(cliente.telefone, mensagem);
-}
-
-/**
- * Processa cancelamento de agendamento
- */
-async function processarCancelamento(cliente, agendamentos) {
-    if (agendamentos.length === 0) {
-        const mensagem = `Olá ${cliente.nome}! 😊
-
-Não encontrei agendamentos próximos para cancelar. Vou encaminhar sua mensagem para a Laura verificar.
-
-Qualquer coisa, estou aqui! 💕`;
-        
-        await sendWhatsAppMessage(cliente.telefone, mensagem);
-        return;
-    }
-
-    const agendamento = agendamentos[0];
-    agendamento.status = 'Cancelado';
-    await agendamento.save();
-
-    const mensagem = `Entendido, ${cliente.nome}! 
-
-Seu agendamento foi cancelado conforme solicitado. 
-
-Se quiser reagendar para outro dia, é só me avisar! Estou aqui para ajudar 💕`;
-
-    await sendWhatsAppMessage(cliente.telefone, mensagem);
-}
-
-/**
- * Processa solicitação de reagendamento
- */
-async function processarReagendamento(cliente, agendamentos) {
-    const mensagem = `Olá ${cliente.nome}! 😊
-
-Entendi que você gostaria de remarcar seu agendamento. Vou encaminhar sua solicitação para a Laura, que entrará em contato para verificar a disponibilidade de novos horários.
-
-Ela tem a agenda toda na cabeça! 💕`;
-
-    await sendWhatsAppMessage(cliente.telefone, mensagem);
-}
-
-/**
- * Processa mensagens não identificadas
- */
-async function processarNaoIdentificado(cliente, mensagemOriginal) {
-    const mensagem = `Olá ${cliente.nome}! 😊
-
-Recebi sua mensagem, mas não consegui entender exatamente como posso ajudar. Vou encaminhar para a Laura, que entrará em contato em breve.
-
-Ela sempre sabe o que fazer! 💕`;
-
-    await sendWhatsAppMessage(cliente.telefone, mensagem);
-}
-
-module.exports = {
-  enviarLembretes24h,
-  processarRespostaWhatsapp,
-};

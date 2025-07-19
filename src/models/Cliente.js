@@ -15,14 +15,20 @@ const clienteSchema = new mongoose.Schema({
     maxlength: [15, 'Telefone deve ter no máximo 15 dígitos'],
     match: [/^[\d\+\-\(\)\s]+$/, 'Formato de telefone inválido. Use apenas números, +, -, (, ) e espaços'],
     // Função para limpar o telefone antes de salvar
-    set: v => v.replace(/\s+/g, '').trim() // Remove espaços extras
+    set: v => {
+      if (!v) return v;
+      // Remove caracteres não numéricos
+      return v.replace(/[^\d]/g, '');
+    }
   },
-   email: { // <-- Adicione aqui, se desejar
+  email: {
     type: String,
     trim: true,
     lowercase: true,
     match: [/^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$/, 'Email inválido.'],
-    sparse: true // Permite valores nulos, mas impõe unicidade para não nulos
+    unique: true,
+    sparse: true, // Permite valores nulos, mas impõe unicidade para não nulos
+    set: v => (v === '' ? null : v) // Converte string vazia para null
   },
   dataNascimento: {
     type: Date,
@@ -125,7 +131,36 @@ clienteSchema.add({
   grauHipertensao: { type: String, trim: true, default: '' }, // Campo para "Grau?" da hipertensão
   tipoDiabetes: { type: String, trim: true, default: '' }, // Campo para "Tipo?" da diabetes
   qualEpilepsia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da epilepsia
-  observacoesAdicionaisAnamnese: { type: String, trim: true, default: '' } // Para observações gerais da anamnese
+  observacoesAdicionaisAnamnese: { type: String, trim: true, default: '' }, // Para observações gerais da anamnese
+  estadoConversa: {
+    type: String,
+    default: 'inicial', // Ex: inicial, aguardando_confirmacao_cliente, aguardando_dados_cadastro, cadastrado, etc.
+    enum: [
+      'inicial',
+      'aguardando_confirmacao_cliente',
+      'aguardando_dados_cadastro',
+      'cadastrado',
+      'aguardando_info_extra',
+      'aguardando_agendamento',
+      'aguardando_feedback',
+      'inativo'
+    ]
+  },
+  historicoMensagens: [
+    {
+      data: { type: Date, default: Date.now },
+      mensagem: String,
+      resposta: String,
+      intent: String, // Ex: novo_agendamento, reagendamento, etc.
+      entidades: Object // Para guardar entidades extraídas, se quiser
+    }
+  ],
+  preferencias: {
+    tomDeVoz: { type: String, default: '' }, // Ex: "formal", "informal", "carinhosa"
+    assuntosFrequentes: [String],
+    outros: { type: Object, default: {} }
+  }
+
 });
 
 clienteSchema.index({ nome: 1 });
