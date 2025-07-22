@@ -8,7 +8,7 @@ const { OpenAI } = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Carrega prompt do sistema (super-prompt) de src/utils/systemLaura.md
-const systemPromptPath = path.join(__dirname, 'systemLaura.md');
+const systemPromptPath = path.join(__dirname, '../prompt/systemLaura.md');
 let systemPrompt = '';
 try {
   systemPrompt = fs.readFileSync(systemPromptPath, 'utf8');
