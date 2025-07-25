@@ -106,37 +106,210 @@ async function gerarOpcoesHorarios() {
 //---------------------------------------------------------------------
 async function processarRespostaWhatsapp(req, res) {
   try {
+    // 1. Extrai telefone e texto da request
     const telefone = req.body.phone || req.body.telefoneCliente;
     const texto    = (req.body.text && req.body.text.message) || req.body.mensagem;
     if (!telefone || !texto) return res.status(400).json({ error: 'Dados incompletos' });
 
-    const cliente  = await Cliente.findOne({ telefone });
-    const contexto = { cliente };
-
-    let resposta = await chatWithLaura({ userMsg: texto, ctx: contexto });
-
-    if (resposta.function_call) {
-      const { name, arguments: args } = resposta.function_call;
-      const result = await dispatch(name, JSON.parse(args));
-
-      resposta = await chatWithLaura({
-        userMsg: texto,
-        ctx: contexto,
-        functionResponse: { name, result },
-      });
+    // 2. Recupera ou inicia conversa
+    let conversa = await Conversa.findOne({ telefone });
+    if (!conversa) {
+      conversa = await Conversa.create({ telefone, estado: 'iniciando', dados: {} });
     }
 
-    await sendWhatsAppMessage(telefone, resposta.content);
-    res.sendStatus(200);
+    // 3. Fluxo inicial: perguntar se é cliente novo ou existente
+    switch (conversa.estado) {
+      case 'iniciando':
+        await sendWhatsAppMessage(
+          telefone,
+          'Olá! Primeiro, confirmo se já és cliente da Laura ou se é a tua primeira vez conosco?'
+        );
+        conversa.estado = 'aguardando_tipo_cliente';
+        await conversa.save();
+        break;
+
+      case 'aguardando_tipo_cliente':
+        // Devolve o texto ao LLM para decidir próximo passo do fluxo
+        await handleLLM(texto, conversa);
+        break;
+
+      default:
+        // Demais interações ficam a cargo do LLM
+        await handleLLM(texto, conversa);
+        break;
+    }
+
+    return res.sendStatus(200);
   } catch (err) {
-    console.error('Webhook erro →', err);
-    try {
-      await sendWhatsAppMessage(req.body.phone, 'Desculpa, houve um problema, estaremos a resolver  😊');
-    } catch (_) {}
-    res.status(500).json({ success: false });
+    console.error('Erro no webhook:', err);
+    const telefone = req.body.phone || req.body.telefoneCliente;
+    await sendWhatsAppMessage(telefone, 'Desculpa, algo correu mal.');
+    return res.sendStatus(500);
   }
 }
 
+
+  /**
+ * Delegar ao LLM para continuar o fluxo após o estado inicial,
+ * processando chamadas de ferramenta via `tool_calls`.
+ */
+async function processarRespostaWhatsapp(req, res) {
+  try {
+    // 1. Extrai telefone e texto da request
+    const telefone = req.body.phone || req.body.telefoneCliente;
+    const texto    = (req.body.text && req.body.text.message) || req.body.mensagem;
+    if (!telefone || !texto) return res.status(400).json({ error: 'Dados incompletos' });
+
+    // 2. Recupera ou inicia conversa
+    let conversa = await Conversa.findOne({ telefone });
+    if (!conversa) {
+      conversa = await Conversa.create({ telefone, estado: 'iniciando', dados: {} });
+    }
+
+    // 3. Fluxo inicial: perguntar se é cliente novo ou existente
+    switch (conversa.estado) {
+      case 'iniciando':
+        await sendWhatsAppMessage(
+          telefone,
+          'Olá! Primeiro, confirmo se já és cliente da Laura ou se é a tua primeira vez conosco?'
+        );
+        conversa.estado = 'aguardando_tipo_cliente';
+        await conversa.save();
+        break;
+
+      case 'aguardando_tipo_cliente':
+        // Devolve o texto ao LLM para decidir próximo passo do fluxo
+        await handleLLM(texto, conversa);
+        break;
+
+      default:
+        // Demais interações ficam a cargo do LLM
+        await handleLLM(texto, conversa);
+        break;
+    }
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error('Erro no webhook:', err);
+    const telefone = req.body.phone || req.body.telefoneCliente;
+    await sendWhatsAppMessage(telefone, 'Desculpa, algo correu mal.');
+    return res.sendStatus(500);
+  }
+}
+
+/**
+ * Delegar ao LLM para continuar o fluxo após o estado inicial,
+ * processando chamadas de ferramenta via `tool_calls`.
+ */
+async function processarRespostaWhatsapp(req, res) {
+  try {
+    // 1. Extrai telefone e texto da request
+    const telefone = req.body.phone || req.body.telefoneCliente;
+    const texto    = (req.body.text && req.body.text.message) || req.body.mensagem;
+    if (!telefone || !texto) return res.status(400).json({ error: 'Dados incompletos' });
+
+    // 2. Recupera ou inicia conversa
+    let conversa = await Conversa.findOne({ telefone });
+    if (!conversa) {
+      conversa = await Conversa.create({ telefone, estado: 'iniciando', dados: {} });
+    }
+
+    // 3. Fluxo inicial: perguntar se é cliente novo ou existente
+    switch (conversa.estado) {
+      case 'iniciando':
+        await sendWhatsAppMessage(
+          telefone,
+          'Olá! Primeiro, confirmo se já és cliente da Laura ou se é a tua primeira vez conosco?'
+        );
+        conversa.estado = 'aguardando_tipo_cliente';
+        await conversa.save();
+        break;
+
+      case 'aguardando_tipo_cliente':
+        // Devolve o texto ao LLM para decidir próximo passo do fluxo
+        await handleLLM(texto, conversa);
+        break;
+
+      default:
+        // Demais interações ficam a cargo do LLM
+        await handleLLM(texto, conversa);
+        break;
+    }
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error('Erro no webhook:', err);
+    const telefone = req.body.phone || req.body.telefoneCliente;
+    await sendWhatsAppMessage(telefone, 'Desculpa, algo correu mal.');
+    return res.sendStatus(500);
+  }
+}
+
+/**
+ * Delegar ao LLM para continuar o fluxo após o estado inicial,
+ * processando chamadas de ferramenta via `tool_calls`.
+ */
+async function handleLLM(texto, conversa) {
+  // 1. Monta contexto e chama LLM
+  const cliente = await Cliente.findOne({ telefone: conversa.telefone });
+  const ctx = {
+    cliente: cliente || null,
+    estado: conversa.estado,
+    dados: conversa.dados
+  };
+  const resposta = await chatWithLaura({ userMsg: texto, ctx });
+
+  // 2. Suporte a function_call (antigo) ou tool_calls (nova API)
+  let calls = [];
+  if (resposta.tool_calls && resposta.tool_calls.length) {
+    calls = resposta.tool_calls;
+  } else if (resposta.function_call) {
+    calls = [{ function: resposta.function_call }];
+  }
+
+  if (calls.length > 0) {
+    for (const call of calls) {
+      const { name, arguments: argsStr } = call.function;
+      console.log(`Executando ferramenta: ${name} com args: ${argsStr}`);
+      let args;
+      try {
+        args = JSON.parse(argsStr);
+      } catch (e) {
+        console.error(`Erro ao parsear args para ${name}:`, e);
+        continue;
+      }
+      // Executa dispatch e atualiza conversa
+      let result;
+      try {
+        result = await dispatch(name, args);
+      } catch (e) {
+        console.error(`Erro no dispatch da ferramenta ${name}:`, e);
+        continue;
+      }
+      if (result.updatedDados) conversa.dados = { ...conversa.dados, ...result.updatedDados };
+      if (result.nextState) conversa.estado = result.nextState;
+      await conversa.save();
+
+      // 3. Follow-up: envia resposta pós-tool-call
+      const followUp = await chatWithLaura({ functionResponse: { name, result }, ctx });
+      if (followUp.content) {
+        await sendWhatsAppMessage(conversa.telefone, followUp.content);
+      } else {
+        // Se não houver conteúdo, e houver novas chamadas, processa recursivamente
+        await handleLLM('', conversa);
+      }
+    }
+    return;
+  }
+
+  // 4. Sem chamadas de ferramenta: envia texto naturalmente
+  if (resposta.content) {
+    await sendWhatsAppMessage(conversa.telefone, resposta.content);
+  }
+}
+
+
+/*
 //---------------------------------------------------------------------
 // 5. Montar contexto dinâmico para a IA
 //---------------------------------------------------------------------
@@ -225,16 +398,19 @@ async function criarClienteEFecharConversa(conversa, telefone, nome, dataNascime
   console.log(`AGENTE: Cliente criado – ${nome}`);
   return cli;
 }
-
+*/
 //---------------------------------------------------------------------
 // 7. Agendamentos próximos (7 dias)
 //---------------------------------------------------------------------
 async function buscarAgendamentosProximos(clienteId) {
   const hoje = new Date();
   const fim  = new Date(); fim.setDate(hoje.getDate() + 7);
-  return Agendamento.find({ cliente: clienteId, dataHora: { $gte: hoje, $lte: fim }, status: { $in: ['Agendado', 'Confirmado'] } }).populate('pacote');
+  return Agendamento.find({
+    cliente: clienteId,
+    dataHora: { $gte: hoje, $lte: fim },
+    status: { $in: ['Agendado', 'Confirmado'] }
+  }).populate('pacote');
 }
 
 //---------------------------------------------------------------------
-module.exports = { enviarLembretes24h, processarRespostaWhatsapp };
-
+module.exports = { enviarLembretes24h, processarRespostaWhatsapp, gerarOpcoesHorarios, buscarAgendamentosProximos };

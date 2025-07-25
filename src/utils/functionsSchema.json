@@ -3,7 +3,7 @@
 [
   {
     "name": "create_client",
-    "description": "Cria um novo cliente na base de dados e devolve o ID",
+    "description": "Cria cliente existente no bando de dados",
     "parameters": {
       "type": "object",
       "properties": {
