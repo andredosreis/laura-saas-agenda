@@ -1,22 +1,20 @@
-const express = require('express');
+import express from 'express';
+import {
+  createPacote,
+  getAllPacotes,
+  getPacote,
+  updatePacote,
+  deletePacote
+} from '../controllers/pacoteController.js';
+import validateObjectId from '../middlewares/validateObjectId.js';
+
 const router = express.Router();
-const pacoteController = require('../controllers/pacoteController');
 
-// GET /api/pacotes
-router.get('/', pacoteController.getAllPacotes);
+// Rotas CRUD para Pacotes
+router.get('/', getAllPacotes);
+router.post('/', createPacote);
+router.get('/:id', validateObjectId, getPacote);
+router.put('/:id', validateObjectId, updatePacote);
+router.delete('/:id', validateObjectId, deletePacote);
 
-
-// Criar novo pacote
-router.post('/', pacoteController.createPacote);
-
-// Buscar pacote por ID
-router.get('/:id', pacoteController.getPacotePorId);
-
-// Atualizar pacote por ID
-router.put('/:id', pacoteController.atualizarPacote);
-
-
-//deletar pacote
-router.delete('/:id', pacoteController.deletarPacote);
-
-module.exports = router;
+export default router;

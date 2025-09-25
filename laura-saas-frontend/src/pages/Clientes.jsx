@@ -51,7 +51,11 @@ function Clientes() {
     try {
       setIsLoading(true);
       const response = await api.get("/clientes");
-      setClientes(response.data);
+
+      console.log("DADOS RECEBIDOS PELA API:", response.data);
+
+      //const dados = response.data;
+       setClientes(Array.isArray(response.data) ? response.data : []);
     } finally {
       setIsLoading(false);
     }

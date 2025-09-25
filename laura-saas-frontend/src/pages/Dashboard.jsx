@@ -20,7 +20,7 @@ function Dashboard() {
     async function fetchDadosDashboard() {
       setIsLoading(true);
       try {
-        const [
+         const [
           resAgendamentosHoje,
           resTotais,
           resListaAmanha,
@@ -38,13 +38,16 @@ function Dashboard() {
           api.get('/dashboard/proximos-agendamentos?limit=5')
         ]);
 
-        setAgendamentosHoje(resAgendamentosHoje.data || []);
+        // Aplicamos a verificação segura para todos os arrays
+        setAgendamentosHoje(Array.isArray(resAgendamentosHoje.data) ? resAgendamentosHoje.data : []);
         setTotais(resTotais.data || {});
-        setAgendamentosAmanha(resListaAmanha.data || []);
+        setAgendamentosAmanha(Array.isArray(resListaAmanha.data) ? resListaAmanha.data : []);
         setContagemAmanha(resContagemAmanha.data.contagem ?? 0);
         setConcluidosSemana(resSemana.data.contagem ?? 0);
-        setSessoesBaixas(resSessoes.data.clientes || []);
-        setProximosAgendamentosLista(resProximosAgendamentos.data.agendamentos || []);
+        setSessoesBaixas(Array.isArray(resSessoes.data.clientes) ? resSessoes.data.clientes : []);
+        
+        // A LINHA CORRIGIDA E COMPLETA ESTÁ AQUI:
+        setProximosAgendamentosLista(Array.isArray(resProximosAgendamentos.data.agendamentos) ? resProximosAgendamentos.data.agendamentos : []);
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
         // toast.error("Falha ao carregar dados do dashboard.");

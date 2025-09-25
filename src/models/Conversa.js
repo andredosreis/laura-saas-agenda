@@ -1,12 +1,11 @@
-// src/models/Conversa.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 // Subschema para armazenar dados temporários coletados via LLM
 const DadosSchema = new mongoose.Schema({
   clientId: { type: String },    // preenchido após persistência
   name: { type: String },
   telephone: { type: String },
-  dateOfBirth: { type: Date }// jamais pegar dados dos clientes se for novo por causa do LGPD
+  dateOfBirth: { type: Date } // jamais pegar dados dos clientes se for novo por causa do LGPD
 }, { _id: false });
 
 const ConversaSchema = new mongoose.Schema({
@@ -39,4 +38,5 @@ ConversaSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('Conversa', ConversaSchema);
+// A única outra mudança está aqui:
+export default mongoose.model('Conversa', ConversaSchema);

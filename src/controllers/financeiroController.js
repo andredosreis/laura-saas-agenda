@@ -1,7 +1,7 @@
 // src/controllers/financeiroController.js
-const Agendamento = require('../models/Agendamento');
-const Pacote = require('../models/Pacote'); // Precisaremos para calcular o valor da sessão do pacote
-const Cliente = require('../models/Cliente'); // Pode ser útil se precisarmos de dados do cliente
+import  Agendamento from '../models/Agendamento';
+import Pacote from '../models/Pacote';
+import Cliente from '../models/Cliente'; // Pode ser útil se precisarmos de dados do cliente
 
 // Função para calcular a receita total do mês atual
 const getReceitaMensalAtual = async (req, res) => {

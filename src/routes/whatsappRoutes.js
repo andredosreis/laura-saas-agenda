@@ -1,25 +1,19 @@
-const express = require('express');
-const router = express.Router();
-
-const {
+import express from 'express';
+import {
   notificarCliente,
   enviarMensagemDireta,
   notificarAgendamentosAmanha,
   zapiWebhook
-} = require('../controllers/whatsappController');
-const agenteController = require('../controllers/agenteController');
+} from '../controllers/whatsappController.js';
 
-// Rota para notificar cliente (com lógica de negócio)
+const router = express.Router();
+
+// Rota para o webhook da Z-API (recebe mensagens dos clientes)
+router.post('/webhook', zapiWebhook);
+
+// Rotas manuais/administrativas
 router.post('/notificar', notificarCliente);
-router.post('/notificar-agendamentos-amanha', notificarAgendamentosAmanha);
+router.post('/enviar-direta', enviarMensagemDireta);
+router.post('/lembretes-amanha', notificarAgendamentosAmanha);
 
-// Rota principal do webhook (Z-API deve apontar para /webhook)
-router.post('/', (req, res, next) => {
-  console.log('Webhook recebido! Body:', req.body);
-  next();
-}, agenteController.processarRespostaWhatsapp);
-
-// Rota para envio direto (debug/testes manuais)
-router.post('/send', enviarMensagemDireta);
-
-module.exports = router;
+export default router;

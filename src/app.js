@@ -1,48 +1,73 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv-flow').config();
-const requestLogger = require('./middlewares/requestLogger');
-const errorHandler = require('./middlewares/errorHandler');
-const whatsappRoutes = require('./routes/whatsappRoutes');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv-flow';
+import morgan from 'morgan';
+
+// Carrega as variáveis de ambiente
+dotenv.config();
+
+// Middlewares
+import requestLogger from './middlewares/requestLogger.js';
+import errorHandler from './middlewares/errorHandler.js';
+
+// Rotas
+import clienteRoutes from './routes/clienteRoutes.js';
+import pacoteRoutes from './routes/pacoteRoutes.js';
+import agendamentoRoutes from './routes/agendamentoRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import whatsappRoutes from './routes/whatsappRoutes.js';
+import agenteRoutes from './routes/agenteRoutes.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
 
 const app = express();
 
-// ===============================
-// CORS: Desenvolvimento x Produção
-// ===============================
-app.use(cors()); // Em desenvolvimento, libera geral
-
-// Em produção, use assim (ajuste o domínio conforme necessário):
- app.use(cors({
-   origin: ['https://laura-saas-agenda-mfqt.vercel.app'],
+// --- Configuração do CORS ---
+const whiteList = ['https://laura-saas-agenda-mfqt.vercel.app'];
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Permite requisições sem 'origin' (ex: Postman, apps mobile) ou da sua whitelist
+    if (!origin || whiteList.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
- }));
-
-// ===============================
+};
+// Em ambiente de desenvolvimento, podemos ser menos restritos
+if (process.env.NODE_ENV === 'development') {
+  app.use(cors());
+} else {
+  app.use(cors(corsOptions));
+}
+// --- Fim da Configuração do CORS ---
 
 // Middlewares globais
-app.use(express.json());
+app.use(express.json()); // para parsear JSON
+app.use(morgan('dev')); // para logs de requisição
 app.use(requestLogger);
-app.use(errorHandler);
 
-// Rotas da API
-app.use('/api/clientes', require('./routes/clienteRoutes'));
-app.use('/api/pacotes', require('./routes/pacoteRoutes'));
-app.use('/api/agendamentos', require('./routes/agendamentoRoutes'));
-app.use('/api/dashboard', require('./routes/dashboardRoutes'));
-app.use('/api/analytics', require('./routes/analyticsRoutes'));
-app.use('/api/whatsapp', require('./routes/whatsappRoutes'));
-app.use('/api/agente', require('./routes/agenteRoutes'));
-// app.use('/api/webhook', require('./routes/webhook')); // Só use se realmente precisar dessa rota
+// Endpoints da API
+app.use('/api/clientes', clienteRoutes);
+app.use('/api/pacotes', pacoteRoutes);
+app.use('/api/agendamentos', agendamentoRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/agente', agenteRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
-// Rota principal do webhook para Z-API
+// Rota principal do webhook para Z-API (se aplicável)
 app.use('/webhook', whatsappRoutes);
 
-// app.use('/api/financeiro', require('./routes/financeiroRoutes')); // descomente se/quando usar
-
-// Rota de teste/saúde
+// Rota de teste
 app.get('/', (req, res) => {
-  res.send('🚀 API Laura SaaS funcionando!');
+  res.send('🚀 API Laura SaaS a funcionar!');
 });
 
-module.exports = app;
+// Middleware de tratamento de erros (deve ser o último)
+app.use(errorHandler);
+
+// A correção principal: usar "export default"
+export default app;

@@ -10,6 +10,7 @@ function Navbar() {
     { to: "/clientes", text: "Clientes" },
     { to: "/agendamentos", text: "Agendamentos" },
     { to: "/pacotes", text: "Pacotes" },
+    { to: "/disponibilidade", text: "Disponibilidade" },
     // Adicionar mais links aqui se necessário
   ];
 

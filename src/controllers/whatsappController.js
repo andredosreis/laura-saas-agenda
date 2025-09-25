@@ -1,37 +1,33 @@
-const Agendamento = require('../models/Agendamento');
-const Cliente = require('../models/Cliente'); // ou Cliente, conforme seu arquivo
-const {  sendWhatsAppMessage } = require('../utils/zapi_client');
-const { classificarIntencaoCliente, gerarRespostaLaura } = require('../utils/openaiHelper');
+import Agendamento from '../models/Agendamento.js';
+import Cliente from '../models/Cliente.js';
+import { sendWhatsAppMessage, sendZapiWhatsAppMessage } from '../utils/zapi_client.js';
+import { classificarIntencaoCliente } from '../utils/openaiHelper.js';
 
-
-
-// Função para notificar cliente individual
-async function notificarCliente(req, res) {
+export const notificarCliente = async (req, res) => {
   const { telefone, mensagem } = req.body;
   if (!telefone || !mensagem) {
     return res.status(400).json({ ok: false, error: 'Telefone e mensagem são obrigatórios.' });
   }
-  const result = await  sendWhatsAppMessage(telefone, mensagem);
+  const result = await sendWhatsAppMessage(telefone, mensagem);
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {
     return res.status(500).json({ ok: false, error: result.error });
   }
-}
+};
 
-// Função para enviar mensagem de teste
-async function enviarMensagemDireta(req, res) {
+export const enviarMensagemDireta = async (req, res) => {
   const { to, body } = req.body;
+  // Nota: Verifique se 'sendZapiWhatsAppMessage' é a função correta que você quer usar aqui.
   const result = await sendZapiWhatsAppMessage(to, body);
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {
     return res.status(500).json({ ok: false, error: result.error });
   }
-}
+};
 
-// Enviar mensagem para todos com agendamento amanhã
-async function notificarAgendamentosAmanha(req, res) {
+export const notificarAgendamentosAmanha = async (req, res) => {
   try {
     const hoje = new Date();
     const amanha = new Date();
@@ -46,90 +42,59 @@ async function notificarAgendamentosAmanha(req, res) {
     }).populate('cliente');
 
     const resultados = [];
-
     for (const ag of agendamentos) {
-      const telefone = ag.cliente?.telefone;
-      if (!telefone) continue;
-
+      if (!ag.cliente?.telefone) continue;
       const hora = new Date(ag.dataHora).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-      const mensagem = `Olá ${ag.cliente.nome}, tudo bem? Este é um lembrete do seu atendimento marcado para amanhã às ${hora}. Qualquer dúvida, estamos à disposição.`;
-
-      const resultado = await sendWhatsAppMessage(telefone, mensagem);
+      const mensagem = `Olá ${ag.cliente.nome}, este é um lembrete do seu atendimento para amanhã às ${hora}.`;
+      const resultado = await sendWhatsAppMessage(ag.cliente.telefone, mensagem);
       resultados.push({ cliente: ag.cliente.nome, status: resultado.success });
     }
-
     return res.status(200).json({ ok: true, enviados: resultados.length, detalhes: resultados });
-
   } catch (error) {
     console.error('Erro ao enviar lembretes:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
-}
+};
 
-async function zapiWebhook(req, res) {
-const phone = req.body?.phone || req.body?.body?.phone || req.body?.data?.phone;
-const texto = req.body?.text?.message || req.body?.body?.text?.message || req.body?.message;
+export const zapiWebhook = async (req, res) => {
+  const phone = req.body?.phone || req.body?.body?.phone || req.body?.data?.phone;
+  const texto = req.body?.text?.message || req.body?.body?.text?.message || req.body?.message;
 
+  if (!phone || !texto) {
+      return res.status(200).send('Ignorando evento sem telefone ou texto.');
+  }
+  
   let cliente = await Cliente.findOne({ telefone: phone });
 
-  // Debug
-  console.log('Telefone:', phone, 'Etapa:', cliente?.etapaConversa, 'Texto:', texto);
-
   if (!cliente) {
-    await  sendWhatsAppMessage(phone, "Oi! Não encontrei seu cadastro. Qual o seu nome, por favor?");
+    await sendWhatsAppMessage(phone, "Olá! Bem-vindo(a). Para começarmos, qual o seu nome completo?");
     await Cliente.create({ telefone: phone, etapaConversa: 'aguardando_nome' });
-    return res.json({ status: 'aguardando_nome' });
+    return res.json({ status: 'novo_cliente_aguardando_nome' });
   }
 
   if (cliente.etapaConversa === 'aguardando_nome') {
     cliente.nome = texto;
-    cliente.etapaConversa = 'livre';
+    cliente.etapaConversa = 'livre'; // Estado padrão após registro
     await cliente.save();
-    await  sendWhatsAppMessage(phone, `Muito obrigado, ${cliente.nome}! Agora posso te ajudar. Em que posso ajudar hoje?`);
+    await sendWhatsAppMessage(phone, `Obrigado, ${cliente.nome}! O seu registo está completo. Como posso ajudar hoje?`);
     return res.json({ status: 'nome_registrado' });
   }
 
-  // >>> ETAPA CRÍTICA: sempre trate etapas específicas ANTES da intenção! <<<
-  if (cliente.etapaConversa === 'aguardando_nova_data') {
-    // Aqui você pode chamar outro helper da IA para extrair a data/hora da frase!
-    // const dataDesejada = texto; // depois pode usar IA para estruturar melhor
-    // const horariosLivres = await buscarHorariosDisponiveis(dataDesejada);
-    await  sendWhatsAppMessage(phone, `Ótimo, ${cliente.nome}! Tenho os seguintes horários: 14h, 16h e 18h. Qual prefere?`);
-    cliente.etapaConversa = 'aguardando_confirmacao_horario';
-    await cliente.save();
-    return res.json({ status: 'sugeriu_horarios' });
-  }
+  // Lógica de estado da conversa (ex: reagendamento)
+  // ...
 
-  if (cliente.etapaConversa === 'aguardando_confirmacao_horario') {
-    // Salva agendamento no banco!
-    await sendWhatsAppMessage(phone, `Prontinho, ${cliente.nome}! Seu atendimento foi remarcado para o horário escolhido. Qualquer dúvida, é só chamar!`);
-    cliente.etapaConversa = 'livre';
-    await cliente.save();
-    return res.json({ status: 'remarcado' });
-  }
-
-  // Só depois disso, classifica intenção!
+  // Se não estiver num fluxo específico, usa a IA para classificar a intenção
   const intencao = await classificarIntencaoCliente(texto);
-  console.log('Intenção IA:', intencao);
 
-  if (intencao && intencao.toUpperCase().startsWith('REM')) {
+  if (intencao && intencao.toUpperCase().includes('REM')) {
     cliente.etapaConversa = 'aguardando_nova_data';
     await cliente.save();
-    await sendWhatsAppMessage(phone, `Sem problemas, ${cliente.nome}! Para qual dia e horário gostaria de remarcar?`);
-    return res.json({ status: 'remarcar_perguntou_data' });
+    await sendWhatsAppMessage(phone, `Entendido, ${cliente.nome}. Para qual dia gostaria de remarcar?`);
+    return res.json({ status: 'iniciando_reagendamento' });
   }
 
-  // ... outros fluxos de intenção aqui (CONFIRMAR, CANCELAR, PERGUNTA, OUTRO) ...
-
-  await sendWhatsAppMessage(phone, `Oi, ${cliente.nome}! Sua mensagem foi recebida. Em que posso te ajudar?`);
-  return res.json({ status: 'livre' });
-}
-
-
-// Exporte tudo no final:
-module.exports = {
-  notificarCliente,
-  enviarMensagemDireta,
-  notificarAgendamentosAmanha,
-  zapiWebhook
+  // Resposta padrão
+  const respostaIA = `Olá ${cliente.nome}! Recebi a sua mensagem. A nossa equipa irá responder assim que possível.`;
+  await sendWhatsAppMessage(phone, respostaIA);
+  return res.json({ status: 'resposta_padrao_enviada' });
 };

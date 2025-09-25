@@ -1,22 +1,23 @@
-// src/services/functionDispatcher.js
-const Cliente     = require('../models/Cliente');
-const Agendamento = require('../models/Agendamento');
+import Cliente from '../models/Cliente.js';
+import Agendamento from '../models/Agendamento.js';
 
 /**
  * Executa a função solicitada pela LLM.
  * @param {string} name – nome da função (de functionsSchema.json)
  * @param {object} args – argumentos fornecidos pela LLM
- * @returns {object} – dados para atualização do fluxo de conversa
+ * @returns {Promise<object>} – dados para atualização do fluxo de conversa
  */
-async function dispatch(name, args) {
+export const dispatch = async (name, args) => {
+  console.log(`DISPATCHER: A executar a ferramenta '${name}'...`);
+
   switch (name) {
     case 'create_client': {
-      // Cria um novo cliente temporário no BD
       const cli = await Cliente.create({
         nome: args.name,
         telefone: args.telephone || args.phone,
         dataNascimento: args.dateOfBirth || args.birthDate ? new Date(args.dateOfBirth || args.birthDate) : undefined,
-        status: 'testing',
+        // status: 'testing', // Sugestão: usar o campo 'etapaConversa' que já existe
+        etapaConversa: 'aguardando_agendamento',
       });
       return {
         clientId: cli._id.toString(),
@@ -26,7 +27,6 @@ async function dispatch(name, args) {
     }
 
     case 'update_client_data': {
-      // Atualiza nome, telefone e data de nascimento de cliente existente
       await Cliente.findByIdAndUpdate(
         args.clientId,
         {
@@ -43,7 +43,6 @@ async function dispatch(name, args) {
     }
 
     case 'schedule_appointment': {
-      // Cria um agendamento para o cliente
       const appt = await Agendamento.create({
         cliente: args.clientId,
         dataHora: new Date(args.datetime),
@@ -57,11 +56,10 @@ async function dispatch(name, args) {
     }
 
     case 'update_appointment': {
-      // Reagenda ou cancela um agendamento
       if (args.action === 'reschedule') {
         const updated = await Agendamento.findByIdAndUpdate(
           args.appointmentId,
-          { dataHora: new Date(args.newDateTime), status: 'Reagendado' },
+          { dataHora: new Date(args.newDateTime), status: 'Agendado' }, // Mudança para 'Agendado' para consistência
           { new: true }
         );
         return {
@@ -72,7 +70,7 @@ async function dispatch(name, args) {
       }
       const cancelled = await Agendamento.findByIdAndUpdate(
         args.appointmentId,
-        { status: 'Cancelado' },
+        { status: 'Cancelado Pelo Cliente' }, // Usar um status mais descritivo
         { new: true }
       );
       return {
@@ -85,6 +83,4 @@ async function dispatch(name, args) {
     default:
       throw new Error(`Função desconhecida no dispatcher: ${name}`);
   }
-}
-
-module.exports = { dispatch };
+};

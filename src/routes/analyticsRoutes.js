@@ -1,10 +1,10 @@
-// src/routes/analyticsRoutes.js
-const express = require('express');
+import express from 'express';
+// Importamos a função específica que precisamos do controller
+import { getAlertaSessoesBaixas } from '../controllers/analyticsController.js';
+
 const router = express.Router();
- const analyticsController = require('../controllers/analyticsController');
- console.log('ROUTER (analyticsRoutes): analyticsController importado é:', analyticsController);
 
-// Exemplo de rota (pode adicionar depois)
-router.get('/alertas/sessoesBaixas', analyticsController.getAlertaSessoesBaixas);
+// A rota agora usa o nome importado diretamente
+router.get('/sessoes-baixas', getAlertaSessoesBaixas);
 
-module.exports = router;
+export default router;

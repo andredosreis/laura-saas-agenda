@@ -1,12 +1,13 @@
-// src/middlewares/validateObjectId.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-
-// Middleware que valida se req.params.id é um ObjectId válido
-module.exports = (req, res, next) => {
-  const { id } = req.params;
-  if (id && !mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'ID inválido' });
+const validateObjectId = (req, res, next) => {
+  // Verifica se o ID fornecido nos parâmetros da rota é um ObjectId válido do MongoDB
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'O ID fornecido é inválido.' });
   }
+  // Se for válido, passa para a próxima função (o controller)
   next();
 };
+
+// A correção principal está aqui:
+export default validateObjectId;

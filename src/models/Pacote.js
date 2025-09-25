@@ -1,6 +1,4 @@
-// Este é o teu schema atualizado - Ótimo!
-// Em src/models/Pacote.js (ou similar)
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const pacoteSchema = new mongoose.Schema({
   nome: {
@@ -18,7 +16,7 @@ const pacoteSchema = new mongoose.Schema({
     required: [true, 'O número de sessões é obrigatório.'],
     min: [1, 'O pacote deve ter pelo menos 1 sessão.']
   },
-  valor: { // CAMPO VALOR ADICIONADO E CORRETO!
+  valor: {
     type: Number,
     required: [true, 'O valor do pacote é obrigatório.'],
     min: [0, 'O valor não pode ser negativo.']
@@ -36,4 +34,5 @@ const pacoteSchema = new mongoose.Schema({
   timestamps: true // Adiciona createdAt e updatedAt automaticamente
 });
 
-module.exports = mongoose.model('Pacote', pacoteSchema);
+// A correção principal está aqui
+export default mongoose.model('Pacote', pacoteSchema);

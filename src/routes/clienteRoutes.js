@@ -1,34 +1,25 @@
-const express = require('express');
+import express from 'express';
+// 1. Importamos as funções específicas que precisamos do controller
+import {
+  createCliente,
+  getAllClientes,
+  getCliente,
+  updateCliente,
+  deleteCliente
+} from '../controllers/clienteController.js';
+
+// 2. Importamos o middleware da mesma forma moderna
+import validateObjectId from '../middlewares/validateObjectId.js';
+
 const router = express.Router();
-const clienteController = require('../controllers/clienteController');
-console.log('OBJETO clienteController IMPORTADO NAS ROTAS:', clienteController);
-const validateObjectId = require('../middlewares/validateObjectId');
 
+// Rotas CRUD para Clientes
+router.get('/', getAllClientes);
+router.post('/', createCliente);
 
+// 3. Usamos os nomes corretos e consistentes das funções importadas
+router.get('/:id', validateObjectId, getCliente);
+router.put('/:id', validateObjectId, updateCliente);
+router.delete('/:id', validateObjectId, deleteCliente);
 
-// Aqui futuramente vamos importar o controller e middlewares
-
-// rota teste
-/*router.get('/', (req, res) => {
-    res.json({ mensagem: 'Rota de clientes está funcionando!' });
-  });*/
-
-  //get/api/clientes
-router.get('/', clienteController.getAllClientes);
-
-router.post('/', clienteController.createCliente);
-
-router.get('/:id', validateObjectId, clienteController.buscarClientePorId);
-
-router.delete('/:id', validateObjectId, clienteController.deletarCliente);
-// src/routes/clienteRoutes.js
-router.put('/:id', validateObjectId, clienteController.atualizarCliente);
-
-
-
-
-
-
-module.exports = router;
-
-
+export default router;

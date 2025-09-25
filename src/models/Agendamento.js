@@ -1,16 +1,15 @@
-// src/models/Agendamento.js (VERSÃO CORRIGIDA)
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const agendamentoSchema = new mongoose.Schema({
   cliente: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Cliente', // Nome do modelo Cliente como definido em mongoose.model('Cliente', ...)
+    ref: 'Cliente',
     required: [true, "O cliente é obrigatório."]
   },
   pacote: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Pacote',  // Nome do modelo Pacote como definido em mongoose.model('Pacote', ...)
-    required: false // Pacote é opcional se for serviço avulso
+    ref: 'Pacote',
+    required: false
   },
   dataHora: {
     type: Date,
@@ -18,11 +17,8 @@ const agendamentoSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    // Ajuste esta lista de enum para os status exatos que você usa no frontend e backend.
-    // Exemplo: ['Agendado', 'Confirmado', 'Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu']
-    // O seu schema anterior tinha: ['AGENDADO', 'CONCLUIDO', 'CANCELADO']
-    // É importante que este enum seja consistente com o que o frontend envia e o controller espera.
-    enum: ['Agendado', 'Confirmado', 'Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu', 'AGENDADO', 'CONCLUIDO', 'CANCELADO'],
+    // Sugestão: Manter a lista limpa e consistente com um único padrão de capitalização.
+    enum: ['Agendado', 'Confirmado', 'Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'],
     default: 'Agendado'
   },
   observacoes: {
@@ -43,25 +39,19 @@ const agendamentoSchema = new mongoose.Schema({
   timestamps: true // Adiciona createdAt e updatedAt automaticamente
 });
 
-// Índices
+// Índices para otimização de performance
 agendamentoSchema.index({ dataHora: 1 });
 agendamentoSchema.index({ cliente: 1 });
 agendamentoSchema.index({ status: 1 });
 
-// Middleware pre-save
+// Middleware para validação antes de salvar
 agendamentoSchema.pre('save', function(next) {
   if (this.isNew && this.dataHora < new Date()) {
-    return next(new Error('Não é possível criar agendamentos com data no passado'));
+    // Cria um erro que será capturado pelo bloco .catch() no controller
+    return next(new Error('Não é possível criar agendamentos com data no passado.'));
   }
-  // Se você precisa garantir que o status seja salvo em maiúsculas, faça aqui ou no controller.
-  // Ex: if (this.isModified('status') && this.status) { this.status = this.status.toUpperCase(); }
   next();
 });
 
-// Seus métodos virtuais e estáticos podem ser adicionados aqui de volta, se não causarem problemas.
-// Ex: agendamentoSchema.virtual('isPast').get(...)
-// Ex: agendamentoSchema.statics.findTodayAppointments = function() { ... }
-// Ex: agendamentoSchema.methods.cancelar = async function() { ... }
-
-
-module.exports = mongoose.model('Agendamento', agendamentoSchema);
+// A correção principal está aqui: usar "export default"
+export default mongoose.model('Agendamento', agendamentoSchema);

@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const clienteSchema = new mongoose.Schema({
   nome: {
     type: String,
     required: [true, 'Nome é obrigatório'],
-    trim: true, // Remove espaços em branco no início e fim
+    trim: true,
     minlength: [3, 'Nome deve ter no mínimo 3 caracteres']
   },
   telefone: {
@@ -13,13 +13,8 @@ const clienteSchema = new mongoose.Schema({
     unique: true,
     minlength: [9, 'Telefone deve ter no mínimo 9 dígitos'],
     maxlength: [15, 'Telefone deve ter no máximo 15 dígitos'],
-    match: [/^[\d\+\-\(\)\s]+$/, 'Formato de telefone inválido. Use apenas números, +, -, (, ) e espaços'],
-    // Função para limpar o telefone antes de salvar
-    set: v => {
-      if (!v) return v;
-      // Remove caracteres não numéricos
-      return v.replace(/[^\d]/g, '');
-    }
+    match: [/^[\d\+\-\(\)\s]+$/, 'Formato de telefone inválido.'],
+    set: v => v ? v.replace(/[^\d]/g, '') : v
   },
   email: {
     type: String,
@@ -27,17 +22,16 @@ const clienteSchema = new mongoose.Schema({
     lowercase: true,
     match: [/^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$/, 'Email inválido.'],
     unique: true,
-    sparse: true, // Permite valores nulos, mas impõe unicidade para não nulos
-    set: v => (v === '' ? null : v) // Converte string vazia para null
+    sparse: true,
+    set: v => (v === '' ? null : v)
   },
   dataNascimento: {
     type: Date,
     required: [true, 'Data de nascimento é obrigatória'],
     validate: {
       validator: function(data) {
-        // Verifica se a data não é futura e se a pessoa tem pelo menos 16 anos
         const hoje = new Date();
-        let idade = hoje.getFullYear() - data.getFullYear(); // Mudou de const para let
+        let idade = hoje.getFullYear() - data.getFullYear(); // Corrigido para let
         const mesAtual = hoje.getMonth() - data.getMonth();
         
         if (mesAtual < 0 || (mesAtual === 0 && hoje.getDate() < data.getDate())) {
@@ -58,20 +52,10 @@ const clienteSchema = new mongoose.Schema({
       message: 'Número de sessões deve ser um número inteiro'
     }
   },
-  criadoEm: {
-    type: Date,
-    default: Date.now,
-    immutable: true // Não permite alteração após criação
-  },
   pacote: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Pacote',
     default: null
-  },
-  // Campos adicionais úteis
-  ultimaAtualizacao: {
-    type: Date,
-    default: Date.now
   },
   observacoes: {
     type: String,
@@ -81,90 +65,64 @@ const clienteSchema = new mongoose.Schema({
   ativo: {
     type: Boolean,
     default: true
-  }
-}, {
-  timestamps: true, // Adiciona automaticamente createdAt e updatedAt
-  toJSON: { virtuals: true }, // Permite usar virtuals quando converter para JSON
-  toObject: { virtuals: true }
-});
-
-// Middleware para atualizar ultimaAtualizacao
-clienteSchema.pre('save', function(next) {
-  this.ultimaAtualizacao = new Date();
-  next();
-});
-
-// Virtual para idade
-clienteSchema.virtual('idade').get(function() {
-  const hoje = new Date();
-  const nascimento = new Date(this.dataNascimento);
-  let idade = hoje.getFullYear() - nascimento.getFullYear();
-  const mesAtual = hoje.getMonth() - nascimento.getMonth();
-  
-  if (mesAtual < 0 || (mesAtual === 0 && hoje.getDate() < nascimento.getDate())) {
-    idade--;
-  }
-  
-  return idade;
-});
-
-clienteSchema.add({
+  },
   // --- CAMPOS DA FICHA DE ANAMNESE ---
   costumaPermanecerMuitoTempoSentada: { type: Boolean, default: false },
   alergias: { type: String, trim: true, default: '' },
+  qualAlergia: { type: String, trim: true, default: '' },
   historicoMedico: { type: String, trim: true, default: '' },
+  qualHistorico: { type: String, trim: true, default: '' },
   medicamentosEmUso: { type: String, trim: true, default: '' },
+  qualMedicamento: { type: String, trim: true, default: '' },
   antecedentesCirurgicos: { type: String, trim: true, default: '' },
-  cicloMenstrualRegular: { type: String, enum: ['Sim', 'Não', 'N/A', ''], default: '' }, // Adicionei '' para o default se não preenchido
+  qualCirurgia: { type: String, trim: true, default: '' },
+  cicloMenstrualRegular: { type: String, enum: ['Sim', 'Não', 'N/A', ''], default: '' },
   usaAnticoncepcional: { type: Boolean, default: false },
+  qualAnticoncepcional: { type: String, trim: true, default: '' },
   temHipertensao: { type: Boolean, default: false },
+  grauHipertensao: { type: String, trim: true, default: '' },
   temDiabetes: { type: Boolean, default: false },
+  tipoDiabetes: { type: String, trim: true, default: '' },
   temEpilepsia: { type: Boolean, default: false },
+  qualEpilepsia: { type: String, trim: true, default: '' },
   temMarcapasso: { type: Boolean, default: false },
   temMetais: { type: Boolean, default: false },
-  // Campos de observação mais específicos da anamnese
-  qualAlergia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da alergia
-  qualHistorico: { type: String, trim: true, default: '' }, // Campo para "Qual?" do histórico
-  qualMedicamento: { type: String, trim: true, default: '' }, // Campo para "Qual?" do medicamento
-  qualCirurgia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da cirurgia
-  qualAnticoncepcional: { type: String, trim: true, default: '' }, // Campo para "Qual?" do anticoncepcional
-  grauHipertensao: { type: String, trim: true, default: '' }, // Campo para "Grau?" da hipertensão
-  tipoDiabetes: { type: String, trim: true, default: '' }, // Campo para "Tipo?" da diabetes
-  qualEpilepsia: { type: String, trim: true, default: '' }, // Campo para "Qual?" da epilepsia
-  observacoesAdicionaisAnamnese: { type: String, trim: true, default: '' }, // Para observações gerais da anamnese
-  estadoConversa: {
+  observacoesAdicionaisAnamnese: { type: String, trim: true, default: '' },
+  // --- CAMPOS DE GESTÃO DO CHATBOT ---
+  etapaConversa: {
     type: String,
-    default: 'inicial', // Ex: inicial, aguardando_confirmacao_cliente, aguardando_dados_cadastro, cadastrado, etc.
-    enum: [
-      'inicial',
-      'aguardando_confirmacao_cliente',
-      'aguardando_dados_cadastro',
-      'cadastrado',
-      'aguardando_info_extra',
-      'aguardando_agendamento',
-      'aguardando_feedback',
-      'inativo'
-    ]
+    default: 'inicial',
+    enum: ['inicial', 'aguardando_nome', 'livre', 'aguardando_nova_data', 'aguardando_confirmacao_horario', 'inativo']
   },
   historicoMensagens: [
     {
       data: { type: Date, default: Date.now },
       mensagem: String,
       resposta: String,
-      intent: String, // Ex: novo_agendamento, reagendamento, etc.
-      entidades: Object // Para guardar entidades extraídas, se quiser
+      intent: String,
+      entidades: Object
     }
-  ],
-  preferencias: {
-    tomDeVoz: { type: String, default: '' }, // Ex: "formal", "informal", "carinhosa"
-    assuntosFrequentes: [String],
-    outros: { type: Object, default: {} }
-  }
-
+  ]
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-clienteSchema.index({ nome: 1 });
+// Virtual para idade (calculado, não guardado)
+clienteSchema.virtual('idade').get(function() {
+  if (!this.dataNascimento) return null;
+  const hoje = new Date();
+  const nascimento = new Date(this.dataNascimento);
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const mes = hoje.getMonth() - nascimento.getMonth();
+  if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+  return idade;
+});
 
 const Cliente = mongoose.model('Cliente', clienteSchema);
 
-module.exports = Cliente;
+// A correção principal está aqui
+export default Cliente;

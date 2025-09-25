@@ -1,6 +1,4 @@
-// src/models/Mensagem.js
-
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const MensagemSchema = new mongoose.Schema({
   telefone: { type: String, required: true },
@@ -10,4 +8,4 @@ const MensagemSchema = new mongoose.Schema({
   conversa: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversa' }
 });
 
-module.exports = mongoose.model('Mensagem', MensagemSchema);
+export default mongoose.model('Mensagem', MensagemSchema);

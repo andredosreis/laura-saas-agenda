@@ -13,6 +13,7 @@ import EditarCliente from './pages/EditarCliente';
 import EditarPacote from './pages/EditarPacote';
 import EditarAgendamento from './pages/EditarAgendamento'; // Corrigido
 import Dashboard from './pages/Dashboard';
+import Disponibilidade from './pages/Disponibilidade.js';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="/clientes/editar/:id" element={<EditarCliente />} />
           <Route path="/pacotes/editar/:id" element={<EditarPacote />} />
           <Route path="/agendamentos/editar/:id" element={<EditarAgendamento />} /> {/* Corrigido */}
+          <Route path="/disponibilidade" element={<Disponibilidade />} />
           {/* Adicione mais rotas conforme necessário */}
         </Routes>
         <ToastContainer />  {/* Movido para dentro do Router e corrigido o nome */}

@@ -1,4 +1,4 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 const whatsappController = require('../controllers/whatsappController');
 router.use((req, res, next) => {
@@ -8,4 +8,4 @@ router.use((req, res, next) => {
 
 router.post('/zapi-webhook', whatsappController.zapiWebhook);
 
-module.exports = router;
+export default router;
