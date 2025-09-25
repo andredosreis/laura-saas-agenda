@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import Schedule from "../models/Schedule.js";
-import Agendamento from "../models/Agendamento.js"; // <-- A LINHA MAIS IMPORTANTE
+import Agendamento from "../models/Agendamento.js"; // <-- A LINHA CRÍTICA QUE FALTAVA
 
 /**
  * @desc    Garante que os 7 dias da semana existem na base de dados.
