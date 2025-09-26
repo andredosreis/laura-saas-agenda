@@ -8,6 +8,8 @@ function CriarAgendamento() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dataSelecionada, setDataSelecionada] = useState('');
+  const [horariosVagos, setHorariosVagos] = useState([]);
   
   const formatDateForInput = (date) => {
     return date.toISOString().slice(0, 16);
@@ -27,73 +29,85 @@ function CriarAgendamento() {
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [errors, setErrors] = useState({});
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      try {
-        const [clientesRes, pacotesRes] = await Promise.all([
-          api.get('/clientes'),
-          api.get('/pacotes')
-        ]);
-        setClientes(clientesRes.data);
-        setPacotes(pacotesRes.data);
-      } catch (error) {
-        toast.error('Erro ao carregar dados necessários');
-        console.error('Erro ao carregar dados:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
+// useEffect para buscar horários disponíveis quando a dataSelecionada mudar
+useEffect(() => {
+  if (dataSelecionada) {
+    const fetchHorarios = async () => {
+      // Chama a sua API do backend para buscar os slots livres
+      const slots = await getAvailableSlots(dataSelecionada, 60); // 60 min de duração
+      setHorariosVagos(slots);
+    };
+    fetchHorarios();
+  }
+}, [dataSelecionada]);
 
-  // Atualizar cliente selecionado quando mudar a seleção
-  const handleClienteChange = async (clienteId) => {
-    if (!clienteId) {
-      setClienteSelecionado(null);
-      setFormData(prev => ({
-        ...prev,
-        cliente: '',
-        pacote: '',
-        tipoServico: 'pacote'
-      }));
-      return;
-    }
-
+// useEffect para carregar clientes e pacotes ao montar o componente
+useEffect(() => {
+  async function fetchData() {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const response = await api.get(`/clientes/${clienteId}`);
-      const cliente = response.data;
-      
-      setClienteSelecionado(cliente);
-      
-      // Se o cliente tem pacote ativo, pré-seleciona e força o tipo para 'pacote'
-      if (cliente.pacote) {
-        const pacoteId = cliente.pacote._id || cliente.pacote;
-        
-        setFormData(prev => ({
-          ...prev,
-          cliente: clienteId,
-          pacote: pacoteId,
-          tipoServico: 'pacote'
-        }));
-      } else {
-        // Se não tem pacote, limpa o pacote e força para 'avulso'
-        setFormData(prev => ({
-          ...prev,
-          cliente: clienteId,
-          pacote: '',
-          tipoServico: 'avulso' // Cliente sem pacote só pode fazer serviço avulso
-        }));
-      }
+      const [clientesRes, pacotesRes] = await Promise.all([
+        api.get('/clientes'),
+        api.get('/pacotes')
+      ]);
+      setClientes(clientesRes.data);
+      setPacotes(pacotesRes.data);
     } catch (error) {
-      toast.error('Erro ao carregar dados do cliente');
-      console.error('Erro ao carregar cliente:', error);
+      toast.error('Erro ao carregar dados necessários');
+      console.error('Erro ao carregar dados:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
+  fetchData();
+}, []);
+
+  // Atualizar cliente selecionado quando mudar a seleção
+  async function handleClienteChange(clienteId) {
+  if (!clienteId) {
+    setClienteSelecionado(null);
+    setFormData(prev => ({
+      ...prev,
+      cliente: '',
+      pacote: '',
+      tipoServico: 'pacote'
+    }));
+    return;
+  }
+
+  try {
+    setIsLoading(true);
+    const response = await api.get(`/clientes/${clienteId}`);
+    const cliente = response.data;
+
+    setClienteSelecionado(cliente);
+
+    // Se o cliente tem pacote ativo, pré-seleciona e força o tipo para 'pacote'
+    if (cliente.pacote) {
+      const pacoteId = cliente.pacote._id || cliente.pacote;
+
+      setFormData(prev => ({
+        ...prev,
+        cliente: clienteId,
+        pacote: pacoteId,
+        tipoServico: 'pacote'
+      }));
+    } else {
+      // Se não tem pacote, limpa o pacote e força para 'avulso'
+      setFormData(prev => ({
+        ...prev,
+        cliente: clienteId,
+        pacote: '',
+        tipoServico: 'avulso' // Cliente sem pacote só pode fazer serviço avulso
+      }));
+    }
+  } catch (error) {
+    toast.error('Erro ao carregar dados do cliente');
+    console.error('Erro ao carregar cliente:', error);
+  } finally {
+    setIsLoading(false);
+  }
+}
 
   // Alternar entre pacote e serviço avulso
   const handleTipoServicoChange = (tipo) => {
@@ -252,6 +266,7 @@ function CriarAgendamento() {
                     {cliente.nome}
                   </option>
                 ))}
+                {horariosVagos.map(slot => <option key={slot} value={slot}>{slot}</option>)}
               </select>
               {errors.cliente && (
                 <p className="mt-1 text-sm text-red-500">{errors.cliente}</p>

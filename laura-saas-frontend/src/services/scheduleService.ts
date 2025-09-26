@@ -1,4 +1,5 @@
 import api from './api.js'; // Reutilizamos a sua instância configurada do Axios
+import { toast } from 'react-toastify';
 
 // 1. Primeiro, definimos a "forma" (o tipo) dos nossos dados de horário.
 // Esta interface deve corresponder ao seu Schema do Mongoose.
@@ -48,5 +49,30 @@ export interface Agendamento {
   cliente: {
     _id: string;
     nome: string;
+    telefone?: string;
   };
 }
+
+/**
+ * @description Busca os slots de horário disponíveis para uma data específica.
+ * @param date A data no formato 'YYYY-MM-DD'.
+ * @param duration A duração do serviço em minutos.
+ * @returns Uma promessa com a lista de horários disponíveis (ex: ["09:00", "09:30"]).
+ */
+export const getAvailableSlots = async (date: string, duration: number = 60): Promise<string[]> => {
+  try {
+    // Usamos `api.get` que já configurámos no ficheiro api.js
+    const response = await api.get(`/schedules/available-slots`, {
+      params: {
+        date,
+        duration,
+      }
+    });
+    // A API deve retornar um objeto { availableSlots: [...] }
+    return response.data.availableSlots || [];
+  } catch (error) {
+    console.error('Erro ao buscar slots disponíveis:', error);
+    toast.error('Não foi possível buscar os horários disponíveis.');
+    throw error;
+  }
+};
