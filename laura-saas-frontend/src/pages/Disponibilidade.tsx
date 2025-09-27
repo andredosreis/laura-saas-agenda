@@ -168,7 +168,7 @@ const AgendaDisponibilidade = () => {
   const fetchSchedules = useCallback(async () => {
     try {
       setLoading(true);
-      // Passar a data de início da semana para o backend
+      // Buscar dados de disponibilidade e agendamentos
       const { disponibilidade, agendamentos } = await getSchedules();
       setSchedules(disponibilidade);
       setAgendamentos(agendamentos);
