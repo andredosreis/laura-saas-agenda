@@ -19,7 +19,7 @@ export interface Schedule {
 // Note que indicamos que ela retorna uma "Promessa de um array de Schedules".
 export const getSchedules = async (): Promise<{ disponibilidade: Schedule[], agendamentos: Agendamento[] }> => {
   try {
-   const response = await api.get('http://localhost:5000/api/schedules');
+   const response = await api.get("/schedules");
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar agenda e horários:', error);

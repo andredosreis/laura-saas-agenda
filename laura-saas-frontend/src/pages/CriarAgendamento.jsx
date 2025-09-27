@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { getAvailableSlots } from '../services/scheduleService'; // Importar a função
 
 function CriarAgendamento() {
   const navigate = useNavigate();
@@ -15,7 +16,6 @@ function CriarAgendamento() {
     return date.toISOString().slice(0, 16);
   };
 
-  // Simplificado: removido isAvulso e adicionado tipoServico
   const [formData, setFormData] = useState({
     cliente: '',
     pacote: '',
@@ -188,11 +188,11 @@ useEffect(() => {
     setIsSubmitting(true);
     try {
       const dadosParaEnviar = {
-        clienteId: formData.cliente,
-        pacoteId: formData.tipoServico === 'pacote' ? formData.pacote : null,
-        dataHora: formData.dataHora,
-        observacoes: formData.observacoes,
-        status: 'Agendado'
+        cliente: formData.cliente,
+        pacote: formData.tipoServico === 'pacote' ? formData.pacote : null,
+         dataHora: formData.dataHora,
+         observacoes: formData.observacoes,
+         status: 'Agendado'
       };
       
       // Se for serviço avulso, adicionar informações adicionais

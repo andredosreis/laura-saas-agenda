@@ -1,4 +1,4 @@
-//import dotenv from 'dotenv-flow';
+import dotenv from 'dotenv-flow';
 import cron from 'node-cron';
 import connectDB from './config/db.js';
 import app from './app.js';
@@ -8,7 +8,7 @@ import app from './app.js';
 import { enviarLembretes24h } from './controllers/agenteController.js';
 
 // Carrega as variáveis de ambiente
-//dotenv.config();
+dotenv.config();
 
 // Conectar ao banco de dados e, após sucesso, iniciar o servidor
 connectDB().then(() => {
