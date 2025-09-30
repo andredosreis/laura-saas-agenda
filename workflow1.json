@@ -1,0 +1,141 @@
+{
+  "name": "Laura SaaS - WhatsApp Core Listener",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook-whatsapp-{{$env.N8N_WEBHOOK_PATH}}",
+        "options": {}
+      },
+      "id": "c1a3b4f5-d6e7-8f90-a1b2-c3d4e5f6a7b8",
+      "name": "Receive WhatsApp Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WEBHOOK_CREDENTIAL_ID_IF_ANY",
+          "name": "Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "messages",
+        "database": "laura_saas_db",
+        "operation": "create",
+        "document": "={{ { from: $json.body.entry[0].changes[0].value.messages[0].from, text: $json.body.entry[0].changes[0].value.messages[0].text.body, timestamp: new Date($json.body.entry[0].changes[0].value.messages[0].timestamp * 1000).toISOString(), raw: $json.body } }}",
+        "options": {}
+      },
+      "id": "d2b4c5f6-e7f8-9a01-b2c3-d4e5f6a7b8c9",
+      "name": "Save Message to MongoDB",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "YOUR_MONGO_CREDENTIAL_ID",
+          "name": "MongoDB Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "jsonResponse": true,
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant for a beauty clinic. Your goal is to detect the user's intent using the available tools. Use PT-PT."
+          },
+          {
+            "role": "user",
+            "content": "={{ $json.body.entry[0].changes[0].value.messages[0].text.body }}"
+          }
+        ],
+        "tools": [
+          {
+            "tool": "={{ JSON.parse('{\"name\":\"detect_intent\",\"description\":\"Deteta intenção e entidades a partir de texto do cliente.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},\"required\":[\"text\"]}}') }}"
+          }
+        ],
+        "toolChoice": "auto"
+      },
+      "id": "e3c5d6f7-f8g9-0h12-i3j4-k5l6m7n8o9p0",
+      "name": "Detect Intent with OpenAI",
+      "type": "n8n-nodes-base.openAiChat",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tool_calls[0].function.name }}",
+              "operation": "equal",
+              "value2": "schedule_appointment"
+            }
+          ]
+        }
+      },
+      "id": "f4d6e7f8-g9h0-1i23-j4k5-l6m7n8o9p0q1",
+      "name": "Is it 'schedule' intent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Receive WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Save Message to MongoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Message to MongoDB": {
+      "main": [
+        [
+          {
+            "node": "Detect Intent with OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Intent with OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Is it 'schedule' intent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
