@@ -34,29 +34,49 @@ export default defineConfig({
         start_url: '/',
         orientation: 'portrait-primary',
         icons: [
+          // Android Icons
           {
-            src: '/icon-192x192.png',
+            src: '/icons/icon-192x192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icon-512x512.png',
+            src: '/icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icon-maskable-192.png',
+            src: '/icons/icon-maskable-192x192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable',
           },
           {
-            src: '/icon-maskable-512.png',
+            src: '/icons/icon-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+          // iOS Icons
+          {
+            src: '/icons/apple-touch-icon.png',
+            sizes: '180x180',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/apple-touch-icon-167x167.png',
+            sizes: '167x167',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/apple-touch-icon-152x152.png',
+            sizes: '152x152',
+            type: 'image/png',
+            purpose: 'any',
           },
         ],
       },
