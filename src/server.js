@@ -21,23 +21,26 @@ connectDB().then(() => {
   process.exit(1); // Encerra o processo se a conexão com o BD falhar
 });
 
-// Cron job para lembretes de agendamento de 24h
+import { sendReminderNotifications } from './controllers/agenteController.js';
+
+// ⏰ CRON JOB: Lembretes diários às 19h (Europe/Lisbon)
 cron.schedule('0 19 * * *', async () => {
-  console.log('⏰ CRON: A executar tarefa de lembretes de 24h...');
+  console.log('⏰ [CRON] Executando lembrete diário de agendamentos...');
   try {
-    // Como importámos a função diretamente, a chamada fica mais limpa
-    await enviarLembretes24h(
-      { method: 'CRON' }, // Simula o objeto 'req'
-      { // Simula o objeto 'res'
-        status: () => ({ 
-          json: (response) => console.log('CRON: Resposta da execução ->', response) 
-        })
+    const resultado = await sendReminderNotifications(
+      { method: 'CRON' },
+      {
+        status: () => ({
+          json: (data) => console.log('[CRON] Resultado:', data),
+        }),
       }
     );
-    console.log('✅ CRON: Tarefa de lembretes concluída com sucesso.');
+    console.log('✅ [CRON] Tarefa de lembretes concluída');
   } catch (error) {
-    console.error('❌ CRON: Falha ao executar tarefa de lembrete:', error);
+    console.error('❌ [CRON] Falha ao executar tarefa:', error);
   }
 }, {
-  timezone: "Europe/Lisbon"
+  timezone: 'Europe/Lisbon',
 });
+
+console.log('⏰ [CRON] Job registado: Lembretes diários às 19h (Europe/Lisbon)');

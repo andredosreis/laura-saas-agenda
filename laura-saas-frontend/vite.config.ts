@@ -11,27 +11,13 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/api\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 24 * 60 * 60, // 24 horas
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
             urlPattern: /^https:\/\/.*\.(woff|woff2|ttf|eot)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'fonts-cache',
               expiration: {
                 maxEntries: 30,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 dias
+                maxAgeSeconds: 60 * 60 * 24 * 30,
               },
             },
           },
@@ -74,6 +60,9 @@ export default defineConfig({
           },
         ],
       },
+      devOptions: {
+        enabled: true
+      }
     }),
   ],
 })

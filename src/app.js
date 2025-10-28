@@ -19,6 +19,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import agenteRoutes from './routes/agenteRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/agente', agenteRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Rota principal do webhook para Z-API (se aplicável)
 app.use('/webhook', whatsappRoutes);

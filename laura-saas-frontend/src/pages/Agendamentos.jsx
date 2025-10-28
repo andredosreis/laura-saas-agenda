@@ -1,20 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import api from '../services/api'; // Certifique-se que o caminho para sua API está correto
+import api from '../services/api';
+import { subscribeToPush, getPushStatus } from '../services/notificationService';
 
 function Agendamentos() {
   const navigate = useNavigate();
   const [agendamentos, setAgendamentos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filtroStatus, setFiltroStatus] = useState('todos'); // Seus status no filtro: 'AGENDADO', 'CONCLUIDO', 'CANCELADO'
+  const [filtroStatus, setFiltroStatus] = useState('todos');
+  
+  // ✨ NEW: Push Notification State
+  const [pushStatus, setPushStatus] = useState({
+    supported: false,
+    permission: 'default',
+    subscribed: false,
+    disabledReason: undefined,
+  });
+  const [subscribingToPush, setSubscribingToPush] = useState(false);
 
   // Carregar agendamentos
   const carregarAgendamentos = async () => {
-    setIsLoading(true); // Movido para o início da função
+    setIsLoading(true);
     try {
       const response = await api.get('/agendamentos');
-      setAgendamentos(response.data || []); // Garante que seja sempre um array
+      setAgendamentos(response.data || []);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast.error('Erro ao carregar agendamentos. Tente novamente mais tarde.');
@@ -23,17 +33,72 @@ function Agendamentos() {
     }
   };
 
+  // ✨ NEW: Initialize Push Notifications
   useEffect(() => {
     carregarAgendamentos();
+
+    // 1️⃣ Check current push status
+    const checkPushStatus = async () => {
+      try {
+        const status = await getPushStatus();
+        console.log('[Agendamentos] 🔔 Push status:', status);
+        setPushStatus(status);
+
+        // 2️⃣ Se não está subscrito e tem suporte, tentar subscrever
+        if (status.supported && !status.subscribed && status.permission !== 'denied') {
+          console.log('[Agendamentos] 📢 Tentando auto-subscrever a push...');
+          setSubscribingToPush(true);
+          
+          const subscription = await subscribeToPush();
+          
+          if (subscription) {
+            console.log('[Agendamentos] ✅ Auto-subscrição bem-sucedida');
+            toast.success('🔔 Notificações ativadas! Receberá lembretes de agendamentos.');
+            setPushStatus(prev => ({ ...prev, subscribed: true }));
+          } else {
+            console.log('[Agendamentos] ⚠️ Não foi possível subscrever automaticamente');
+          }
+          
+          setSubscribingToPush(false);
+        }
+      } catch (error) {
+        console.error('[Agendamentos] ❌ Erro ao verificar push status:', error);
+      }
+    };
+
+    checkPushStatus();
   }, []);
+
+  // ✨ NEW: Manual Subscribe Handler
+  const handleManualSubscribe = async () => {
+    try {
+      setSubscribingToPush(true);
+      console.log('[Agendamentos] 📢 Subscrevendo manualmente a push...');
+
+      const subscription = await subscribeToPush();
+
+      if (subscription) {
+        console.log('[Agendamentos] ✅ Subscrição manual bem-sucedida');
+        toast.success('✅ Notificações ativadas com sucesso!');
+        setPushStatus(prev => ({ ...prev, subscribed: true }));
+      } else {
+        console.warn('[Agendamentos] ⚠️ Não foi possível subscrever');
+        toast.error('❌ Não foi possível ativar notificações. Verifique as permissões do navegador.');
+      }
+    } catch (error) {
+      console.error('[Agendamentos] ❌ Erro ao subscrever:', error);
+      toast.error('Erro ao ativar notificações.');
+    } finally {
+      setSubscribingToPush(false);
+    }
+  };
 
   // Atualizar status do agendamento
   const atualizarStatus = async (id, novoStatus) => {
     try {
-      // Certifique-se que 'novoStatus' corresponde aos valores que seu backend espera (ex: 'CONCLUIDO', 'CANCELADO')
       await api.put(`/agendamentos/${id}/status`, { status: novoStatus });
       toast.success('Status do agendamento atualizado com sucesso!');
-      carregarAgendamentos(); // Recarrega a lista para refletir a mudança
+      carregarAgendamentos();
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast.error(error.response?.data?.message || 'Erro ao atualizar status do agendamento.');
@@ -48,14 +113,13 @@ function Agendamentos() {
     try {
       await api.delete(`/agendamentos/${id}`);
       toast.success('Agendamento excluído com sucesso!');
-      carregarAgendamentos(); // Recarrega a lista
+      carregarAgendamentos();
     } catch (error) {
       console.error('Erro ao deletar agendamento:', error);
       toast.error(error.response?.data?.message || 'Erro ao deletar agendamento.');
     }
   };
-  
-  // ADICIONADA: Função para navegar para a página de edição
+
   const handleEditarAgendamento = (idDoAgendamento) => {
     navigate(`/agendamentos/editar/${idDoAgendamento}`);
   };
@@ -64,15 +128,13 @@ function Agendamentos() {
   const formatarData = (dataIsoString) => {
     if (!dataIsoString) return 'Data não definida';
     try {
-      // Considera que dataIsoString já vem num formato que new Date() entende (como ISO 8601)
       const data = new Date(dataIsoString);
-      return data.toLocaleString('pt-BR', { // Usando pt-BR para o formato DD/MM/YYYY HH:mm
+      return data.toLocaleString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        // timeZone: 'UTC' // Adicione se suas datas no backend são UTC e você quer mostrar como tal antes de converter para local
       });
     } catch (error) {
       console.error('Erro ao formatar data:', error);
@@ -83,13 +145,13 @@ function Agendamentos() {
   // Filtrar agendamentos por status
   const agendamentosFiltrados = agendamentos.filter(agendamento => {
     if (filtroStatus === 'todos') return true;
-    return agendamento.status === filtroStatus; // Compara com os valores do filtro (ex: 'AGENDADO')
+    return agendamento.status === filtroStatus;
   });
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen"> {/* Ajustado para h-screen para centralizar na tela toda */}
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div> {/* Cor do spinner da marca */}
+      <div className="flex flex-col justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
         <p className="mt-3 text-gray-700 text-lg">Carregando agendamentos...</p>
       </div>
     );
@@ -97,6 +159,37 @@ function Agendamentos() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* ✨ NEW: Push Notification Status Banner */}
+      {pushStatus.supported && !pushStatus.subscribed && pushStatus.permission !== 'denied' && (
+        <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded flex items-start justify-between">
+          <div>
+            <p className="text-blue-700 font-semibold">🔔 Notificações Disponíveis</p>
+            <p className="text-blue-600 text-sm">Ative notificações para receber lembretes de agendamentos.</p>
+          </div>
+          <button
+            onClick={handleManualSubscribe}
+            disabled={subscribingToPush}
+            className="ml-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded transition-colors text-sm whitespace-nowrap"
+          >
+            {subscribingToPush ? '⏳ Ativando...' : '✅ Ativar'}
+          </button>
+        </div>
+      )}
+
+      {pushStatus.subscribed && (
+        <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded">
+          <p className="text-green-700 font-semibold">✅ Notificações Ativas</p>
+          <p className="text-green-600 text-sm">Receberá lembretes de agendamentos via notificações.</p>
+        </div>
+      )}
+
+      {pushStatus.permission === 'denied' && (
+        <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+          <p className="text-red-700 font-semibold">❌ Notificações Bloqueadas</p>
+          <p className="text-red-600 text-sm">Altere as permissões do navegador para ativar notificações.</p>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-gray-800">Agendamentos</h1>
         <button
@@ -117,9 +210,8 @@ function Agendamentos() {
           className="border border-gray-300 rounded-md p-2 focus:ring-amber-500 focus:border-amber-500"
         >
           <option value="todos">Todos</option>
-          {/* Certifique-se que estes valores correspondem aos status no seu backend/modelo */}
           <option value="Agendado">Agendado</option>
-          <option value="Confirmado">Confirmado</option> 
+          <option value="Confirmado">Confirmado</option>
           <option value="Realizado">Realizado</option>
           <option value="Cancelado Pelo Cliente">Cancelado Pelo Cliente</option>
           <option value="Cancelado Pelo Salão">Cancelado Pelo Salão</option>
@@ -128,9 +220,9 @@ function Agendamentos() {
       </div>
 
       {/* Lista de Agendamentos */}
-      <div className="bg-white shadow-xl rounded-lg overflow-x-auto"> {/* overflow-x-auto para tabelas responsivas */}
+      <div className="bg-white shadow-xl rounded-lg overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-100"> {/* Fundo do cabeçalho da tabela */}
+          <thead className="bg-gray-100">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cliente</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Serviço/Pacote</th>
@@ -152,7 +244,6 @@ function Agendamentos() {
                   {formatarData(agendamento.dataHora)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {/* Adapte as cores e texto do status conforme seus valores exatos */}
                   <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full 
                     ${agendamento.status === 'Agendado' ? 'bg-blue-100 text-blue-800' : ''}
                     ${agendamento.status === 'Confirmado' ? 'bg-teal-100 text-teal-800' : ''}
@@ -165,8 +256,6 @@ function Agendamentos() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex justify-end items-center space-x-2">
-                    {/* Botão Editar */}
-                    {/* Condição para mostrar o botão Editar (ex: não mostrar se já realizado ou cancelado) */}
                     {!(agendamento.status === 'Realizado' || agendamento.status === 'Cancelado Pelo Cliente' || agendamento.status === 'Cancelado Pelo Salão' || agendamento.status === 'Não Compareceu') && (
                       <button
                         onClick={() => handleEditarAgendamento(agendamento._id)}
@@ -177,8 +266,6 @@ function Agendamentos() {
                       </button>
                     )}
 
-                    {/* Botões para Concluir, Cancelar (baseado no status) */}
-                    {/* Certifique-se que os valores de status aqui correspondem aos do seu backend */}
                     {(agendamento.status === 'Agendado' || agendamento.status === 'Confirmado') && (
                       <>
                         <button
@@ -188,7 +275,7 @@ function Agendamentos() {
                         >
                           Realizar
                         </button>
-                        <button // Botão para "Cancelar Pelo Salão" como exemplo
+                        <button
                           onClick={() => atualizarStatus(agendamento._id, 'Cancelado Pelo Salão')}
                           className="text-orange-500 hover:text-orange-700 px-3 py-1 rounded-md hover:bg-orange-50 transition-colors text-xs"
                           title="Cancelar Agendamento (Pelo Salão)"
@@ -197,11 +284,9 @@ function Agendamentos() {
                         </button>
                       </>
                     )}
-                    
-                    {/* Botão Excluir (pode ser condicional também) */}
-                    {/* Exemplo: permitir excluir apenas se cancelado ou não compareceu, ou sempre? */}
+
                     {(agendamento.status === 'Cancelado Pelo Cliente' || agendamento.status === 'Cancelado Pelo Salão' || agendamento.status === 'Não Compareceu') && (
-                       <button
+                      <button
                         onClick={() => deletarAgendamento(agendamento._id)}
                         className="text-red-600 hover:text-red-800 px-3 py-1 rounded-md hover:bg-red-50 transition-colors text-xs"
                         title="Excluir Agendamento Permanentemente"
@@ -216,7 +301,7 @@ function Agendamentos() {
           </tbody>
         </table>
 
-        {agendamentosFiltrados.length === 0 && !isLoading && ( // Adicionado !isLoading aqui também
+        {agendamentosFiltrados.length === 0 && !isLoading && (
           <div className="text-center py-10 text-gray-500">
             Nenhum agendamento encontrado com os filtros aplicados.
           </div>

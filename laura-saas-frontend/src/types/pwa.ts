@@ -7,6 +7,7 @@
 
 export interface PushSubscriptionJSON {
   endpoint: string;        // URL única do servidor de push (Google, Mozilla, etc)
+   expirationTime?: number
   keys: {
     auth: string;          // Chave de autenticação (base64)
     p256dh: string;        // Chave de criptografia ECDH (base64)

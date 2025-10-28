@@ -1,3 +1,5 @@
+import UserSubscription from '../models/UserSubscription.js';
+import { sendPushNotification } from '../services/pushService.js';
 import { DateTime } from "luxon";
 import Agendamento from "../models/Agendamento.js";
 import Cliente from "../models/Cliente.js";
@@ -11,6 +13,125 @@ import { detectarPalavraChave } from "../utils/notificacaoHelper.js";
 
 console.log("CONTROLLER: agenteController.js carregado (v2)");
 
+
+/**
+ * 🔔 Função de Lembrete com Web Push
+ * Chamada pelo CRON todos os dias às 19h
+ */
+export const sendReminderNotifications = async (req, res) => {
+  try {
+    console.log('[Agente] 🔔 Iniciando envio de lembretes via Web Push...');
+
+    // 1️⃣ Obter data de amanhã
+    const amanha = DateTime.now()
+      .plus({ days: 1 })
+      .startOf('day');
+
+    console.log(`[Agente] 📅 Procurando agendamentos para: ${amanha.toISODate()}`);
+
+    // 2️⃣ Buscar agendamentos para AMANHÃ
+    const agendamentosDiarios = await Agendamento.find({
+      dataHora: {
+        $gte: amanha.toJSDate(),
+        $lt: amanha.plus({ days: 1 }).toJSDate(),
+      },
+      status: { $in: ['Agendado', 'Confirmado'] }, // Apenas os relevantes
+    }).populate('cliente');
+
+    console.log(`[Agente] 📋 Encontrados ${agendamentosDiarios.length} agendamentos`);
+
+    if (agendamentosDiarios.length === 0) {
+      console.log('[Agente] ℹ️ Nenhum agendamento para amanhã');
+      return {
+        success: true,
+        message: 'Nenhum agendamento para amanhã',
+        sent: 0,
+        failed: 0,
+      };
+    }
+
+    // 3️⃣ Para cada agendamento, enviar notificação
+    let notificacoesEnviadas = 0;
+    let notificacoesFalhadas = 0;
+
+    for (const agendamento of agendamentosDiarios) {
+      try {
+        const clienteId = agendamento.cliente?._id;
+
+        if (!clienteId) {
+          console.warn(`[Agente] ⚠️ Agendamento ${agendamento._id} sem cliente`);
+          notificacoesFalhadas++;
+          continue;
+        }
+
+        // 4️⃣ Buscar subscription do cliente
+        const subscription = await UserSubscription.findOne({
+          userId: clienteId,
+          active: true,
+        });
+
+        if (!subscription) {
+          console.log(`[Agente] 📵 Cliente ${clienteId} sem subscription ativa`);
+          notificacoesFalhadas++;
+          continue;
+        }
+
+        // 5️⃣ Preparar payload da notificação
+        const dataAgendamento = DateTime.fromJSDate(
+          new Date(agendamento.dataHora)
+        );
+
+        const payload = {
+          title: '🔔 Lembrete de Agendamento',
+          body: `Tens agendamento amanhã às ${dataAgendamento.toFormat('HH:mm')}`,
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+          tag: `reminder-${agendamento._id}`,
+          requireInteraction: true,
+          data: {
+            agendamentoId: agendamento._id.toString(),
+            clienteNome: agendamento.cliente.nome,
+            servicoNome: agendamento.pacote?.nome || agendamento.servicoAvulsoNome,
+          },
+        };
+
+        // 6️⃣ Enviar notificação
+        const enviado = await sendPushNotification(subscription, payload);
+
+        if (enviado) {
+          notificacoesEnviadas++;
+          console.log(
+            `[Agente] ✅ Notificação enviada para ${agendamento.cliente.nome}`
+          );
+        } else {
+          notificacoesFalhadas++;
+        }
+      } catch (error) {
+        console.error(`[Agente] ❌ Erro ao enviar notificação:`, error);
+        notificacoesFalhadas++;
+      }
+    }
+
+    const resultado = {
+      success: true,
+      message: 'Lembretes enviados',
+      total: agendamentosDiarios.length,
+      sent: notificacoesEnviadas,
+      failed: notificacoesFalhadas,
+    };
+
+    console.log('[Agente] 📊 Resultado:', resultado);
+
+    return resultado;
+  } catch (error) {
+    console.error('[Agente] ❌ Erro ao enviar lembretes:', error);
+    return {
+      success: false,
+      message: 'Erro ao enviar lembretes',
+      error: error.message,
+    };
+  }
+};
 //---------------------------------------------------------------------
 // 1. Lembretes 24 h
 //---------------------------------------------------------------------
