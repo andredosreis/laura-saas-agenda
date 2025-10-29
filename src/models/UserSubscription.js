@@ -4,7 +4,7 @@ const userSubscriptionSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cliente',
-    required: [true, 'UserId é obrigatório'],
+    required: false,
   },
   endpoint: {
     type: String,
