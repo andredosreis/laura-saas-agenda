@@ -10,3 +10,4 @@ createRoot(document.getElementById('root')!).render(
     <SpeedInsights />
   </StrictMode>,
 );
+//colocando o SpeedInsights para monitoramento de performance
