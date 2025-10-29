@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
-import { subscribeToPush, getPushStatus } from '../services/notificationService';
+import { subscribeToPush, getPushStatus, unsubscribeFromPush } from '../services/notificationService';
 
 function Agendamentos() {
   const navigate = useNavigate();
@@ -10,7 +10,6 @@ function Agendamentos() {
   const [isLoading, setIsLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('todos');
   
-  // ✨ NEW: Push Notification State
   const [pushStatus, setPushStatus] = useState({
     supported: false,
     permission: 'default',
@@ -19,7 +18,6 @@ function Agendamentos() {
   });
   const [subscribingToPush, setSubscribingToPush] = useState(false);
 
-  // Carregar agendamentos
   const carregarAgendamentos = async () => {
     setIsLoading(true);
     try {
@@ -33,18 +31,15 @@ function Agendamentos() {
     }
   };
 
-  // ✨ NEW: Initialize Push Notifications
   useEffect(() => {
     carregarAgendamentos();
 
-    // 1️⃣ Check current push status
     const checkPushStatus = async () => {
       try {
         const status = await getPushStatus();
         console.log('[Agendamentos] 🔔 Push status:', status);
         setPushStatus(status);
 
-        // 2️⃣ Se não está subscrito e tem suporte, tentar subscrever
         if (status.supported && !status.subscribed && status.permission !== 'denied') {
           console.log('[Agendamentos] 📢 Tentando auto-subscrever a push...');
           setSubscribingToPush(true);
@@ -69,7 +64,6 @@ function Agendamentos() {
     checkPushStatus();
   }, []);
 
-  // ✨ NEW: Manual Subscribe Handler
   const handleManualSubscribe = async () => {
     try {
       setSubscribingToPush(true);
@@ -93,7 +87,30 @@ function Agendamentos() {
     }
   };
 
-  // Atualizar status do agendamento
+  // ✨ NEW: Handle Unsubscribe
+  const handleUnsubscribe = async () => {
+    try {
+      setSubscribingToPush(true);
+      console.log('[Agendamentos] 🔕 Desinscrever de notificações...');
+
+      const unsubscribed = await unsubscribeFromPush();
+
+      if (unsubscribed) {
+        console.log('[Agendamentos] ✅ Desinscrição bem-sucedida');
+        toast.success('🔕 Notificações desativadas com sucesso');
+        setPushStatus(prev => ({ ...prev, subscribed: false }));
+      } else {
+        console.warn('[Agendamentos] ⚠️ Não foi possível desinscrever');
+        toast.error('❌ Não foi possível desativar notificações.');
+      }
+    } catch (error) {
+      console.error('[Agendamentos] ❌ Erro ao desinscrever:', error);
+      toast.error('Erro ao desativar notificações.');
+    } finally {
+      setSubscribingToPush(false);
+    }
+  };
+
   const atualizarStatus = async (id, novoStatus) => {
     try {
       await api.put(`/agendamentos/${id}/status`, { status: novoStatus });
@@ -105,7 +122,6 @@ function Agendamentos() {
     }
   };
 
-  // Deletar agendamento
   const deletarAgendamento = async (id) => {
     if (!window.confirm('Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.')) {
       return;
@@ -124,7 +140,6 @@ function Agendamentos() {
     navigate(`/agendamentos/editar/${idDoAgendamento}`);
   };
 
-  // Formatar data
   const formatarData = (dataIsoString) => {
     if (!dataIsoString) return 'Data não definida';
     try {
@@ -142,7 +157,6 @@ function Agendamentos() {
     }
   };
 
-  // Filtrar agendamentos por status
   const agendamentosFiltrados = agendamentos.filter(agendamento => {
     if (filtroStatus === 'todos') return true;
     return agendamento.status === filtroStatus;
@@ -159,7 +173,7 @@ function Agendamentos() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* ✨ NEW: Push Notification Status Banner */}
+      {/* Push Notification Status Banner */}
       {pushStatus.supported && !pushStatus.subscribed && pushStatus.permission !== 'denied' && (
         <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded flex items-start justify-between">
           <div>
@@ -177,9 +191,18 @@ function Agendamentos() {
       )}
 
       {pushStatus.subscribed && (
-        <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded">
-          <p className="text-green-700 font-semibold">✅ Notificações Ativas</p>
-          <p className="text-green-600 text-sm">Receberá lembretes de agendamentos via notificações.</p>
+        <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded flex items-start justify-between">
+          <div>
+            <p className="text-green-700 font-semibold">✅ Notificações Ativas</p>
+            <p className="text-green-600 text-sm">Receberá lembretes de agendamentos via notificações.</p>
+          </div>
+          <button
+            onClick={handleUnsubscribe}
+            disabled={subscribingToPush}
+            className="ml-4 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded transition-colors text-sm whitespace-nowrap"
+          >
+            {subscribingToPush ? '⏳ Desativando...' : '🔕 Desativar'}
+          </button>
         </div>
       )}
 
@@ -249,63 +272,29 @@ function Agendamentos() {
                     ${agendamento.status === 'Confirmado' ? 'bg-teal-100 text-teal-800' : ''}
                     ${agendamento.status === 'Realizado' ? 'bg-green-100 text-green-800' : ''}
                     ${agendamento.status === 'Cancelado Pelo Cliente' || agendamento.status === 'Cancelado Pelo Salão' ? 'bg-red-100 text-red-800' : ''}
-                    ${agendamento.status === 'Não Compareceu' ? 'bg-gray-100 text-gray-800' : ''}
+                    ${agendamento.status === 'Não Compareceu' ? 'bg-yellow-100 text-yellow-800' : ''}
                   `}>
-                    {agendamento.status || 'N/D'}
+                    {agendamento.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end items-center space-x-2">
-                    {!(agendamento.status === 'Realizado' || agendamento.status === 'Cancelado Pelo Cliente' || agendamento.status === 'Cancelado Pelo Salão' || agendamento.status === 'Não Compareceu') && (
-                      <button
-                        onClick={() => handleEditarAgendamento(agendamento._id)}
-                        className="text-indigo-600 hover:text-indigo-800 px-3 py-1 rounded-md hover:bg-indigo-50 transition-colors text-xs"
-                        title="Editar Agendamento"
-                      >
-                        Editar
-                      </button>
-                    )}
-
-                    {(agendamento.status === 'Agendado' || agendamento.status === 'Confirmado') && (
-                      <>
-                        <button
-                          onClick={() => atualizarStatus(agendamento._id, 'Realizado')}
-                          className="text-green-600 hover:text-green-800 px-3 py-1 rounded-md hover:bg-green-50 transition-colors text-xs"
-                          title="Marcar como Realizado"
-                        >
-                          Realizar
-                        </button>
-                        <button
-                          onClick={() => atualizarStatus(agendamento._id, 'Cancelado Pelo Salão')}
-                          className="text-orange-500 hover:text-orange-700 px-3 py-1 rounded-md hover:bg-orange-50 transition-colors text-xs"
-                          title="Cancelar Agendamento (Pelo Salão)"
-                        >
-                          Cancelar
-                        </button>
-                      </>
-                    )}
-
-                    {(agendamento.status === 'Cancelado Pelo Cliente' || agendamento.status === 'Cancelado Pelo Salão' || agendamento.status === 'Não Compareceu') && (
-                      <button
-                        onClick={() => deletarAgendamento(agendamento._id)}
-                        className="text-red-600 hover:text-red-800 px-3 py-1 rounded-md hover:bg-red-50 transition-colors text-xs"
-                        title="Excluir Agendamento Permanentemente"
-                      >
-                        Excluir
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    onClick={() => handleEditarAgendamento(agendamento._id)}
+                    className="text-indigo-600 hover:text-indigo-900 mr-4"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => deletarAgendamento(agendamento._id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Deletar
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-
-        {agendamentosFiltrados.length === 0 && !isLoading && (
-          <div className="text-center py-10 text-gray-500">
-            Nenhum agendamento encontrado com os filtros aplicados.
-          </div>
-        )}
       </div>
     </div>
   );
