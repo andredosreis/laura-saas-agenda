@@ -17,7 +17,6 @@ const agendamentoSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    // Sugestão: Manter a lista limpa e consistente com um único padrão de capitalização.
     enum: ['Agendado', 'Confirmado', 'Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'],
     default: 'Agendado'
   },
@@ -34,24 +33,36 @@ const agendamentoSchema = new mongoose.Schema({
   servicoAvulsoValor: {
     type: Number,
     default: null
+  },
+  confirmacao: {
+    tipo: {
+      type: String,
+      enum: ['pendente', 'confirmado', 'rejeitado'],
+      default: 'pendente'
+    },
+    respondidoEm: {
+      type: Date,
+      default: null
+    },
+    respondidoPor: {
+      type: String,
+      enum: ['cliente', 'laura'],
+      default: null
+    }
   }
 }, {
-  timestamps: true // Adiciona createdAt e updatedAt automaticamente
+  timestamps: true
 });
 
-// Índices para otimização de performance
 agendamentoSchema.index({ dataHora: 1 });
 agendamentoSchema.index({ cliente: 1 });
 agendamentoSchema.index({ status: 1 });
 
-// Middleware para validação antes de salvar
 agendamentoSchema.pre('save', function(next) {
   if (this.isNew && this.dataHora < new Date()) {
-    // Cria um erro que será capturado pelo bloco .catch() no controller
     return next(new Error('Não é possível criar agendamentos com data no passado.'));
   }
   next();
 });
 
-// A correção principal está aqui: usar "export default"
 export default mongoose.model('Agendamento', agendamentoSchema);

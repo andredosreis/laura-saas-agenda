@@ -17,6 +17,7 @@ console.log("CONTROLLER: agenteController.js carregado (v2)");
 /**
  * 🔔 Função de Lembrete com Web Push
  * Chamada pelo CRON todos os dias às 19h
+ * MODIFICADO: Envia notificações para LAURA e CLIENTE
  */
 export const sendReminderNotifications = async (req, res) => {
   try {
@@ -35,7 +36,7 @@ export const sendReminderNotifications = async (req, res) => {
         $gte: amanha.toJSDate(),
         $lt: amanha.plus({ days: 1 }).toJSDate(),
       },
-      status: { $in: ['Agendado', 'Confirmado'] }, // Apenas os relevantes
+      status: { $in: ['Agendado', 'Confirmado'] },
     }).populate('cliente');
 
     console.log(`[Agente] 📋 Encontrados ${agendamentosDiarios.length} agendamentos`);
@@ -50,7 +51,7 @@ export const sendReminderNotifications = async (req, res) => {
       };
     }
 
-    // 3️⃣ Para cada agendamento, enviar notificação
+    // 3️⃣ Para cada agendamento, enviar notificação para LAURA e CLIENTE
     let notificacoesEnviadas = 0;
     let notificacoesFalhadas = 0;
 
@@ -64,51 +65,86 @@ export const sendReminderNotifications = async (req, res) => {
           continue;
         }
 
-        // 4️⃣ Buscar subscription do cliente
-        const subscription = await UserSubscription.findOne({
-          userId: clienteId,
-          active: true,
-        });
-
-        if (!subscription) {
-          console.log(`[Agente] 📵 Cliente ${clienteId} sem subscription ativa`);
-          notificacoesFalhadas++;
-          continue;
-        }
-
-        // 5️⃣ Preparar payload da notificação
         const dataAgendamento = DateTime.fromJSDate(
           new Date(agendamento.dataHora)
         );
 
-        const payload = {
-          title: '🔔 Lembrete de Agendamento',
-          body: `Tens agendamento amanhã às ${dataAgendamento.toFormat('HH:mm')}`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          tag: `reminder-${agendamento._id}`,
-          requireInteraction: true,
-          data: {
-            agendamentoId: agendamento._id.toString(),
-            clienteNome: agendamento.cliente.nome,
-            servicoNome: agendamento.pacote?.nome || agendamento.servicoAvulsoNome,
-          },
-        };
+        // 4️⃣ NOTIFICAÇÃO PARA CLIENTE
+        const subscriptionCliente = await UserSubscription.findOne({
+          userId: clienteId,
+          active: true,
+        });
 
-        // 6️⃣ Enviar notificação
-        const enviado = await sendPushNotification(subscription, payload);
+        if (subscriptionCliente) {
+          const payloadCliente = {
+            title: '🔔 Confirmação Necessária',
+            body: `Seu agendamento é amanhã às ${dataAgendamento.toFormat('HH:mm')}. Confirmar agendamento?`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: `reminder-${agendamento._id}`,
+            requireInteraction: true,
+            data: {
+              agendamentoId: agendamento._id.toString(),
+              clienteNome: agendamento.cliente.nome,
+              servicoNome: agendamento.pacote?.nome || agendamento.servicoAvulsoNome,
+              tipo: 'confirmacao-cliente',
+            },
+          };
 
-        if (enviado) {
-          notificacoesEnviadas++;
-          console.log(
-            `[Agente] ✅ Notificação enviada para ${agendamento.cliente.nome}`
-          );
+          const enviado = await sendPushNotification(subscriptionCliente, payloadCliente);
+          if (enviado) {
+            notificacoesEnviadas++;
+            console.log(
+              `[Agente] ✅ Notificação de confirmação enviada para ${agendamento.cliente.nome}`
+            );
+          } else {
+            notificacoesFalhadas++;
+          }
         } else {
+          console.log(`[Agente] 📵 Cliente ${clienteId} sem subscription ativa`);
           notificacoesFalhadas++;
         }
+
+        // 5️⃣ NOTIFICAÇÃO PARA LAURA
+        const subscriptionLaura = await UserSubscription.findOne({
+          userId: 'LAURA',
+          active: true,
+        });
+
+        if (subscriptionLaura) {
+          const payloadLaura = {
+            title: '📋 Novo Agendamento Pendente',
+            body: `${agendamento.cliente.nome} - Amanhã às ${dataAgendamento.toFormat('HH:mm')}`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: `laura-reminder-${agendamento._id}`,
+            requireInteraction: true,
+            data: {
+              agendamentoId: agendamento._id.toString(),
+              clienteNome: agendamento.cliente.nome,
+              clienteId: clienteId.toString(),
+              servicoNome: agendamento.pacote?.nome || agendamento.servicoAvulsoNome,
+              dataHora: agendamento.dataHora,
+              tipo: 'novo-agendamento-pendente',
+            },
+          };
+
+          const enviado = await sendPushNotification(subscriptionLaura, payloadLaura);
+          if (enviado) {
+            notificacoesEnviadas++;
+            console.log(
+              `[Agente] ✅ Notificação para Laura enviada sobre agendamento de ${agendamento.cliente.nome}`
+            );
+          } else {
+            console.warn(`[Agente] ⚠️ Falha ao enviar notificação para Laura`);
+            notificacoesFalhadas++;
+          }
+        } else {
+          console.log('[Agente] 📵 Laura sem subscription ativa');
+        }
       } catch (error) {
-        console.error(`[Agente] ❌ Erro ao enviar notificação:`, error);
-        notificacoesFalhadas++;
+        console.error(`[Agente] ❌ Erro ao enviar notificações:`, error);
+        notificacoesFalhadas += 2;
       }
     }
 
@@ -132,43 +168,6 @@ export const sendReminderNotifications = async (req, res) => {
     };
   }
 };
-//---------------------------------------------------------------------
-// 1. Lembretes 24 h
-//---------------------------------------------------------------------
-export const enviarLembretes24h = async (req, res) => {
-  console.log("AGENTE: A enviar lembretes de 24 h…");
-  try {
-    const inicio = DateTime.now().setZone("Europe/Lisbon").plus({ days: 1 }).startOf("day").toJSDate();
-    const fim = DateTime.now().setZone("Europe/Lisbon").plus({ days: 1 }).endOf("day").toJSDate();
-
-    const ags = await Agendamento.find({
-      dataHora: { $gte: inicio, $lte: fim },
-      status: { $in: ["Agendado", "Confirmado"] },
-    }).populate("cliente pacote");
-
-    if (!ags.length) {
-      const message = "AGENTE: Nada para lembrar amanhã.";
-      console.log(message);
-      if (res) return res.status(200).json({ message }); // Verifica se res existe (caso de CRON)
-      return;
-    }
-
-    const resultados = [];
-    for (const ag of ags) {
-      if (!ag.cliente?.telefone) continue;
-      const serv = ag.pacote?.nome || ag.servicoAvulsoNome || "o teu atendimento";
-      const hora = DateTime.fromJSDate(ag.dataHora, { zone: "Europe/Lisbon" }).toFormat("HH:mm");
-      const msg = `Olá ${ag.cliente.nome}! Só para lembrar que amanhã, às ${hora}, tens a sessão de "${serv}". Responde "Sim" para confirmares.`;
-      await sendWhatsAppMessage(ag.cliente.telefone, msg);
-      resultados.push({ cliente: ag.cliente.nome, status: "enviado" });
-    }
-    if (res) res.status(200).json({ success: true, enviados: resultados.length });
-  } catch (e) {
-    console.error("AGENTE: Erro nos lembretes →", e);
-    if (res) res.status(500).json({ success: false, error: e.message });
-  }
-};
-
 //---------------------------------------------------------------------
 // 2. Webhook principal com LLM + Function-Calling
 //---------------------------------------------------------------------

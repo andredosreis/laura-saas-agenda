@@ -1,6 +1,9 @@
 import Agendamento from "../models/Agendamento.js";
 import Schedule from "../models/Schedule.js"; // Importar o modelo Schedule
 import { DateTime } from "luxon"; // Importar Luxon para manipulação de datas
+import { sendPushNotification } from "../services/pushService.js";
+import UserSubscription from "../models/UserSubscription.js";
+
 
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
 const timeToMinutes = (timeString) => {
@@ -162,5 +165,91 @@ export const deleteAgendamento = async (req, res) => {
       return res.status(400).json({ message: "ID do agendamento inválido." });
     }
     res.status(500).json({ message: "Erro ao deletar agendamento.", details: error.message });
+  }
+};
+
+
+
+
+// @desc    Confirmar ou rejeitar agendamento (NOVO)
+export const confirmarAgendamento = async (req, res) => {
+  try {
+    const { confirmacao, respondidoPor } = req.body;
+    
+    // Validar input
+    if (!confirmacao || !['confirmado', 'rejeitado'].includes(confirmacao)) {
+      return res.status(400).json({ 
+        message: "Campo 'confirmacao' deve ser 'confirmado' ou 'rejeitado'." 
+      });
+    }
+    
+    if (!respondidoPor || !['laura', 'cliente'].includes(respondidoPor)) {
+      return res.status(400).json({ 
+        message: "Campo 'respondidoPor' deve ser 'laura' ou 'cliente'." 
+      });
+    }
+
+    // Buscar agendamento
+    const agendamento = await Agendamento.findById(req.params.id).populate('cliente');
+    if (!agendamento) {
+      return res.status(404).json({ message: "Agendamento não encontrado." });
+    }
+
+    // Atualizar confirmação
+    agendamento.confirmacao = {
+      tipo: confirmacao,
+      respondidoEm: new Date(),
+      respondidoPor: respondidoPor
+    };
+    
+    await agendamento.save();
+
+    // 🔔 Notificar o outro lado (se Laura confirmou, notificar cliente e vice-versa)
+    try {
+      if (respondidoPor === 'laura') {
+        // Laura confirmou/rejeitou, notificar CLIENTE
+        const subscriptionCliente = await UserSubscription.findOne({
+          userId: agendamento.cliente._id,
+          active: true,
+        });
+
+        if (subscriptionCliente) {
+          const payloadCliente = {
+            title: confirmacao === 'confirmado' ? '✅ Agendamento Confirmado' : '❌ Agendamento Rejeitado',
+            body: confirmacao === 'confirmado' 
+              ? `Seu agendamento foi confirmado!`
+              : `Seu agendamento foi rejeitado. Agende um novo horário.`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: `confirmacao-${agendamento._id}`,
+            requireInteraction: true,
+            data: {
+              agendamentoId: agendamento._id.toString(),
+              confirmacao: confirmacao,
+              respondidoEm: agendamento.confirmacao.respondidoEm,
+              tipo: 'confirmacao-resposta',
+            },
+          };
+
+          await sendPushNotification(subscriptionCliente, payloadCliente);
+        }
+      }
+    } catch (notifError) {
+      console.error('[AgenteController] ⚠️ Erro ao enviar notificação:', notifError);
+      // Não falhar a requisição se notificação falhar
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Agendamento ${confirmacao} com sucesso.`,
+      agendamento
+    });
+
+  } catch (error) {
+    console.error('Erro ao confirmar agendamento:', error);
+    res.status(500).json({ 
+      message: "Erro ao confirmar agendamento.", 
+      details: error.message 
+    });
   }
 };

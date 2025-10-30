@@ -9,6 +9,7 @@ function Agendamentos() {
   const [agendamentos, setAgendamentos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [confirmando, setConfirmando] = useState(null);
   
   const [pushStatus, setPushStatus] = useState({
     supported: false,
@@ -87,7 +88,6 @@ function Agendamentos() {
     }
   };
 
-  // ✨ NEW: Handle Unsubscribe
   const handleUnsubscribe = async () => {
     try {
       setSubscribingToPush(true);
@@ -119,6 +119,25 @@ function Agendamentos() {
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast.error(error.response?.data?.message || 'Erro ao atualizar status do agendamento.');
+    }
+  };
+
+  // ✨ NEW: Confirmar agendamento
+  const confirmarAgendamento = async (id, confirmacao) => {
+    try {
+      setConfirmando(id);
+      const response = await api.patch(`/agendamentos/${id}/confirmar`, {
+        confirmacao: confirmacao,
+        respondidoPor: 'laura'
+      });
+      
+      toast.success(`✅ Agendamento ${confirmacao === 'confirmado' ? 'confirmado' : 'rejeitado'} com sucesso!`);
+      carregarAgendamentos();
+    } catch (error) {
+      console.error('Erro ao confirmar agendamento:', error);
+      toast.error(error.response?.data?.message || 'Erro ao confirmar agendamento.');
+    } finally {
+      setConfirmando(null);
     }
   };
 
@@ -155,6 +174,56 @@ function Agendamentos() {
       console.error('Erro ao formatar data:', error);
       return 'Data inválida';
     }
+  };
+
+  // ✨ NEW: Renderizar status de confirmação
+  const renderStatusConfirmacao = (agendamento) => {
+    const confirmacao = agendamento.confirmacao;
+    
+    if (!confirmacao || confirmacao.tipo === 'pendente') {
+      return (
+        <span className="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+          ⏳ Pendente
+        </span>
+      );
+    }
+    
+    if (confirmacao.tipo === 'confirmado') {
+      return (
+        <span className="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+          ✅ Confirmado
+        </span>
+      );
+    }
+    
+    if (confirmacao.tipo === 'rejeitado') {
+      return (
+        <span className="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+          ❌ Rejeitado
+        </span>
+      );
+    }
+  };
+
+  // ✨ NEW: Mostrar quem respondeu e quando
+  const renderRespondidoPor = (agendamento) => {
+    const confirmacao = agendamento.confirmacao;
+    
+    if (!confirmacao || confirmacao.tipo === 'pendente') {
+      return '-';
+    }
+
+    const respondidoPor = confirmacao.respondidoPor === 'laura' ? 'Laura' : 'Cliente';
+    const data = new Date(confirmacao.respondidoEm);
+    const dataFormatada = data.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return `${respondidoPor} - ${dataFormatada}`;
   };
 
   const agendamentosFiltrados = agendamentos.filter(agendamento => {
@@ -251,6 +320,8 @@ function Agendamentos() {
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Serviço/Pacote</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Data/Hora</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Confirmação</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Respondido</th>
               <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
             </tr>
           </thead>
@@ -277,10 +348,37 @@ function Agendamentos() {
                     {agendamento.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {renderStatusConfirmacao(agendamento)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {renderRespondidoPor(agendamento)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  {/* Botões de confirmação (apenas se pendente) */}
+                  {(!agendamento.confirmacao || agendamento.confirmacao.tipo === 'pendente') && (
+                    <>
+                      <button
+                        onClick={() => confirmarAgendamento(agendamento._id, 'confirmado')}
+                        disabled={confirmando === agendamento._id}
+                        className="inline-flex items-center px-2.5 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                      >
+                        {confirmando === agendamento._id ? '⏳' : '✅'} Confirmar
+                      </button>
+                      <button
+                        onClick={() => confirmarAgendamento(agendamento._id, 'rejeitado')}
+                        disabled={confirmando === agendamento._id}
+                        className="inline-flex items-center px-2.5 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                      >
+                        {confirmando === agendamento._id ? '⏳' : '❌'} Rejeitar
+                      </button>
+                    </>
+                  )}
+
+                  {/* Botões de editar/deletar */}
                   <button
                     onClick={() => handleEditarAgendamento(agendamento._id)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-4"
+                    className="text-indigo-600 hover:text-indigo-900"
                   >
                     Editar
                   </button>
