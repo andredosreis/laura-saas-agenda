@@ -27,7 +27,8 @@ const STORAGE_KEYS = {
   DISABLED_REASON: 'laura-push-disabled-reason',
 } as const;
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+// ✅ Suporta tanto VITE_VAPID_PUBLIC_KEY quanto VITE_VAPID_PUBLIC (caso Vercel bloqueie _KEY)
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || import.meta.env.VITE_VAPID_PUBLIC || '';
 
 // ============================================
 // 2️⃣ VERIFICAR SUPORTE A WEB PUSH
