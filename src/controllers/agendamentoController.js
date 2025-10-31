@@ -298,7 +298,7 @@ Por favor, confirme sua presença respondendo:
 ✅ *SIM* - para confirmar
 ❌ *NÃO* - para cancelar
 
-Aguardamos você! 💆‍♀️✨
+Aguardamos por ti! 💆‍♀️✨
 
 _La Estética Avançada_`;
 
