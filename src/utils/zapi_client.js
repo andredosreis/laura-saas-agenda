@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const ZAPI_INSTANCE_ID = process.env.ZAPI_INSTANCE_ID;
-const ZAPI_TOKEN = process.env.ZAPI_INSTANCE_TOKEN;
+const ZAPI_TOKEN = process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN; // ✅ Aceita ambos os nomes
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_SECURITY_TOKEN; // ✅ Client token para autenticação
 const ZAPI_BASE_URL = 'https://api.z-api.io';
 
