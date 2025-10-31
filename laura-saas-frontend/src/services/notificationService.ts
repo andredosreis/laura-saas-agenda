@@ -30,6 +30,14 @@ const STORAGE_KEYS = {
 // ✅ Suporta tanto VITE_VAPID_PUBLIC_KEY quanto VITE_VAPID_PUBLIC (caso Vercel bloqueie _KEY)
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || import.meta.env.VITE_VAPID_PUBLIC || '';
 
+// 🔍 DEBUG: Verificar se variável está carregando
+console.log('[NotifService] 🔍 DEBUG VAPID:', {
+  hasVITE_VAPID_PUBLIC_KEY: !!import.meta.env.VITE_VAPID_PUBLIC_KEY,
+  hasVITE_VAPID_PUBLIC: !!import.meta.env.VITE_VAPID_PUBLIC,
+  keyLength: VAPID_PUBLIC_KEY.length,
+  allEnvKeys: Object.keys(import.meta.env).filter(k => k.includes('VAPID'))
+});
+
 // ============================================
 // 2️⃣ VERIFICAR SUPORTE A WEB PUSH
 // ============================================
