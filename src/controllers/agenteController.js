@@ -8,20 +8,20 @@ import Pacote from "../models/Pacote.js";
 import Mensagem from "../models/Mensagem.js";
 import { chatWithLaura } from "../utils/openaiHelper.js";
 import { dispatch } from "../services/functionDispatcher.js";
-import { sendWhatsAppMessage } from "../utils/zapi_client.js";
+import { sendWhatsAppMessage } from "../utils/zapi_client.js"; // ✨ Já importado
 import { detectarPalavraChave } from "../utils/notificacaoHelper.js";
 
 console.log("CONTROLLER: agenteController.js carregado (v2)");
 
 
 /**
- * 🔔 Função de Lembrete com Web Push
+ * 🔔 Função de Lembrete Híbrida: WhatsApp + Web Push
  * Chamada pelo CRON todos os dias às 19h
- * MODIFICADO: Envia notificações para LAURA e CLIENTE
+ * MODIFICADO: WhatsApp para CLIENTE + Web Push para LAURA
  */
 export const sendReminderNotifications = async (req, res) => {
   try {
-    console.log('[Agente] 🔔 Iniciando envio de lembretes via Web Push...');
+    console.log('[Agente] 🔔 Iniciando envio de lembretes (WhatsApp + Web Push)...');
 
     // 1️⃣ Obter data de amanhã
     const amanha = DateTime.now()
@@ -51,13 +51,14 @@ export const sendReminderNotifications = async (req, res) => {
       };
     }
 
-    // 3️⃣ Para cada agendamento, enviar notificação para LAURA e CLIENTE
+    // 3️⃣ Para cada agendamento, enviar WhatsApp para CLIENTE + Web Push para LAURA
     let notificacoesEnviadas = 0;
     let notificacoesFalhadas = 0;
 
     for (const agendamento of agendamentosDiarios) {
       try {
         const clienteId = agendamento.cliente?._id;
+        const telefone = agendamento.cliente?.telefone;
 
         if (!clienteId) {
           console.warn(`[Agente] ⚠️ Agendamento ${agendamento._id} sem cliente`);
@@ -65,47 +66,41 @@ export const sendReminderNotifications = async (req, res) => {
           continue;
         }
 
-        const dataAgendamento = DateTime.fromJSDate(
-          new Date(agendamento.dataHora)
-        );
+        const dataAgendamento = DateTime.fromJSDate(new Date(agendamento.dataHora));
+        const dataFormatada = dataAgendamento.toFormat('dd/MM/yyyy');
+        const horaFormatada = dataAgendamento.toFormat('HH:mm');
 
-        // 4️⃣ NOTIFICAÇÃO PARA CLIENTE
-        const subscriptionCliente = await UserSubscription.findOne({
-          userId: clienteId.toString(), // Converte ObjectId para String
-          active: true,
-        });
+        // 4️⃣ WHATSAPP PARA CLIENTE
+        if (telefone) {
+          const mensagemWhatsApp = `🔔 *Lembrete de Agendamento*
 
-        if (subscriptionCliente) {
-          const payloadCliente = {
-            title: '🔔 Confirmação Necessária',
-            body: `Seu agendamento é amanhã às ${dataAgendamento.toFormat('HH:mm')}. Confirmar agendamento?`,
-            icon: '/icon-192x192.png',
-            badge: '/icon-192x192.png',
-            tag: `reminder-${agendamento._id}`,
-            requireInteraction: true,
-            data: {
-              agendamentoId: agendamento._id.toString(),
-              clienteNome: agendamento.cliente.nome,
-              servicoNome: agendamento.pacote?.nome || agendamento.servicoAvulsoNome,
-              tipo: 'confirmacao-cliente',
-            },
-          };
+Olá ${agendamento.cliente.nome}!
 
-          const enviado = await sendPushNotification(subscriptionCliente, payloadCliente);
-          if (enviado) {
+Você tem um agendamento marcado para *AMANHÃ*:
+📅 Data: ${dataFormatada}
+🕐 Horário: ${horaFormatada}
+
+Por favor, confirme sua presença respondendo SIM ou NÃO.
+
+Aguardamos você! 💆‍♀️✨
+
+_La Estética Avançada_`;
+
+          const resultadoWhatsApp = await sendWhatsAppMessage(telefone, mensagemWhatsApp);
+
+          if (resultadoWhatsApp.success) {
             notificacoesEnviadas++;
-            console.log(
-              `[Agente] ✅ Notificação de confirmação enviada para ${agendamento.cliente.nome}`
-            );
+            console.log(`[Agente] ✅ WhatsApp enviado para ${agendamento.cliente.nome} (${telefone})`);
           } else {
             notificacoesFalhadas++;
+            console.warn(`[Agente] ⚠️ Falha ao enviar WhatsApp para ${agendamento.cliente.nome}`);
           }
         } else {
-          console.log(`[Agente] 📵 Cliente ${clienteId} sem subscription ativa`);
+          console.log(`[Agente] 📵 Cliente ${agendamento.cliente.nome} sem telefone cadastrado`);
           notificacoesFalhadas++;
         }
 
-        // 5️⃣ NOTIFICAÇÃO PARA LAURA
+        // 5️⃣ WEB PUSH PARA LAURA
         const subscriptionLaura = await UserSubscription.findOne({
           userId: 'LAURA',
           active: true,
@@ -114,7 +109,7 @@ export const sendReminderNotifications = async (req, res) => {
         if (subscriptionLaura) {
           const payloadLaura = {
             title: '📋 Novo Agendamento Pendente',
-            body: `${agendamento.cliente.nome} - Amanhã às ${dataAgendamento.toFormat('HH:mm')}`,
+            body: `${agendamento.cliente.nome} - Amanhã às ${horaFormatada}`,
             icon: '/icon-192x192.png',
             badge: '/icon-192x192.png',
             tag: `laura-reminder-${agendamento._id}`,
@@ -132,18 +127,16 @@ export const sendReminderNotifications = async (req, res) => {
           const enviado = await sendPushNotification(subscriptionLaura, payloadLaura);
           if (enviado) {
             notificacoesEnviadas++;
-            console.log(
-              `[Agente] ✅ Notificação para Laura enviada sobre agendamento de ${agendamento.cliente.nome}`
-            );
+            console.log(`[Agente] ✅ Web Push enviado para Laura sobre ${agendamento.cliente.nome}`);
           } else {
-            console.warn(`[Agente] ⚠️ Falha ao enviar notificação para Laura`);
+            console.warn(`[Agente] ⚠️ Falha ao enviar Web Push para Laura`);
             notificacoesFalhadas++;
           }
         } else {
-          console.log('[Agente] 📵 Laura sem subscription ativa');
+          console.log('[Agente] 📵 Laura sem subscription ativa (Web Push)');
         }
       } catch (error) {
-        console.error(`[Agente] ❌ Erro ao enviar notificações:`, error);
+        console.error(`[Agente] ❌ Erro ao processar agendamento:`, error);
         notificacoesFalhadas += 2;
       }
     }

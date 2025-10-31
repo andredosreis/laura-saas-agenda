@@ -3,6 +3,7 @@ import Schedule from "../models/Schedule.js"; // Importar o modelo Schedule
 import { DateTime } from "luxon"; // Importar Luxon para manipulação de datas
 import { sendPushNotification } from "../services/pushService.js";
 import UserSubscription from "../models/UserSubscription.js";
+import { sendWhatsAppMessage } from "../utils/zapi_client.js"; // ✨ ADICIONAR Z-API
 
 
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
@@ -255,10 +256,10 @@ export const confirmarAgendamento = async (req, res) => {
 };
 
 
-// @desc    Enviar lembrete manual para cliente (NOVO)
+// @desc    Enviar lembrete manual via WhatsApp (MODIFICADO)
 export const enviarLembreteManual = async (req, res) => {
   try {
-    console.log('[Agendamento] 📱 Enviando lembrete manual...');
+    console.log('[Agendamento] 📱 Enviando lembrete manual via WhatsApp...');
 
     // Buscar agendamento com populate de cliente
     const agendamento = await Agendamento.findById(req.params.id).populate('cliente');
@@ -267,37 +268,15 @@ export const enviarLembreteManual = async (req, res) => {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
-    const clienteId = agendamento.cliente?._id;
-    if (!clienteId) {
+    if (!agendamento.cliente) {
       return res.status(400).json({ message: "Agendamento sem cliente associado." });
     }
 
-    // 🔄 MODIFICAÇÃO TEMPORÁRIA PARA TESTES:
-    // Tenta buscar subscription do cliente, se não encontrar, usa qualquer subscription ativa (Laura)
-    let subscriptionCliente = await UserSubscription.findOne({
-      userId: clienteId.toString(), // Converte ObjectId para String
-      active: true,
-    });
-
-    // Se cliente não tem subscription, busca Laura ou qualquer subscription ativa
-    if (!subscriptionCliente) {
-      console.log('[Agendamento] ⚠️ Cliente sem subscription, buscando Laura...');
-      subscriptionCliente = await UserSubscription.findOne({
-        userId: 'LAURA',
-        active: true,
-      });
-
-      // Se Laura também não tem, busca qualquer subscription ativa (para testes)
-      if (!subscriptionCliente) {
-        console.log('[Agendamento] ⚠️ Laura sem subscription, buscando qualquer subscription ativa...');
-        subscriptionCliente = await UserSubscription.findOne({ active: true });
-      }
-    }
-
-    if (!subscriptionCliente) {
-      return res.status(404).json({
-        message: "Nenhuma notificação ativa encontrada.",
-        hint: "Ative notificações no app para receber lembretes."
+    const telefone = agendamento.cliente.telefone;
+    if (!telefone) {
+      return res.status(400).json({
+        message: "Cliente não possui telefone cadastrado.",
+        hint: "Cadastre o telefone do cliente para enviar lembretes."
       });
     }
 
@@ -306,30 +285,27 @@ export const enviarLembreteManual = async (req, res) => {
     const dataFormatada = dataAgendamento.toFormat('dd/MM/yyyy');
     const horaFormatada = dataAgendamento.toFormat('HH:mm');
 
-    // Preparar payload da notificação
-    const payload = {
-      title: '🔔 Lembrete de Agendamento',
-      body: `Olá ${agendamento.cliente.nome}! Lembrete do seu agendamento em ${dataFormatada} às ${horaFormatada}.`,
-      icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png',
-      tag: `lembrete-manual-${agendamento._id}-${Date.now()}`,
-      requireInteraction: true,
-      data: {
-        agendamentoId: agendamento._id.toString(),
-        clienteNome: agendamento.cliente.nome,
-        dataHora: agendamento.dataHora,
-        tipo: 'lembrete-manual',
-      },
-    };
+    // Preparar mensagem WhatsApp
+    const mensagem = `🔔 *Lembrete de Agendamento*
 
-    // Enviar notificação
-    const enviado = await sendPushNotification(subscriptionCliente, payload);
+Olá ${agendamento.cliente.nome}!
 
-    if (enviado) {
-      console.log(`[Agendamento] ✅ Lembrete manual enviado para ${agendamento.cliente.nome}`);
+Você tem um agendamento marcado:
+📅 Data: ${dataFormatada}
+🕐 Horário: ${horaFormatada}
+
+Aguardamos você! 💆‍♀️✨
+
+_La Estética Avançada_`;
+
+    // Enviar via WhatsApp (Z-API)
+    const resultado = await sendWhatsAppMessage(telefone, mensagem);
+
+    if (resultado.success) {
+      console.log(`[Agendamento] ✅ Lembrete WhatsApp enviado para ${agendamento.cliente.nome} (${telefone})`);
       return res.status(200).json({
         success: true,
-        message: `Lembrete enviado para ${agendamento.cliente.nome}`,
+        message: `Lembrete enviado via WhatsApp para ${agendamento.cliente.nome}`,
         cliente: {
           nome: agendamento.cliente.nome,
           telefone: agendamento.cliente.telefone,
@@ -340,10 +316,11 @@ export const enviarLembreteManual = async (req, res) => {
         },
       });
     } else {
-      console.warn(`[Agendamento] ⚠️ Falha ao enviar lembrete para ${agendamento.cliente.nome}`);
+      console.warn(`[Agendamento] ⚠️ Falha ao enviar WhatsApp para ${agendamento.cliente.nome}`);
       return res.status(500).json({
         success: false,
-        message: "Falha ao enviar notificação. A subscription pode estar expirada.",
+        message: "Falha ao enviar mensagem WhatsApp.",
+        details: resultado.error,
       });
     }
 
