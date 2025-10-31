@@ -294,6 +294,10 @@ Você tem um agendamento marcado:
 📅 Data: ${dataFormatada}
 🕐 Horário: ${horaFormatada}
 
+Por favor, confirme sua presença respondendo:
+✅ *SIM* - para confirmar
+❌ *NÃO* - para cancelar
+
 Aguardamos você! 💆‍♀️✨
 
 _La Estética Avançada_`;

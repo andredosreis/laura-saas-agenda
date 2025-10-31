@@ -80,7 +80,9 @@ Você tem um agendamento marcado para *AMANHÃ*:
 📅 Data: ${dataFormatada}
 🕐 Horário: ${horaFormatada}
 
-Por favor, confirme sua presença respondendo SIM ou NÃO.
+Por favor, confirme sua presença respondendo:
+✅ *SIM* - para confirmar
+❌ *NÃO* - para cancelar
 
 Aguardamos você! 💆‍♀️✨
 
