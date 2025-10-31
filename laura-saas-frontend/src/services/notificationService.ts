@@ -218,6 +218,7 @@ export async function sendSubscriptionToBackend(
 
     const response = await api.post('/notifications/subscribe', {
       subscription,
+      userId: 'LAURA', // ✨ CORREÇÃO: Identifica Laura para receber notificações
       userAgent: navigator.userAgent,
     });
 

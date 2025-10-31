@@ -2,10 +2,7 @@ import dotenv from 'dotenv-flow';
 import cron from 'node-cron';
 import connectDB from './config/db.js';
 import app from './app.js';
-
-// Importamos APENAS a função que precisamos do controller.
-// Isto é uma boa prática que o ES Modules facilita.
-import { enviarLembretes24h } from './controllers/agenteController.js';
+import { sendReminderNotifications } from './controllers/agenteController.js';
 
 // Carrega as variáveis de ambiente
 dotenv.config();
@@ -20,8 +17,6 @@ connectDB().then(() => {
   console.error("❌ Falha ao conectar ao MongoDB. O servidor não foi iniciado.", err);
   process.exit(1); // Encerra o processo se a conexão com o BD falhar
 });
-
-import { sendReminderNotifications } from './controllers/agenteController.js';
 
 // ⏰ CRON JOB: Lembretes diários às 19h (Europe/Lisbon)
 cron.schedule('0 19 * * *', async () => {

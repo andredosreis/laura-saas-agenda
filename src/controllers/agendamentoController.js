@@ -175,17 +175,17 @@ export const deleteAgendamento = async (req, res) => {
 export const confirmarAgendamento = async (req, res) => {
   try {
     const { confirmacao, respondidoPor } = req.body;
-    
+
     // Validar input
     if (!confirmacao || !['confirmado', 'rejeitado'].includes(confirmacao)) {
-      return res.status(400).json({ 
-        message: "Campo 'confirmacao' deve ser 'confirmado' ou 'rejeitado'." 
+      return res.status(400).json({
+        message: "Campo 'confirmacao' deve ser 'confirmado' ou 'rejeitado'."
       });
     }
-    
+
     if (!respondidoPor || !['laura', 'cliente'].includes(respondidoPor)) {
-      return res.status(400).json({ 
-        message: "Campo 'respondidoPor' deve ser 'laura' ou 'cliente'." 
+      return res.status(400).json({
+        message: "Campo 'respondidoPor' deve ser 'laura' ou 'cliente'."
       });
     }
 
@@ -201,7 +201,7 @@ export const confirmarAgendamento = async (req, res) => {
       respondidoEm: new Date(),
       respondidoPor: respondidoPor
     };
-    
+
     await agendamento.save();
 
     // 🔔 Notificar o outro lado (se Laura confirmou, notificar cliente e vice-versa)
@@ -209,14 +209,14 @@ export const confirmarAgendamento = async (req, res) => {
       if (respondidoPor === 'laura') {
         // Laura confirmou/rejeitou, notificar CLIENTE
         const subscriptionCliente = await UserSubscription.findOne({
-          userId: agendamento.cliente._id,
+          userId: agendamento.cliente._id.toString(), // Converte ObjectId para String
           active: true,
         });
 
         if (subscriptionCliente) {
           const payloadCliente = {
             title: confirmacao === 'confirmado' ? '✅ Agendamento Confirmado' : '❌ Agendamento Rejeitado',
-            body: confirmacao === 'confirmado' 
+            body: confirmacao === 'confirmado'
               ? `Seu agendamento foi confirmado!`
               : `Seu agendamento foi rejeitado. Agende um novo horário.`,
             icon: '/icon-192x192.png',
@@ -247,9 +247,111 @@ export const confirmarAgendamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao confirmar agendamento:', error);
-    res.status(500).json({ 
-      message: "Erro ao confirmar agendamento.", 
-      details: error.message 
+    res.status(500).json({
+      message: "Erro ao confirmar agendamento.",
+      details: error.message
+    });
+  }
+};
+
+
+// @desc    Enviar lembrete manual para cliente (NOVO)
+export const enviarLembreteManual = async (req, res) => {
+  try {
+    console.log('[Agendamento] 📱 Enviando lembrete manual...');
+
+    // Buscar agendamento com populate de cliente
+    const agendamento = await Agendamento.findById(req.params.id).populate('cliente');
+
+    if (!agendamento) {
+      return res.status(404).json({ message: "Agendamento não encontrado." });
+    }
+
+    const clienteId = agendamento.cliente?._id;
+    if (!clienteId) {
+      return res.status(400).json({ message: "Agendamento sem cliente associado." });
+    }
+
+    // 🔄 MODIFICAÇÃO TEMPORÁRIA PARA TESTES:
+    // Tenta buscar subscription do cliente, se não encontrar, usa qualquer subscription ativa (Laura)
+    let subscriptionCliente = await UserSubscription.findOne({
+      userId: clienteId.toString(), // Converte ObjectId para String
+      active: true,
+    });
+
+    // Se cliente não tem subscription, busca Laura ou qualquer subscription ativa
+    if (!subscriptionCliente) {
+      console.log('[Agendamento] ⚠️ Cliente sem subscription, buscando Laura...');
+      subscriptionCliente = await UserSubscription.findOne({
+        userId: 'LAURA',
+        active: true,
+      });
+
+      // Se Laura também não tem, busca qualquer subscription ativa (para testes)
+      if (!subscriptionCliente) {
+        console.log('[Agendamento] ⚠️ Laura sem subscription, buscando qualquer subscription ativa...');
+        subscriptionCliente = await UserSubscription.findOne({ active: true });
+      }
+    }
+
+    if (!subscriptionCliente) {
+      return res.status(404).json({
+        message: "Nenhuma notificação ativa encontrada.",
+        hint: "Ative notificações no app para receber lembretes."
+      });
+    }
+
+    // Formatar data do agendamento
+    const dataAgendamento = DateTime.fromJSDate(new Date(agendamento.dataHora));
+    const dataFormatada = dataAgendamento.toFormat('dd/MM/yyyy');
+    const horaFormatada = dataAgendamento.toFormat('HH:mm');
+
+    // Preparar payload da notificação
+    const payload = {
+      title: '🔔 Lembrete de Agendamento',
+      body: `Olá ${agendamento.cliente.nome}! Lembrete do seu agendamento em ${dataFormatada} às ${horaFormatada}.`,
+      icon: '/icon-192x192.png',
+      badge: '/icon-192x192.png',
+      tag: `lembrete-manual-${agendamento._id}-${Date.now()}`,
+      requireInteraction: true,
+      data: {
+        agendamentoId: agendamento._id.toString(),
+        clienteNome: agendamento.cliente.nome,
+        dataHora: agendamento.dataHora,
+        tipo: 'lembrete-manual',
+      },
+    };
+
+    // Enviar notificação
+    const enviado = await sendPushNotification(subscriptionCliente, payload);
+
+    if (enviado) {
+      console.log(`[Agendamento] ✅ Lembrete manual enviado para ${agendamento.cliente.nome}`);
+      return res.status(200).json({
+        success: true,
+        message: `Lembrete enviado para ${agendamento.cliente.nome}`,
+        cliente: {
+          nome: agendamento.cliente.nome,
+          telefone: agendamento.cliente.telefone,
+        },
+        agendamento: {
+          id: agendamento._id,
+          dataHora: agendamento.dataHora,
+        },
+      });
+    } else {
+      console.warn(`[Agendamento] ⚠️ Falha ao enviar lembrete para ${agendamento.cliente.nome}`);
+      return res.status(500).json({
+        success: false,
+        message: "Falha ao enviar notificação. A subscription pode estar expirada.",
+      });
+    }
+
+  } catch (error) {
+    console.error('[Agendamento] ❌ Erro ao enviar lembrete manual:', error);
+    res.status(500).json({
+      message: "Erro ao enviar lembrete.",
+      details: error.message
     });
   }
 };

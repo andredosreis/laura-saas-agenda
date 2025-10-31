@@ -10,6 +10,7 @@ function Agendamentos() {
   const [isLoading, setIsLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [confirmando, setConfirmando] = useState(null);
+  const [enviandoLembrete, setEnviandoLembrete] = useState(null);
   
   const [pushStatus, setPushStatus] = useState({
     supported: false,
@@ -130,7 +131,7 @@ function Agendamentos() {
         confirmacao: confirmacao,
         respondidoPor: 'laura'
       });
-      
+
       toast.success(`✅ Agendamento ${confirmacao === 'confirmado' ? 'confirmado' : 'rejeitado'} com sucesso!`);
       carregarAgendamentos();
     } catch (error) {
@@ -138,6 +139,29 @@ function Agendamentos() {
       toast.error(error.response?.data?.message || 'Erro ao confirmar agendamento.');
     } finally {
       setConfirmando(null);
+    }
+  };
+
+  // ✨ NEW: Enviar lembrete manual
+  const enviarLembrete = async (id, clienteNome) => {
+    try {
+      setEnviandoLembrete(id);
+      const response = await api.post(`/agendamentos/${id}/enviar-lembrete`);
+
+      if (response.data.success) {
+        toast.success(`📱 Lembrete enviado para ${clienteNome}!`);
+      } else {
+        toast.warning(response.data.message || 'Não foi possível enviar o lembrete.');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar lembrete:', error);
+      if (error.response?.status === 404) {
+        toast.error(`Cliente ${clienteNome} não possui notificações ativadas.`);
+      } else {
+        toast.error(error.response?.data?.message || 'Erro ao enviar lembrete.');
+      }
+    } finally {
+      setEnviandoLembrete(null);
     }
   };
 
@@ -354,40 +378,52 @@ function Agendamentos() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {renderRespondidoPor(agendamento)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  {/* Botões de confirmação (apenas se pendente) */}
-                  {(!agendamento.confirmacao || agendamento.confirmacao.tipo === 'pendente') && (
-                    <>
-                      <button
-                        onClick={() => confirmarAgendamento(agendamento._id, 'confirmado')}
-                        disabled={confirmando === agendamento._id}
-                        className="inline-flex items-center px-2.5 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
-                      >
-                        {confirmando === agendamento._id ? '⏳' : '✅'} Confirmar
-                      </button>
-                      <button
-                        onClick={() => confirmarAgendamento(agendamento._id, 'rejeitado')}
-                        disabled={confirmando === agendamento._id}
-                        className="inline-flex items-center px-2.5 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
-                      >
-                        {confirmando === agendamento._id ? '⏳' : '❌'} Rejeitar
-                      </button>
-                    </>
-                  )}
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="flex flex-col gap-2">
+                    {/* Linha 1: Botões de confirmação (apenas se pendente) */}
+                    {(!agendamento.confirmacao || agendamento.confirmacao.tipo === 'pendente') && (
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => confirmarAgendamento(agendamento._id, 'confirmado')}
+                          disabled={confirmando === agendamento._id}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                        >
+                          {confirmando === agendamento._id ? '⏳' : '✅'} Confirmar
+                        </button>
+                        <button
+                          onClick={() => confirmarAgendamento(agendamento._id, 'rejeitado')}
+                          disabled={confirmando === agendamento._id}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                        >
+                          {confirmando === agendamento._id ? '⏳' : '❌'} Rejeitar
+                        </button>
+                      </div>
+                    )}
 
-                  {/* Botões de editar/deletar */}
-                  <button
-                    onClick={() => handleEditarAgendamento(agendamento._id)}
-                    className="text-indigo-600 hover:text-indigo-900"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => deletarAgendamento(agendamento._id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Deletar
-                  </button>
+                    {/* Linha 2: Botão de lembrete + editar/deletar */}
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => enviarLembrete(agendamento._id, agendamento.cliente?.nome)}
+                        disabled={enviandoLembrete === agendamento._id}
+                        className="inline-flex items-center px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                        title="Enviar lembrete via notificação"
+                      >
+                        {enviandoLembrete === agendamento._id ? '⏳' : '📱'} Lembrete
+                      </button>
+                      <button
+                        onClick={() => handleEditarAgendamento(agendamento._id)}
+                        className="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => deletarAgendamento(agendamento._id)}
+                        className="text-red-600 hover:text-red-900 text-xs font-medium"
+                      >
+                        Deletar
+                      </button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             ))}

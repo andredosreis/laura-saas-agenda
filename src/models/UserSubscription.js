@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const userSubscriptionSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Cliente',
+    type: String, // ✨ CORREÇÃO: Aceita String (ex: "LAURA") ou ObjectId como string
     required: false,
+    index: true, // Adiciona índice para busca rápida
   },
   endpoint: {
     type: String,

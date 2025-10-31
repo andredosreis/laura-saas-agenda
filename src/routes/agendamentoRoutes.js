@@ -6,6 +6,7 @@ import {
   updateAgendamento,
   deleteAgendamento,
   confirmarAgendamento,
+  enviarLembreteManual,
 } from '../controllers/agendamentoController.js';
 import validateObjectId from '../middlewares/validateObjectId.js';
 
@@ -17,6 +18,9 @@ router.post('/', createAgendamento);
 router.get('/:id', validateObjectId, getAgendamento);
 router.put('/:id', validateObjectId, updateAgendamento);
 router.delete('/:id', validateObjectId, deleteAgendamento);
+
+// Rotas de confirmação e lembretes
 router.patch('/:id/confirmar', validateObjectId, confirmarAgendamento);
+router.post('/:id/enviar-lembrete', validateObjectId, enviarLembreteManual);
 
 export default router;

@@ -13,6 +13,7 @@ function Dashboard() {
   const [concluidosSemana, setConcluidosSemana] = useState(0);
   const [sessoesBaixas, setSessoesBaixas] = useState([]);
   const [proximosAgendamentosLista, setProximosAgendamentosLista] = useState([]);
+  const [enviandoLembrete, setEnviandoLembrete] = useState(null);
 
   const limiteSessoesBaixasParaFetch = 2; // Definindo o limite aqui para reutilizar
 
@@ -62,6 +63,33 @@ function Dashboard() {
     if (!dataIso) return '';
     const data = new Date(dataIso);
     return data.toLocaleTimeString('pt-PT', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit' });
+  };
+
+  // ✨ NEW: Enviar lembrete manual
+  const enviarLembrete = async (id, clienteNome) => {
+    try {
+      setEnviandoLembrete(id);
+      const response = await api.post(`/agendamentos/${id}/enviar-lembrete`);
+
+      if (response.data.success) {
+        // toast.success(`📱 Lembrete enviado para ${clienteNome}!`);
+        alert(`📱 Lembrete enviado para ${clienteNome}!`);
+      } else {
+        // toast.warning(response.data.message || 'Não foi possível enviar o lembrete.');
+        alert(response.data.message || 'Não foi possível enviar o lembrete.');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar lembrete:', error);
+      if (error.response?.status === 404) {
+        // toast.error(`Cliente ${clienteNome} não possui notificações ativadas.`);
+        alert(`Cliente ${clienteNome} não possui notificações ativadas.`);
+      } else {
+        // toast.error(error.response?.data?.message || 'Erro ao enviar lembrete.');
+        alert(error.response?.data?.message || 'Erro ao enviar lembrete.');
+      }
+    } finally {
+      setEnviandoLembrete(null);
+    }
   };
 
   if (isLoading) {
@@ -190,13 +218,23 @@ function Dashboard() {
                     </div>
                   )}
                 </div>
-                <div className="bg-gray-50 p-2 text-center border-t border-gray-100">
-                  <button
-                    onClick={() => navigate(`/agendamentos/editar/${ag._id}`)}
-                    className="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded transition-colors"
-                  >
-                    Ver Detalhes
-                  </button>
+                <div className="bg-gray-50 p-2 border-t border-gray-100">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => enviarLembrete(ag._id, ag.cliente?.nome)}
+                      disabled={enviandoLembrete === ag._id}
+                      className="flex-1 text-xs bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white py-1 px-2 rounded transition-colors"
+                      title="Enviar lembrete"
+                    >
+                      {enviandoLembrete === ag._id ? '⏳' : '📱'}
+                    </button>
+                    <button
+                      onClick={() => navigate(`/agendamentos/editar/${ag._id}`)}
+                      className="flex-1 text-xs bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded transition-colors"
+                    >
+                      Ver
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

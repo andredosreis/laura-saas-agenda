@@ -71,7 +71,7 @@ export const sendReminderNotifications = async (req, res) => {
 
         // 4️⃣ NOTIFICAÇÃO PARA CLIENTE
         const subscriptionCliente = await UserSubscription.findOne({
-          userId: clienteId,
+          userId: clienteId.toString(), // Converte ObjectId para String
           active: true,
         });
 
