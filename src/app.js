@@ -20,6 +20,7 @@ import whatsappRoutes from './routes/whatsappRoutes.js';
 import agenteRoutes from './routes/agenteRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 
 const app = express();
 
@@ -60,8 +61,8 @@ app.use('/api/agente', agenteRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Rota principal do webhook para Z-API (se aplicável)
-app.use('/webhook', whatsappRoutes);
+// Webhook Z-API para confirmações de agendamento
+app.use('/webhook', webhookRoutes);
 
 // Rota de teste
 app.get('/', (req, res) => {
