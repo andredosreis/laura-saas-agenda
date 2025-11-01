@@ -30,36 +30,24 @@ app.use(morgan('dev')); // para logs de requisição
 app.use(requestLogger);
 
 // --- Configuração do CORS ---
+// IMPORTANTE: Permite requisições sem origin (webhooks, Postman, etc) E da whitelist
 const whiteList = ['https://laura-saas-agenda-mfqt.vercel.app'];
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Permite requisições sem 'origin' (ex: Postman, apps mobile, webhooks) ou da whitelist
-    if (!origin || whiteList.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-};
 
-// CORS condicional: webhooks não precisam de CORS (server-to-server)
-app.use((req, res, next) => {
-  if (req.path.startsWith('/webhook')) {
-    // Webhooks: permite qualquer origem
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    return next();
-  }
-
-  // Outras rotas: aplica CORS normal
-  if (process.env.NODE_ENV === 'development') {
-    cors()(req, res, next);
-  } else {
-    cors(corsOptions)(req, res, next);
-  }
-});
+if (process.env.NODE_ENV === 'development') {
+  app.use(cors()); // Desenvolvimento: permite tudo
+} else {
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Permite se: sem origin (webhooks/Postman) OU está na whitelist
+      if (!origin || whiteList.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }));
+}
 // --- Fim da Configuração do CORS ---
 
 // Endpoints da API
