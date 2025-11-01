@@ -24,11 +24,16 @@ import webhookRoutes from './routes/webhookRoutes.js';
 
 const app = express();
 
+// Middlewares globais (ANTES do CORS para webhooks funcionarem)
+app.use(express.json()); // para parsear JSON
+app.use(morgan('dev')); // para logs de requisição
+app.use(requestLogger);
+
 // --- Configuração do CORS ---
 const whiteList = ['https://laura-saas-agenda-mfqt.vercel.app'];
 const corsOptions = {
   origin: (origin, callback) => {
-    // Permite requisições sem 'origin' (ex: Postman, apps mobile) ou da sua whitelist
+    // Permite requisições sem 'origin' (ex: Postman, apps mobile, webhooks) ou da whitelist
     if (!origin || whiteList.includes(origin)) {
       callback(null, true);
     } else {
@@ -37,6 +42,15 @@ const corsOptions = {
   },
   credentials: true,
 };
+
+// Webhook Z-API NÃO precisa de CORS (server-to-server)
+app.use('/webhook', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
 // Em ambiente de desenvolvimento, podemos ser menos restritos
 if (process.env.NODE_ENV === 'development') {
   app.use(cors());
@@ -44,11 +58,6 @@ if (process.env.NODE_ENV === 'development') {
   app.use(cors(corsOptions));
 }
 // --- Fim da Configuração do CORS ---
-
-// Middlewares globais
-app.use(express.json()); // para parsear JSON
-app.use(morgan('dev')); // para logs de requisição
-app.use(requestLogger);
 
 // Endpoints da API
 app.use('/api/clientes', clienteRoutes);
