@@ -2,8 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useEffect } from 'react';
-import type { FC } from 'react';
 import Navbar from './components/Navbar';
+import InstallPrompt from './components/InstallPrompt';
 // ❌ REMOVIDO: import Home from './pages/Home';
 import Agendamentos from './pages/Agendamentos';
 import Clientes from './pages/Clientes';
@@ -67,7 +67,7 @@ const App = () => {
   return (
     <Router>
       <Navbar />
-      
+
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/agendamentos" element={<Agendamentos />} />
@@ -82,7 +82,8 @@ const App = () => {
           <Route path="/disponibilidade" element={<Disponibilidade />} />
         </Routes>
         <ToastContainer />
-      
+        <InstallPrompt />
+
     </Router>
   );
 };
