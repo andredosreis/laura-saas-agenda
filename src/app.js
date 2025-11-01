@@ -31,7 +31,10 @@ app.use(requestLogger);
 
 // --- Configuração do CORS ---
 // IMPORTANTE: Permite requisições sem origin (webhooks, Postman, etc) E da whitelist
-const whiteList = ['https://laura-saas-agenda-mfqt.vercel.app'];
+const whiteList = [
+  'https://laura-saas-agenda-mfqt.vercel.app', // Frontend Vercel
+  'https://api.z-api.io'                        // Webhook Z-API
+];
 
 // 🔍 DEBUG: Log do ambiente
 console.log(`[APP] NODE_ENV: "${process.env.NODE_ENV}"`);
