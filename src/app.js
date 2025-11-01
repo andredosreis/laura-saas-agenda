@@ -43,20 +43,23 @@ const corsOptions = {
   credentials: true,
 };
 
-// Webhook Z-API NÃO precisa de CORS (server-to-server)
-app.use('/webhook', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  next();
-});
+// CORS condicional: webhooks não precisam de CORS (server-to-server)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/webhook')) {
+    // Webhooks: permite qualquer origem
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    return next();
+  }
 
-// Em ambiente de desenvolvimento, podemos ser menos restritos
-if (process.env.NODE_ENV === 'development') {
-  app.use(cors());
-} else {
-  app.use(cors(corsOptions));
-}
+  // Outras rotas: aplica CORS normal
+  if (process.env.NODE_ENV === 'development') {
+    cors()(req, res, next);
+  } else {
+    cors(corsOptions)(req, res, next);
+  }
+});
 // --- Fim da Configuração do CORS ---
 
 // Endpoints da API
