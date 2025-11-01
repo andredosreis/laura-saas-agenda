@@ -33,19 +33,31 @@ app.use(requestLogger);
 // IMPORTANTE: Permite requisições sem origin (webhooks, Postman, etc) E da whitelist
 const whiteList = ['https://laura-saas-agenda-mfqt.vercel.app'];
 
+// 🔍 DEBUG: Log do ambiente
+console.log(`[APP] NODE_ENV: "${process.env.NODE_ENV}"`);
+
 if (process.env.NODE_ENV === 'development') {
+  console.log('[APP] 🟢 Modo DESENVOLVIMENTO - CORS liberado para todos');
   app.use(cors()); // Desenvolvimento: permite tudo
 } else {
+  console.log('[APP] 🔴 Modo PRODUÇÃO - CORS restrito');
   app.use(cors({
     origin: (origin, callback) => {
-      // 🔍 DEBUG: Log para ver qual origin está vindo
-      console.log(`[CORS] Origin recebido: "${origin}" | Tipo: ${typeof origin}`);
+      // 🔍 DEBUG: Log SEMPRE será executado
+      console.log(`[CORS] ========================================`);
+      console.log(`[CORS] Origin recebido: "${origin}"`);
+      console.log(`[CORS] Tipo: ${typeof origin}`);
+      console.log(`[CORS] É undefined?: ${origin === undefined}`);
+      console.log(`[CORS] É null?: ${origin === null}`);
+      console.log(`[CORS] Avaliação !origin: ${!origin}`);
+      console.log(`[CORS] ========================================`);
 
       // Permite se: sem origin (webhooks/Postman) OU está na whitelist
       if (!origin || whiteList.includes(origin)) {
+        console.log(`[CORS] ✅ PERMITIDO`);
         callback(null, true);
       } else {
-        console.warn(`[CORS] ⚠️ Origin REJEITADO: "${origin}"`);
+        console.log(`[CORS] ❌ REJEITADO - Origin "${origin}" não está na whitelist`);
         callback(new Error('Not allowed by CORS'));
       }
     },
