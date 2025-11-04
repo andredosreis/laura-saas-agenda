@@ -11,6 +11,22 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
   try {
     console.log('[Webhook] 📥 Recebido:', JSON.stringify(req.body, null, 2));
 
+    // 🔍 VALIDAÇÃO 1: Ignora mensagens enviadas pelo próprio salão (fromMe: true)
+    if (req.body.fromMe === true) {
+      console.log('[Webhook] ⏭️ Ignorando mensagem enviada pelo salão (fromMe: true)');
+      return res.status(200).json({ message: 'Mensagem do salão ignorada' });
+    }
+
+    // 🔍 VALIDAÇÃO 2: Verifica timestamp (só processa mensagens dos últimos 5 minutos)
+    const timestampMensagem = req.body.momment || req.body.timestamp || Date.now();
+    const idadeMensagem = Date.now() - timestampMensagem;
+    const CINCO_MINUTOS = 5 * 60 * 1000;
+
+    if (idadeMensagem > CINCO_MINUTOS) {
+      console.log(`[Webhook] ⏭️ Mensagem antiga (${Math.round(idadeMensagem / 1000)}s) - ignorando`);
+      return res.status(200).json({ message: 'Mensagem antiga ignorada' });
+    }
+
     // Extrai dados do webhook Z-API
     const telefone = req.body.phone || req.body.data?.phone || req.body.data?.from;
     const mensagem = req.body.text?.message || req.body.data?.body || '';
@@ -31,6 +47,15 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       .trim();
 
     console.log(`[Webhook] 📱 Telefone: ${telefoneNormalizado}, Mensagem: "${mensagemNormalizada}"`);
+
+    // 🔍 VALIDAÇÃO 3: Só processa mensagens que parecem ser respostas de confirmação
+    const padraoConfirmacao = /^(sim|confirmo|confirmar|ok|certo|confirma|yes|s|nao|não|cancelar|cancel|desmarcar|nope|n)$/;
+    const pareceMensagemCasual = mensagemNormalizada.length > 20 || !padraoConfirmacao.test(mensagemNormalizada);
+
+    if (pareceMensagemCasual) {
+      console.log(`[Webhook] ⏭️ Mensagem casual ignorada: "${mensagem}"`);
+      return res.status(200).json({ message: 'Mensagem casual ignorada' });
+    }
 
     // Busca cliente pelo telefone
     const cliente = await Cliente.findOne({
