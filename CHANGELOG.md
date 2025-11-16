@@ -11,15 +11,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### 🐛 Corrigido
 
-#### Webhook WhatsApp - Delegação Inteligente para IA
+#### Webhook WhatsApp - Resposta Automática Simples (IA Desativada)
 **Problema:** Cliente enviava mensagem casual (ex: "Olá") e recebia erro "Não encontramos nenhum agendamento pendente de confirmação".
 
 **Causa:** Webhook estava configurado apenas para processar confirmações (SIM/NÃO) de agendamentos.
 
-**Solução:** Implementado **roteamento inteligente** no webhook:
+**Solução:** Implementado **roteamento inteligente** no webhook com **resposta automática simples**:
 - Se mensagem é `SIM/NÃO` → Processa confirmação de agendamento
-- Se mensagem é outra coisa → Delega para IA (chatbot GPT-4o-mini)
-- Se `SIM/NÃO` mas sem agendamento pendente → Delega para IA
+- Se mensagem é outra coisa → Envia resposta automática ÚNICA baseada no horário
+- Se cliente já recebeu resposta → IGNORA (Laura tratará manualmente)
+- **IA (GPT-4o-mini) DESATIVADA por enquanto**
 
 **Arquivos modificados:**
 - `src/controllers/webhookController.js` - Adicionada função `delegarParaIA()`
@@ -31,12 +32,25 @@ Antes:
 Cliente: "Olá"
 Sistema: ❌ "Não encontramos nenhum agendamento pendente"
 
-Depois:
-Cliente: "Olá"
-Sistema: ✅ "Olá! Bem-vindo(a) à Clínica de Estética Laura. Como posso ajudar?"
+Depois (v1.0.1):
+Cliente: "Olá" (primeira vez)
+Sistema: ✅ "Boa tarde! 👋 Tudo bem? Sou um assistente virtual da Laura.
+          Em breve ela entrará em contato para mais informações. 💆‍♀️✨"
+
+Cliente: "Olá" (segunda vez - mesmo cliente)
+Sistema: ✅ (NENHUMA resposta - Laura tratará manualmente)
 ```
 
-**Documentação:** [assets/docs/FIX_WEBHOOK_WHATSAPP.md](assets/docs/FIX_WEBHOOK_WHATSAPP.md)
+**Funcionalidades:**
+- ✅ Saudação baseada no horário (Bom dia/Boa tarde/Boa noite)
+- ✅ Responde APENAS UMA VEZ por cliente (evita spam)
+- ✅ Marca cliente como 'aguardando_laura' após primeira resposta
+- ✅ Ignora mensagens subsequentes (Laura trata manualmente)
+- ✅ Confirmações de agendamento (SIM/NÃO) continuam funcionando
+
+**Documentação:**
+- [assets/docs/WEBHOOK_RESPOSTA_AUTOMATICA.md](assets/docs/WEBHOOK_RESPOSTA_AUTOMATICA.md) - Documentação completa
+- [assets/docs/FIX_WEBHOOK_WHATSAPP.md](assets/docs/FIX_WEBHOOK_WHATSAPP.md) - Análise do problema original
 
 ---
 

@@ -164,37 +164,99 @@ Por favor, responda:
 };
 
 /**
- * 🤖 Delega mensagem para IA (chatbot)
- * Chama o agenteController para processar a mensagem com GPT-4o-mini
+ * 🤖 Resposta automática simples (SEM IA)
+ * Envia mensagem de saudação e notifica Laura
+ * IMPORTANTE: Responde APENAS UMA VEZ, nunca mais interage
  */
 async function delegarParaIA(req, res) {
   try {
-    console.log('[Webhook] 🤖 Delegando para IA (chatbot)...');
+    console.log('[Webhook] 📝 Processando mensagem não-confirmação (resposta automática simples)');
 
-    // Importa dinamicamente para evitar dependência circular
-    const { processarRespostaWhatsapp } = await import('./agenteController.js');
-
-    // Chama a função de processamento do agente IA
-    return await processarRespostaWhatsapp(req, res);
-
-  } catch (error) {
-    console.error('[Webhook] ❌ Erro ao delegar para IA:', error);
-
-    // Fallback: envia mensagem genérica de boas-vindas
     const telefone = req.body.phone || req.body.data?.phone || req.body.data?.from;
 
-    if (telefone) {
-      const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
-      await sendWhatsAppMessage(
-        telefoneNormalizado,
-        'Olá! 👋 Bem-vindo(a) à Clínica de Estética Laura. Como posso ajudar?'
-      );
+    if (!telefone) {
+      return res.status(400).json({ error: 'Telefone não fornecido' });
+    }
+
+    const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
+
+    // Verifica se já respondemos antes (evita spam)
+    const cliente = await Cliente.findOne({
+      $or: [
+        { telefone: telefoneNormalizado },
+        { telefone: `351${telefoneNormalizado}` },
+        { telefone: telefoneNormalizado.replace(/^351/, '') }
+      ]
+    });
+
+    // Se cliente já existe E já tem etapaConversa definida, significa que já respondemos antes
+    // Neste caso, NÃO respondemos novamente (Laura vai tratar manualmente)
+    if (cliente && cliente.etapaConversa) {
+      console.log(`[Webhook] ⏭️ Cliente ${cliente.nome} já recebeu mensagem automática - ignorando`);
+      return res.status(200).json({
+        success: true,
+        tipo: 'ignorado',
+        message: 'Cliente já recebeu resposta automática anteriormente'
+      });
+    }
+
+    // Determina saudação baseada no horário (timezone Europe/Lisbon)
+    const agora = DateTime.now().setZone('Europe/Lisbon');
+    const hora = agora.hour;
+
+    let saudacao;
+    if (hora >= 6 && hora < 12) {
+      saudacao = 'Bom dia';
+    } else if (hora >= 12 && hora < 19) {
+      saudacao = 'Boa tarde';
+    } else {
+      saudacao = 'Boa noite';
+    }
+
+    // Mensagem automática ÚNICA
+    const mensagemAutomatica = `${saudacao}! 👋
+
+Tudo bem? Sou um assistente virtual da *Laura*.
+
+Em breve ela entrará em contato para mais informações. 💆‍♀️✨
+
+_La Estética Avançada_`;
+
+    // Envia mensagem
+    await sendWhatsAppMessage(telefoneNormalizado, mensagemAutomatica);
+    console.log(`[Webhook] ✅ Mensagem automática enviada (${saudacao})`);
+
+    // Marca que já respondemos (para não responder novamente)
+    if (cliente) {
+      cliente.etapaConversa = 'aguardando_laura';
+      await cliente.save();
+      console.log(`[Webhook] 📝 Cliente ${cliente.nome} marcado como aguardando_laura`);
+    } else {
+      // Se cliente não existe, cria registro temporário para evitar spam
+      await Cliente.create({
+        nome: 'Visitante (aguardando cadastro)',
+        telefone: telefoneNormalizado,
+        dataNascimento: new Date('2000-01-01'), // Placeholder (será atualizado pela Laura)
+        etapaConversa: 'aguardando_laura'
+      });
+      console.log(`[Webhook] 📝 Registro temporário criado para ${telefoneNormalizado}`);
     }
 
     return res.status(200).json({
       success: true,
-      tipo: 'fallback',
-      message: 'Mensagem processada com fallback genérico'
+      tipo: 'resposta_automatica',
+      saudacao,
+      message: 'Mensagem automática enviada - aguardando Laura'
+    });
+
+  } catch (error) {
+    console.error('[Webhook] ❌ Erro ao processar resposta automática:', error);
+
+    // Fallback silencioso: apenas loga, não envia nada
+    return res.status(200).json({
+      success: false,
+      tipo: 'erro_silencioso',
+      message: 'Erro processado silenciosamente'
     });
   }
 }
