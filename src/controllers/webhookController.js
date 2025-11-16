@@ -48,14 +48,18 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     console.log(`[Webhook] 📱 Telefone: ${telefoneNormalizado}, Mensagem: "${mensagemNormalizada}"`);
 
-    // 🔍 VALIDAÇÃO 3: Só processa mensagens que parecem ser respostas de confirmação
+    // 🔍 ROTEAMENTO INTELIGENTE: Detecta se é confirmação (SIM/NÃO) ou conversa normal
     const padraoConfirmacao = /^(sim|confirmo|confirmar|ok|certo|confirma|yes|s|nao|não|cancelar|cancel|desmarcar|nope|n)$/;
-    const pareceMensagemCasual = mensagemNormalizada.length > 20 || !padraoConfirmacao.test(mensagemNormalizada);
+    const ehRespostaConfirmacao = padraoConfirmacao.test(mensagemNormalizada);
 
-    if (pareceMensagemCasual) {
-      console.log(`[Webhook] ⏭️ Mensagem casual ignorada: "${mensagem}"`);
-      return res.status(200).json({ message: 'Mensagem casual ignorada' });
+    if (!ehRespostaConfirmacao) {
+      // ✅ NÃO é confirmação → Delega para IA (chatbot)
+      console.log(`[Webhook] 🤖 NÃO é confirmação - delegando para IA: "${mensagem}"`);
+      return await delegarParaIA(req, res);
     }
+
+    // ✅ É uma resposta de confirmação (SIM/NÃO) → Continua processando
+    console.log(`[Webhook] ✅ Detectado resposta de confirmação: "${mensagem}"`);
 
     // Busca cliente pelo telefone
     const cliente = await Cliente.findOne({
@@ -67,8 +71,8 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     });
 
     if (!cliente) {
-      console.warn(`[Webhook] ⚠️ Cliente não encontrado para telefone: ${telefoneNormalizado}`);
-      return res.status(200).json({ message: 'Cliente não encontrado' });
+      console.warn(`[Webhook] ⚠️ Cliente não encontrado - delegando para IA`);
+      return await delegarParaIA(req, res);
     }
 
     console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
@@ -87,11 +91,8 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     }).sort({ dataHora: 1 });
 
     if (!agendamento) {
-      console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente encontrado para ${cliente.nome}`);
-      await sendWhatsAppMessage(telefoneNormalizado,
-        `Olá ${cliente.nome}! Não encontramos nenhum agendamento pendente de confirmação. 🤔`
-      );
-      return res.status(200).json({ message: 'Nenhum agendamento pendente' });
+      console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${cliente.nome} - delegando para IA`);
+      return await delegarParaIA(req, res);
     }
 
     // Processa resposta
@@ -161,3 +162,39 @@ Por favor, responda:
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 };
+
+/**
+ * 🤖 Delega mensagem para IA (chatbot)
+ * Chama o agenteController para processar a mensagem com GPT-4o-mini
+ */
+async function delegarParaIA(req, res) {
+  try {
+    console.log('[Webhook] 🤖 Delegando para IA (chatbot)...');
+
+    // Importa dinamicamente para evitar dependência circular
+    const { processarRespostaWhatsapp } = await import('./agenteController.js');
+
+    // Chama a função de processamento do agente IA
+    return await processarRespostaWhatsapp(req, res);
+
+  } catch (error) {
+    console.error('[Webhook] ❌ Erro ao delegar para IA:', error);
+
+    // Fallback: envia mensagem genérica de boas-vindas
+    const telefone = req.body.phone || req.body.data?.phone || req.body.data?.from;
+
+    if (telefone) {
+      const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
+      await sendWhatsAppMessage(
+        telefoneNormalizado,
+        'Olá! 👋 Bem-vindo(a) à Clínica de Estética Laura. Como posso ajudar?'
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      tipo: 'fallback',
+      message: 'Mensagem processada com fallback genérico'
+    });
+  }
+}

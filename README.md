@@ -301,8 +301,10 @@ Configure variáveis de ambiente no seu provedor (Railway, Render, etc.) e faça
 
 ### Documentação Disponível
 
-- **[ANALISE_COMPLETA.md](docs/ANALISE_COMPLETA.md)**: Análise técnica detalhada (127 arquivos, 15k+ LOC)
-- **[ARQUITETURA.md](docs/ARQUITETURA.md)**: Diagramas, fluxos e decisões arquiteturais
+- **[ANALISE_COMPLETA.md](assets/docs/ANALISE_COMPLETA.md)**: Análise técnica detalhada (127 arquivos, 15k+ LOC)
+- **[ARQUITETURA.md](assets/docs/ARQUITETURA.md)**: Diagramas, fluxos e decisões arquiteturais
+- **[TROUBLESHOOTING.md](assets/docs/TROUBLESHOOTING.md)**: Guia de solução de problemas
+- **[FIX_WEBHOOK_WHATSAPP.md](assets/docs/FIX_WEBHOOK_WHATSAPP.md)**: Correção do webhook WhatsApp
 - **[ARQUITETURA_PWA.md](assets/docs/ARQUITETURA_PWA.md)**: Documentação PWA v2
 - **[CHECKLIST_PWA.md](assets/docs/CHECKLIST_PWA.md)**: Checklist de implementação PWA
 - **[systemLaura.md](src/prompt/systemLaura.md)**: System prompt do chatbot IA
@@ -399,7 +401,7 @@ Configure variáveis de ambiente no seu provedor (Railway, Render, etc.) e faça
 - 💡 Testes com coverage < 20% (target: 80%)
 - 💡 Sem monitoramento estruturado (Prometheus/Grafana)
 
-**Ver lista completa:** [docs/ANALISE_COMPLETA.md#11-pontos-de-atenção-e-melhorias](docs/ANALISE_COMPLETA.md#11-pontos-de-aten%C3%A7%C3%A3o-e-melhorias)
+**Ver lista completa:** [assets/docs/ANALISE_COMPLETA.md#11-pontos-de-atenção-e-melhorias](assets/docs/ANALISE_COMPLETA.md#11-pontos-de-aten%C3%A7%C3%A3o-e-melhorias)
 
 ---
 
@@ -457,7 +459,7 @@ Contribuições são bem-vindas! Por favor, siga estas etapas:
 
 - **Email:** [seu-email@exemplo.com]
 - **Issues:** [GitHub Issues](https://github.com/seu-usuario/laura-saas-agenda/issues)
-- **Documentação:** [docs/](docs/)
+- **Documentação:** [assets/docs/](assets/docs/)
 
 ---
 
