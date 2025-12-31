@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 
 const pacoteSchema = new mongoose.Schema({
+  // 🆕 MULTI-TENANT: Identificador do tenant
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: [true, 'TenantId é obrigatório'],
+    index: true
+  },
   nome: {
     type: String,
     required: [true, 'O nome do pacote é obrigatório.'],

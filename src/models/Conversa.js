@@ -9,14 +9,21 @@ const DadosSchema = new mongoose.Schema({
 }, { _id: false });
 
 const ConversaSchema = new mongoose.Schema({
-  telefone: { type: String, required: true, unique: true },
+  // 🆕 MULTI-TENANT: Identificador do tenant
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: [true, 'TenantId é obrigatório'],
+    index: true
+  },
+  telefone: { type: String, required: true }, // Removido unique: true - agora é por tenant
   estado: {
     type: String,
     enum: [
-       // inicialização do fluxo
-      'iniciando', 
+      // inicialização do fluxo
+      'iniciando',
       // novo cliente: nome e telefone
-      'aguardando_nome', 
+      'aguardando_nome',
       'aguardando_telefone',
       // clientes antigos
       'aguardando_data_nascimento', // cliente existente: data de nascimento
@@ -33,7 +40,7 @@ const ConversaSchema = new mongoose.Schema({
 });
 
 // Atualiza automaticamente a data da última interação
-ConversaSchema.pre('save', function(next) {
+ConversaSchema.pre('save', function (next) {
   this.ultimaInteracao = new Date();
   next();
 });

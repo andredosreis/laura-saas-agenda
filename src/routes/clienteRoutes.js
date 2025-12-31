@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticate } from '../middlewares/auth.js'; // 🆕 Importar autenticação
 // 1. Importamos as funções específicas que precisamos do controller
 import {
   createCliente,
@@ -12,6 +13,9 @@ import {
 import validateObjectId from '../middlewares/validateObjectId.js';
 
 const router = express.Router();
+
+// 🆕 Proteger todas as rotas
+router.use(authenticate);
 
 // Rotas CRUD para Clientes
 router.get('/', getAllClientes);

@@ -4,14 +4,23 @@ dotenv.config();
 import webPush from 'web-push';
 
 
-// Configurar VAPID keys
-console.log('[PushService] 🔍 VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY ? '✅ Carregada' : '❌ Não carregada');
+// Configurar VAPID keys com segurança
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:support@laurasaas.com';
 
-webPush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'mailto:support@laurasaas.com',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+console.log('[PushService] 🔍 VAPID_PUBLIC_KEY:', vapidPublicKey ? '✅ Carregada' : '❌ Não carregada');
+
+if (vapidPublicKey && vapidPrivateKey) {
+  try {
+    webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    console.log('[PushService] ✅ WebPush configurado com sucesso');
+  } catch (error) {
+    console.error('[PushService] ❌ Erro ao configurar WebPush (verifique suas chaves VAPID):', error.message);
+  }
+} else {
+  console.warn('[PushService] ⚠️ Chaves VAPID ausentes. Notificações push não funcionarão.');
+}
 
 /**
  * Envia notificação push para um cliente

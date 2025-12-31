@@ -1,0 +1,80 @@
+import express from 'express';
+import {
+    register,
+    login,
+    refreshToken,
+    logout,
+    logoutAll,
+    me,
+    updateProfile,
+    changePassword
+} from '../controllers/authController.js';
+import { authenticate } from '../middlewares/auth.js';
+
+const router = express.Router();
+
+// =============================================
+// ROTAS PÚBLICAS (sem autenticação)
+// =============================================
+
+/**
+ * @route   POST /api/auth/register
+ * @desc    Criar nova conta (tenant + usuário)
+ * @access  Public
+ */
+router.post('/register', register);
+
+/**
+ * @route   POST /api/auth/login
+ * @desc    Autenticar usuário
+ * @access  Public
+ */
+router.post('/login', login);
+
+/**
+ * @route   POST /api/auth/refresh
+ * @desc    Renovar access token usando refresh token
+ * @access  Public
+ */
+router.post('/refresh', refreshToken);
+
+// =============================================
+// ROTAS PROTEGIDAS (requer autenticação)
+// =============================================
+
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Invalidar refresh token atual
+ * @access  Private
+ */
+router.post('/logout', authenticate, logout);
+
+/**
+ * @route   POST /api/auth/logout-all
+ * @desc    Invalidar todos os refresh tokens (logout de todos dispositivos)
+ * @access  Private
+ */
+router.post('/logout-all', authenticate, logoutAll);
+
+/**
+ * @route   GET /api/auth/me
+ * @desc    Retorna dados do usuário logado
+ * @access  Private
+ */
+router.get('/me', authenticate, me);
+
+/**
+ * @route   PUT /api/auth/profile
+ * @desc    Atualizar perfil do usuário
+ * @access  Private
+ */
+router.put('/profile', authenticate, updateProfile);
+
+/**
+ * @route   PUT /api/auth/password
+ * @desc    Alterar senha
+ * @access  Private
+ */
+router.put('/password', authenticate, changePassword);
+
+export default router;

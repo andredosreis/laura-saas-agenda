@@ -21,6 +21,7 @@ import agenteRoutes from './routes/agenteRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import authRoutes from './routes/authRoutes.js'; // 🆕 Autenticação
 
 const app = express();
 
@@ -70,6 +71,7 @@ if (process.env.NODE_ENV === 'development') {
 // --- Fim da Configuração do CORS ---
 
 // Endpoints da API
+app.use('/api/auth', authRoutes); // 🆕 Autenticação (público)
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/pacotes', pacoteRoutes);
 app.use('/api/agendamentos', agendamentoRoutes);

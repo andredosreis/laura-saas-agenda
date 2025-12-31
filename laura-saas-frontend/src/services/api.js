@@ -15,7 +15,7 @@ const api = axios.create({
 // Mensagens de erro personalizadas por código HTTP
 const ERROR_MESSAGES = {
   400: 'Dados inválidos. Por favor, verifique as informações.',
-  401: 'Não autorizado. Por favor, faça login novamente.',
+  401: 'Sessão expirada. Por favor, faça login novamente.',
   403: 'Acesso negado. Você não tem permissão para esta ação.',
   404: 'Recurso não encontrado.',
   422: 'Dados inválidos. Verifique os campos preenchidos.',
@@ -24,11 +24,29 @@ const ERROR_MESSAGES = {
   503: 'Serviço indisponível. Tente novamente mais tarde.'
 };
 
+// 🆕 Chaves do localStorage (AlinhINHAdo com AuthContext)
+const TOKEN_KEY = 'laura_access_token';
+const REFRESH_TOKEN_KEY = 'laura_refresh_token';
+
+// 🆕 Flag para evitar múltiplos refreshs simultâneos
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+// Helper para notificar subscribers após refresh
+const subscribeTokenRefresh = (callback) => {
+  refreshSubscribers.push(callback);
+};
+
+const onTokenRefreshed = (newToken) => {
+  refreshSubscribers.forEach(callback => callback(newToken));
+  refreshSubscribers = [];
+};
+
 // Interceptor de requisição
 api.interceptors.request.use(
   config => {
-    // Aqui você pode adicionar um token de autenticação, se necessário
-    const token = localStorage.getItem('token');
+    // 🆕 Usar nova chave do localStorage
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -44,12 +62,77 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => {
     // Se a resposta incluir uma mensagem de sucesso, mostrar toast
-    if (response.data?.message) {
+    // 🆕 Só mostrar toast se não for uma resposta de autenticação
+    if (response.data?.message && !response.config.url.includes('/auth/')) {
       toast.success(response.data.message);
     }
     return response;
   },
-  error => {
+  async error => {
+    const originalRequest = error.config;
+
+    // 🆕 Se receber 401 e não é uma tentativa de refresh, tentar renovar token
+    if (error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url.includes('/auth/')) {
+
+      // Se TOKEN_EXPIRED, tentar refresh
+      if (error.response?.data?.code === 'TOKEN_EXPIRED') {
+        originalRequest._retry = true;
+
+        if (!isRefreshing) {
+          isRefreshing = true;
+
+          try {
+            const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+            if (refreshToken) {
+              const response = await api.post('/auth/refresh', { refreshToken });
+
+              if (response.data.success) {
+                const { accessToken, refreshToken: newRefreshToken } = response.data.data.tokens;
+
+                localStorage.setItem(TOKEN_KEY, accessToken);
+                localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+                api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+                isRefreshing = false;
+                onTokenRefreshed(accessToken);
+
+                // Retry da requisição original com novo token
+                originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+                return api(originalRequest);
+              }
+            }
+          } catch (refreshError) {
+            isRefreshing = false;
+            // Refresh falhou, fazer logout
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
+            localStorage.removeItem('laura_user');
+            localStorage.removeItem('laura_tenant');
+            window.location.href = '/login';
+            return Promise.reject(refreshError);
+          }
+        }
+
+        // Se já está fazendo refresh, aguardar
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((newToken) => {
+            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
+      // 401 sem código de expiração = credenciais inválidas
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem('laura_user');
+      localStorage.removeItem('laura_tenant');
+      window.location.href = '/login';
+    }
+
     console.error('Erro na API:', error);
 
     let errorMessage = 'Ocorreu um erro ao processar sua solicitação.';
@@ -57,21 +140,16 @@ api.interceptors.response.use(
     if (error.response) {
       // Erro com resposta do servidor
       const status = error.response.status;
-      errorMessage = error.response.data?.message || 
-                    ERROR_MESSAGES[status] || 
-                    `Erro ${status}`;
+      errorMessage = error.response.data?.error ||
+        error.response.data?.message ||
+        ERROR_MESSAGES[status] ||
+        `Erro ${status}`;
 
       // Tratamento especial para erros de validação
       if (status === 422 && error.response.data?.errors) {
         errorMessage = Object.values(error.response.data.errors)
           .flat()
           .join('\n');
-      }
-
-      // Se receber 401, limpar token e redirecionar para login
-      if (status === 401) {
-        localStorage.removeItem('token');
-        // window.location.href = '/login';
       }
 
     } else if (error.request) {
@@ -83,15 +161,17 @@ api.interceptors.response.use(
       }
     }
 
-    // Mostrar toast de erro
-    toast.error(errorMessage, {
-      position: "top-right",
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-    });
+    // 🆕 Não mostrar toast para erros de autenticação (já tratados pelo redirect)
+    if (!error.config?.url?.includes('/auth/')) {
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    }
 
     return Promise.reject(error);
   }

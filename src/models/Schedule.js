@@ -1,12 +1,19 @@
 import mongoose from 'mongoose';
 
 const scheduleSchema = new mongoose.Schema({
+  // 🆕 MULTI-TENANT: Identificador do tenant
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: [true, 'TenantId é obrigatório'],
+    index: true
+  },
   dayOfWeek: {
     type: Number,
     required: true,
     min: 0, // 0 para Domingo, 1 para Segunda, etc.
     max: 6,
-    unique: true, // Garante que só haverá um documento por dia da semana
+    // Removido unique: true - agora é único por tenant (ver índice composto abaixo)
   },
   label: {
     type: String,

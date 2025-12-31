@@ -1,11 +1,10 @@
-import dotenv from 'dotenv-flow';
+// Carrega variáveis de ambiente ANTES de qualquer outro import
+import 'dotenv-flow/config';
+
 import cron from 'node-cron';
 import connectDB from './config/db.js';
 import app from './app.js';
 import { sendReminderNotifications } from './controllers/agenteController.js';
-
-// Carrega as variáveis de ambiente
-dotenv.config();
 
 // Conectar ao banco de dados e, após sucesso, iniciar o servidor
 connectDB().then(() => {

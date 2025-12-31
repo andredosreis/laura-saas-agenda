@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 
 const agendamentoSchema = new mongoose.Schema({
+  // 🆕 MULTI-TENANT: Identificador do tenant
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: [true, 'TenantId é obrigatório'],
+    index: true
+  },
   cliente: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cliente',
@@ -58,7 +65,7 @@ agendamentoSchema.index({ dataHora: 1 });
 agendamentoSchema.index({ cliente: 1 });
 agendamentoSchema.index({ status: 1 });
 
-agendamentoSchema.pre('save', function(next) {
+agendamentoSchema.pre('save', function (next) {
   if (this.isNew && this.dataHora < new Date()) {
     return next(new Error('Não é possível criar agendamentos com data no passado.'));
   }

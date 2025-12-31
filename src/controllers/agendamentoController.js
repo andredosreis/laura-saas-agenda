@@ -32,7 +32,8 @@ export const createAgendamento = async (req, res) => {
     const requestedTimeInMinutes = timeToMinutes(agendamentoDateTime.toFormat("HH:mm"));
 
     // 3. Buscar a disponibilidade para o dia da semana
-    const schedule = await Schedule.findOne({ dayOfWeek });
+    // 🆕 Filtrar pelo tenant
+    const schedule = await Schedule.findOne({ dayOfWeek, tenantId: req.tenantId });
 
     if (!schedule || !schedule.isActive) {
       return res.status(400).json({ message: `O salão não está ativo para agendamentos na ${schedule?.label || "este dia da semana"}.` });
@@ -51,7 +52,7 @@ export const createAgendamento = async (req, res) => {
     const breakEndMinutes = timeToMinutes(schedule.breakEndTime);
 
     if (breakStartMinutes !== null && breakEndMinutes !== null &&
-        requestedTimeInMinutes >= breakStartMinutes && requestedTimeInMinutes < breakEndMinutes) {
+      requestedTimeInMinutes >= breakStartMinutes && requestedTimeInMinutes < breakEndMinutes) {
       return res.status(400).json({ message: "Horário de agendamento coincide com o período de pausa." });
     }
 
@@ -60,6 +61,7 @@ export const createAgendamento = async (req, res) => {
     const requestedEndTimeInMinutes = requestedTimeInMinutes + agendamentoDurationMinutes;
 
     const conflictingAgendamento = await Agendamento.findOne({
+      tenantId: req.tenantId, // 🆕 Filtrar conflitos apenas deste tenant
       dataHora: {
         $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(), // Início do slot anterior
         $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(), // Fim do slot posterior
@@ -72,7 +74,15 @@ export const createAgendamento = async (req, res) => {
     }
 
     // Se todas as validações passarem, criar o agendamento
-    const novoAgendamento = new Agendamento({ cliente, dataHora, pacote, servicoAvulsoNome, servicoAvulsoValor });
+    // 🆕 Injectar tenantId
+    const novoAgendamento = new Agendamento({
+      cliente,
+      dataHora,
+      pacote,
+      servicoAvulsoNome,
+      servicoAvulsoValor,
+      tenantId: req.tenantId
+    });
     await novoAgendamento.save();
     res.status(201).json(novoAgendamento);
   } catch (error) {
@@ -88,7 +98,8 @@ export const createAgendamento = async (req, res) => {
 // @desc    Listar todos os agendamentos
 export const getAllAgendamentos = async (req, res) => {
   try {
-    const agendamentos = await Agendamento.find().populate("cliente pacote");
+    // 🆕 Listar apenas do tenant
+    const agendamentos = await Agendamento.find({ tenantId: req.tenantId }).populate("cliente pacote");
     res.status(200).json(agendamentos);
   } catch (error) {
     res.status(500).json({ message: "Erro ao buscar agendamentos.", details: error.message });
@@ -98,7 +109,8 @@ export const getAllAgendamentos = async (req, res) => {
 // @desc    Buscar um agendamento por ID
 export const getAgendamento = async (req, res) => {
   try {
-    const agendamento = await Agendamento.findById(req.params.id).populate("cliente pacote");
+    // 🆕 Buscar apenas se pertencer ao tenant
+    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate("cliente pacote");
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
@@ -139,8 +151,9 @@ export const updateStatusAgendamento = async (req, res) => {
     if (!status) {
       return res.status(400).json({ message: "O campo status é obrigatório." });
     }
-    const agendamento = await Agendamento.findByIdAndUpdate(
-      req.params.id,
+    // 🆕 Update seguro com tenantId
+    const agendamento = await Agendamento.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
       { status },
       { new: true, runValidators: true }
     );
@@ -156,7 +169,8 @@ export const updateStatusAgendamento = async (req, res) => {
 // @desc    Deletar agendamento
 export const deleteAgendamento = async (req, res) => {
   try {
-    const agendamento = await Agendamento.findByIdAndDelete(req.params.id);
+    // 🆕 Delete seguro com tenantId
+    const agendamento = await Agendamento.findOneAndDelete({ _id: req.params.id, tenantId: req.tenantId });
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
@@ -190,8 +204,9 @@ export const confirmarAgendamento = async (req, res) => {
       });
     }
 
-    // Buscar agendamento
-    const agendamento = await Agendamento.findById(req.params.id).populate('cliente');
+
+    // Buscar agendamento (seguro)
+    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('cliente');
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
@@ -261,8 +276,9 @@ export const enviarLembreteManual = async (req, res) => {
   try {
     console.log('[Agendamento] 📱 Enviando lembrete manual via WhatsApp...');
 
-    // Buscar agendamento com populate de cliente
-    const agendamento = await Agendamento.findById(req.params.id).populate('cliente');
+
+    // Buscar agendamento com populate de cliente (seguro)
+    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('cliente');
 
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });

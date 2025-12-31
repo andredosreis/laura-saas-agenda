@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticate } from '../middlewares/auth.js'; // 🆕 Importar autenticação
 import {
   createAgendamento,
   getAllAgendamentos,
@@ -11,6 +12,9 @@ import {
 import validateObjectId from '../middlewares/validateObjectId.js';
 
 const router = express.Router();
+
+// 🆕 Proteger todas as rotas
+router.use(authenticate);
 
 // Rotas CRUD para Agendamentos
 router.get('/', getAllAgendamentos);

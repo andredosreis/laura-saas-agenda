@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 
 const clienteSchema = new mongoose.Schema({
+  // 🆕 MULTI-TENANT: Identificador do tenant
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: [true, 'TenantId é obrigatório'],
+    index: true
+  },
   nome: {
     type: String,
     required: [true, 'Nome é obrigatório'],
@@ -29,15 +36,15 @@ const clienteSchema = new mongoose.Schema({
     type: Date,
     required: [true, 'Data de nascimento é obrigatória'],
     validate: {
-      validator: function(data) {
+      validator: function (data) {
         const hoje = new Date();
         let idade = hoje.getFullYear() - data.getFullYear(); // Corrigido para let
         const mesAtual = hoje.getMonth() - data.getMonth();
-        
+
         if (mesAtual < 0 || (mesAtual === 0 && hoje.getDate() < data.getDate())) {
           idade--;
         }
-        
+
         return data <= hoje && idade >= 16;
       },
       message: 'Data de nascimento inválida. Cliente deve ter pelo menos 16 anos.'
@@ -110,7 +117,7 @@ const clienteSchema = new mongoose.Schema({
 });
 
 // Virtual para idade (calculado, não guardado)
-clienteSchema.virtual('idade').get(function() {
+clienteSchema.virtual('idade').get(function () {
   if (!this.dataNascimento) return null;
   const hoje = new Date();
   const nascimento = new Date(this.dataNascimento);

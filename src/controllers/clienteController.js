@@ -4,7 +4,8 @@ import Cliente from '../models/Cliente.js';
 // @desc    Listar todos os clientes
 export const getAllClientes = async (req, res) => {
   try {
-    const clientes = await Cliente.find().populate('pacote');
+    // 🆕 Filtrar apenas pelo tenant do usuário logado
+    const clientes = await Cliente.find({ tenantId: req.tenantId }).populate('pacote');
     res.status(200).json(clientes);
   } catch (error) {
     console.error('Erro ao listar clientes:', error.message);
@@ -15,7 +16,11 @@ export const getAllClientes = async (req, res) => {
 // @desc    Criar um novo cliente
 export const createCliente = async (req, res) => {
   try {
-    const novoCliente = new Cliente(req.body);
+    // 🆕 Injetar tenantId do usuário logado e garantir que não venha do body
+    const novoCliente = new Cliente({
+      ...req.body,
+      tenantId: req.tenantId
+    });
     const salvo = await novoCliente.save();
     res.status(201).json(salvo);
   } catch (error) {
@@ -36,7 +41,12 @@ export const createCliente = async (req, res) => {
 // @desc    Buscar um cliente pelo ID
 export const getCliente = async (req, res) => {
   try {
-    const cliente = await Cliente.findById(req.params.id).populate('pacote');
+    // 🆕 Garantir que o cliente pertença ao tenant
+    const cliente = await Cliente.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).populate('pacote');
+
     if (!cliente) {
       return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
@@ -53,8 +63,9 @@ export const getCliente = async (req, res) => {
 // @desc    Atualizar um cliente pelo ID
 export const updateCliente = async (req, res) => {
   try {
-    const clienteAtualizado = await Cliente.findByIdAndUpdate(
-      req.params.id,
+    // 🆕 Garantir update apenas no tenant correto
+    const clienteAtualizado = await Cliente.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
       req.body,
       { new: true, runValidators: true }
     ).populate('pacote');
@@ -74,11 +85,13 @@ export const updateCliente = async (req, res) => {
 export const deleteCliente = async (req, res) => {
   try {
     const clienteId = req.params.id;
-    const clienteParaDeletar = await Cliente.findById(clienteId);
+    // 🆕 Garantir deleção apenas no tenant correto
+    const clienteParaDeletar = await Cliente.findOne({ _id: clienteId, tenantId: req.tenantId });
+
     if (!clienteParaDeletar) {
       return res.status(404).json({ message: 'Cliente não encontrado para deleção.' });
     }
-    await Agendamento.deleteMany({ cliente: clienteId });
+    await Agendamento.deleteMany({ cliente: clienteId, tenantId: req.tenantId }); // Também deletar agendamentos do tenant
     await Cliente.deleteOne({ _id: clienteId });
     res.status(200).json({ message: 'Cliente e seus agendamentos associados foram removidos com sucesso.' });
   } catch (error) {
