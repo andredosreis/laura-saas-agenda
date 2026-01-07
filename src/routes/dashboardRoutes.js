@@ -8,6 +8,7 @@ import {
   getTotaisSistema,
   getClientesComSessoesBaixas,
   getProximosAgendamentos,
+  getDadosFinanceiros,
 } from '../controllers/dashboardController.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.get('/clientesAtendidosSemana', getClientesAtendidosSemana);
 router.get('/totais', getTotaisSistema);
 router.get('/sessoes-baixas', getClientesComSessoesBaixas);
 router.get('/proximos-agendamentos', getProximosAgendamentos);
+router.get('/financeiro', getDadosFinanceiros);
 
 // 3. A exportação padrão já estava correta
 export default router;

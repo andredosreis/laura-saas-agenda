@@ -15,7 +15,7 @@ function Login() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Para onde redirecionar após login
-    const from = location.state?.from?.pathname || '/';
+    const from = location.state?.from?.pathname || '/dashboard';
 
     const handleChange = (e) => {
         const { name, value } = e.target;

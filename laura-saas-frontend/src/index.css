@@ -1,7 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* (Se quiser, depois adiciona estilo personalizado aqui) */
+/* =============================================
+   DESIGN SYSTEM PREMIUM - Laura SAAS
+   ============================================= */
 
+:root {
+    /* Cores Primárias */
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --primary-light: #818cf8;
 
+    /* Acentos */
+    --accent: #f59e0b;
+    --accent-dark: #d97706;
+    --success: #10b981;
+    --warning: #f97316;
+    --error: #ef4444;
+
+    /* Neutros - Dark Mode */
+    --bg-dark: #0f172a;
+    --bg-darker: #020617;
+    --bg-card: rgba(30, 41, 59, 0.7);
+    --bg-card-hover: rgba(30, 41, 59, 0.9);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-bg-hover: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-hover: rgba(255, 255, 255, 0.2);
+    --glass-blur: 16px;
+
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --gradient-accent: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --gradient-dark: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+}
+
+/* =============================================
+   BASE STYLES
+   ============================================= */
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================
+   GLASSMORPHISM COMPONENTS
+   ============================================= */
+
+@layer components {
+
+    /* Card Glass Base */
+    .glass-card {
+        @apply relative overflow-hidden rounded-2xl;
+        background: var(--glass-bg);
+        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: blur(var(--glass-blur));
+        border: 1px solid var(--glass-border);
+        transition: all 0.3s ease;
+    }
+
+    .glass-card:hover {
+        background: var(--glass-bg-hover);
+        border-color: var(--glass-border-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    /* KPI Card */
+    .kpi-card {
+        @apply glass-card p-6;
+    }
+
+    .kpi-card .kpi-icon {
+        @apply w-12 h-12 rounded-xl flex items-center justify-center mb-4;
+        background: var(--gradient-primary);
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+
+    .kpi-card .kpi-value {
+        @apply text-3xl font-bold text-white mb-1;
+    }
+
+    .kpi-card .kpi-label {
+        @apply text-sm text-slate-400;
+    }
+
+    .kpi-card .kpi-trend {
+        @apply text-xs mt-2 flex items-center gap-1;
+    }
+
+    .kpi-card .kpi-trend.positive {
+        @apply text-emerald-400;
+    }
+
+    .kpi-card .kpi-trend.negative {
+        @apply text-red-400;
+    }
+
+    /* Status Badges */
+    .badge {
+        @apply px-3 py-1 rounded-full text-xs font-medium;
+    }
+
+    .badge-confirmed {
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-pending {
+        background-color: rgba(245, 158, 11, 0.2);
+        color: #fbbf24;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-completed {
+        background-color: rgba(99, 102, 241, 0.2);
+        color: #818cf8;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .badge-cancelled {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Buttons */
+    .btn-primary {
+        @apply px-4 py-2 rounded-xl font-medium transition-all duration-300;
+        background: var(--gradient-primary);
+        color: white;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-glass {
+        @apply px-4 py-2 rounded-xl font-medium transition-all duration-300;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        color: var(--text-primary);
+    }
+
+    .btn-glass:hover {
+        background: var(--glass-bg-hover);
+        border-color: var(--glass-border-hover);
+    }
+
+    /* Skeleton Loading */
+    .skeleton {
+        @apply relative overflow-hidden rounded-lg;
+        background: linear-gradient(90deg,
+                rgba(255, 255, 255, 0.05) 25%,
+                rgba(255, 255, 255, 0.1) 50%,
+                rgba(255, 255, 255, 0.05) 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+}
+
+/* =============================================
+   ANIMATIONS
+   ============================================= */
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 5px rgba(99, 102, 241, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.8);
+    }
+}
+
+/* =============================================
+   SCROLLBAR CUSTOM
+   ============================================= */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-darker);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}

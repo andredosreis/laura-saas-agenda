@@ -1,122 +1,156 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  Package,
+  Clock,
+  LogOut,
+  Menu,
+  X,
+  Sparkles
+} from 'lucide-react';
 
 function Navbar() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
 
-  // Define os links de navegação para reutilização
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   const navLinks = [
-    { to: "/", text: "Dashboard" },
-    { to: "/clientes", text: "Clientes" },
-    { to: "/agendamentos", text: "Agendamentos" },
-    { to: "/pacotes", text: "Pacotes" },
-    { to: "/disponibilidade", text: "Disponibilidade" },
-    // Adicionar mais links aqui se necessário
+    { to: "/dashboard", text: "Dashboard", icon: LayoutDashboard },
+    { to: "/clientes", text: "Clientes", icon: Users },
+    { to: "/agendamentos", text: "Agendamentos", icon: Calendar },
+    { to: "/pacotes", text: "Pacotes", icon: Package },
+    { to: "/disponibilidade", text: "Horários", icon: Clock },
   ];
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const linkClass = ({ isActive }) => 
-    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${ // Ajustei para text-sm font-medium
-      isActive 
-        ? 'text-amber-500' // Link ativo: Dourado
-        : 'text-gray-300 hover:text-amber-400' // Link inativo: Cinza claro, hover dourado mais claro
-    }`;
-     const linkClassMobile = ({ isActive }) =>
-    `block px-3 py-2 rounded-md text-base font-medium transition-colors ${ // 'block' para ocupar a largura e empilhar
-      isActive 
-        ? 'bg-amber-500 text-black' // Ex: Fundo dourado e texto preto para link ativo no mobile
-        : 'text-gray-300 hover:bg-gray-700 hover:text-white' // Estilo para link inativo no mobile
-    }`;
-  
-  // ADICIONA ESTA FUNÇÃO PARA FECHAR O MENU:
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false); // Corrigido: setIsMobileMenuOpen para setMobileMenuOpen
-  };
-
+  // Estilos de Link
+  const getLinkClasses = ({ isActive }) => `
+    flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 font-medium
+    ${isActive
+      ? 'bg-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/10'
+      : 'text-slate-400 hover:text-white hover:bg-white/5'}
+  `;
 
   return (
-    <nav className="bg-gray-900 shadow-md"> {/* Adicionei uma sombra sutil */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8"> {/* Padding responsivo */}
-        <div className="flex items-center justify-between h-16"> {/* Define altura e alinhamento */}
-          
-          {/* Nome da Marca / Logo (Esquerda) */}
-          <div className="flex-shrink-0">
-            <NavLink 
-              to="/" 
-              className="text-2xl font-bold text-amber-500 hover:text-amber-400 transition-colors" // Estilo para o nome da marca
-              onClick={isMobileMenuOpen ? closeMobileMenu : undefined} // Fecha o menu se estiver aberto
-            >
-              LA Estética Avançada
-            </NavLink>
-          </div>
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-lg border-b border-white/5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
 
-          {/* Links de Navegação (Direita) */}
-          <div className="hidden md:flex md:items-center md:space-x-4"> {/* Esconde em mobile, mostra em desktop */}
-            {navLinks.map((link) => (
-              <NavLink 
-                key={link.to} 
-                to={link.to} 
-                className={linkClass}
-                // Adiciona 'end' para o link da Dashboard ou qualquer link que aponte para "/"
-                {...(link.to === "/" ? { end: true } : {})} 
-              >
-                {link.text}
-              </NavLink>
-            ))}
-          </div>
-          
-          {/* Botão de Menu Mobile */}
-          <div className="md:hidden flex items-center">
-            <button 
-              type="button" 
-              className="text-gray-400 hover:text-amber-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500"
-              onClick={toggleMobileMenu} // Corrigido: onClick como propriedade
-              aria-controls="mobile-menu" // Associa o botão ao menu
-              aria-expanded={isMobileMenuOpen} // Indica se o menu está expandido
-            >
-              <span className="sr-only">Abrir menu principal</span>
-              {isMobileMenuOpen ? (
-                // Ícone "X" (quando o menu está aberto)
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                // Ícone "Hamburger" (quando o menu está fechado)
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
-                </svg>
-              )}
-            </button>
-          </div>
+          {/* Logo / Brand */}
+          <NavLink
+            to="/dashboard"
+            className="flex items-center gap-2 group"
+            onClick={closeMobileMenu}
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              Laura SAAS
+            </span>
+          </NavLink>
 
-        </div>
-      </div>
-
-      {/* Menu Mobile Expansível */}
-       {isMobileMenuOpen && (
-        <div className="md:hidden" id="mobile-menu">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-2">
             {navLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
-                className={linkClassMobile}
-                onClick={closeMobileMenu} // Fecha o menu ao clicar
-                // Adiciona 'end' para o link da Dashboard ou qualquer link que aponte para "/"
-                {...(link.to === "/" ? { end: true } : {})} 
+                className={getLinkClasses}
+                end={link.to === "/dashboard"}
               >
-                {link.text}
+                <link.icon className="w-4 h-4" />
+                <span>{link.text}</span>
               </NavLink>
             ))}
+
+            {/* Divider */}
+            <div className="h-6 w-px bg-white/10 mx-2" />
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300"
+              title="Sair do sistema"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="hidden lg:inline">Sair</span>
+            </button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-white/5 bg-slate-900">
+          <div className="px-4 py-3 space-y-2">
+            {/* User Info Mobile */}
+            <div className="flex items-center gap-3 px-3 py-3 mb-4 rounded-xl bg-white/5">
+              <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">
+                {user?.nome?.[0] || 'U'}
+              </div>
+              <div>
+                <p className="text-white font-medium">{user?.nome || 'Usuário'}</p>
+                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+              </div>
+            </div>
+
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) => `
+                  flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300
+                  ${isActive
+                    ? 'bg-indigo-500/20 text-indigo-400'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'}
+                `}
+                onClick={closeMobileMenu}
+                end={link.to === "/dashboard"}
+              >
+                <link.icon className="w-5 h-5" />
+                <span className="font-medium">{link.text}</span>
+              </NavLink>
+            ))}
+
+            <div className="h-px bg-white/5 my-2" />
+
+            {/* Logout Mobile */}
+            <button
+              onClick={() => {
+                closeMobileMenu();
+                handleLogout();
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="font-medium">Sair da Conta</span>
+            </button>
           </div>
         </div>
       )}
     </nav>
   );
 }
-
 
 export default Navbar;

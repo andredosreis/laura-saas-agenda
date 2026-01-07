@@ -96,11 +96,12 @@ Para comercialização, cada clínica/salão precisa seu próprio espaço:
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│   PLANO FREE  │     │  PLANO PRO    │     │ PLANO PREMIUM │
-│   1 usuário   │     │  5 usuários   │     │  Ilimitado    │
-│   50 clientes │     │  500 clientes │     │  Ilimitado    │
-│   Sem IA      │     │  IA WhatsApp  │     │  IA Completa  │
-│   €0/mês      │     │  €29/mês      │     │  €79/mês      │
+│   PLANO BÁSICO │     │  PLANO PRO    │     │ PLANO ELITE │
+│   Organização + 
+Lembretes                IA WhatsApp       
+Limitados             IA Completa             Clínicas de médio 
+                                                e grande porte
+│   €49/mês      │     │  €99/mês      │     │  €199/mês      │
 └───────────────┘     └───────────────┘     └───────────────┘
         │                     │                     │
         └─────────────────────┼─────────────────────┘
@@ -116,7 +117,7 @@ Para comercialização, cada clínica/salão precisa seu próprio espaço:
 - Roles: Admin, Recepcionista, Terapeuta
 - Onboarding guiado para novos clientes
 - Personalização de branding (logo, cores)
-
+- Personalização individualizada de cada Negocio
 ---
 
 ### 3. 📊 **Analytics & Relatórios Financeiros**
@@ -237,36 +238,36 @@ Sistema de white-label para cada cliente:
 Antes de começar a implementação, preciso que você confirme:
 
 1. **Qual o público-alvo principal?**
-   - [ ] Clínicas de estética (como a sua)
+   - [ ] Clínicas e atendimentos em estética
    - [ ] Salões de beleza
    - [ ] Consultórios médicos
-   - [ ] Todos os acima
+   - [ ] Clinicas e atendimentos em geral
+   - [ x] Todos os acima
 
 2. **Modelo de comercialização desejado?**
-   - [ ] SaaS multi-tenant (cada cliente sua conta)
+   - [ x] SaaS multi-tenant (cada cliente sua conta)
    - [ ] White-label (você revende para clínicas)
    - [ ] Single-tenant (você opera para clientes)
 
 3. **Prioridade de features:**
-   - [ ] Design primeiro (WOW factor)
-   - [ ] Funcionalidades primeiro (analytics)
-   - [ ] Segurança primeiro (autenticação)
+Seguindo por ordem de prioridade:
+   1- [ ] Design primeiro (WOW factor)
+   2- [ ] Funcionalidades primeiro (analytics)
+   3- [ ] Segurança primeiro (autenticação)
 
-4. **Manter o nome "Laura SAAS" ou criar novo branding?**
+4. **Manter o nome "" ou criar novo branding?**
+Criar um novo branding para o produto, pois cada um vai ter sua marca e nome individual, ou seja cada cliente vai personalizar seu dashboard, 
 
 5. **Budget de ferramentas?**
    - Calendário (FullCalendar = gratuito)
    - Gráficos (Chart.js = gratuito, Recharts = gratuito)
    - Autenticação (Auth0 = pago, Custom JWT = gratuito)
 
+6. **Melhorias futuras**
+ O sistema deve ter uma interface para que o cliente possa personalizar seu dashboard, como o nome, logo, cores, etc.
+
+   
+
 ---
 
-## 🎬 Próximos Passos
 
-Aguardo sua aprovação e respostas às questões acima. Depois posso:
-
-1. Criar mockups detalhados do novo Dashboard
-2. Criar o plano de implementação técnico
-3. Começar a implementar por fases
-
-> **⚠️ IMPORTANTE:** Não vou alterar nenhum código até você aprovar esta proposta.

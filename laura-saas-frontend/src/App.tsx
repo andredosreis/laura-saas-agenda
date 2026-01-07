@@ -11,6 +11,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import InstallPrompt from './components/InstallPrompt';
 
+// 🆕 Página de Landing (Pública)
+import LandingPage from './pages/LandingPage';
+
 // 🆕 Páginas de Autenticação
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -91,12 +94,15 @@ const App = () => {
     <AuthProvider>
       <Router>
         <Routes>
+          {/* 🆕 Página de Apresentação (Pública) */}
+          <Route path="/" element={<LandingPage />} />
+
           {/* 🆕 Rotas Públicas (sem navbar) */}
           <Route path="/login" element={<Login />} />
           <Route path="/registrar" element={<Register />} />
 
           {/* 🔐 Rotas Protegidas (com navbar) */}
-          <Route path="/" element={
+          <Route path="/dashboard" element={
             <ProtectedLayout><Dashboard /></ProtectedLayout>
           } />
           <Route path="/agendamentos" element={
