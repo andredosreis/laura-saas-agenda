@@ -3,8 +3,9 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useEffect } from 'react';
 
-// 🆕 Contexto de Autenticação
+// 🆕 Contextos
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Componentes de Layout
@@ -17,6 +18,8 @@ import LandingPage from './pages/LandingPage';
 // 🆕 Páginas de Autenticação
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Páginas Protegidas
 import Agendamentos from './pages/Agendamentos';
@@ -91,15 +94,18 @@ const App = () => {
   }, []);
 
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
           {/* 🆕 Página de Apresentação (Pública) */}
           <Route path="/" element={<LandingPage />} />
 
           {/* 🆕 Rotas Públicas (sem navbar) */}
           <Route path="/login" element={<Login />} />
           <Route path="/registrar" element={<Register />} />
+          <Route path="/esqueci-senha" element={<ForgotPassword />} />
+          <Route path="/reset-senha/:token" element={<ResetPassword />} />
 
           {/* 🔐 Rotas Protegidas (com navbar) */}
           <Route path="/dashboard" element={
@@ -137,10 +143,11 @@ const App = () => {
           } />
         </Routes>
 
-        <ToastContainer />
-        <InstallPrompt />
-      </Router>
-    </AuthProvider>
+          <ToastContainer />
+          <InstallPrompt />
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

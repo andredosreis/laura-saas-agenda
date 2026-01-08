@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 import { motion } from 'framer-motion';
 import {
@@ -24,6 +25,8 @@ import {
   SkeletonAgendamentoGrid
 } from '../components/SkeletonCard';
 import DashboardChart from '../components/DashboardChart';
+import ThemeToggle from '../components/ThemeToggle';
+import toastService from '../services/toastService.jsx';
 
 /**
  * Dashboard Premium - Laura SAAS
@@ -32,6 +35,7 @@ import DashboardChart from '../components/DashboardChart';
 function Dashboard() {
   const navigate = useNavigate();
   const { user, tenant } = useAuth();
+  const { isDark } = useTheme();
 
   const [agendamentosHoje, setAgendamentosHoje] = useState([]);
   const [agendamentosAmanha, setAgendamentosAmanha] = useState([]);
@@ -139,13 +143,13 @@ function Dashboard() {
       setEnviandoLembrete(id);
       const response = await api.post(`/agendamentos/${id}/enviar-lembrete`);
       if (response.data.success) {
-        alert(`📱 Lembrete enviado para ${clienteNome}!`);
+        toastService.whatsapp(clienteNome);
       } else {
-        alert(response.data.message || 'Não foi possível enviar o lembrete.');
+        toastService.warning(response.data.message || 'Não foi possível enviar o lembrete.');
       }
     } catch (error) {
       console.error('Erro ao enviar lembrete:', error);
-      alert(error.response?.data?.message || 'Erro ao enviar lembrete.');
+      toastService.error(error.response?.data?.message || 'Erro ao enviar lembrete.');
     } finally {
       setEnviandoLembrete(null);
     }
@@ -203,11 +207,11 @@ function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen p-8 space-y-8 bg-slate-900">
+      <div className={`min-h-screen p-8 space-y-8 ${isDark ? 'bg-slate-900' : 'bg-slate-100'}`}>
         <div className="flex justify-between items-center">
           <div className="space-y-2">
-            <div className="h-8 w-64 bg-slate-800 rounded-lg animate-pulse" />
-            <div className="h-4 w-48 bg-slate-800 rounded-lg animate-pulse" />
+            <div className={`h-8 w-64 ${isDark ? 'bg-slate-800' : 'bg-slate-300'} rounded-lg animate-pulse`} />
+            <div className={`h-4 w-48 ${isDark ? 'bg-slate-800' : 'bg-slate-300'} rounded-lg animate-pulse`} />
           </div>
         </div>
         <SkeletonKPIGrid count={4} />
@@ -215,7 +219,7 @@ function Dashboard() {
           <div className="lg:col-span-2 space-y-4">
             <SkeletonAgendamentoGrid count={3} />
           </div>
-          <div className="lg:col-span-1 h-64 bg-slate-800 rounded-2xl animate-pulse" />
+          <div className={`lg:col-span-1 h-64 ${isDark ? 'bg-slate-800' : 'bg-slate-300'} rounded-2xl animate-pulse`} />
         </div>
       </div>
     );
@@ -226,7 +230,9 @@ function Dashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen pt-24 px-4 pb-8 md:px-8 bg-slate-900 text-white overflow-hidden"
+      className={`min-h-screen pt-24 px-4 pb-8 md:px-8 overflow-hidden transition-colors duration-300 ${
+        isDark ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-900'
+      }`}
     >
       {/* --- HEADER --- */}
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
@@ -241,6 +247,7 @@ function Dashboard() {
         </div>
 
         <div className="flex gap-3">
+          <ThemeToggle />
           <button className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-slate-400 hover:text-white">
             <Bell className="w-5 h-5" />
           </button>

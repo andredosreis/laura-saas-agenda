@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
@@ -13,6 +14,7 @@ function Login() {
     });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // Para onde redirecionar após login
     const from = location.state?.from?.pathname || '/dashboard';
@@ -61,6 +63,15 @@ function Login() {
 
             {/* Card de Login */}
             <div className="relative w-full max-w-md">
+                {/* Link para voltar à Landing */}
+                <Link
+                    to="/"
+                    className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6 group"
+                >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Voltar ao início</span>
+                </Link>
+
                 {/* Glassmorphism card */}
                 <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
                     {/* Logo/Header */}
@@ -97,17 +108,31 @@ function Login() {
                             <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                                 Senha
                             </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                placeholder="••••••••"
-                            />
+                            <div className="relative">
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    required
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    placeholder="••••••••"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="w-5 h-5" />
+                                    ) : (
+                                        <Eye className="w-5 h-5" />
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Erro */}

@@ -82,9 +82,9 @@ function Clientes() {
   // Componente de Loading
   if (isLoading) {
     return (
-      <div className="p-4 max-w-7xl mx-auto">
+      <div className="pt-24 px-4 pb-4 max-w-7xl mx-auto min-h-screen bg-slate-900">
         <div className="flex items-center justify-center min-h-[200px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
         </div>
       </div>
     );
@@ -92,7 +92,7 @@ function Clientes() {
 
   return (
     <ErrorBoundary>
-      <div className="p-4 max-w-7xl mx-auto">
+      <div className="pt-24 px-4 pb-4 max-w-7xl mx-auto min-h-screen bg-slate-900">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Lista de Clientes</h1>
           <button

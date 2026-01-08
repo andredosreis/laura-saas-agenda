@@ -7,7 +7,10 @@ import {
     logoutAll,
     me,
     updateProfile,
-    changePassword
+    changePassword,
+    forgotPassword,
+    resetPassword,
+    verifyResetToken
 } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 
@@ -37,6 +40,27 @@ router.post('/login', login);
  * @access  Public
  */
 router.post('/refresh', refreshToken);
+
+/**
+ * @route   POST /api/auth/forgot-password
+ * @desc    Solicitar recuperação de senha
+ * @access  Public
+ */
+router.post('/forgot-password', forgotPassword);
+
+/**
+ * @route   POST /api/auth/reset-password
+ * @desc    Redefinir senha usando token
+ * @access  Public
+ */
+router.post('/reset-password', resetPassword);
+
+/**
+ * @route   GET /api/auth/verify-reset-token/:token
+ * @desc    Verificar se o token de reset é válido
+ * @access  Public
+ */
+router.get('/verify-reset-token/:token', verifyResetToken);
 
 // =============================================
 // ROTAS PROTEGIDAS (requer autenticação)

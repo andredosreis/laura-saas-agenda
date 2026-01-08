@@ -15,6 +15,7 @@
     "framer-motion": "^12.24.7",
     "lucide-react": "^0.553.0",
     "luxon": "^3.7.2",
+    "nodemailer": "^7.0.12",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.5.2",

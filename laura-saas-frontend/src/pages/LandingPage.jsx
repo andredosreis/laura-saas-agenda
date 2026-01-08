@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
     MessageSquare,
     Calendar,
@@ -14,6 +15,44 @@ import {
     Shield,
     Zap
 } from 'lucide-react';
+
+// Variantes de animação
+const fadeInUp = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.6, ease: "easeOut" }
+    }
+};
+
+const fadeIn = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: { duration: 0.6 }
+    }
+};
+
+const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.2
+        }
+    }
+};
+
+const scaleIn = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: {
+        opacity: 1,
+        scale: 1,
+        transition: { duration: 0.5, ease: "easeOut" }
+    }
+};
 
 const LandingPage = () => {
     const features = [
@@ -167,30 +206,47 @@ const LandingPage = () => {
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
                 </div>
 
-                <div className="relative max-w-7xl mx-auto text-center">
+                <motion.div
+                    className="relative max-w-7xl mx-auto text-center"
+                    initial="hidden"
+                    animate="visible"
+                    variants={staggerContainer}
+                >
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 mb-8">
+                    <motion.div
+                        variants={fadeInUp}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 mb-8"
+                    >
                         <Zap className="w-4 h-4 text-indigo-400" />
                         <span className="text-sm text-indigo-300">Powered by GPT-4 AI</span>
-                    </div>
+                    </motion.div>
 
                     {/* Main Heading */}
-                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+                    <motion.h1
+                        variants={fadeInUp}
+                        className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
+                    >
                         <span className="block">Sua Agenda no</span>
                         <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                             Piloto Automático
                         </span>
-                    </h1>
+                    </motion.h1>
 
                     {/* Subtitle */}
-                    <p className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed">
+                    <motion.p
+                        variants={fadeInUp}
+                        className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed"
+                    >
                         Sistema de agendamentos com <strong className="text-white">IA conversacional no WhatsApp</strong>.
                         Seus clientes agendam, confirmam e são lembrados automaticamente.
                         <span className="text-emerald-400"> Você foca no que importa.</span>
-                    </p>
+                    </motion.p>
 
                     {/* CTA Buttons */}
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                    <motion.div
+                        variants={fadeInUp}
+                        className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
+                    >
                         <Link
                             to="/registrar"
                             className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-2xl shadow-indigo-500/25 hover:shadow-indigo-500/40"
@@ -204,10 +260,10 @@ const LandingPage = () => {
                         >
                             Ver Funcionalidades
                         </a>
-                    </div>
+                    </motion.div>
 
                     {/* Hero Image / Dashboard Preview */}
-                    <div className="relative max-w-5xl mx-auto">
+                    <motion.div variants={scaleIn} className="relative max-w-5xl mx-auto">
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent z-10 pointer-events-none" />
                         <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-purple-500/10 bg-slate-800/50 backdrop-blur-sm">
                             <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
@@ -220,10 +276,13 @@ const LandingPage = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Trust Badges */}
-                    <div className="flex flex-wrap items-center justify-center gap-8 mt-16 text-slate-500 text-sm">
+                    <motion.div
+                        variants={fadeInUp}
+                        className="flex flex-wrap items-center justify-center gap-8 mt-16 text-slate-500 text-sm"
+                    >
                         <div className="flex items-center gap-2">
                             <Shield className="w-5 h-5 text-emerald-500" />
                             <span>Dados Seguros</span>
@@ -236,28 +295,41 @@ const LandingPage = () => {
                             <Clock className="w-5 h-5 text-emerald-500" />
                             <span>Setup em 5 minutos</span>
                         </div>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             </section>
 
             {/* Features Section */}
             <section id="features" className="py-20 px-4 relative">
                 <div className="max-w-7xl mx-auto">
                     {/* Section Header */}
-                    <div className="text-center mb-16">
+                    <motion.div
+                        className="text-center mb-16"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={fadeInUp}
+                    >
                         <h2 className="text-3xl md:text-5xl font-bold mb-4">
                             Tudo que você precisa
                         </h2>
                         <p className="text-slate-400 text-lg max-w-2xl mx-auto">
                             Funcionalidades pensadas para profissionais de estética e beleza que querem automatizar e escalar seu negócio.
                         </p>
-                    </div>
+                    </motion.div>
 
                     {/* Features Grid */}
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <motion.div
+                        className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                    >
                         {features.map((feature, index) => (
-                            <div
+                            <motion.div
                                 key={index}
+                                variants={fadeInUp}
                                 className="group relative p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all duration-300"
                             >
                                 {/* Icon */}
@@ -268,42 +340,48 @@ const LandingPage = () => {
                                 {/* Content */}
                                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                                 <p className="text-slate-400 leading-relaxed">{feature.description}</p>
-                            </div>
+                            </motion.div>
                         ))}
-                    </div>
+                    </motion.div>
                 </div>
             </section>
 
             {/* Stats Section */}
             <section className="py-16 px-4 border-y border-white/10 bg-white/5">
-                <div className="max-w-7xl mx-auto">
+                <motion.div
+                    className="max-w-7xl mx-auto"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-50px" }}
+                    variants={staggerContainer}
+                >
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                        <div>
+                        <motion.div variants={fadeInUp}>
                             <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-2">
                                 98%
                             </div>
                             <p className="text-slate-400">Taxa de Satisfação</p>
-                        </div>
-                        <div>
+                        </motion.div>
+                        <motion.div variants={fadeInUp}>
                             <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-2">
                                 -70%
                             </div>
                             <p className="text-slate-400">Redução de No-Shows</p>
-                        </div>
-                        <div>
+                        </motion.div>
+                        <motion.div variants={fadeInUp}>
                             <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent mb-2">
                                 24/7
                             </div>
                             <p className="text-slate-400">Disponibilidade IA</p>
-                        </div>
-                        <div>
+                        </motion.div>
+                        <motion.div variants={fadeInUp}>
                             <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent mb-2">
                                 5min
                             </div>
                             <p className="text-slate-400">Para Começar</p>
-                        </div>
+                        </motion.div>
                     </div>
-                </div>
+                </motion.div>
             </section>
 
             {/* WhatsApp Integration Section */}
@@ -315,7 +393,12 @@ const LandingPage = () => {
                 <div className="relative max-w-7xl mx-auto">
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
                         {/* Content */}
-                        <div>
+                        <motion.div
+                            initial="hidden"
+                            whileInView="visible"
+                            viewport={{ once: true, margin: "-100px" }}
+                            variants={fadeInUp}
+                        >
                             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 mb-6">
                                 <MessageSquare className="w-4 h-4 text-green-400" />
                                 <span className="text-sm text-green-300">WhatsApp Business</span>
@@ -347,10 +430,16 @@ const LandingPage = () => {
                                     </li>
                                 ))}
                             </ul>
-                        </div>
+                        </motion.div>
 
                         {/* Phone Mockup */}
-                        <div className="relative flex justify-center">
+                        <motion.div
+                            className="relative flex justify-center"
+                            initial="hidden"
+                            whileInView="visible"
+                            viewport={{ once: true, margin: "-100px" }}
+                            variants={scaleIn}
+                        >
                             <div className="relative w-72 h-[580px] rounded-[3rem] bg-slate-800 border-4 border-slate-700 shadow-2xl overflow-hidden">
                                 {/* Phone Screen */}
                                 <div className="absolute inset-4 rounded-[2.5rem] bg-gradient-to-b from-slate-700 to-slate-800 overflow-hidden">
@@ -393,7 +482,7 @@ const LandingPage = () => {
 
                             {/* Decorative elements */}
                             <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-green-500/20 rounded-full blur-[80px]" />
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             </section>
@@ -406,20 +495,33 @@ const LandingPage = () => {
 
                 <div className="relative max-w-7xl mx-auto">
                     {/* Section Header */}
-                    <div className="text-center mb-16">
+                    <motion.div
+                        className="text-center mb-16"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={fadeInUp}
+                    >
                         <h2 className="text-3xl md:text-5xl font-bold mb-4">
                             Planos simples, sem surpresas
                         </h2>
                         <p className="text-slate-400 text-lg max-w-2xl mx-auto">
                             Escolha o plano ideal para o seu negócio. Comece grátis e faça upgrade quando quiser.
                         </p>
-                    </div>
+                    </motion.div>
 
                     {/* Pricing Cards */}
-                    <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <motion.div
+                        className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                    >
                         {plans.map((plan, index) => (
-                            <div
+                            <motion.div
                                 key={index}
+                                variants={fadeInUp}
                                 className={`relative rounded-2xl p-8 transition-all duration-300 ${plan.popular
                                     ? 'bg-gradient-to-b from-indigo-500/20 to-purple-500/10 border-2 border-indigo-500/50 scale-105 shadow-2xl shadow-indigo-500/20'
                                     : 'bg-white/5 border border-white/10 hover:border-white/20'
@@ -466,25 +568,37 @@ const LandingPage = () => {
                                 >
                                     {plan.cta}
                                 </Link>
-                            </div>
+                            </motion.div>
                         ))}
-                    </div>
+                    </motion.div>
                 </div>
             </section>
 
             {/* FAQ Section */}
             <section className="py-20 px-4 bg-slate-900/50">
                 <div className="max-w-4xl mx-auto">
-                    <div className="text-center mb-16">
+                    <motion.div
+                        className="text-center mb-16"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={fadeInUp}
+                    >
                         <h2 className="text-3xl md:text-4xl font-bold mb-4">
                             Perguntas Frequentes
                         </h2>
                         <p className="text-slate-400 text-lg">
                             Tire suas dúvidas sobre o Laura SAAS
                         </p>
-                    </div>
+                    </motion.div>
 
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <motion.div
+                        className="grid md:grid-cols-2 gap-6"
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                    >
                         {[
                             {
                                 q: "Como funciona o teste grátis?",
@@ -503,12 +617,16 @@ const LandingPage = () => {
                                 a: "Sim, não temos contratos de fidelidade. Você pode cancelar sua assinatura a qualquer momento."
                             }
                         ].map((faq, index) => (
-                            <div key={index} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                            <motion.div
+                                key={index}
+                                variants={fadeInUp}
+                                className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                            >
                                 <h3 className="font-bold text-lg mb-2 text-white">{faq.q}</h3>
                                 <p className="text-slate-400 leading-relaxed">{faq.a}</p>
-                            </div>
+                            </motion.div>
                         ))}
-                    </div>
+                    </motion.div>
                 </div>
             </section>
 
@@ -579,7 +697,13 @@ const LandingPage = () => {
 
             {/* Final CTA Section */}
             <section className="py-20 px-4">
-                <div className="max-w-4xl mx-auto text-center">
+                <motion.div
+                    className="max-w-4xl mx-auto text-center"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={scaleIn}
+                >
                     <div className="p-12 rounded-3xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 relative overflow-hidden">
                         {/* Background decoration */}
                         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent" />
@@ -603,7 +727,7 @@ const LandingPage = () => {
                             </p>
                         </div>
                     </div>
-                </div>
+                </motion.div>
             </section>
 
             {/* Footer */}

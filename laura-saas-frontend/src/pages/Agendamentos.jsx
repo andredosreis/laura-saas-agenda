@@ -257,7 +257,7 @@ function Agendamentos() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen">
+      <div className="flex flex-col justify-center items-center h-screen pt-24">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
         <p className="mt-3 text-gray-700 text-lg">Carregando agendamentos...</p>
       </div>
@@ -265,7 +265,7 @@ function Agendamentos() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
       {/* Push Notification Status Banner */}
       {pushStatus.supported && !pushStatus.subscribed && pushStatus.permission !== 'denied' && (
         <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded flex items-start justify-between">

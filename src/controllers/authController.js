@@ -1,7 +1,9 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 // =============================================
 // CONFIGURAÇÕES JWT
@@ -569,7 +571,6 @@ export const changePassword = async (req, res) => {
         }
 
         // Atualizar senha
-        const bcrypt = await import('bcryptjs');
         const salt = await bcrypt.genSalt(12);
         const passwordHash = await bcrypt.hash(newPassword, salt);
 
@@ -592,6 +593,194 @@ export const changePassword = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/auth/forgot-password
+ * Solicitar recuperação de senha
+ */
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email é obrigatório'
+            });
+        }
+
+        // Buscar usuário pelo email
+        const user = await User.findOne({ email: email.toLowerCase() });
+
+        // Sempre retornar sucesso para não revelar se o email existe
+        if (!user) {
+            return res.json({
+                success: true,
+                message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.'
+            });
+        }
+
+        // Gerar token de recuperação
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenHash = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+        // Salvar token hasheado e data de expiração (1 hora)
+        await User.findByIdAndUpdate(user._id, {
+            resetPasswordToken: resetTokenHash,
+            resetPasswordExpires: Date.now() + 60 * 60 * 1000 // 1 hora
+        });
+
+        // Enviar email
+        try {
+            await sendPasswordResetEmail(user.email, resetToken, user.nome);
+        } catch (emailError) {
+            console.error('Erro ao enviar email:', emailError);
+            // Limpar token se o email falhou
+            await User.findByIdAndUpdate(user._id, {
+                $unset: { resetPasswordToken: 1, resetPasswordExpires: 1 }
+            });
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao enviar email. Tente novamente mais tarde.'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.'
+        });
+
+    } catch (error) {
+        console.error('Erro no forgot-password:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno ao processar solicitação'
+        });
+    }
+};
+
+/**
+ * POST /api/auth/reset-password
+ * Redefinir senha usando token
+ */
+export const resetPassword = async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token e nova senha são obrigatórios'
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: 'A senha deve ter pelo menos 6 caracteres'
+            });
+        }
+
+        // Hash do token recebido para comparar com o banco
+        const resetTokenHash = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        // Buscar usuário com token válido e não expirado
+        const user = await User.findOne({
+            resetPasswordToken: resetTokenHash,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token inválido ou expirado. Solicite uma nova recuperação de senha.'
+            });
+        }
+
+        // Hash da nova senha
+        const salt = await bcrypt.genSalt(12);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        // Atualizar senha e limpar tokens
+        await User.findByIdAndUpdate(user._id, {
+            $set: { passwordHash },
+            $unset: {
+                resetPasswordToken: 1,
+                resetPasswordExpires: 1,
+                refreshTokens: 1 // Invalidar todas as sessões
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'Senha alterada com sucesso! Você já pode fazer login com sua nova senha.'
+        });
+
+    } catch (error) {
+        console.error('Erro no reset-password:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno ao redefinir senha'
+        });
+    }
+};
+
+/**
+ * GET /api/auth/verify-reset-token/:token
+ * Verificar se o token de reset é válido
+ */
+export const verifyResetToken = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token é obrigatório'
+            });
+        }
+
+        // Hash do token recebido
+        const resetTokenHash = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        // Verificar se existe usuário com token válido
+        const user = await User.findOne({
+            resetPasswordToken: resetTokenHash,
+            resetPasswordExpires: { $gt: Date.now() }
+        }).select('email nome');
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token inválido ou expirado'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                email: user.email.replace(/(.{2})(.*)(@.*)/, '$1***$3'), // Mascarar email
+                nome: user.nome
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro ao verificar token:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno ao verificar token'
+        });
+    }
+};
+
 export default {
     register,
     login,
@@ -600,5 +789,8 @@ export default {
     logoutAll,
     me,
     updateProfile,
-    changePassword
+    changePassword,
+    forgotPassword,
+    resetPassword,
+    verifyResetToken
 };

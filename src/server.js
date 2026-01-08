@@ -5,9 +5,13 @@ import cron from 'node-cron';
 import connectDB from './config/db.js';
 import app from './app.js';
 import { sendReminderNotifications } from './controllers/agenteController.js';
+import { initEmailService } from './services/emailService.js';
 
 // Conectar ao banco de dados e, após sucesso, iniciar o servidor
 connectDB().then(() => {
+  // Inicializar serviço de email
+  initEmailService();
+
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`🖥️  Servidor a rodar na porta ${PORT}`);
