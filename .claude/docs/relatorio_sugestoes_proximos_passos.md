@@ -4,11 +4,29 @@
 - **Email:** `laura@laesteticaavancada.pt`
 - **Senha:** `Laura@2024!`
 
-## Status Atual (Fase 1 Completa)
-O sistema atingiu um marco visual e funcional importante, com a reformulação completa do Dashboard e da Landing Page para refletir uma identidade "Premium".
+## Status Atual (Fase 1D em Andamento - 50%)
+O sistema evoluiu significativamente com a implementação do sistema de temas (Dark/Light mode) e notificações Toast profissionais.
 
 ### Conquistas Recentes
-1. **Novo Dashboard Premium:**
+
+#### Fase 1D - Polimento UX (Em Andamento)
+1. **Sistema de Temas (Dark/Light Mode):**
+   - `ThemeContext.jsx` para gestão de estado do tema com persistência em localStorage.
+   - Componente `ThemeToggle.jsx` com ícones Sun/Moon animados.
+   - Dashboard completamente adaptado para ambos os modos.
+   - CSS variables em `index.css` para cores dinâmicas.
+
+2. **Toast Notifications:**
+   - `toastService.jsx` com métodos: success, error, warning, info, whatsapp, loading, confirm.
+   - Estilos glassmorphism compatíveis com dark/light mode.
+   - Integrado com `react-toastify` e CSS customizado.
+
+3. **Correções de UI:**
+   - Ajuste de espaçamento (pt-24) na página Agendamentos para navbar fixa.
+   - KPI cards, Visão Semanal, Desempenho, Ações Pendentes e Amanhã adaptados para light mode.
+
+#### Fases Anteriores Completas
+1. **Novo Dashboard Premium (Fase 1B):**
    - Design moderno com glassmorphism e animações suaves (`framer-motion`).
    - KPIs Financeiros reais integrados (Faturamento e Taxa de Comparecimento).
    - Layout otimizado de 3 colunas (Sidebar implícita, Agenda, Analytics).
@@ -19,21 +37,24 @@ O sistema atingiu um marco visual e funcional importante, com a reformulação c
    - Links com ícones intuitivos e feedback visual claro.
    - Menu mobile responsivo com informações do usuário e logout.
 
-3. **Landing Page Comercial:**
+3. **Landing Page Comercial (Fase 1C):**
    - Planos de Preços atualizados (Básico, PRO, ELITE).
    - Seções de FAQ e Contato implementadas.
+   - Animações de scroll com framer-motion.
    - Ajustes de espaçamento para navegação fixa.
 
 ---
 
 ## Sugestões de Próximos Passos (Roadmap)
 
-Para manter o ritmo e agregar valor rapidamente, sugiro a seguinte ordem de desenvolvimento para as próximas semanas:
+Para manter o ritmo e agregar valor rapidamente, sugiro a seguinte ordem de desenvolvimento:
 
-### 1. Curto Prazo (Polimento Visual) - Fase 1 Final
-- **Screenshot Real:** Tirar um print do novo Dashboard rodando com dados e inseri-lo na Hero Section da Landing Page para aumentar a credibilidade.
-- **Animações de Scroll:** Implementar animações (ex: *fade-up*) na Landing Page à medida que o usuário desce a tela, aumentando o engajamento ("WOW factor").
+### 1. Curto Prazo (Finalizar Fase 1D) - Polimento Final
+- **Validação de Formulários:** Implementar validação em tempo real nos formulários de criação/edição.
+- **Loading States:** Adicionar skeletons e spinners durante carregamento de dados.
 - **Testes Mobile:** Garantir que o gráfico e as tabelas do dashboard se comportem perfeitamente em telas muito pequenas (iPhone SE, etc).
+- **Acessibilidade:** Verificar contraste WCAG AA em ambos os modos (dark/light).
+- **Screenshot Real:** Tirar um print do novo Dashboard (em dark mode) e inseri-lo na Hero Section da Landing Page.
 
 ### 2. Médio Prazo (Funcionalidades Core) - Fase 2
 - **Calendário Interativo (FullCalendar):**

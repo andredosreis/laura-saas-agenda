@@ -102,8 +102,15 @@
 ## Fase 1D: Polimento UX 🔄 EM ANDAMENTO
 
 ### Melhorias de Interface
-- [ ] 1D.1 Substituir alerts() por Toast notifications estilizados
-- [ ] 1D.2 Adicionar Dark mode toggle no Dashboard
+- [x] 1D.1 Substituir alerts() por Toast notifications estilizados
+  - Criado `toastService.jsx` com métodos: success, error, warning, info, whatsapp, loading, confirm
+  - Configurado react-toastify com estilos glassmorphism
+  - CSS customizado para dark/light mode
+- [x] 1D.2 Adicionar Dark mode toggle no Dashboard
+  - Criado `ThemeContext.jsx` para gestão de tema (localStorage)
+  - Criado componente `ThemeToggle.jsx` (Sun/Moon icons)
+  - Dashboard totalmente adaptado para light/dark mode
+  - CSS variables para ambos os modos em `index.css`
 - [ ] 1D.3 Melhorar validação de formulários em tempo real
 - [ ] 1D.4 Adicionar feedback visual em ações (loading states)
 
@@ -184,7 +191,7 @@
 | 1A - Autenticação | ✅ Completa | 100% |
 | 1B - Dashboard Design | ✅ Completa | 100% |
 | 1C - Landing Page | ✅ Completa | 95% |
-| 1D - Polimento UX | 🔄 Em andamento | 0% |
+| 1D - Polimento UX | 🔄 Em andamento | 50% |
 | 2 - Calendário + Analytics | ⏳ Pendente | 0% |
 | 3 - Multi-Tenant Completo | ⏳ Pendente | 0% |
 
@@ -192,6 +199,6 @@
 
 ## 🎯 Próximas Ações Imediatas
 
-1. **Finalizar Fase 1C**: Screenshot do Dashboard + Testimonials
-2. **Iniciar Fase 1D**: Toast notifications + Dark mode toggle
-3. **Testes de QA**: Responsividade e acessibilidade
+1. **Continuar Fase 1D**: Validação de formulários + Loading states
+2. **Testes de QA**: Responsividade e acessibilidade
+3. **Finalizar Fase 1C**: Screenshot do Dashboard + Testimonials
