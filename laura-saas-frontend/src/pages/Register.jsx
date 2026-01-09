@@ -1,55 +1,64 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { registerSchema, getPasswordStrength, formatPhone } from '../schemas/validationSchemas';
 
 function Register() {
     const navigate = useNavigate();
-    const { register, isLoading: authLoading } = useAuth();
+    const { register: registerUser, isLoading: authLoading } = useAuth();
 
-    const [formData, setFormData] = useState({
-        nomeEmpresa: '',
-        nome: '',
-        email: '',
-        telefone: '',
-        password: '',
-        confirmPassword: ''
-    });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        setError('');
+    // React Hook Form com Zod
+    const {
+        register,
+        handleSubmit,
+        watch,
+        setValue,
+        formState: { errors, dirtyFields },
+    } = useForm({
+        resolver: zodResolver(registerSchema),
+        mode: 'onChange',
+        defaultValues: {
+            nomeEmpresa: '',
+            nome: '',
+            email: '',
+            telefone: '',
+            password: '',
+            confirmPassword: '',
+        },
+    });
+
+    // Watch para verificar força da senha em tempo real
+    const watchPassword = watch('password');
+    const passwordStrength = getPasswordStrength(watchPassword);
+
+    // Handler para formatar telefone
+    const handlePhoneChange = (e) => {
+        const formatted = formatPhone(e.target.value);
+        setValue('telefone', formatted, { shouldValidate: true });
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const onSubmit = async (data) => {
         setError('');
-
-        // Validações
-        if (formData.password !== formData.confirmPassword) {
-            setError('As senhas não coincidem');
-            return;
-        }
-
-        if (formData.password.length < 6) {
-            setError('A senha deve ter pelo menos 6 caracteres');
-            return;
-        }
-
         setIsLoading(true);
 
         try {
-            const result = await register({
-                nomeEmpresa: formData.nomeEmpresa,
-                nome: formData.nome,
-                email: formData.email,
-                telefone: formData.telefone,
-                password: formData.password
+            // Limpar telefone antes de enviar (apenas dígitos)
+            const cleanPhone = data.telefone.replace(/\D/g, '');
+
+            const result = await registerUser({
+                nomeEmpresa: data.nomeEmpresa,
+                nome: data.nome,
+                email: data.email,
+                telefone: cleanPhone,
+                password: data.password,
             });
 
             if (result.success) {
@@ -62,6 +71,55 @@ function Register() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Helper para determinar o estado visual do input
+    const getInputState = (fieldName) => {
+        if (errors[fieldName]) return 'error';
+        if (dirtyFields[fieldName] && !errors[fieldName]) return 'success';
+        return 'default';
+    };
+
+    // Classes dinâmicas para inputs
+    const getInputClasses = (fieldName, hasIcon = false) => {
+        const state = getInputState(fieldName);
+        const baseClasses = `w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-gray-500 focus:outline-none transition-all ${hasIcon ? 'pr-12' : ''}`;
+
+        switch (state) {
+            case 'error':
+                return `${baseClasses} border-red-500/50 focus:ring-2 focus:ring-red-500 focus:border-transparent`;
+            case 'success':
+                return `${baseClasses} border-green-500/50 focus:ring-2 focus:ring-green-500 focus:border-transparent`;
+            default:
+                return `${baseClasses} border-white/10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent`;
+        }
+    };
+
+    // Componente de feedback inline
+    const FieldFeedback = ({ fieldName }) => {
+        if (!dirtyFields[fieldName]) return null;
+
+        return (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                {errors[fieldName] ? (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                ) : (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                )}
+            </span>
+        );
+    };
+
+    // Componente de mensagem de erro
+    const ErrorMessage = ({ fieldName }) => {
+        if (!errors[fieldName]) return null;
+
+        return (
+            <p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+                <XCircle className="w-4 h-4 flex-shrink-0" />
+                {errors[fieldName].message}
+            </p>
+        );
     };
 
     if (authLoading) {
@@ -111,22 +169,23 @@ function Register() {
                     </div>
 
                     {/* Formulário */}
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                         {/* Nome da Empresa */}
                         <div>
                             <label htmlFor="nomeEmpresa" className="block text-sm font-medium text-gray-300 mb-2">
                                 Nome do seu negócio
                             </label>
-                            <input
-                                id="nomeEmpresa"
-                                name="nomeEmpresa"
-                                type="text"
-                                required
-                                value={formData.nomeEmpresa}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                placeholder="Ex: Studio Bella"
-                            />
+                            <div className="relative">
+                                <input
+                                    id="nomeEmpresa"
+                                    type="text"
+                                    {...register('nomeEmpresa')}
+                                    className={getInputClasses('nomeEmpresa', true)}
+                                    placeholder="Ex: Studio Bella"
+                                />
+                                <FieldFeedback fieldName="nomeEmpresa" />
+                            </div>
+                            <ErrorMessage fieldName="nomeEmpresa" />
                         </div>
 
                         {/* Nome */}
@@ -134,16 +193,17 @@ function Register() {
                             <label htmlFor="nome" className="block text-sm font-medium text-gray-300 mb-2">
                                 Seu nome
                             </label>
-                            <input
-                                id="nome"
-                                name="nome"
-                                type="text"
-                                required
-                                value={formData.nome}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                placeholder="Maria Silva"
-                            />
+                            <div className="relative">
+                                <input
+                                    id="nome"
+                                    type="text"
+                                    {...register('nome')}
+                                    className={getInputClasses('nome', true)}
+                                    placeholder="Maria Silva"
+                                />
+                                <FieldFeedback fieldName="nome" />
+                            </div>
+                            <ErrorMessage fieldName="nome" />
                         </div>
 
                         {/* Email */}
@@ -151,33 +211,37 @@ function Register() {
                             <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                                 Email
                             </label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                placeholder="seu@email.com"
-                            />
+                            <div className="relative">
+                                <input
+                                    id="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    {...register('email')}
+                                    className={getInputClasses('email', true)}
+                                    placeholder="seu@email.com"
+                                />
+                                <FieldFeedback fieldName="email" />
+                            </div>
+                            <ErrorMessage fieldName="email" />
                         </div>
 
                         {/* Telefone */}
                         <div>
                             <label htmlFor="telefone" className="block text-sm font-medium text-gray-300 mb-2">
-                                Telefone <span className="text-gray-500">(opcional)</span>
+                                Telefone
                             </label>
-                            <input
-                                id="telefone"
-                                name="telefone"
-                                type="tel"
-                                value={formData.telefone}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                placeholder="+351 912 345 678"
-                            />
+                            <div className="relative">
+                                <input
+                                    id="telefone"
+                                    type="tel"
+                                    {...register('telefone')}
+                                    onChange={handlePhoneChange}
+                                    className={getInputClasses('telefone', true)}
+                                    placeholder="(91) 23456-7890"
+                                />
+                                <FieldFeedback fieldName="telefone" />
+                            </div>
+                            <ErrorMessage fieldName="telefone" />
                         </div>
 
                         {/* Password */}
@@ -188,28 +252,56 @@ function Register() {
                             <div className="relative">
                                 <input
                                     id="password"
-                                    name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     autoComplete="new-password"
-                                    required
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                    placeholder="Mínimo 6 caracteres"
+                                    {...register('password')}
+                                    className={`${getInputClasses('password')} pr-20`}
+                                    placeholder="Mínimo 8 caracteres"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
-                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                                >
-                                    {showPassword ? (
-                                        <EyeOff className="w-5 h-5" />
-                                    ) : (
-                                        <Eye className="w-5 h-5" />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                    {dirtyFields.password && (
+                                        <span>
+                                            {errors.password ? (
+                                                <XCircle className="w-5 h-5 text-red-500" />
+                                            ) : (
+                                                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                            )}
+                                        </span>
                                     )}
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="text-gray-400 hover:text-white transition-colors p-1"
+                                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    >
+                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
                             </div>
+                            <ErrorMessage fieldName="password" />
+
+                            {/* Password Strength Indicator */}
+                            {watchPassword && (
+                                <div className="mt-2">
+                                    <div className="flex gap-1 mb-1">
+                                        {[1, 2, 3, 4, 5].map((level) => (
+                                            <div
+                                                key={level}
+                                                className={`h-1 flex-1 rounded-full transition-all ${
+                                                    level <= passwordStrength.strength
+                                                        ? passwordStrength.color
+                                                        : 'bg-gray-700'
+                                                }`}
+                                            />
+                                        ))}
+                                    </div>
+                                    {passwordStrength.label && (
+                                        <p className="text-xs text-gray-400">
+                                            Força: <span className="font-medium">{passwordStrength.label}</span>
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Confirm Password */}
@@ -220,31 +312,36 @@ function Register() {
                             <div className="relative">
                                 <input
                                     id="confirmPassword"
-                                    name="confirmPassword"
                                     type={showConfirmPassword ? 'text' : 'password'}
                                     autoComplete="new-password"
-                                    required
-                                    value={formData.confirmPassword}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    {...register('confirmPassword')}
+                                    className={`${getInputClasses('confirmPassword')} pr-20`}
                                     placeholder="Repita a senha"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
-                                    aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                                >
-                                    {showConfirmPassword ? (
-                                        <EyeOff className="w-5 h-5" />
-                                    ) : (
-                                        <Eye className="w-5 h-5" />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                    {dirtyFields.confirmPassword && (
+                                        <span>
+                                            {errors.confirmPassword ? (
+                                                <XCircle className="w-5 h-5 text-red-500" />
+                                            ) : (
+                                                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                            )}
+                                        </span>
                                     )}
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="text-gray-400 hover:text-white transition-colors p-1"
+                                        aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    >
+                                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
                             </div>
+                            <ErrorMessage fieldName="confirmPassword" />
                         </div>
 
-                        {/* Erro */}
+                        {/* Erro do servidor */}
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                 <p className="text-red-400 text-sm text-center">{error}</p>
@@ -271,9 +368,25 @@ function Register() {
                         >
                             {isLoading ? (
                                 <span className="flex items-center justify-center">
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    <svg
+                                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                        ></circle>
+                                        <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        ></path>
                                     </svg>
                                     Criando conta...
                                 </span>

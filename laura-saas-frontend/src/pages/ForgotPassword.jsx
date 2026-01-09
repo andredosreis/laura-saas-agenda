@@ -1,26 +1,64 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { forgotPasswordSchema } from '../schemas/validationSchemas';
 import api from '../services/api';
 
 function ForgotPassword() {
-    const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+    const [submittedEmail, setSubmittedEmail] = useState('');
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    // React Hook Form com Zod
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, dirtyFields },
+    } = useForm({
+        resolver: zodResolver(forgotPasswordSchema),
+        mode: 'onChange',
+        defaultValues: {
+            email: '',
+        },
+    });
+
+    const onSubmit = async (data) => {
         setError('');
         setIsLoading(true);
 
         try {
-            await api.post('/auth/forgot-password', { email });
+            await api.post('/auth/forgot-password', { email: data.email });
+            setSubmittedEmail(data.email);
             setSuccess(true);
         } catch (err) {
             setError(err.response?.data?.error || 'Erro ao processar solicitacao. Tente novamente.');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // Helper para determinar o estado visual do input
+    const getInputState = (fieldName) => {
+        if (errors[fieldName]) return 'error';
+        if (dirtyFields[fieldName] && !errors[fieldName]) return 'success';
+        return 'default';
+    };
+
+    // Classes dinâmicas para inputs
+    const getInputClasses = (fieldName) => {
+        const state = getInputState(fieldName);
+        const baseClasses = 'w-full px-4 py-3 pr-12 bg-white/5 border rounded-xl text-white placeholder-gray-500 focus:outline-none transition-all';
+
+        switch (state) {
+            case 'error':
+                return `${baseClasses} border-red-500/50 focus:ring-2 focus:ring-red-500 focus:border-transparent`;
+            case 'success':
+                return `${baseClasses} border-green-500/50 focus:ring-2 focus:ring-green-500 focus:border-transparent`;
+            default:
+                return `${baseClasses} border-white/10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent`;
         }
     };
 
@@ -53,7 +91,7 @@ function ForgotPassword() {
                             </div>
                             <h1 className="text-2xl font-bold text-white mb-4">Email enviado!</h1>
                             <p className="text-gray-400 mb-6">
-                                Se o email <span className="text-indigo-400">{email}</span> estiver cadastrado,
+                                Se o email <span className="text-indigo-400">{submittedEmail}</span> estiver cadastrado,
                                 você receberá instruções para redefinir sua senha.
                             </p>
                             <p className="text-sm text-gray-500 mb-8">
@@ -80,28 +118,42 @@ function ForgotPassword() {
                                 </p>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-6">
+                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                                 {/* Email */}
                                 <div>
                                     <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                                         Email
                                     </label>
-                                    <input
-                                        id="email"
-                                        type="email"
-                                        autoComplete="email"
-                                        required
-                                        value={email}
-                                        onChange={(e) => {
-                                            setEmail(e.target.value);
-                                            setError('');
-                                        }}
-                                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                        placeholder="seu@email.com"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            id="email"
+                                            type="email"
+                                            autoComplete="email"
+                                            {...register('email')}
+                                            className={getInputClasses('email')}
+                                            placeholder="seu@email.com"
+                                        />
+                                        {/* Ícone de feedback */}
+                                        {dirtyFields.email && (
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                {errors.email ? (
+                                                    <XCircle className="w-5 h-5 text-red-500" />
+                                                ) : (
+                                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                                )}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {/* Mensagem de erro */}
+                                    {errors.email && (
+                                        <p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+                                            <XCircle className="w-4 h-4" />
+                                            {errors.email.message}
+                                        </p>
+                                    )}
                                 </div>
 
-                                {/* Erro */}
+                                {/* Erro do servidor */}
                                 {error && (
                                     <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                         <p className="text-red-400 text-sm text-center">{error}</p>

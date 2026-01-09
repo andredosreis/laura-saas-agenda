@@ -1,37 +1,43 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { loginSchema } from '../schemas/validationSchemas';
 
 function Login() {
     const navigate = useNavigate();
     const location = useLocation();
     const { login, isLoading: authLoading } = useAuth();
 
-    const [formData, setFormData] = useState({
-        email: '',
-        password: ''
-    });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    // React Hook Form com Zod
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, touchedFields, isValid, dirtyFields },
+    } = useForm({
+        resolver: zodResolver(loginSchema),
+        mode: 'onChange', // Validação em tempo real
+        defaultValues: {
+            email: '',
+            password: '',
+        },
+    });
+
     // Para onde redirecionar após login
     const from = location.state?.from?.pathname || '/dashboard';
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        setError(''); // Limpar erro ao digitar
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const onSubmit = async (data) => {
         setError('');
         setIsLoading(true);
 
         try {
-            const result = await login(formData.email, formData.password);
+            const result = await login(data.email, data.password);
 
             if (result.success) {
                 navigate(from, { replace: true });
@@ -42,6 +48,28 @@ function Login() {
             setError('Erro ao conectar com o servidor');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // Helper para determinar o estado visual do input
+    const getInputState = (fieldName) => {
+        if (errors[fieldName]) return 'error';
+        if (dirtyFields[fieldName] && !errors[fieldName]) return 'success';
+        return 'default';
+    };
+
+    // Classes dinâmicas para inputs
+    const getInputClasses = (fieldName) => {
+        const state = getInputState(fieldName);
+        const baseClasses = 'w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-gray-500 focus:outline-none transition-all';
+
+        switch (state) {
+            case 'error':
+                return `${baseClasses} border-red-500/50 focus:ring-2 focus:ring-red-500 focus:border-transparent`;
+            case 'success':
+                return `${baseClasses} border-green-500/50 focus:ring-2 focus:ring-green-500 focus:border-transparent`;
+            default:
+                return `${baseClasses} border-white/10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent`;
         }
     };
 
@@ -84,23 +112,39 @@ function Login() {
                     </div>
 
                     {/* Formulário */}
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         {/* Email */}
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                                 Email
                             </label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                placeholder="seu@email.com"
-                            />
+                            <div className="relative">
+                                <input
+                                    id="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    {...register('email')}
+                                    className={getInputClasses('email')}
+                                    placeholder="seu@email.com"
+                                />
+                                {/* Ícone de feedback */}
+                                {dirtyFields.email && (
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        {errors.email ? (
+                                            <XCircle className="w-5 h-5 text-red-500" />
+                                        ) : (
+                                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                        )}
+                                    </span>
+                                )}
+                            </div>
+                            {/* Mensagem de erro */}
+                            {errors.email && (
+                                <p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+                                    <XCircle className="w-4 h-4" />
+                                    {errors.email.message}
+                                </p>
+                            )}
                         </div>
 
                         {/* Password */}
@@ -111,31 +155,47 @@ function Login() {
                             <div className="relative">
                                 <input
                                     id="password"
-                                    name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     autoComplete="current-password"
-                                    required
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    {...register('password')}
+                                    className={`${getInputClasses('password')} pr-20`}
                                     placeholder="••••••••"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
-                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                                >
-                                    {showPassword ? (
-                                        <EyeOff className="w-5 h-5" />
-                                    ) : (
-                                        <Eye className="w-5 h-5" />
+                                {/* Ícones de feedback e toggle */}
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                    {dirtyFields.password && (
+                                        <span>
+                                            {errors.password ? (
+                                                <XCircle className="w-5 h-5 text-red-500" />
+                                            ) : (
+                                                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                            )}
+                                        </span>
                                     )}
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="text-gray-400 hover:text-white transition-colors p-1"
+                                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="w-5 h-5" />
+                                        ) : (
+                                            <Eye className="w-5 h-5" />
+                                        )}
+                                    </button>
+                                </div>
                             </div>
+                            {/* Mensagem de erro */}
+                            {errors.password && (
+                                <p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+                                    <XCircle className="w-4 h-4" />
+                                    {errors.password.message}
+                                </p>
+                            )}
                         </div>
 
-                        {/* Erro */}
+                        {/* Erro do servidor */}
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                 <p className="text-red-400 text-sm text-center">{error}</p>

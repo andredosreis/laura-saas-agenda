@@ -99,7 +99,7 @@
 
 ---
 
-## Fase 1D: Polimento UX 🔄 EM ANDAMENTO
+## Fase 1D: Polimento UX ✅ COMPLETA
 
 ### Melhorias de Interface
 - [x] 1D.1 Substituir alerts() por Toast notifications estilizados
@@ -111,8 +111,20 @@
   - Criado componente `ThemeToggle.jsx` (Sun/Moon icons)
   - Dashboard totalmente adaptado para light/dark mode
   - CSS variables para ambos os modos em `index.css`
-- [ ] 1D.3 Melhorar validação de formulários em tempo real
-- [ ] 1D.4 Adicionar feedback visual em ações (loading states)
+- [x] 1D.3 Melhorar validação de formulários em tempo real
+  - Instaladas bibliotecas: `react-hook-form`, `zod`, `@hookform/resolvers`
+  - Criado `src/schemas/validationSchemas.js` com schemas centralizados
+  - Refatorados formulários com validação em tempo real:
+    - Login.jsx, Register.jsx, ForgotPassword.jsx
+    - CriarCliente.jsx, EditarCliente.jsx
+    - CriarAgendamento.jsx, CriarPacote.jsx
+  - Feedback visual: bordas verde/vermelha, ícones CheckCircle/XCircle
+  - Indicador de força de senha no Register
+  - Formatação automática de telefone com máscara
+- [x] 1D.4 Adicionar feedback visual em ações (loading states)
+  - Spinners animados em todos os botões de submit
+  - Estados "Salvando...", "Criando...", "Cadastrando..."
+  - Desabilitação de botões durante requisições
 
 ### Testes Finais Fase 1
 - [ ] 1D.5 Testar responsividade completa (mobile, tablet, desktop)
@@ -191,7 +203,7 @@
 | 1A - Autenticação | ✅ Completa | 100% |
 | 1B - Dashboard Design | ✅ Completa | 100% |
 | 1C - Landing Page | ✅ Completa | 95% |
-| 1D - Polimento UX | 🔄 Em andamento | 50% |
+| 1D - Polimento UX | ✅ Completa | 100% |
 | 2 - Calendário + Analytics | ⏳ Pendente | 0% |
 | 3 - Multi-Tenant Completo | ⏳ Pendente | 0% |
 
@@ -199,6 +211,6 @@
 
 ## 🎯 Próximas Ações Imediatas
 
-1. **Continuar Fase 1D**: Validação de formulários + Loading states
-2. **Testes de QA**: Responsividade e acessibilidade
-3. **Finalizar Fase 1C**: Screenshot do Dashboard + Testimonials
+1. **Testes de QA**: Responsividade e acessibilidade (1D.5, 1D.6, 1D.7)
+2. **Finalizar Fase 1C**: Screenshot do Dashboard + Testimonials
+3. **Iniciar Fase 2**: Calendário interativo com FullCalendar
