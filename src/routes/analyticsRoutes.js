@@ -1,10 +1,19 @@
 import express from 'express';
-// Importamos a função específica que precisamos do controller
-import { getAlertaSessoesBaixas } from '../controllers/analyticsController.js';
+import {
+    getAlertaSessoesBaixas,
+    getReceitaTemporal,
+    getDistribuicaoServicos,
+    getTopClientes
+} from '../controllers/analyticsController.js';
 
 const router = express.Router();
 
-// A rota agora usa o nome importado diretamente
+// Existing route
 router.get('/sessoes-baixas', getAlertaSessoesBaixas);
+
+// 🆕 Phase 2B: Analytics routes
+router.get('/receita-temporal', getReceitaTemporal);
+router.get('/distribuicao-servicos', getDistribuicaoServicos);
+router.get('/top-clientes', getTopClientes);
 
 export default router;

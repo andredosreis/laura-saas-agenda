@@ -209,7 +209,7 @@ function CriarAgendamento() {
   const getInputClasses = (fieldName) => {
     const state = getInputState(fieldName);
     const baseClasses =
-      'block w-full rounded border p-2 shadow-sm focus:ring focus:ring-amber-200 transition-all';
+      'block w-full rounded border p-2 shadow-sm focus:ring focus:ring-amber-200 transition-all text-gray-900 bg-white placeholer:text-gray-400';
 
     switch (state) {
       case 'error':
@@ -336,15 +336,13 @@ function CriarAgendamento() {
                     checked={watchTipoServico === 'pacote'}
                     onChange={() => handleTipoServicoChange('pacote')}
                     disabled={!clienteTemPacote || isSubmitting}
-                    className={`h-4 w-4 ${
-                      !clienteTemPacote ? 'opacity-50 cursor-not-allowed' : ''
-                    } text-amber-600 focus:ring-amber-500 border-gray-300`}
+                    className={`h-4 w-4 ${!clienteTemPacote ? 'opacity-50 cursor-not-allowed' : ''
+                      } text-amber-600 focus:ring-amber-500 border-gray-300`}
                   />
                   <label
                     htmlFor="tipoPacote"
-                    className={`ml-2 text-sm ${
-                      !clienteTemPacote ? 'text-gray-400' : 'text-gray-700'
-                    }`}
+                    className={`ml-2 text-sm ${!clienteTemPacote ? 'text-gray-400' : 'text-gray-700'
+                      }`}
                   >
                     Usar Pacote Contratado
                     {!clienteTemPacote && (
@@ -449,11 +447,10 @@ function CriarAgendamento() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`flex-1 flex items-center justify-center ${
-                isSubmitting
+              className={`flex-1 flex items-center justify-center ${isSubmitting
                   ? 'bg-amber-400 cursor-not-allowed'
                   : 'bg-amber-500 hover:bg-amber-600'
-              } text-white font-semibold py-2 px-4 rounded transition-colors`}
+                } text-white font-semibold py-2 px-4 rounded transition-colors`}
             >
               {isSubmitting ? (
                 <>

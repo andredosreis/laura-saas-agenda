@@ -65,6 +65,11 @@ agendamentoSchema.index({ dataHora: 1 });
 agendamentoSchema.index({ cliente: 1 });
 agendamentoSchema.index({ status: 1 });
 
+// 🆕 Phase 2B: Composite indexes for analytics queries
+agendamentoSchema.index({ tenantId: 1, status: 1, dataHora: 1 });
+agendamentoSchema.index({ tenantId: 1, dataHora: 1 });
+agendamentoSchema.index({ tenantId: 1, cliente: 1, status: 1 });
+
 agendamentoSchema.pre('save', function (next) {
   if (this.isNew && this.dataHora < new Date()) {
     return next(new Error('Não é possível criar agendamentos com data no passado.'));

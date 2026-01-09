@@ -22,6 +22,8 @@ import scheduleRoutes from './routes/scheduleRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import authRoutes from './routes/authRoutes.js'; // 🆕 Autenticação
+import financeiroRoutes from './routes/financeiroRoutes.js'; // Added from snippet
+import migrationRoutes from './routes/migrationRoutes.js'; // 🆕 Rota de Migração
 
 const app = express();
 
@@ -81,6 +83,8 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/agente', agenteRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/financeiro', financeiroRoutes);
+app.use('/api/migration', migrationRoutes);
 
 // Webhook Z-API para confirmações de agendamento
 app.use('/webhook', webhookRoutes);

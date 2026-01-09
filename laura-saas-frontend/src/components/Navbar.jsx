@@ -5,8 +5,10 @@ import {
   LayoutDashboard,
   Users,
   Calendar,
+  CalendarCheck,
   Package,
   Clock,
+  TrendingUp,
   LogOut,
   Menu,
   X,
@@ -27,8 +29,10 @@ function Navbar() {
     { to: "/dashboard", text: "Dashboard", icon: LayoutDashboard },
     { to: "/clientes", text: "Clientes", icon: Users },
     { to: "/agendamentos", text: "Agendamentos", icon: Calendar },
+    { to: "/calendario", text: "Calendário", icon: CalendarCheck },
     { to: "/pacotes", text: "Pacotes", icon: Package },
-    { to: "/disponibilidade", text: "Horários", icon: Clock },
+    { to: "/financeiro", text: "Financeiro", icon: TrendingUp },
+    { to: "/disponibilidade", text: "Minha Disponibilidade", icon: Clock },
   ];
 
   const closeMobileMenu = () => setMobileMenuOpen(false);

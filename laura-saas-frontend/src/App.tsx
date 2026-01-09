@@ -33,6 +33,8 @@ import EditarPacote from './pages/EditarPacote';
 import EditarAgendamento from './pages/EditarAgendamento';
 import Dashboard from './pages/Dashboard';
 import Disponibilidade from './pages/Disponibilidade';
+import CalendarView from './pages/CalendarView';
+import Financeiro from './pages/Financeiro';
 
 // Services
 import { registerServiceWorker, checkForUpdates } from './services/serviceWorkerService';
@@ -66,10 +68,12 @@ const App = () => {
               toast.info(
                 '🔄 Nova versão disponível! Recarregue a página para atualizar.',
                 {
+                  toastId: 'update-available', // Evita duplicatas
                   position: 'top-right',
-                  autoClose: false,
+                  autoClose: 10000, // 10 segundos
                   closeButton: true,
                   pauseOnHover: true,
+                  draggable: true,
                 }
               );
             },
@@ -98,52 +102,69 @@ const App = () => {
       <AuthProvider>
         <Router>
           <Routes>
-          {/* 🆕 Página de Apresentação (Pública) */}
-          <Route path="/" element={<LandingPage />} />
+            {/* 🆕 Página de Apresentação (Pública) */}
+            <Route path="/" element={<LandingPage />} />
 
-          {/* 🆕 Rotas Públicas (sem navbar) */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/registrar" element={<Register />} />
-          <Route path="/esqueci-senha" element={<ForgotPassword />} />
-          <Route path="/reset-senha/:token" element={<ResetPassword />} />
+            {/* 🆕 Rotas Públicas (sem navbar) */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/registrar" element={<Register />} />
+            <Route path="/esqueci-senha" element={<ForgotPassword />} />
+            <Route path="/reset-senha/:token" element={<ResetPassword />} />
 
-          {/* 🔐 Rotas Protegidas (com navbar) */}
-          <Route path="/dashboard" element={
-            <ProtectedLayout><Dashboard /></ProtectedLayout>
-          } />
-          <Route path="/agendamentos" element={
-            <ProtectedLayout><Agendamentos /></ProtectedLayout>
-          } />
-          <Route path="/clientes" element={
-            <ProtectedLayout><Clientes /></ProtectedLayout>
-          } />
-          <Route path="/pacotes" element={
-            <ProtectedLayout><Pacotes /></ProtectedLayout>
-          } />
-          <Route path="/criar-cliente" element={
-            <ProtectedLayout><CriarCliente /></ProtectedLayout>
-          } />
-          <Route path="/criar-agendamento" element={
-            <ProtectedLayout><CriarAgendamento /></ProtectedLayout>
-          } />
-          <Route path="/criar-pacote" element={
-            <ProtectedLayout><CriarPacote /></ProtectedLayout>
-          } />
-          <Route path="/clientes/editar/:id" element={
-            <ProtectedLayout><EditarCliente /></ProtectedLayout>
-          } />
-          <Route path="/pacotes/editar/:id" element={
-            <ProtectedLayout><EditarPacote /></ProtectedLayout>
-          } />
-          <Route path="/agendamentos/editar/:id" element={
-            <ProtectedLayout><EditarAgendamento /></ProtectedLayout>
-          } />
-          <Route path="/disponibilidade" element={
-            <ProtectedLayout><Disponibilidade /></ProtectedLayout>
-          } />
-        </Routes>
+            {/* 🔐 Rotas Protegidas (com navbar) */}
+            <Route path="/dashboard" element={
+              <ProtectedLayout><Dashboard /></ProtectedLayout>
+            } />
+            <Route path="/agendamentos" element={
+              <ProtectedLayout><Agendamentos /></ProtectedLayout>
+            } />
+            <Route path="/calendario" element={
+              <ProtectedLayout><CalendarView /></ProtectedLayout>
+            } />
+            <Route path="/clientes" element={
+              <ProtectedLayout><Clientes /></ProtectedLayout>
+            } />
+            <Route path="/pacotes" element={
+              <ProtectedLayout><Pacotes /></ProtectedLayout>
+            } />
+            <Route path="/financeiro" element={
+              <ProtectedLayout><Financeiro /></ProtectedLayout>
+            } />
+            <Route path="/criar-cliente" element={
+              <ProtectedLayout><CriarCliente /></ProtectedLayout>
+            } />
+            <Route path="/criar-agendamento" element={
+              <ProtectedLayout><CriarAgendamento /></ProtectedLayout>
+            } />
+            <Route path="/criar-pacote" element={
+              <ProtectedLayout><CriarPacote /></ProtectedLayout>
+            } />
+            <Route path="/clientes/editar/:id" element={
+              <ProtectedLayout><EditarCliente /></ProtectedLayout>
+            } />
+            <Route path="/pacotes/editar/:id" element={
+              <ProtectedLayout><EditarPacote /></ProtectedLayout>
+            } />
+            <Route path="/agendamentos/editar/:id" element={
+              <ProtectedLayout><EditarAgendamento /></ProtectedLayout>
+            } />
+            <Route path="/disponibilidade" element={
+              <ProtectedLayout><Disponibilidade /></ProtectedLayout>
+            } />
+          </Routes>
 
-          <ToastContainer />
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            limit={3}
+          />
           <InstallPrompt />
         </Router>
       </AuthProvider>
