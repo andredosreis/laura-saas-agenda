@@ -95,11 +95,35 @@ export const createAgendamento = async (req, res) => {
   }
 };
 
-// @desc    Listar todos os agendamentos
+// @desc    Listar todos os agendamentos (com filtros opcionais)
 export const getAllAgendamentos = async (req, res) => {
   try {
-    // 🆕 Listar apenas do tenant
-    const agendamentos = await Agendamento.find({ tenantId: req.tenantId }).populate("cliente pacote");
+    const { dataInicio, dataFim, status } = req.query;
+
+    // Base query - sempre filtrar por tenant
+    const query = { tenantId: req.tenantId };
+
+    // Filtro de data (para visão semanal, mensal, etc)
+    if (dataInicio && dataFim) {
+      query.dataHora = {
+        $gte: new Date(dataInicio),
+        $lte: new Date(dataFim)
+      };
+    } else if (dataInicio) {
+      query.dataHora = { $gte: new Date(dataInicio) };
+    } else if (dataFim) {
+      query.dataHora = { $lte: new Date(dataFim) };
+    }
+
+    // Filtro de status
+    if (status) {
+      query.status = status;
+    }
+
+    const agendamentos = await Agendamento.find(query)
+      .populate("cliente pacote")
+      .sort({ dataHora: 1 }); // Ordenar por data/hora crescente
+
     res.status(200).json(agendamentos);
   } catch (error) {
     res.status(500).json({ message: "Erro ao buscar agendamentos.", details: error.message });

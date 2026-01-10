@@ -8,7 +8,7 @@ dotenv.config();
 const addIndexes = async () => {
   try {
     console.log('🔌 Conectando ao MongoDB...');
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Conectado ao MongoDB');
 
     console.log('\n📊 Criando índices de analytics...');
