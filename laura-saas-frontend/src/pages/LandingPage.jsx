@@ -184,8 +184,14 @@ const LandingPage = () => {
                                 Começar Grátis
                             </Link>
                         </div>
-                        {/* Mobile menu button */}
-                        <div className="md:hidden">
+                        {/* Mobile menu buttons */}
+                        <div className="md:hidden flex items-center gap-3">
+                            <Link
+                                to="/login"
+                                className="text-slate-300 hover:text-white transition-colors font-medium text-sm"
+                            >
+                                Entrar
+                            </Link>
                             <Link
                                 to="/registrar"
                                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 font-medium text-sm"
