@@ -258,9 +258,8 @@ function CalendarView() {
     // Update appointment status
     const handleUpdateStatus = async (appointmentId, newStatus) => {
         try {
-            const appointment = agendamentos.find(a => a._id === appointmentId);
+            // ✅ Enviar apenas o campo status em vez do objeto completo
             await api.put(`/agendamentos/${appointmentId}`, {
-                ...appointment,
                 status: newStatus
             });
             toast.success(`Status atualizado para "${newStatus}"`);
@@ -268,7 +267,15 @@ function CalendarView() {
             setDetailModalOpen(false);
         } catch (error) {
             console.error('Erro ao atualizar status:', error);
-            toast.error('Erro ao atualizar status');
+            const errorMessage = error.response?.data?.message || 'Erro ao atualizar status';
+            const errorDetails = error.response?.data?.details;
+
+            if (errorDetails) {
+                console.error('Detalhes do erro:', errorDetails);
+                toast.error(`${errorMessage}: ${errorDetails.join(', ')}`);
+            } else {
+                toast.error(errorMessage);
+            }
         }
     };
 

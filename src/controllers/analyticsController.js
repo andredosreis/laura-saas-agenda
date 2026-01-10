@@ -2,6 +2,7 @@ import Cliente from '../models/Cliente.js';
 import Agendamento from '../models/Agendamento.js';
 import Pacote from '../models/Pacote.js';
 import { DateTime } from 'luxon';
+import mongoose from 'mongoose';
 
 /**
  * @desc    Busca clientes com um número baixo de sessões restantes num pacote.
@@ -37,7 +38,8 @@ export const getAlertaSessoesBaixas = async (req, res) => {
  */
 export const getReceitaTemporal = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    // Converter tenantId para ObjectId para agregação
+    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
     const { periodo = 'dia', dias = 30 } = req.query;
 
     // Calcular data de início
@@ -172,7 +174,8 @@ export const getReceitaTemporal = async (req, res) => {
  */
 export const getDistribuicaoServicos = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    // Converter tenantId para ObjectId para agregação
+    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
     const { dataInicio, dataFim } = req.query;
 
     // Datas padrão: último mês
@@ -279,7 +282,8 @@ export const getDistribuicaoServicos = async (req, res) => {
  */
 export const getTopClientes = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    // Converter tenantId para ObjectId para agregação
+    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
     const { limite = 10, dataInicio, dataFim } = req.query;
 
     // Datas padrão: último mês

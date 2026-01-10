@@ -12,7 +12,10 @@ import {
   LogOut,
   Menu,
   X,
-  Sparkles
+  Sparkles,
+  DollarSign,
+  ShoppingBag,
+  Receipt
 } from 'lucide-react';
 
 function Navbar() {
@@ -31,8 +34,11 @@ function Navbar() {
     { to: "/agendamentos", text: "Agendamentos", icon: Calendar },
     { to: "/calendario", text: "Calendário", icon: CalendarCheck },
     { to: "/pacotes", text: "Pacotes", icon: Package },
-    { to: "/financeiro", text: "Financeiro", icon: TrendingUp },
-    { to: "/disponibilidade", text: "Minha Disponibilidade", icon: Clock },
+    { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
+    { to: "/caixa", text: "Caixa", icon: DollarSign },
+    { to: "/transacoes", text: "Transações", icon: Receipt },
+    { to: "/financeiro", text: "Relatórios", icon: TrendingUp },
+    { to: "/disponibilidade", text: "Horários", icon: Clock },
   ];
 
   const closeMobileMenu = () => setMobileMenuOpen(false);

@@ -56,6 +56,72 @@ const agendamentoSchema = new mongoose.Schema({
       enum: ['cliente', 'laura'],
       default: null
     }
+  },
+
+  // 💰 FASE 3: Controle Financeiro
+  valorCobrado: {
+    type: Number,
+    default: null,
+    min: [0, 'O valor não pode ser negativo']
+  },
+
+  // Se for de um pacote comprado
+  compraPacote: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CompraPacote',
+    default: null
+  },
+  numeroDaSessao: {
+    type: Number,
+    default: null,
+    min: [1, 'Número da sessão deve ser pelo menos 1']
+  },
+
+  // Controle financeiro
+  transacao: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Transacao',
+    default: null
+  },
+  statusPagamento: {
+    type: String,
+    enum: ['Pendente', 'Pago', 'Cancelado'],
+    default: 'Pendente'
+  },
+
+  // Profissional que realizou o serviço
+  profissional: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  // Comissão
+  comissao: {
+    profissional: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    percentual: {
+      type: Number,
+      min: [0, 'Percentual não pode ser negativo'],
+      max: [100, 'Percentual não pode ser maior que 100'],
+      default: 0
+    },
+    valor: {
+      type: Number,
+      min: [0, 'Valor não pode ser negativo'],
+      default: 0
+    },
+    pago: {
+      type: Boolean,
+      default: false
+    },
+    dataPagamento: {
+      type: Date,
+      default: null
+    }
   }
 }, {
   timestamps: true
@@ -69,6 +135,11 @@ agendamentoSchema.index({ status: 1 });
 agendamentoSchema.index({ tenantId: 1, status: 1, dataHora: 1 });
 agendamentoSchema.index({ tenantId: 1, dataHora: 1 });
 agendamentoSchema.index({ tenantId: 1, cliente: 1, status: 1 });
+
+// 💰 Phase 3: Financial indexes
+agendamentoSchema.index({ tenantId: 1, compraPacote: 1 });
+agendamentoSchema.index({ tenantId: 1, statusPagamento: 1 });
+agendamentoSchema.index({ tenantId: 1, profissional: 1, status: 1 });
 
 agendamentoSchema.pre('save', function (next) {
   if (this.isNew && this.dataHora < new Date()) {

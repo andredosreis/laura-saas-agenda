@@ -129,6 +129,41 @@ const UserSchema = new Schema({
     },
 
     // =============================================
+    // 💼 FASE 3: DADOS PROFISSIONAIS (para funcionários)
+    // =============================================
+    tipo: {
+        type: String,
+        enum: ['Admin', 'Profissional'],
+        default: 'Admin'
+    },
+
+    // Comissão padrão
+    comissaoPadrao: {
+        type: Number,
+        min: [0, 'Comissão não pode ser negativa'],
+        max: [100, 'Comissão não pode ser maior que 100%'],
+        default: 0
+    },
+
+    // Dados bancários (para pagamento de comissões)
+    dadosBancarios: {
+        titular: {
+            type: String,
+            trim: true
+        },
+        iban: {
+            type: String,
+            uppercase: true,
+            trim: true,
+            match: [/^PT50[0-9]{21}$/, 'IBAN português inválido']
+        },
+        banco: {
+            type: String,
+            trim: true
+        }
+    },
+
+    // =============================================
     // SEGURANÇA
     // =============================================
     refreshTokens: [{

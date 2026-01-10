@@ -150,11 +150,13 @@ export const getAgendamento = async (req, res) => {
 // @desc    Atualizar agendamento completo
 export const updateAgendamento = async (req, res) => {
   try {
-    const agendamento = await Agendamento.findByIdAndUpdate(
-      req.params.id,
+    // 🆕 Update seguro com tenantId
+    const agendamento = await Agendamento.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
       req.body,
       { new: true, runValidators: true }
-    );
+    ).populate("cliente pacote");
+
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }

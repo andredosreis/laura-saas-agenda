@@ -4,6 +4,7 @@
 - **Email:** `laura@laesteticaavancada.pt`
 - **Senha:** `Laura@2024!`
 
+
 ## Status Atual (Fase 1D Completa - 100%)
 O sistema está pronto para testes de QA, com validação em tempo real implementada em todos os formulários.
 

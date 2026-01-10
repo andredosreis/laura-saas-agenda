@@ -36,6 +36,12 @@ import Disponibilidade from './pages/Disponibilidade';
 import CalendarView from './pages/CalendarView';
 import Financeiro from './pages/Financeiro';
 
+// 💰 FASE 3: Páginas do Sistema Financeiro
+import Transacoes from './pages/Transacoes';
+import PacotesAtivos from './pages/PacotesAtivos';
+import VenderPacote from './pages/VenderPacote';
+import Caixa from './pages/Caixa';
+
 // Services
 import { registerServiceWorker, checkForUpdates } from './services/serviceWorkerService';
 
@@ -150,6 +156,20 @@ const App = () => {
             } />
             <Route path="/disponibilidade" element={
               <ProtectedLayout><Disponibilidade /></ProtectedLayout>
+            } />
+
+            {/* 💰 FASE 3: Rotas do Sistema Financeiro */}
+            <Route path="/transacoes" element={
+              <ProtectedLayout><Transacoes /></ProtectedLayout>
+            } />
+            <Route path="/pacotes-ativos" element={
+              <ProtectedLayout><PacotesAtivos /></ProtectedLayout>
+            } />
+            <Route path="/vender-pacote" element={
+              <ProtectedLayout><VenderPacote /></ProtectedLayout>
+            } />
+            <Route path="/caixa" element={
+              <ProtectedLayout><Caixa /></ProtectedLayout>
             } />
           </Routes>
 

@@ -93,9 +93,10 @@ export const clienteSchema = z.object({
     ),
   dataNascimento: z
     .string()
-    .min(1, 'Data de nascimento é obrigatória')
+    .optional()
     .refine(
       (val) => {
+        if (!val) return true; // Opcional
         const birthDate = new Date(val);
         const today = new Date();
         const age = today.getFullYear() - birthDate.getFullYear();
@@ -104,17 +105,10 @@ export const clienteSchema = z.object({
           monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())
             ? age - 1
             : age;
-        return actualAge >= 16;
+        return actualAge >= 0;
       },
-      { message: 'Cliente deve ter pelo menos 16 anos' }
+      { message: 'Data de nascimento inválida' }
     ),
-  pacote: z.string().min(1, 'Pacote é obrigatório'),
-  sessoesRestantes: z
-    .union([z.string(), z.number()])
-    .transform((val) => (typeof val === 'string' ? parseInt(val, 10) : val))
-    .refine((val) => !isNaN(val) && val >= 0, {
-      message: 'Sessões restantes deve ser um número maior ou igual a 0',
-    }),
   observacoes: z.string().max(500, 'Observações devem ter no máximo 500 caracteres').optional(),
 });
 

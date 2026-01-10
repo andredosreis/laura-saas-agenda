@@ -24,6 +24,10 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import authRoutes from './routes/authRoutes.js'; // 🆕 Autenticação
 import financeiroRoutes from './routes/financeiroRoutes.js'; // Added from snippet
 import migrationRoutes from './routes/migrationRoutes.js'; // 🆕 Rota de Migração
+import transacaoRoutes from './routes/transacaoRoutes.js'; // 💰 FASE 3: Transações
+import compraPacoteRoutes from './routes/compraPacoteRoutes.js'; // 💰 FASE 3: Compra de Pacotes
+import pagamentoRoutes from './routes/pagamentoRoutes.js'; // 💰 FASE 3: Pagamentos
+import caixaRoutes from './routes/caixaRoutes.js'; // 💰 FASE 3: Controle de Caixa
 
 const app = express();
 
@@ -86,8 +90,24 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/financeiro', financeiroRoutes);
 app.use('/api/migration', migrationRoutes);
 
+// 💰 FASE 3: Rotas do Sistema Financeiro
+app.use('/api/transacoes', transacaoRoutes);
+app.use('/api/compras-pacotes', compraPacoteRoutes);
+app.use('/api/pagamentos', pagamentoRoutes);
+app.use('/api/caixa', caixaRoutes);
+
 // Webhook Z-API para confirmações de agendamento
 app.use('/webhook', webhookRoutes);
+
+// Health check endpoint (para Vercel e monitoramento)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Rota de teste
 app.get('/', (req, res) => {

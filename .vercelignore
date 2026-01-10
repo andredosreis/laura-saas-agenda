@@ -1,0 +1,45 @@
+# Node modules
+node_modules
+laura-saas-frontend/node_modules
+
+# Environment files
+.env
+.env.local
+.env.*.local
+laura-saas-frontend/.env
+laura-saas-frontend/.env.local
+
+# Frontend build
+laura-saas-frontend/dist
+laura-saas-frontend/.vite
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Tests
+coverage
+.nyc_output
+
+# Documentation
+.claude
+docs
+*.md
+!README.md
+
+# Seeds and development
+seeds
