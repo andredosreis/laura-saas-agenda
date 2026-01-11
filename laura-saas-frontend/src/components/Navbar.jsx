@@ -33,19 +33,17 @@ function Navbar() {
     { to: "/clientes", text: "Clientes", icon: Users },
     { to: "/agendamentos", text: "Agendamentos", icon: Calendar },
     { to: "/calendario", text: "Calendário", icon: CalendarCheck },
-    { to: "/pacotes", text: "Pacotes", icon: Package },
+    { to: "/pacotes", text: "Serviços", icon: Package },
     { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
     { to: "/caixa", text: "Caixa", icon: DollarSign },
-    { to: "/transacoes", text: "Transações", icon: Receipt },
     { to: "/financeiro", text: "Relatórios", icon: TrendingUp },
-    { to: "/disponibilidade", text: "Horários", icon: Clock },
   ];
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   // Estilos de Link
   const getLinkClasses = ({ isActive }) => `
-    flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 font-medium
+    flex items-center gap-1.5 px-2.5 py-2 rounded-lg transition-all duration-300 font-medium text-sm
     ${isActive
       ? 'bg-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/10'
       : 'text-slate-400 hover:text-white hover:bg-white/5'}
@@ -71,7 +69,7 @@ function Navbar() {
           </NavLink>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               <NavLink
                 key={link.to}
@@ -85,16 +83,16 @@ function Navbar() {
             ))}
 
             {/* Divider */}
-            <div className="h-6 w-px bg-white/10 mx-2" />
+            <div className="h-6 w-px bg-white/10 mx-1" />
 
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all duration-300 border border-red-500/30"
               title="Sair do sistema"
             >
-              <LogOut className="w-5 h-5" />
-              <span className="hidden lg:inline">Sair</span>
+              <LogOut className="w-4 h-4" />
+              <span>Sair</span>
             </button>
           </div>
 

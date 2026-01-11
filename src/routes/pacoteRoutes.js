@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticate, injectTenant } from '../middlewares/auth.js';
 import {
   createPacote,
   getAllPacotes,
@@ -9,6 +10,10 @@ import {
 import validateObjectId from '../middlewares/validateObjectId.js';
 
 const router = express.Router();
+
+// Proteger todas as rotas e injetar tenantId
+router.use(authenticate);
+router.use(injectTenant);
 
 // Rotas CRUD para Pacotes
 router.get('/', getAllPacotes);

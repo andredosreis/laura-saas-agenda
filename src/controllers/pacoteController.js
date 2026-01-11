@@ -23,7 +23,8 @@ export const createPacote = async (req, res) => {
 // @desc    Listar todos os pacotes
 export const getAllPacotes = async (req, res) => {
   try {
-    const pacotes = await Pacote.find();
+    const filter = req.tenantFilter || {};
+    const pacotes = await Pacote.find(filter);
     res.status(200).json(pacotes);
   } catch (error) {
     console.error('Erro ao buscar pacotes:', error.message);
@@ -34,7 +35,8 @@ export const getAllPacotes = async (req, res) => {
 // @desc    Buscar um pacote por ID
 export const getPacote = async (req, res) => {
   try {
-    const pacote = await Pacote.findById(req.params.id);
+    const filter = { _id: req.params.id, ...(req.tenantFilter || {}) };
+    const pacote = await Pacote.findOne(filter);
     if (!pacote) {
       return res.status(404).json({ message: 'Pacote não encontrado.' });
     }
@@ -51,8 +53,9 @@ export const getPacote = async (req, res) => {
 // @desc    Atualizar um pacote
 export const updatePacote = async (req, res) => {
   try {
-    const pacote = await Pacote.findByIdAndUpdate(
-      req.params.id,
+    const filter = { _id: req.params.id, ...(req.tenantFilter || {}) };
+    const pacote = await Pacote.findOneAndUpdate(
+      filter,
       req.body,
       { new: true, runValidators: true }
     );
@@ -77,7 +80,8 @@ export const updatePacote = async (req, res) => {
 // @desc    Deletar um pacote
 export const deletePacote = async (req, res) => {
   try {
-    const pacote = await Pacote.findByIdAndDelete(req.params.id);
+    const filter = { _id: req.params.id, ...(req.tenantFilter || {}) };
+    const pacote = await Pacote.findOneAndDelete(filter);
     if (!pacote) {
       return res.status(404).json({ message: 'Pacote não encontrado para deleção.' });
     }

@@ -16,7 +16,7 @@ const timeToMinutes = (timeString) => {
 // @desc    Criar novo agendamento
 export const createAgendamento = async (req, res) => {
   try {
-    const { cliente, dataHora, pacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
+    const { cliente, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
 
     // 1. Validar se a dataHora é um formato válido e não está no passado (já existe no middleware do modelo, mas reforçar aqui)
     const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "America/Sao_Paulo" }); // Usar fuso horário adequado
@@ -75,15 +75,26 @@ export const createAgendamento = async (req, res) => {
 
     // Se todas as validações passarem, criar o agendamento
     // 🆕 Injectar tenantId
+    console.log('[createAgendamento] Dados recebidos:', { cliente, dataHora, pacote, compraPacote, tenantId: req.tenantId });
+    
     const novoAgendamento = new Agendamento({
       cliente,
       dataHora,
       pacote,
+      compraPacote,
       servicoAvulsoNome,
       servicoAvulsoValor,
       tenantId: req.tenantId
     });
     await novoAgendamento.save();
+    
+    console.log('[createAgendamento] ✅ Agendamento criado:', {
+      _id: novoAgendamento._id,
+      cliente: novoAgendamento.cliente,
+      compraPacote: novoAgendamento.compraPacote,
+      status: novoAgendamento.status
+    });
+    
     res.status(201).json(novoAgendamento);
   } catch (error) {
     console.error("Erro ao criar agendamento:", error);
@@ -177,17 +188,58 @@ export const updateStatusAgendamento = async (req, res) => {
     if (!status) {
       return res.status(400).json({ message: "O campo status é obrigatório." });
     }
-    // 🆕 Update seguro com tenantId
+    
+    console.log(`[updateStatusAgendamento] Alterando status para: ${status}`);
+    
+    // Buscar agendamento atual com populate
+    const agendamentoAtual = await Agendamento.findOne(
+      { _id: req.params.id, tenantId: req.tenantId }
+    );
+    
+    if (!agendamentoAtual) {
+      return res.status(404).json({ message: "Agendamento não encontrado." });
+    }
+    
+    console.log(`[updateStatusAgendamento] Agendamento encontrado. compraPacote: ${agendamentoAtual.compraPacote}`);
+    
+    // Se está marcando como Realizado e tem compraPacote vinculada
+    if (status === 'Realizado' && agendamentoAtual.compraPacote) {
+      const CompraPacote = (await import('../models/CompraPacote.js')).default;
+      const compraPacote = await CompraPacote.findById(agendamentoAtual.compraPacote).populate('pacote');
+      
+      if (!compraPacote) {
+        console.error(`[updateStatusAgendamento] ⚠️ CompraPacote não encontrada: ${agendamentoAtual.compraPacote}`);
+        return res.status(404).json({ message: "Pacote comprado não encontrado." });
+      }
+      
+      console.log(`[updateStatusAgendamento] CompraPacote encontrada. Sessões restantes: ${compraPacote.sessoesRestantes}`);
+      
+      try {
+        // Usar sessão do pacote (decrementa automaticamente)
+        const valorCobrado = compraPacote.pacote?.valor || 0;
+        await compraPacote.usarSessao(agendamentoAtual._id, valorCobrado, req.user?._id);
+        console.log(`✅ Sessão decrementada do pacote ${compraPacote._id}. Restantes: ${compraPacote.sessoesRestantes}`);
+      } catch (error) {
+        console.error('⚠️ Erro ao decrementar sessão:', error.message);
+        return res.status(400).json({ 
+          message: "Erro ao decrementar sessão do pacote.", 
+          details: error.message 
+        });
+      }
+    } else if (status === 'Realizado' && !agendamentoAtual.compraPacote) {
+      console.warn(`[updateStatusAgendamento] ⚠️ Agendamento marcado como Realizado mas não tem compraPacote vinculada`);
+    }
+    
+    // Atualizar status do agendamento
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       { status },
       { new: true, runValidators: true }
-    );
-    if (!agendamento) {
-      return res.status(404).json({ message: "Agendamento não encontrado." });
-    }
+    ).populate('compraPacote cliente');
+    
     res.status(200).json(agendamento);
   } catch (error) {
+    console.error('[updateStatusAgendamento] Erro:', error);
     res.status(500).json({ message: "Erro ao atualizar status.", details: error.message });
   }
 };

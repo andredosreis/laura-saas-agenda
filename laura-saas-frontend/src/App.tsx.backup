@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useEffect } from 'react';
 
 // 🆕 Contextos
 import { AuthProvider } from './contexts/AuthContext';
@@ -41,6 +42,9 @@ import PacotesAtivos from './pages/PacotesAtivos';
 import VenderPacote from './pages/VenderPacote';
 import Caixa from './pages/Caixa';
 
+// Services
+import { registerServiceWorker, checkForUpdates } from './services/serviceWorkerService';
+
 // Componente para layout protegido (com Navbar)
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -52,6 +56,53 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
+    const setupServiceWorker = async () => {
+      console.log('[App] 🚀 Iniciando setup de Service Worker...');
+
+      try {
+        const registration = await registerServiceWorker();
+
+        if (registration) {
+          console.log('[App] ✅ SW registrado, configurando verificação de updates');
+
+          unsubscribe = checkForUpdates(
+            () => {
+              console.log('[App] 📦 Update disponível! Mostrando notificação...');
+              toast.info(
+                '🔄 Nova versão disponível! Recarregue a página para atualizar.',
+                {
+                  toastId: 'update-available', // Evita duplicatas
+                  position: 'top-right',
+                  autoClose: 10000, // 10 segundos
+                  closeButton: true,
+                  pauseOnHover: true,
+                  draggable: true,
+                }
+              );
+            },
+            60
+          );
+        } else {
+          console.error('[App] ❌ Falha ao registar SW');
+        }
+      } catch (error) {
+        console.error('[App] ❌ Erro no setup:', error);
+      }
+    };
+
+    setupServiceWorker();
+
+    return () => {
+      console.log('[App] 🛑 Desmontando App, limpando listeners');
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>

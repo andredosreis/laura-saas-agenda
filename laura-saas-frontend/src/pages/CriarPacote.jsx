@@ -6,9 +6,11 @@ import { CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { pacoteSchema } from '../schemas/validationSchemas';
+import { useTheme } from '../contexts/ThemeContext';
 
 function CriarPacote() {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // React Hook Form com Zod
@@ -45,11 +47,11 @@ function CriarPacote() {
       };
 
       await api.post('/pacotes', dadosParaEnviar);
-      toast.success('Pacote criado com sucesso!');
+      toast.success('Serviço criado com sucesso!');
       navigate('/pacotes');
     } catch (error) {
-      console.error('Erro ao criar pacote:', error.response?.data || error.message);
-      toast.error(error.response?.data?.message || 'Erro ao criar pacote. Tente novamente.');
+      console.error('Erro ao criar serviço:', error.response?.data || error.message);
+      toast.error(error.response?.data?.message || 'Erro ao criar serviço. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -64,7 +66,11 @@ function CriarPacote() {
 
   const getInputClasses = (fieldName) => {
     const state = getInputState(fieldName);
-    const baseClasses = 'mt-1 block w-full rounded-md p-3 shadow-sm focus:ring-amber-500 transition-all';
+    const baseClasses = `mt-1 block w-full rounded-md p-2 shadow-sm focus:ring-amber-500 transition-all ${
+      isDarkMode 
+        ? 'bg-gray-700 border-gray-600 text-gray-100' 
+        : 'bg-white border-gray-300 text-gray-900'
+    }`;
 
     switch (state) {
       case 'error':
@@ -72,7 +78,7 @@ function CriarPacote() {
       case 'success':
         return `${baseClasses} border-green-500 focus:border-green-500`;
       default:
-        return `${baseClasses} border-gray-300 focus:border-amber-500`;
+        return `${baseClasses} focus:border-amber-500`;
     }
   };
 
@@ -100,26 +106,35 @@ function CriarPacote() {
   };
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="max-w-2xl mx-auto">
-        <button
-          onClick={() => navigate('/pacotes')}
-          className="mb-6 inline-flex items-center gap-1 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Voltar para Pacotes
-        </button>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} py-8`}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={() => navigate('/pacotes')}
+            className={`mb-6 inline-flex items-center gap-2 px-4 py-2 border rounded-lg shadow-sm text-sm font-medium transition-colors ${
+              isDarkMode 
+                ? 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700' 
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <ArrowLeft size={18} />
+            Voltar para Serviços
+          </button>
 
-        <div className="bg-white text-black border border-gray-200 shadow-xl rounded-lg p-6 sm:p-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-8">
-            Criar Novo Pacote
-          </h1>
+          <div className={`shadow-xl rounded-lg p-6 ${
+            isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+          }`}>
+            <h1 className={`text-2xl font-bold text-center mb-6 ${
+              isDarkMode ? 'text-gray-100' : 'text-gray-800'
+            }`}>
+              Criar Novo Serviço
+            </h1>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Campo Nome */}
             <div>
-              <label htmlFor="nome" className="block text-sm font-medium text-gray-700">
-                Nome do Pacote <span className="text-red-500">*</span>
+              <label htmlFor="nome" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Nome do Serviço <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -136,7 +151,7 @@ function CriarPacote() {
 
             {/* Campo Categoria */}
             <div>
-              <label htmlFor="categoria" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="categoria" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Categoria <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -152,10 +167,10 @@ function CriarPacote() {
               <ErrorMessage fieldName="categoria" />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {/* Campo Sessões */}
               <div>
-                <label htmlFor="sessoes" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="sessoes" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Número de Sessões <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -173,7 +188,7 @@ function CriarPacote() {
 
               {/* Campo Valor */}
               <div>
-                <label htmlFor="valor" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="valor" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Valor (€) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -194,18 +209,18 @@ function CriarPacote() {
 
             {/* Campo Descrição */}
             <div>
-              <label htmlFor="descricao" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="descricao" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Descrição (Opcional)
               </label>
               <textarea
                 id="descricao"
                 {...register('descricao')}
                 rows="3"
-                placeholder="Descrição do pacote..."
+                placeholder="Descrição do serviço..."
                 className={getInputClasses('descricao')}
               />
               <ErrorMessage fieldName="descricao" />
-              <p className="mt-1 text-sm text-gray-500">
+              <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 {watchDescricao?.length || 0}/500 caracteres
               </p>
             </div>
@@ -218,8 +233,8 @@ function CriarPacote() {
                 {...register('ativo')}
                 className="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
               />
-              <label htmlFor="ativo" className="ml-2 block text-sm text-gray-900">
-                Pacote Ativo
+              <label htmlFor="ativo" className={`ml-2 block text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                Serviço Ativo
               </label>
             </div>
 
@@ -227,25 +242,12 @@ function CriarPacote() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-3 px-4 rounded-lg font-semibold text-black shadow-md transition-all flex items-center justify-center ${
-                isSubmitting
-                  ? 'bg-amber-400 cursor-not-allowed'
-                  : 'bg-amber-500 hover:bg-amber-600 hover:shadow-lg'
-              }`}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
             >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Criando...
-                </>
-              ) : (
-                'Criar Pacote'
-              )}
+              {isSubmitting ? 'A criar serviço...' : 'Criar Serviço'}
             </button>
           </form>
+          </div>
         </div>
       </div>
     </div>

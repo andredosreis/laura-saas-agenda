@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, Calendar, TrendingUp } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { clienteSchema, formatPhone } from '../schemas/validationSchemas';
@@ -12,6 +12,7 @@ function EditarCliente() {
   const navigate = useNavigate();
 
   const [pacotes, setPacotes] = useState([]);
+  const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -44,14 +45,21 @@ function EditarCliente() {
     async function fetchData() {
       setIsLoading(true);
       try {
-        // Buscar dados do cliente e pacotes em paralelo
-        const [clienteRes, pacotesRes] = await Promise.all([
+        // Buscar dados do cliente, pacotes disponíveis e pacotes do cliente em paralelo
+        const [clienteRes, pacotesRes, pacotesClienteRes] = await Promise.all([
           api.get(`/clientes/${id}`),
           api.get('/pacotes'),
+          api.get(`/compras-pacotes/cliente/${id}`)
         ]);
 
         const clienteData = clienteRes.data;
         setPacotes(pacotesRes.data);
+        
+        // Filtrar apenas pacotes ativos com sessões
+        const pacotesAtivos = (pacotesClienteRes.data || []).filter(
+          (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
+        );
+        setPacotesDoCliente(pacotesAtivos);
 
         // Popular formulário com dados existentes
         reset({
@@ -175,7 +183,70 @@ function EditarCliente() {
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-10 p-6 bg-white border border-gray-300 shadow-lg rounded-lg">
+    <div className="max-w-4xl mx-auto mt-10 p-6">
+      {/* Seção de Pacotes Ativos */}
+      {pacotesDoCliente.length > 0 && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg shadow">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-gray-800">
+              Pacotes Ativos ({pacotesDoCliente.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {pacotesDoCliente.map((cp) => (
+              <div
+                key={cp._id}
+                className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-gray-800">
+                    {cp.pacote?.nome || 'Pacote'}
+                  </h3>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                    {cp.status}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>
+                      <strong>{cp.sessoesRestantes}</strong> de{' '}
+                      {cp.sessoesContratadas} sessões restantes
+                    </span>
+                  </div>
+                  {cp.dataExpiracao && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        Validade:{' '}
+                        {new Date(cp.dataExpiracao).toLocaleDateString('pt-PT')}
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-gray-600">
+                    <strong>Valor:</strong> €{cp.valorTotal.toFixed(2)}
+                  </div>
+                </div>
+                {/* Barra de progresso */}
+                <div className="mt-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{
+                        width: `${(cp.sessoesRestantes / cp.sessoesContratadas) * 100}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Formulário de Edição */}
+      <div className="p-6 bg-white border border-gray-300 shadow-lg rounded-lg">
       <h1 className="text-2xl font-bold mb-6 text-center">Editar Cliente</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -214,7 +285,7 @@ function EditarCliente() {
               id="telefone"
               {...register('telefone')}
               onChange={handlePhoneChange}
-              placeholder="(99) 99999-9999"
+              placeholder="912 345 678"
               className={`${getInputClasses('telefone')} pr-10`}
             />
             <FieldFeedback fieldName="telefone" />
@@ -367,6 +438,7 @@ function EditarCliente() {
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }

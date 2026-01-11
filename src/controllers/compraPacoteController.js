@@ -183,17 +183,13 @@ export const pacotesDoCliente = async (req, res) => {
 
     const pacotes = await CompraPacote.find({
       tenantId: req.tenantId,
-      cliente: clienteId,
-      status: 'Ativo',
-      sessoesRestantes: { $gt: 0 }
+      cliente: clienteId
     })
       .populate('pacote')
       .sort('-dataCompra');
 
-    res.status(200).json({
-      pacotes,
-      quantidade: pacotes.length
-    });
+    // Retornar array diretamente para facilitar no frontend
+    res.status(200).json(pacotes);
 
   } catch (error) {
     console.error('Erro ao buscar pacotes do cliente:', error);

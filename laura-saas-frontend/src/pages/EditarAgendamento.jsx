@@ -224,16 +224,44 @@ function EditarAgendamento() {
   };
 
   const handleStatusChange = async (newStatus) => {
+    const oldStatus = formData.status;
+    
+    // Atualizar estado local primeiro
     setFormData(prev => ({
       ...prev,
       status: newStatus
     }));
     
-    // Se for uma ação rápida, podemos submeter o formulário automaticamente
+    // Se for uma ação rápida (Realizado, Cancelado), atualizar imediatamente via API
     if (newStatus === 'Realizado' || newStatus.includes('Cancelado')) {
       const shouldProceed = window.confirm(`Deseja realmente marcar este agendamento como "${newStatus}"?`);
       if (shouldProceed) {
-        await handleSubmit(null, true, newStatus);
+        try {
+          setIsSubmitting(true);
+          // Usar PATCH para atualizar apenas o status
+          await api.patch(`/agendamentos/${id}/status`, { status: newStatus });
+          toast.success(`Status alterado para "${newStatus}"! ${newStatus === 'Realizado' ? '✅ Sessão decrementada.' : ''}`);
+          
+          // Recarregar dados do agendamento
+          const agendamentoResponse = await api.get(`/agendamentos/${id}`);
+          setAgendamentoOriginal(agendamentoResponse.data);
+        } catch (error) {
+          console.error('Erro ao alterar status:', error);
+          toast.error(error.response?.data?.message || 'Erro ao alterar status.');
+          // Reverter para o status anterior em caso de erro
+          setFormData(prev => ({
+            ...prev,
+            status: oldStatus
+          }));
+        } finally {
+          setIsSubmitting(false);
+        }
+      } else {
+        // Se cancelou, reverter o status
+        setFormData(prev => ({
+          ...prev,
+          status: oldStatus
+        }));
       }
     }
   };

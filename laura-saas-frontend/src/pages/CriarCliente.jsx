@@ -171,7 +171,7 @@ function CriarCliente() {
                 type="text"
                 {...register('telefone')}
                 onChange={handlePhoneChange}
-                placeholder="(99) 99999-9999"
+                placeholder="912 345 678"
                 className={`${getInputClasses('telefone')} pr-12`}
               />
               <FieldFeedback fieldName="telefone" />

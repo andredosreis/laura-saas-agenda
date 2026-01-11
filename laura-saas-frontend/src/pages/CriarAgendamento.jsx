@@ -10,36 +10,22 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { getAvailableSlots } from '../services/scheduleService';
 
 // Schema de validação específico para agendamento
-const agendamentoFormSchema = z
-  .object({
-    cliente: z.string().min(1, 'Selecione um cliente'),
-    tipoServico: z.enum(['pacote', 'avulso'], {
-      required_error: 'Selecione o tipo de serviço',
-    }),
-    pacote: z.string().optional(),
-    dataHora: z
-      .string()
-      .min(1, 'Selecione data e hora')
-      .refine(
-        (val) => {
-          const selectedDate = new Date(val);
-          const now = new Date();
-          return selectedDate > now;
-        },
-        { message: 'A data e hora devem ser no futuro' }
-      ),
-    observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
-  })
-  .refine(
-    (data) => {
-      // Se for tipo pacote ou avulso, precisa ter pacote selecionado
-      return data.pacote && data.pacote.length > 0;
-    },
-    {
-      message: 'Selecione um pacote ou serviço',
-      path: ['pacote'],
-    }
-  );
+const agendamentoFormSchema = z.object({
+  cliente: z.string().min(1, 'Selecione um cliente'),
+  pacote: z.string().min(1, 'Selecione um pacote do cliente'),
+  dataHora: z
+    .string()
+    .min(1, 'Selecione data e hora')
+    .refine(
+      (val) => {
+        const selectedDate = new Date(val);
+        const now = new Date();
+        return selectedDate > now;
+      },
+      { message: 'A data e hora devem ser no futuro' }
+    ),
+  observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
+});
 
 function CriarAgendamento() {
   const navigate = useNavigate();
@@ -50,6 +36,7 @@ function CriarAgendamento() {
   const [clientes, setClientes] = useState([]);
   const [pacotes, setPacotes] = useState([]);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
+  const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
 
   const formatDateForInput = (date) => {
     return date.toISOString().slice(0, 16);
@@ -71,11 +58,9 @@ function CriarAgendamento() {
       pacote: '',
       dataHora: formatDateForInput(new Date()),
       observacoes: '',
-      tipoServico: 'pacote',
     },
   });
 
-  const watchTipoServico = watch('tipoServico');
   const watchObservacoes = watch('observacoes');
 
   // Buscar horários disponíveis
@@ -114,58 +99,70 @@ function CriarAgendamento() {
   async function handleClienteChange(clienteId) {
     if (!clienteId) {
       setClienteSelecionado(null);
+      setPacotesDoCliente([]);
       setValue('cliente', '', { shouldValidate: true });
       setValue('pacote', '', { shouldValidate: true });
-      setValue('tipoServico', 'pacote');
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await api.get(`/clientes/${clienteId}`);
-      const cliente = response.data;
-
+      
+      // Buscar cliente
+      const clienteResponse = await api.get(`/clientes/${clienteId}`);
+      const cliente = clienteResponse.data;
       setClienteSelecionado(cliente);
       setValue('cliente', clienteId, { shouldValidate: true });
 
-      if (cliente.pacote) {
-        const pacoteId = cliente.pacote._id || cliente.pacote;
-        setValue('pacote', pacoteId, { shouldValidate: true });
-        setValue('tipoServico', 'pacote');
-      } else {
+      // Buscar pacotes ativos do cliente (comprados em Vendas)
+      const pacotesResponse = await api.get(`/compras-pacotes/cliente/${clienteId}`);
+      // A API já retorna array direto
+      const pacotesAtivos = (pacotesResponse.data || []).filter(
+        (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
+      );
+      
+      setPacotesDoCliente(pacotesAtivos);
+
+      // Verificar se cliente tem pacotes ativos
+      if (pacotesAtivos.length === 0) {
+        toast.warning(
+          '⚠️ Este cliente não possui pacotes ativos. Vá em "Vendas" para vender um pacote antes de agendar.',
+          { autoClose: 5000 }
+        );
         setValue('pacote', '', { shouldValidate: true });
-        setValue('tipoServico', 'avulso');
+      } else if (pacotesAtivos.length === 1) {
+        // Auto-selecionar se houver apenas 1 pacote
+        setValue('pacote', pacotesAtivos[0]._id, { shouldValidate: true });
       }
     } catch (error) {
       toast.error('Erro ao carregar dados do cliente');
       console.error('Erro ao carregar cliente:', error);
+      setPacotesDoCliente([]);
     } finally {
       setIsLoading(false);
     }
   }
 
-  // Handler para tipo de serviço
-  const handleTipoServicoChange = (tipo) => {
-    if (tipo === 'pacote' && clienteSelecionado && !clienteSelecionado.pacote) {
-      toast.warning('Este cliente não possui pacote ativo. Selecione Serviço Avulso.');
-      return;
-    }
-
-    setValue('tipoServico', tipo);
-
-    if (tipo === 'pacote' && clienteSelecionado && clienteSelecionado.pacote) {
-      const pacoteId = clienteSelecionado.pacote._id || clienteSelecionado.pacote;
-      setValue('pacote', pacoteId, { shouldValidate: true });
-    } else {
-      setValue('pacote', '', { shouldValidate: true });
-    }
-  };
+  // Handler para tipo de serviço - REMOVIDO (só permitiremos pacotes comprados)
+  // const handleTipoServicoChange = (tipo) => {...}
 
   // Submit
   const onSubmit = async (data) => {
-    // Verificar sessões disponíveis se for pacote
-    if (data.tipoServico === 'pacote' && clienteSelecionado?.sessoesRestantes <= 0) {
-      toast.error('Cliente não possui sessões disponíveis no pacote');
+    // Verificar se cliente tem pacote ativo
+    if (pacotesDoCliente.length === 0) {
+      toast.error('Cliente não possui pacotes ativos. Venda um pacote antes de agendar.');
+      return;
+    }
+
+    // Buscar o pacote selecionado para verificar sessões
+    const compraPacote = pacotesDoCliente.find((cp) => cp._id === data.pacote);
+    if (!compraPacote) {
+      toast.error('Pacote selecionado não encontrado');
+      return;
+    }
+
+    if (compraPacote.sessoesRestantes <= 0) {
+      toast.error('Este pacote não possui sessões disponíveis');
       return;
     }
 
@@ -173,22 +170,14 @@ function CriarAgendamento() {
     try {
       const dadosParaEnviar = {
         cliente: data.cliente,
-        pacote: data.tipoServico === 'pacote' ? data.pacote : null,
+        compraPacote: data.pacote, // ID da CompraPacote
         dataHora: data.dataHora,
         observacoes: data.observacoes || '',
         status: 'Agendado',
       };
 
-      if (data.tipoServico === 'avulso') {
-        const pacoteSelecionado = pacotes.find((p) => p._id === data.pacote);
-        if (pacoteSelecionado) {
-          dadosParaEnviar.servicoAvulsoNome = pacoteSelecionado.nome;
-          dadosParaEnviar.servicoAvulsoValor = pacoteSelecionado.valor;
-        }
-      }
-
       await api.post('/agendamentos', dadosParaEnviar);
-      toast.success('Agendamento criado com sucesso!');
+      toast.success('✅ Agendamento criado com sucesso!');
       navigate('/agendamentos');
     } catch (error) {
       console.error('Erro ao criar agendamento:', error);
@@ -239,8 +228,6 @@ function CriarAgendamento() {
       </div>
     );
   }
-
-  const clienteTemPacote = clienteSelecionado && clienteSelecionado.pacote;
 
   return (
     <ErrorBoundary>
@@ -308,100 +295,88 @@ function CriarAgendamento() {
 
           {/* Seção 2: Detalhes do Serviço */}
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h2 className="text-lg font-medium text-gray-700 mb-3">Detalhes do Serviço</h2>
+            <h2 className="text-lg font-medium text-gray-700 mb-3">Pacote do Cliente</h2>
 
-            {/* Informações do pacote atual */}
-            {clienteTemPacote && (
-              <div className="p-3 bg-blue-50 rounded-lg mb-4 border border-blue-100">
-                <p className="text-sm text-blue-800 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Pacote atual: {clienteSelecionado.pacote.nome}
+            {/* Mostrar pacotes do cliente ou mensagem de aviso */}
+            {clienteSelecionado && pacotesDoCliente.length === 0 && (
+              <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-sm text-yellow-800 font-medium flex items-center gap-2">
+                  <XCircle className="w-5 h-5" />
+                  Cliente não possui pacotes ativos
                 </p>
-                <p className="text-sm text-blue-800">
-                  Sessões restantes: {clienteSelecionado.sessoesRestantes}
+                <p className="text-sm text-yellow-700 mt-2">
+                  Para agendar este cliente, primeiro vá em <strong>"Vendas"</strong> e venda um pacote para ele.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/vender-pacote')}
+                  className="mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                >
+                  Ir para Vendas
+                </button>
               </div>
             )}
 
-            {/* Tipo de Serviço */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Serviço <span className="text-red-500">*</span>
-              </label>
-              <div className="flex space-x-4">
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    id="tipoPacote"
-                    checked={watchTipoServico === 'pacote'}
-                    onChange={() => handleTipoServicoChange('pacote')}
-                    disabled={!clienteTemPacote || isSubmitting}
-                    className={`h-4 w-4 ${!clienteTemPacote ? 'opacity-50 cursor-not-allowed' : ''
-                      } text-amber-600 focus:ring-amber-500 border-gray-300`}
-                  />
-                  <label
-                    htmlFor="tipoPacote"
-                    className={`ml-2 text-sm ${!clienteTemPacote ? 'text-gray-400' : 'text-gray-700'
-                      }`}
+            {/* Lista de pacotes ativos do cliente */}
+            {pacotesDoCliente.length > 0 && (
+              <div className="space-y-3">
+                {pacotesDoCliente.map((compraPacote) => (
+                  <div
+                    key={compraPacote._id}
+                    className="p-3 bg-blue-50 rounded-lg border border-blue-100"
                   >
-                    Usar Pacote Contratado
-                    {!clienteTemPacote && (
-                      <span className="text-xs ml-1">(Cliente sem pacote)</span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm text-blue-900 font-semibold">
+                          {compraPacote.pacote?.nome || 'Pacote'}
+                        </p>
+                        <div className="mt-1 space-y-1 text-xs text-blue-700">
+                          <p>
+                            <CheckCircle2 className="w-3 h-3 inline mr-1" />
+                            Sessões: {compraPacote.sessoesUsadas}/{compraPacote.sessoesContratadas}
+                            <span className="font-medium ml-1">
+                              ({compraPacote.sessoesRestantes} restantes)
+                            </span>
+                          </p>
+                          {compraPacote.dataExpiracao && (
+                            <p>
+                              📅 Válido até:{' '}
+                              {new Date(compraPacote.dataExpiracao).toLocaleDateString('pt-PT')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Campo de seleção de pacote */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Selecionar Pacote <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    name="pacote"
+                    control={control}
+                    render={({ field }) => (
+                      <select
+                        {...field}
+                        disabled={isSubmitting || pacotesDoCliente.length === 0}
+                        className={getInputClasses('pacote')}
+                      >
+                        <option value="">Selecione o pacote para este agendamento</option>
+                        {pacotesDoCliente.map((cp) => (
+                          <option key={cp._id} value={cp._id}>
+                            {cp.pacote?.nome} - {cp.sessoesRestantes} sessões restantes
+                          </option>
+                        ))}
+                      </select>
                     )}
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    id="tipoAvulso"
-                    checked={watchTipoServico === 'avulso'}
-                    onChange={() => handleTipoServicoChange('avulso')}
-                    disabled={isSubmitting}
-                    className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300"
                   />
-                  <label htmlFor="tipoAvulso" className="ml-2 text-sm text-gray-700">
-                    Serviço Avulso
-                  </label>
+                  <ErrorMessage fieldName="pacote" />
                 </div>
               </div>
-            </div>
-
-            {/* Campo Pacote/Serviço */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {watchTipoServico === 'pacote' ? 'Pacote Contratado' : 'Serviço'}{' '}
-                <span className="text-red-500">*</span>
-              </label>
-
-              {watchTipoServico === 'pacote' && clienteTemPacote ? (
-                <div className="p-2 bg-gray-100 border border-gray-300 rounded text-gray-700 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  {clienteSelecionado.pacote.nome}
-                </div>
-              ) : (
-                <Controller
-                  name="pacote"
-                  control={control}
-                  render={({ field }) => (
-                    <select
-                      {...field}
-                      disabled={
-                        isSubmitting || (watchTipoServico === 'pacote' && clienteTemPacote)
-                      }
-                      className={getInputClasses('pacote')}
-                    >
-                      <option value="">Selecione um serviço</option>
-                      {pacotes.map((pacote) => (
-                        <option key={pacote._id} value={pacote._id}>
-                          {pacote.nome} - R$ {pacote.valor}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                />
-              )}
-              <ErrorMessage fieldName="pacote" />
-            </div>
+            )}
           </div>
 
           {/* Seção 3: Observações */}

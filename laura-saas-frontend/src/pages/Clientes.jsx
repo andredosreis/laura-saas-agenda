@@ -7,8 +7,11 @@ import ErrorBoundary from "../components/ErrorBoundary";
 // import { response } from "express";
 
 // Componente ClienteCard com verificações de segurança
-const ClienteCard = ({ cliente, onEdit, onDelete }) => {
+const ClienteCard = ({ cliente, pacotes = [], onEdit, onDelete }) => {
   if (!cliente) return null;
+  
+  const totalSessoes = pacotes.reduce((sum, cp) => sum + cp.sessoesRestantes, 0);
+  const primeiroPacote = pacotes[0];
 
   return (
     <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition duration-300">
@@ -17,10 +20,11 @@ const ClienteCard = ({ cliente, onEdit, onDelete }) => {
       </h2>
       <p className="text-gray-600">📞 {cliente.telefone || 'Não informado'}</p>
       <p className="text-gray-600">
-        💆 Pacote: {cliente.pacote?.nome || "Nenhum pacote"}
+        💆 Serviço: {primeiroPacote?.pacote?.nome || "Nenhum serviço"}
+        {pacotes.length > 1 && <span className="text-xs text-blue-600 ml-1">(+{pacotes.length - 1})</span>}
       </p>
       <p className="text-gray-600">
-        📅 Sessões restantes: {cliente.sessoesRestantes ?? "N/A"}
+        📅 Sessões restantes: {totalSessoes > 0 ? totalSessoes : "0"}
       </p>
 
       <div className="mt-4 flex gap-2">
@@ -43,6 +47,7 @@ const ClienteCard = ({ cliente, onEdit, onDelete }) => {
 
 function Clientes() {
   const [clientes, setClientes] = useState([]);
+  const [pacotesClientes, setPacotesClientes] = useState({}); // { clienteId: [pacotes] }
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -54,8 +59,31 @@ function Clientes() {
 
       console.log("DADOS RECEBIDOS PELA API:", response.data);
 
-      //const dados = response.data;
-       setClientes(Array.isArray(response.data) ? response.data : []);
+      const clientesData = Array.isArray(response.data) ? response.data : [];
+      setClientes(clientesData);
+      
+      // Buscar pacotes de cada cliente
+      if (clientesData.length > 0) {
+        const pacotesPromises = clientesData.map(async (cliente) => {
+          try {
+            const pacotesRes = await api.get(`/compras-pacotes/cliente/${cliente._id}`);
+            const pacotesAtivos = (pacotesRes.data || []).filter(
+              (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
+            );
+            return { clienteId: cliente._id, pacotes: pacotesAtivos };
+          } catch (error) {
+            console.error(`Erro ao buscar pacotes do cliente ${cliente._id}:`, error);
+            return { clienteId: cliente._id, pacotes: [] };
+          }
+        });
+        
+        const pacotesResults = await Promise.all(pacotesPromises);
+        const pacotesMap = {};
+        pacotesResults.forEach(({ clienteId, pacotes }) => {
+          pacotesMap[clienteId] = pacotes;
+        });
+        setPacotesClientes(pacotesMap);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +142,7 @@ function Clientes() {
               <ClienteCard
                 key={cliente._id}
                 cliente={cliente}
+                pacotes={pacotesClientes[cliente._id] || []}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // Para navegação
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { toast } from "react-toastify"; // Para feedback
+import { toast } from "react-toastify";
+import { useTheme } from '../contexts/ThemeContext';
 
-// Subcomponente para o Card de cada Pacote
-const PacoteCard = ({ pacote, onEdit, onDelete }) => {
+// Subcomponente para o Card de cada Serviço
+const PacoteCard = ({ pacote, onEdit, onDelete, isDarkMode }) => {
   // Função para formatar o valor como moeda
-  // Ajusta a localidade e moeda conforme a tua necessidade (ex: 'pt-PT', 'EUR' ou 'pt-BR', 'BRL')
   const formatCurrency = (value) => {
     if (typeof value !== 'number') {
       // Tenta converter para número se for string e parecer um número
@@ -20,20 +20,24 @@ const PacoteCard = ({ pacote, onEdit, onDelete }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 ease-in-out flex flex-col justify-between">
+    <div className={`rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 ease-in-out flex flex-col justify-between ${
+      isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
+    }`}>
       <div>
-        <h2 className="text-xl font-semibold text-amber-600 mb-2 truncate" title={pacote.nome}>{pacote.nome}</h2> {/* Dourado mais escuro para o título do card */}
-        <p className="text-gray-600 text-sm mb-1">
+        <h2 className="text-xl font-semibold text-amber-500 mb-2" title={pacote.nome}>
+          {pacote.nome}
+        </h2>
+        <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           <span className="font-medium">Categoria:</span> {pacote.categoria || "Não informada"}
         </p>
-        <p className="text-gray-600 text-sm mb-1">
+        <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           <span className="font-medium">Sessões:</span> {pacote.sessoes !== undefined ? pacote.sessoes : "N/A"}
         </p>
-        <p className="text-gray-800 text-lg font-bold mb-3">
+        <p className={`text-lg font-bold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
           {formatCurrency(pacote.valor)} {/* Assumindo que tens um campo 'valor' */}
         </p>
         {pacote.descricao && (
-          <p className="text-gray-500 text-xs mb-3 italic max-h-20 overflow-y-auto"> {/* Limita altura da descrição */}
+          <p className={`text-xs mb-3 italic max-h-20 overflow-y-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
             {pacote.descricao}
           </p>
         )}
@@ -60,6 +64,7 @@ function Pacotes() {
   const [pacotes, setPacotes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     async function fetchPacotes() {
@@ -68,8 +73,8 @@ function Pacotes() {
         const response = await api.get("/pacotes");
         setPacotes(response.data || []); // Garante que pacotes seja sempre um array
       } catch (error) {
-        console.error("Erro ao buscar pacotes:", error);
-        toast.error("Não foi possível carregar os pacotes. Tente novamente mais tarde.");
+        console.error("Erro ao buscar serviços:", error);
+        toast.error("Não foi possível carregar os serviços. Tente novamente mais tarde.");
       } finally {
         setIsLoading(false);
       }
@@ -87,65 +92,65 @@ function Pacotes() {
     navigate(`/pacotes/editar/${id}`);
   };
 
-  const handleDeletePacote = (id) => {
-    // Adicionar confirmação antes de deletar
-    if (window.confirm("Tem a certeza que deseja deletar este pacote? Esta ação não pode ser desfeita.")) {
-      // Lógica de deleção da API (vamos implementar depois)
-      // Exemplo:
-      // api.delete(`/pacotes/${id}`)
-      //   .then(() => {
-      //     toast.success("Pacote deletado com sucesso!");
-      //     setPacotes(prevPacotes => prevPacotes.filter(p => p._id !== id));
-      //   })
-      //   .catch(err => {
-      //     console.error("Erro ao deletar pacote:", err);
-      //     toast.error(err.response?.data?.message || "Erro ao deletar pacote.");
-      //   });
-      toast.warn(`Deleção do pacote com ID: ${id} (lógica da API a implementar).`);
+  const handleDeletePacote = async (id) => {
+    if (window.confirm("Tem a certeza que deseja deletar este serviço? Esta ação não pode ser desfeita.")) {
+      try {
+        await api.delete(`/pacotes/${id}`);
+        toast.success("Serviço deletado com sucesso!");
+        setPacotes(prevPacotes => prevPacotes.filter(p => p._id !== id));
+      } catch (err) {
+        console.error("Erro ao deletar serviço:", err);
+        toast.error(err.response?.data?.message || "Erro ao deletar serviço.");
+      }
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div> {/* Cor do spinner dourada */}
-        <p className="ml-3 mt-3 text-gray-700 text-lg">A carregar pacotes...</p>
+      <div className={`flex flex-col justify-center items-center h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+        <p className={`ml-3 mt-3 text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>A carregar serviços...</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-        <h1 className="text-3xl font-bold text-gray-800">Gestão de Pacotes</h1>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} py-8`}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+          <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Gestão de Serviços</h1>
         <button
           onClick={handleNavigateToCriarPacote}
           className="bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out"
         >
-          Novo Pacote
+          Novo Serviço
         </button>
       </div>
 
-      {pacotes.length === 0 && !isLoading ? ( // Só mostra se não estiver a carregar e a lista estiver vazia
-        <div className="text-center py-10 bg-white rounded-lg shadow-md">
+        {pacotes.length === 0 && !isLoading ? (
+          <div className={`text-center py-10 rounded-lg shadow-md ${
+            isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
+          }`}>
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
           </svg>
-          <h3 className="mt-2 text-xl font-medium text-gray-700">Nenhum pacote encontrado</h3>
-          <p className="mt-1 text-sm text-gray-500">Clica em "Novo Pacote" para começar a adicionar.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {pacotes.map((pacote) => (
-            <PacoteCard
-              key={pacote._id}
-              pacote={pacote}
-              onEdit={handleEditPacote}
-              onDelete={handleDeletePacote}
-            />
-          ))}
-        </div>
-      )}
+            <h3 className={`mt-2 text-xl font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nenhum serviço encontrado</h3>
+            <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Clica em "Novo Serviço" para começar a adicionar.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {pacotes.map((pacote) => (
+              <PacoteCard
+                key={pacote._id}
+                pacote={pacote}
+                onEdit={handleEditPacote}
+                onDelete={handleDeletePacote}
+                isDarkMode={isDarkMode}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

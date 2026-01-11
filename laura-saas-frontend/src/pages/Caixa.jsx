@@ -128,7 +128,7 @@ function Caixa() {
   const caixaAberto = statusCaixa?.status === 'Aberto';
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pt-24">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -139,27 +139,29 @@ function Caixa() {
         <div className="flex items-center gap-3">
           {caixaAberto ? (
             <>
-              <span className="flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg font-medium">
+              <span className="flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg font-medium border-2 border-green-300 dark:border-green-700">
                 <Unlock className="w-5 h-5" />
-                Caixa Aberto
+                <span className="font-bold">Caixa Aberto</span>
               </span>
               <button
                 onClick={() => setModalFechar(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+                className="flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-lg shadow-red-500/30 border-2 border-red-700"
               >
+                <Lock className="w-5 h-5" />
                 Fechar Caixa
               </button>
             </>
           ) : (
             <>
-              <span className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium">
+              <span className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium border-2 border-gray-400 dark:border-gray-600">
                 <Lock className="w-5 h-5" />
-                Caixa Fechado
+                <span className="font-bold">Caixa Fechado</span>
               </span>
               <button
                 onClick={() => setModalAbrir(true)}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium"
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30 border-2 border-indigo-700"
               >
+                <Unlock className="w-5 h-5" />
                 Abrir Caixa
               </button>
             </>

@@ -170,7 +170,7 @@ export const agendamentoSchema = z
 export const pacoteSchema = z.object({
   nome: z
     .string()
-    .min(1, 'Nome do pacote é obrigatório')
+    .min(1, 'Nome do serviço é obrigatório')
     .min(2, 'Nome deve ter no mínimo 2 caracteres'),
   categoria: z.string().min(1, 'Categoria é obrigatória'),
   descricao: z.string().max(500, 'Descrição deve ter no máximo 500 caracteres').optional(),
@@ -186,13 +186,6 @@ export const pacoteSchema = z.object({
     .refine((val) => !isNaN(val) && val > 0, {
       message: 'Valor deve ser maior que 0',
     }),
-  duracao: z
-    .union([z.string(), z.number()])
-    .transform((val) => (typeof val === 'string' ? parseInt(val, 10) : val))
-    .refine((val) => !isNaN(val) && val >= 15, {
-      message: 'Duração deve ser pelo menos 15 minutos',
-    })
-    .optional(),
   ativo: z.boolean().default(true),
 });
 
@@ -203,14 +196,12 @@ export const pacoteSchema = z.object({
 // Remove caracteres não numéricos do telefone para validação
 export const sanitizePhone = (phone) => phone.replace(/\D/g, '');
 
-// Formata telefone para exibição (XX) XXXXX-XXXX
+// Formata telefone para exibição portuguesa: 9XX XXX XXX (9 dígitos)
 export const formatPhone = (value) => {
   const digits = value.replace(/\D/g, '');
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 11)
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)}`;
 };
 
 // Valida força da senha e retorna feedback

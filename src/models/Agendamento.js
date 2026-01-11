@@ -18,6 +18,12 @@ const agendamentoSchema = new mongoose.Schema({
     ref: 'Pacote',
     required: false
   },
+  // Referência à compra do pacote (usado quando cliente comprou pacote)
+  compraPacote: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CompraPacote',
+    required: false
+  },
   dataHora: {
     type: Date,
     required: [true, "A data e hora são obrigatórias."]
