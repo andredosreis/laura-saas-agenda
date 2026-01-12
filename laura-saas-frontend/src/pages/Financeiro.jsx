@@ -42,6 +42,7 @@ function Financeiro() {
 
     // State
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [selectedPreset, setSelectedPreset] = useState(1); // Último Mês
     const [periodo, setPeriodo] = useState('dia');
 
@@ -53,7 +54,9 @@ function Financeiro() {
         totalReceita: 0,
         ticketMedio: 0,
         taxaComparecimento: 0,
-        crescimento: 0
+        crescimento: 0,
+        totalClientes: 0,
+        valorPendente: 0
     });
 
     // Calculate date range
@@ -67,6 +70,7 @@ function Financeiro() {
     // Fetch all data
     const fetchData = useCallback(async () => {
         setLoading(true);
+        setError(null);
         const { dataInicio, dataFim, dias } = getDateRange();
 
         try {
@@ -74,12 +78,14 @@ function Financeiro() {
                 receitaRes,
                 servicosRes,
                 clientesRes,
-                financeiroRes
+                financeiroRes,
+                todosClientesRes
             ] = await Promise.all([
                 api.get(`/analytics/receita-temporal?periodo=${periodo}&dias=${dias}`),
                 api.get(`/analytics/distribuicao-servicos?dataInicio=${dataInicio.toISODate()}&dataFim=${dataFim.toISODate()}`),
                 api.get(`/analytics/top-clientes?limite=10&dataInicio=${dataInicio.toISODate()}&dataFim=${dataFim.toISODate()}`),
-                api.get('/dashboard/financeiro')
+                api.get('/dashboard/financeiro'),
+                api.get('/clientes')
             ]);
 
             // Set chart data
@@ -90,16 +96,20 @@ function Financeiro() {
             // Calculate KPIs
             const totalReceita = servicosRes.data?.totalReceita || 0;
             const totalAgendamentos = (receitaRes.data?.dados || []).reduce((acc, d) => acc + d.agendamentos, 0);
+            const totalClientesAtivos = todosClientesRes.data?.length || 0;
 
             setKpis({
                 totalReceita,
                 ticketMedio: totalAgendamentos > 0 ? totalReceita / totalAgendamentos : 0,
                 taxaComparecimento: financeiroRes.data?.taxaComparecimento || 0,
-                crescimento: 0 // Would need previous period data
+                crescimento: 0, // Would need previous period data
+                totalClientes: totalClientesAtivos,
+                valorPendente: financeiroRes.data?.valorPendente || 0
             });
 
         } catch (error) {
             console.error('Erro ao carregar dados financeiros:', error);
+            setError(error.response?.data?.message || 'Erro ao carregar dados financeiros');
             toast.error('Erro ao carregar dados financeiros');
         } finally {
             setLoading(false);
@@ -159,7 +169,7 @@ function Financeiro() {
     };
 
     return (
-        <div className={`min-h-screen pt-20 pb-8 px-4 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+        <div className={`min-h-screen pt-24 pb-8 px-4 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
             <div className="max-w-7xl mx-auto">
 
                 {/* Header */}
@@ -228,6 +238,19 @@ function Financeiro() {
                     </div>
                 </div>
 
+                {/* Error Message */}
+                {error && !loading && (
+                    <div className={`rounded-2xl border p-6 text-center ${isDarkMode ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
+                        <p className="text-red-500 font-medium">{error}</p>
+                        <button
+                            onClick={fetchData}
+                            className="mt-4 px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        >
+                            Tentar Novamente
+                        </button>
+                    </div>
+                )}
+
                 {/* Loading Overlay */}
                 {loading && (
                     <div className="flex items-center justify-center py-12">
@@ -260,7 +283,7 @@ function Financeiro() {
                             />
                             <KPICard
                                 title="Total Clientes"
-                                value={topClientes.length}
+                                value={kpis.totalClientes}
                                 icon={Users}
                                 format="number"
                                 color="amber"

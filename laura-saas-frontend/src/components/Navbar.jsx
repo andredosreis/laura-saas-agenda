@@ -35,6 +35,7 @@ function Navbar() {
     { to: "/calendario", text: "Calendário", icon: CalendarCheck },
     { to: "/pacotes", text: "Serviços", icon: Package },
     { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
+    { to: "/transacoes", text: "Transações", icon: Receipt },
     { to: "/caixa", text: "Caixa", icon: DollarSign },
     { to: "/financeiro", text: "Relatórios", icon: TrendingUp },
   ];

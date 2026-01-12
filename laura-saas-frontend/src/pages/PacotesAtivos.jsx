@@ -15,7 +15,10 @@ import {
   History,
   CalendarPlus,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Edit,
+  Trash2,
+  MoreVertical
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
@@ -80,6 +83,21 @@ function PacotesAtivos() {
     setShowEstender(true);
   };
 
+  const handleDeletarPacote = async (pacote) => {
+    if (!window.confirm(`Tem certeza que deseja deletar o pacote de ${pacote.cliente?.nome}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/compras-pacotes/${pacote._id}`);
+      toast.success('Pacote deletado com sucesso!');
+      fetchComprasPacotes();
+    } catch (error) {
+      console.error('Erro ao deletar pacote:', error);
+      toast.error(error.response?.data?.message || 'Erro ao deletar pacote');
+    }
+  };
+
   const handleConfirmarExtensao = async () => {
     if (!pacoteSelecionado) return;
     
@@ -118,8 +136,16 @@ function PacotesAtivos() {
     ? 'bg-slate-700/50 border-white/10 text-white placeholder-slate-400'
     : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400';
 
+  // Calcular estatísticas
+  const stats = {
+    total: comprasPacotes.length,
+    valorTotal: comprasPacotes.reduce((sum, c) => sum + (c.valorTotal || 0), 0),
+    valorPago: comprasPacotes.reduce((sum, c) => sum + (c.valorPago || 0), 0),
+    sessoesTotais: comprasPacotes.reduce((sum, c) => sum + (c.sessoesRestantes || 0), 0)
+  };
+
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} pt-20 pb-8 px-4`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} pt-24 pb-8 px-4`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
@@ -147,6 +173,38 @@ function PacotesAtivos() {
             </button>
           </div>
         </div>
+
+        {/* Estatísticas */}
+        {!loading && filtroStatus === 'Ativo' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className={`${cardClass} rounded-2xl p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Package className={`w-4 h-4 ${subTextClass}`} />
+                <span className={`text-xs ${subTextClass}`}>Total Ativos</span>
+              </div>
+              <p className={`text-2xl font-bold ${textClass}`}>{stats.total}</p>
+            </div>
+            <div className={`${cardClass} rounded-2xl p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <span className={`text-xs ${subTextClass}`}>Sessões Restantes</span>
+              </div>
+              <p className="text-2xl font-bold text-emerald-500">{stats.sessoesTotais}</p>
+            </div>
+            <div className={`${cardClass} rounded-2xl p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs ${subTextClass}`}>💰 Total Vendido</span>
+              </div>
+              <p className={`text-2xl font-bold ${textClass}`}>€{stats.valorTotal.toFixed(2)}</p>
+            </div>
+            <div className={`${cardClass} rounded-2xl p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs ${subTextClass}`}>✅ Pago</span>
+              </div>
+              <p className="text-2xl font-bold text-emerald-500">€{stats.valorPago.toFixed(2)}</p>
+            </div>
+          </div>
+        )}
 
         {/* Alertas */}
         {(alertas.expirando.length > 0 || alertas.poucasSessoes.length > 0) && (
@@ -230,21 +288,32 @@ function PacotesAtivos() {
                 >
                   {/* Cliente e Pacote */}
                   <div className="flex items-start justify-between mb-4">
-                    <div>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <User className={`w-4 h-4 ${subTextClass}`} />
                         <span className={`font-medium ${textClass}`}>{compra.cliente?.nome}</span>
                       </div>
                       <p className={`text-sm ${subTextClass}`}>{compra.pacote?.nome}</p>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      compra.status === 'Ativo' ? 'bg-emerald-500/10 text-emerald-500' :
-                      compra.status === 'Concluído' ? 'bg-blue-500/10 text-blue-500' :
-                      compra.status === 'Expirado' ? 'bg-amber-500/10 text-amber-500' :
-                      'bg-red-500/10 text-red-500'
-                    }`}>
-                      {compra.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        compra.status === 'Ativo' ? 'bg-emerald-500/10 text-emerald-500' :
+                        compra.status === 'Concluído' ? 'bg-blue-500/10 text-blue-500' :
+                        compra.status === 'Expirado' ? 'bg-amber-500/10 text-amber-500' :
+                        'bg-red-500/10 text-red-500'
+                      }`}>
+                        {compra.status}
+                      </span>
+                      <button
+                        onClick={() => handleDeletarPacote(compra)}
+                        className={`p-1.5 rounded-lg ${
+                          isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'
+                        } text-red-500 transition-colors`}
+                        title="Deletar pacote"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Barra de Progresso */}
@@ -302,25 +371,36 @@ function PacotesAtivos() {
                   </div>
 
                   {/* Ações */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleVerHistorico(compra)}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl ${
-                        isDarkMode ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-gray-100 hover:bg-gray-200'
-                      } ${subTextClass} transition-colors text-sm`}
-                    >
-                      <History className="w-4 h-4" />
-                      Histórico
-                    </button>
-                    {compra.status === 'Ativo' && compra.dataExpiracao && (
+                  <div className="space-y-2">
+                    {compra.status === 'Ativo' && compra.sessoesRestantes > 0 && (
                       <button
-                        onClick={() => handleEstenderPrazo(compra)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 transition-colors text-sm"
+                        onClick={() => navigate('/criar-agendamento', { state: { clienteId: compra.cliente?._id } })}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all text-sm font-medium"
                       >
                         <CalendarPlus className="w-4 h-4" />
-                        Estender
+                        Agendar Sessão
                       </button>
                     )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleVerHistorico(compra)}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl ${
+                          isDarkMode ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-gray-100 hover:bg-gray-200'
+                        } ${subTextClass} transition-colors text-sm`}
+                      >
+                        <History className="w-4 h-4" />
+                        Histórico
+                      </button>
+                      {compra.status === 'Ativo' && compra.dataExpiracao && (
+                        <button
+                          onClick={() => handleEstenderPrazo(compra)}
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors text-sm"
+                        >
+                          <Clock className="w-4 h-4" />
+                          Estender
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

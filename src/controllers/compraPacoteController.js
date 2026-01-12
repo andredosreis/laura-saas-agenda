@@ -500,3 +500,40 @@ export const estatisticasPacotes = async (req, res) => {
     });
   }
 };
+
+// @desc    Deletar compra de pacote
+// @route   DELETE /api/compras-pacotes/:id
+// @access  Private
+export const deletarPacote = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Buscar compraPacote
+    const compraPacote = await CompraPacote.findOne({
+      _id: id,
+      tenantId: req.tenantId
+    });
+
+    if (!compraPacote) {
+      return res.status(404).json({ message: 'Pacote não encontrado' });
+    }
+
+    // Verificar se há sessões agendadas para este pacote
+    // (opcional - você pode decidir se quer permitir deletar com sessões ou não)
+    
+    // Deletar o pacote
+    await CompraPacote.deleteOne({ _id: id, tenantId: req.tenantId });
+
+    res.status(200).json({ 
+      message: 'Pacote deletado com sucesso',
+      deletedId: id
+    });
+
+  } catch (error) {
+    console.error('Erro ao deletar pacote:', error);
+    res.status(500).json({
+      message: 'Erro ao deletar pacote',
+      details: error.message
+    });
+  }
+};

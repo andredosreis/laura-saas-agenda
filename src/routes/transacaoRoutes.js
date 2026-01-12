@@ -6,6 +6,7 @@ import {
   buscarTransacao,
   atualizarTransacao,
   cancelarTransacao,
+  deletarTransacao,
   listarTransacoesPendentes,
   registrarPagamento,
   relatorioPorPeriodo,
@@ -27,7 +28,8 @@ router.get('/relatorio/periodo', relatorioPorPeriodo);
 router.get('/comissoes/pendentes', comissoesPendentes);
 router.get('/:id', validateObjectId, buscarTransacao);
 router.put('/:id', validateObjectId, atualizarTransacao);
-router.delete('/:id', validateObjectId, cancelarTransacao);
+router.delete('/:id', validateObjectId, deletarTransacao);
+router.put('/:id/cancelar', validateObjectId, cancelarTransacao);
 
 // Rotas de pagamento e comissão
 router.post('/:id/pagamento', validateObjectId, registrarPagamento);

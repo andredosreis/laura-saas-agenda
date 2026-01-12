@@ -258,7 +258,8 @@ export const atualizarTransacao = async (req, res) => {
       'observacoes',
       'valor',
       'desconto',
-      'categoria'
+      'categoria',
+      'formaPagamento'
     ];
 
     camposPermitidos.forEach(campo => {
@@ -679,6 +680,60 @@ export const pagarComissao = async (req, res) => {
     console.error('Erro ao pagar comissão:', error);
     res.status(500).json({
       message: 'Erro ao pagar comissão',
+      details: error.message
+    });
+  }
+};
+
+// @desc    Deletar transação permanentemente
+// @route   DELETE /api/transacoes/:id/deletar
+// @access  Private
+export const deletarTransacao = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const transacao = await Transacao.findOne({
+      _id: id,
+      tenantId: req.tenantId
+    });
+
+    if (!transacao) {
+      return res.status(404).json({
+        message: 'Transação não encontrada'
+      });
+    }
+
+    // Verificar se tem agendamento vinculado
+    if (transacao.agendamento) {
+      return res.status(400).json({
+        message: 'Não é possível deletar transação vinculada a um agendamento. Cancele o agendamento primeiro.'
+      });
+    }
+
+    // Verificar se tem pagamentos registrados
+    const pagamentos = await Pagamento.countDocuments({
+      transacao: id,
+      tenantId: req.tenantId
+    });
+
+    if (pagamentos > 0) {
+      return res.status(400).json({
+        message: 'Não é possível deletar transação com pagamentos registrados. Cancele a transação.'
+      });
+    }
+
+    // Deletar transação
+    await Transacao.deleteOne({ _id: id, tenantId: req.tenantId });
+
+    res.status(200).json({
+      message: 'Transação deletada com sucesso',
+      deletedId: id
+    });
+
+  } catch (error) {
+    console.error('Erro ao deletar transação:', error);
+    res.status(500).json({
+      message: 'Erro ao deletar transação',
       details: error.message
     });
   }

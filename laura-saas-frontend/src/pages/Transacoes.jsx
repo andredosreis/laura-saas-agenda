@@ -14,7 +14,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Eye
+  Eye,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
@@ -69,6 +71,18 @@ function Transacoes() {
     formaPagamento: 'Dinheiro'
   });
   const [salvandoDespesa, setSalvandoDespesa] = useState(false);
+  
+  // Modal de edição
+  const [showEditarTransacao, setShowEditarTransacao] = useState(false);
+  const [transacaoEditando, setTransacaoEditando] = useState(null);
+  const [dadosEdicao, setDadosEdicao] = useState({
+    categoria: '',
+    valor: '',
+    descricao: '',
+    observacoes: '',
+    formaPagamento: ''
+  });
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   // Buscar transações
   const fetchTransacoes = useCallback(async () => {
@@ -165,6 +179,63 @@ function Transacoes() {
     }
   };
 
+  const handleEditarTransacao = (transacao) => {
+    setTransacaoEditando(transacao);
+    setDadosEdicao({
+      categoria: transacao.categoria,
+      valor: transacao.valorFinal?.toString() || transacao.valor?.toString() || '',
+      descricao: transacao.descricao,
+      observacoes: transacao.observacoes || '',
+      formaPagamento: transacao.formaPagamento || 'Dinheiro'
+    });
+    setShowEditarTransacao(true);
+  };
+
+  const handleSalvarEdicao = async (e) => {
+    e.preventDefault();
+    
+    if (!dadosEdicao.valor || !dadosEdicao.descricao) {
+      toast.error('Preencha valor e descrição');
+      return;
+    }
+
+    setSalvandoEdicao(true);
+    try {
+      await api.put(`/transacoes/${transacaoEditando._id}`, {
+        categoria: dadosEdicao.categoria,
+        valor: parseFloat(dadosEdicao.valor),
+        descricao: dadosEdicao.descricao,
+        observacoes: dadosEdicao.observacoes,
+        formaPagamento: dadosEdicao.formaPagamento
+      });
+
+      toast.success('Transação atualizada com sucesso!');
+      setShowEditarTransacao(false);
+      setTransacaoEditando(null);
+      fetchTransacoes();
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+      toast.error(error.response?.data?.message || 'Erro ao atualizar transação');
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  };
+
+  const handleDeletarTransacao = async (transacao) => {
+    if (!window.confirm(`Tem certeza que deseja deletar esta ${transacao.tipo.toLowerCase()}?\n\nDescrição: ${transacao.descricao}\nValor: €${transacao.valorFinal?.toFixed(2)}\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/transacoes/${transacao._id}`);
+      toast.success('Transação deletada com sucesso!');
+      fetchTransacoes();
+    } catch (error) {
+      console.error('Erro ao deletar transação:', error);
+      toast.error(error.response?.data?.message || 'Erro ao deletar transação');
+    }
+  };
+
   const exportarCSV = () => {
     if (transacoes.length === 0) {
       toast.warning('Não há transações para exportar');
@@ -203,7 +274,7 @@ function Transacoes() {
     : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400';
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} pt-20 pb-8 px-4`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} pt-24 pb-8 px-4`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
@@ -417,14 +488,30 @@ function Transacoes() {
                             {transacao.statusPagamento}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleVerDetalhes(transacao)}
-                            className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
-                            title="Ver detalhes"
-                          >
-                            <Eye className={`w-4 h-4 ${subTextClass}`} />
-                          </button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleVerDetalhes(transacao)}
+                              className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
+                              title="Ver detalhes"
+                            >
+                              <Eye className={`w-4 h-4 ${subTextClass}`} />
+                            </button>
+                            <button
+                              onClick={() => handleEditarTransacao(transacao)}
+                              className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50'} transition-colors`}
+                              title="Editar transação"
+                            >
+                              <Edit className="w-4 h-4 text-indigo-500" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletarTransacao(transacao)}
+                              className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'} transition-colors`}
+                              title="Deletar transação"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -675,6 +762,126 @@ function Transacoes() {
             >
               Fechar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Transação */}
+      {showEditarTransacao && transacaoEditando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`${cardClass} rounded-2xl w-full max-w-md p-6`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${textClass}`}>✏️ Editar Transação</h2>
+              <button
+                onClick={() => { setShowEditarTransacao(false); setTransacaoEditando(null); }}
+                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+              >
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarEdicao} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Tipo</label>
+                <div className={`px-4 py-3 rounded-xl ${isDarkMode ? 'bg-slate-700/30' : 'bg-gray-100'} ${subTextClass}`}>
+                  {transacaoEditando.tipo}
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Categoria *</label>
+                <select
+                  value={dadosEdicao.categoria}
+                  onChange={(e) => setDadosEdicao(prev => ({ ...prev, categoria: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  required
+                >
+                  {transacaoEditando.tipo === 'Receita' ? (
+                    CATEGORIAS_RECEITA.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))
+                  ) : (
+                    CATEGORIAS_DESPESA.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Valor (€) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={dadosEdicao.valor}
+                  onChange={(e) => setDadosEdicao(prev => ({ ...prev, valor: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Descrição *</label>
+                <input
+                  type="text"
+                  value={dadosEdicao.descricao}
+                  onChange={(e) => setDadosEdicao(prev => ({ ...prev, descricao: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="Descrição da transação"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Forma de Pagamento</label>
+                <select
+                  value={dadosEdicao.formaPagamento}
+                  onChange={(e) => setDadosEdicao(prev => ({ ...prev, formaPagamento: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                >
+                  {FORMAS_PAGAMENTO.map(forma => (
+                    <option key={forma} value={forma}>{forma}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Observações</label>
+                <textarea
+                  value={dadosEdicao.observacoes}
+                  onChange={(e) => setDadosEdicao(prev => ({ ...prev, observacoes: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass} resize-none`}
+                  rows="2"
+                  placeholder="Observações adicionais..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditarTransacao(false); setTransacaoEditando(null); }}
+                  className={`flex-1 px-4 py-3 rounded-xl border ${cardClass} ${textClass} hover:opacity-80 transition-all`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvandoEdicao}
+                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {salvandoEdicao ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    'Salvar Alterações'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

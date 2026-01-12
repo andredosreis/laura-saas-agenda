@@ -11,7 +11,7 @@ import mongoose from 'mongoose';
  */
 export const getAlertaSessoesBaixas = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const tenantId = req.tenantId;
     const limiteSessoes = parseInt(req.query.limite, 10) || 1;
 
     const clientesComSessoesBaixas = await Cliente.find({
@@ -39,7 +39,7 @@ export const getAlertaSessoesBaixas = async (req, res) => {
 export const getReceitaTemporal = async (req, res) => {
   try {
     // Converter tenantId para ObjectId para agregação
-    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+    const tenantId = new mongoose.Types.ObjectId(req.tenantId);
     const { periodo = 'dia', dias = 30 } = req.query;
 
     // Calcular data de início
@@ -175,7 +175,7 @@ export const getReceitaTemporal = async (req, res) => {
 export const getDistribuicaoServicos = async (req, res) => {
   try {
     // Converter tenantId para ObjectId para agregação
-    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+    const tenantId = new mongoose.Types.ObjectId(req.tenantId);
     const { dataInicio, dataFim } = req.query;
 
     // Datas padrão: último mês
@@ -283,7 +283,7 @@ export const getDistribuicaoServicos = async (req, res) => {
 export const getTopClientes = async (req, res) => {
   try {
     // Converter tenantId para ObjectId para agregação
-    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+    const tenantId = new mongoose.Types.ObjectId(req.tenantId);
     const { limite = 10, dataInicio, dataFim } = req.query;
 
     // Datas padrão: último mês
