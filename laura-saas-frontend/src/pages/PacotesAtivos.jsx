@@ -150,8 +150,8 @@ function PacotesAtivos() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
-            <h1 className={`text-2xl font-bold ${textClass}`}>📦 Pacotes Ativos</h1>
-            <p className={subTextClass}>Gerencie os pacotes vendidos aos clientes</p>
+            <h1 className={`text-2xl font-bold ${textClass}`}>📦 Serviços Ativos</h1>
+            <p className={subTextClass}>Gerencie os serviços vendidos aos clientes</p>
           </div>
           <div className="flex gap-3 mt-4 md:mt-0">
             <select
@@ -169,7 +169,7 @@ function PacotesAtivos() {
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
             >
               <Plus className="w-4 h-4" />
-              Vender Pacote
+              Vender Serviço
             </button>
           </div>
         </div>
@@ -217,7 +217,7 @@ function PacotesAtivos() {
                   </div>
                   <div>
                     <h3 className={`font-medium ${textClass}`}>
-                      {alertas.expirando.length} pacote(s) expirando em 7 dias
+                      {alertas.expirando.length} serviço(s) expirando em 7 dias
                     </h3>
                     <p className={`text-sm ${subTextClass} mt-1`}>
                       {alertas.expirando.slice(0, 3).map(p => p.cliente?.nome).join(', ')}
@@ -236,7 +236,7 @@ function PacotesAtivos() {
                   </div>
                   <div>
                     <h3 className={`font-medium ${textClass}`}>
-                      {alertas.poucasSessoes.length} pacote(s) com poucas sessões
+                      {alertas.poucasSessoes.length} serviço(s) com poucas sessões
                     </h3>
                     <p className={`text-sm ${subTextClass} mt-1`}>
                       {alertas.poucasSessoes.slice(0, 3).map(p => `${p.cliente?.nome} (${p.sessoesRestantes})`).join(', ')}
@@ -257,11 +257,11 @@ function PacotesAtivos() {
         ) : comprasPacotes.length === 0 ? (
           <div className={`${cardClass} rounded-2xl p-12 text-center`}>
             <Package className={`w-12 h-12 mx-auto mb-4 ${subTextClass}`} />
-            <p className={textClass}>Nenhum pacote encontrado</p>
+            <p className={textClass}>Nenhum serviço encontrado</p>
             <p className={`text-sm ${subTextClass}`}>
               {filtroStatus === 'Ativo' 
-                ? 'Venda um novo pacote para começar' 
-                : `Nenhum pacote com status "${filtroStatus}"`
+                ? 'Venda um novo serviço para começar' 
+                : `Nenhum serviço com status "${filtroStatus}"`
               }
             </p>
             <button
@@ -309,7 +309,7 @@ function PacotesAtivos() {
                         className={`p-1.5 rounded-lg ${
                           isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'
                         } text-red-500 transition-colors`}
-                        title="Deletar pacote"
+                        title="Deletar serviço"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -146,7 +146,7 @@ export const agendamentoSchema = z
       return true;
     },
     {
-      message: 'Pacote é obrigatório quando o tipo de serviço é pacote',
+      message: 'Serviço é obrigatório quando o tipo de serviço é serviço',
       path: ['pacote'],
     }
   )

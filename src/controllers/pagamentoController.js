@@ -1,6 +1,7 @@
 import Pagamento from '../models/Pagamento.js';
 import Transacao from '../models/Transacao.js';
 import CompraPacote from '../models/CompraPacote.js';
+import mongoose from 'mongoose';
 
 // @desc    Listar pagamentos
 // @route   GET /api/pagamentos
@@ -389,6 +390,11 @@ export const resumoMensal = async (req, res) => {
     const inicioMes = new Date(anoConsulta, mesConsulta - 1, 1);
     const fimMes = new Date(anoConsulta, mesConsulta, 0, 23, 59, 59, 999);
 
+    // Converter tenantId para ObjectId para aggregate
+    const tenantIdObj = mongoose.Types.ObjectId.isValid(req.tenantId)
+      ? new mongoose.Types.ObjectId(req.tenantId)
+      : req.tenantId;
+
     const pagamentos = await Pagamento.find({
       tenantId: req.tenantId,
       dataPagamento: {
@@ -418,7 +424,7 @@ export const resumoMensal = async (req, res) => {
     const pagamentosPorDia = await Pagamento.aggregate([
       {
         $match: {
-          tenantId: req.tenantId,
+          tenantId: tenantIdObj,
           dataPagamento: {
             $gte: inicioMes,
             $lte: fimMes

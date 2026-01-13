@@ -205,6 +205,7 @@ export const updateStatusAgendamento = async (req, res) => {
     // Se está marcando como Realizado e tem compraPacote vinculada
     if (status === 'Realizado' && agendamentoAtual.compraPacote) {
       const CompraPacote = (await import('../models/CompraPacote.js')).default;
+      const Transacao = (await import('../models/Transacao.js')).default;
       const compraPacote = await CompraPacote.findById(agendamentoAtual.compraPacote).populate('pacote');
       
       if (!compraPacote) {
@@ -216,18 +217,39 @@ export const updateStatusAgendamento = async (req, res) => {
       
       try {
         // Usar sessão do pacote (decrementa automaticamente)
-        const valorCobrado = compraPacote.pacote?.valor || 0;
-        await compraPacote.usarSessao(agendamentoAtual._id, valorCobrado, req.user?._id);
-        console.log(`✅ Sessão decrementada do pacote ${compraPacote._id}. Restantes: ${compraPacote.sessoesRestantes}`);
+        const valorPorSessao = compraPacote.pacote?.valor && compraPacote.pacote?.sessoes
+          ? compraPacote.pacote.valor / compraPacote.pacote.sessoes
+          : 0;
+        await compraPacote.usarSessao(agendamentoAtual._id, valorPorSessao, req.user?._id);
+        console.log(`✅ Sessão decrementada do pacote ${compraPacote._id}. Restantes: ${compraPacote.sessoesRestantes - 1}`);
+
+        // 💰 IMPORTANTE: NÃO criar transação aqui!
+        // A transação de receita já foi criada na VENDA do pacote (compraPacoteController.venderPacote)
+        // Aqui apenas registramos o USO da sessão no histórico do pacote
+
+        // Atualizar status de pagamento do agendamento (já pago na compra do pacote)
+        agendamentoAtual.statusPagamento = 'Pago';
+        await agendamentoAtual.save();
+
+        console.log(`✅ Sessão registrada sem criar transação (receita já contabilizada na venda do pacote)`);
+
       } catch (error) {
         console.error('⚠️ Erro ao decrementar sessão:', error.message);
-        return res.status(400).json({ 
-          message: "Erro ao decrementar sessão do pacote.", 
-          details: error.message 
+        return res.status(400).json({
+          message: "Erro ao decrementar sessão do pacote.",
+          details: error.message
         });
       }
+    } else if (status === 'Realizado' && !agendamentoAtual.compraPacote && agendamentoAtual.servicoAvulsoValor) {
+      // 🆕 Serviço avulso - NÃO criar transação automaticamente
+      // A transação deve ser criada pelo frontend com a forma de pagamento correta
+      console.log(`[updateStatusAgendamento] ⏳ Serviço avulso realizado. Aguardando registro de pagamento pelo frontend.`);
+
+      // Marcar status de pagamento como Pendente
+      agendamentoAtual.statusPagamento = 'Pendente';
+      await agendamentoAtual.save();
     } else if (status === 'Realizado' && !agendamentoAtual.compraPacote) {
-      console.warn(`[updateStatusAgendamento] ⚠️ Agendamento marcado como Realizado mas não tem compraPacote vinculada`);
+      console.warn(`[updateStatusAgendamento] ⚠️ Agendamento marcado como Realizado mas não tem compraPacote vinculada nem valor avulso`);
     }
     
     // Atualizar status do agendamento
@@ -348,6 +370,127 @@ export const confirmarAgendamento = async (req, res) => {
   }
 };
 
+
+// @desc    Registrar pagamento de serviço avulso (NOVO)
+// @route   POST /api/agendamentos/:id/pagamento
+// @access  Private
+export const registrarPagamentoServico = async (req, res) => {
+  try {
+    const {
+      valor,
+      formaPagamento,
+      dadosMBWay,
+      dadosMultibanco,
+      dadosCartao,
+      dadosTransferencia,
+      observacoes
+    } = req.body;
+
+    // Validações
+    if (!valor || valor <= 0) {
+      return res.status(400).json({
+        message: 'Valor do pagamento deve ser maior que zero'
+      });
+    }
+
+    if (!formaPagamento) {
+      return res.status(400).json({
+        message: 'Forma de pagamento é obrigatória'
+      });
+    }
+
+    // Buscar agendamento
+    const agendamento = await Agendamento.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+
+    if (!agendamento) {
+      return res.status(404).json({ message: "Agendamento não encontrado." });
+    }
+
+    // Verificar se é serviço avulso
+    if (agendamento.compraPacote) {
+      return res.status(400).json({
+        message: 'Este agendamento é de um pacote. Pagamento já foi registrado na compra do pacote.'
+      });
+    }
+
+    if (!agendamento.servicoAvulsoValor) {
+      return res.status(400).json({
+        message: 'Este agendamento não possui valor de serviço avulso definido.'
+      });
+    }
+
+    // Importar modelos dinamicamente
+    const Transacao = (await import('../models/Transacao.js')).default;
+    const Pagamento = (await import('../models/Pagamento.js')).default;
+
+    // Criar transação
+    const transacao = await Transacao.create({
+      tenantId: req.tenantId,
+      tipo: 'Receita',
+      categoria: 'Serviço Avulso',
+      agendamento: agendamento._id,
+      cliente: agendamento.cliente,
+      profissional: req.user?._id,
+      valor: agendamento.servicoAvulsoValor,
+      desconto: 0,
+      valorFinal: valor, // Usar valor recebido (pode ser diferente se houver desconto)
+      statusPagamento: valor >= agendamento.servicoAvulsoValor ? 'Pago' : 'Parcial',
+      formaPagamento: null, // Será preenchido após criar pagamento
+      dataPagamento: new Date(),
+      descricao: agendamento.servicoAvulsoNome || 'Serviço avulso',
+      observacoes: observacoes || `Serviço realizado em ${new Date(agendamento.dataHora).toLocaleDateString('pt-PT')}`
+    });
+
+    // Criar registro de pagamento
+    const pagamento = await Pagamento.create({
+      tenantId: req.tenantId,
+      transacao: transacao._id,
+      valor,
+      formaPagamento,
+      dataPagamento: new Date(),
+      dadosMBWay: dadosMBWay || {},
+      dadosMultibanco: dadosMultibanco || {},
+      dadosCartao: dadosCartao || {},
+      dadosTransferencia: dadosTransferencia || {},
+      observacoes: observacoes || ''
+    });
+
+    // Atualizar transação com forma de pagamento
+    transacao.formaPagamento = formaPagamento;
+    await transacao.save();
+
+    // Vincular transação ao agendamento
+    agendamento.transacao = transacao._id;
+    agendamento.statusPagamento = transacao.statusPagamento;
+    await agendamento.save();
+
+    // Popular dados
+    await transacao.populate([
+      { path: 'cliente', select: 'nome telefone' },
+      { path: 'profissional', select: 'nome' }
+    ]);
+
+    console.log(`✅ Pagamento de serviço avulso registrado: Transação ${transacao._id}, Pagamento ${pagamento._id}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Pagamento registrado com sucesso',
+      transacao,
+      pagamento,
+      agendamento
+    });
+
+  } catch (error) {
+    console.error('Erro ao registrar pagamento de serviço:', error);
+    res.status(500).json({
+      message: 'Erro ao registrar pagamento',
+      details: error.message
+    });
+  }
+};
 
 // @desc    Enviar lembrete manual via WhatsApp (MODIFICADO)
 export const enviarLembreteManual = async (req, res) => {

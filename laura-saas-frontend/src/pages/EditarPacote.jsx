@@ -232,7 +232,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                 {/* Campo Valor */}
                 <div>
                   <label htmlFor="valor" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Valor do Pacote (€)
+                    Valor do Serviço (€)
                   </label>
                   <input
                     type="number"
@@ -283,7 +283,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                   className="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
                 />
                 <label htmlFor="ativo" className={`ml-2 block text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                  Pacote Ativo
+                  Serviço Ativo
                 </label>
               </div>
 

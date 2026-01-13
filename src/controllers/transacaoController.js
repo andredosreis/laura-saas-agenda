@@ -2,6 +2,7 @@ import Transacao from '../models/Transacao.js';
 import Pagamento from '../models/Pagamento.js';
 import CompraPacote from '../models/CompraPacote.js';
 import { DateTime } from 'luxon';
+import mongoose from 'mongoose';
 
 // @desc    Criar nova transação
 // @route   POST /api/transacoes
@@ -97,7 +98,13 @@ export const listarTransacoes = async (req, res) => {
     } = req.query;
 
     // Construir query
-    const query = { tenantId: req.tenantId };
+    // Converter tenantId para ObjectId para funcionar corretamente no aggregate
+    // JWT decodifica ObjectId como String, mas aggregate precisa de ObjectId
+    const query = {
+      tenantId: mongoose.Types.ObjectId.isValid(req.tenantId)
+        ? new mongoose.Types.ObjectId(req.tenantId)
+        : req.tenantId
+    };
 
     if (tipo) query.tipo = tipo;
     if (categoria) query.categoria = categoria;
@@ -132,7 +139,23 @@ export const listarTransacoes = async (req, res) => {
       Transacao.countDocuments(query)
     ]);
 
+    // Debug: Verificar valores das transações
+    if (transacoes.length > 0) {
+      console.log('[listarTransacoes] 🔍 Primeira transação:', {
+        _id: transacoes[0]._id,
+        tipo: transacoes[0].tipo,
+        categoria: transacoes[0].categoria,
+        valor: transacoes[0].valor,
+        desconto: transacoes[0].desconto,
+        valorFinal: transacoes[0].valorFinal,
+        createdAt: transacoes[0].createdAt
+      });
+    }
+
     // Calcular totais
+    console.log('[listarTransacoes] 🔍 Query para aggregate:', JSON.stringify(query, null, 2));
+    console.log('[listarTransacoes] 📊 Total de transações encontradas:', total);
+
     const resumo = await Transacao.aggregate([
       { $match: query },
       {
@@ -144,12 +167,16 @@ export const listarTransacoes = async (req, res) => {
       }
     ]);
 
+    console.log('[listarTransacoes] 📈 Resumo do aggregate:', JSON.stringify(resumo, null, 2));
+
     const totais = {
       receitas: resumo.find(r => r._id === 'Receita')?.total || 0,
       despesas: resumo.find(r => r._id === 'Despesa')?.total || 0,
       saldo: 0
     };
     totais.saldo = totais.receitas - totais.despesas;
+
+    console.log('[listarTransacoes] 💰 Totais calculados:', totais);
 
     res.status(200).json({
       transacoes,
@@ -485,6 +512,11 @@ export const relatorioPorPeriodo = async (req, res) => {
     const inicio = DateTime.fromISO(dataInicio).setZone('Europe/Lisbon').startOf('day').toJSDate();
     const fim = DateTime.fromISO(dataFim).setZone('Europe/Lisbon').endOf('day').toJSDate();
 
+    // Converter tenantId para ObjectId para aggregate
+    const tenantIdObj = mongoose.Types.ObjectId.isValid(req.tenantId)
+      ? new mongoose.Types.ObjectId(req.tenantId)
+      : req.tenantId;
+
     // Buscar transações pagas no período
     const transacoes = await Transacao.find({
       tenantId: req.tenantId,
@@ -496,7 +528,7 @@ export const relatorioPorPeriodo = async (req, res) => {
     const resumoPorTipo = await Transacao.aggregate([
       {
         $match: {
-          tenantId: req.tenantId,
+          tenantId: tenantIdObj,
           statusPagamento: 'Pago',
           dataPagamento: { $gte: inicio, $lte: fim }
         }
@@ -514,7 +546,7 @@ export const relatorioPorPeriodo = async (req, res) => {
     const resumoPorCategoria = await Transacao.aggregate([
       {
         $match: {
-          tenantId: req.tenantId,
+          tenantId: tenantIdObj,
           statusPagamento: 'Pago',
           dataPagamento: { $gte: inicio, $lte: fim }
         }

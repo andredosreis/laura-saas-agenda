@@ -5,9 +5,11 @@ import {
   getAllAgendamentos,
   getAgendamento,
   updateAgendamento,
+  updateStatusAgendamento,
   deleteAgendamento,
   confirmarAgendamento,
   enviarLembreteManual,
+  registrarPagamentoServico,
 } from '../controllers/agendamentoController.js';
 import validateObjectId from '../middlewares/validateObjectId.js';
 
@@ -21,10 +23,14 @@ router.get('/', getAllAgendamentos);
 router.post('/', createAgendamento);
 router.get('/:id', validateObjectId, getAgendamento);
 router.put('/:id', validateObjectId, updateAgendamento);
+router.patch('/:id/status', validateObjectId, updateStatusAgendamento);
 router.delete('/:id', validateObjectId, deleteAgendamento);
 
 // Rotas de confirmação e lembretes
 router.patch('/:id/confirmar', validateObjectId, confirmarAgendamento);
 router.post('/:id/enviar-lembrete', validateObjectId, enviarLembreteManual);
+
+// Rota para registrar pagamento de serviço avulso
+router.post('/:id/pagamento', validateObjectId, registrarPagamentoServico);
 
 export default router;

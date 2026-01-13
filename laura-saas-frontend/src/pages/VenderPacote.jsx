@@ -191,8 +191,8 @@ function VenderPacote() {
             <ArrowLeft className={`w-5 h-5 ${subTextClass}`} />
           </button>
           <div>
-            <h1 className={`text-2xl font-bold ${textClass}`}>🎁 Vender Pacote</h1>
-            <p className={subTextClass}>Venda um pacote para um cliente</p>
+            <h1 className={`text-2xl font-bold ${textClass}`}>🎁 Vender Serviço</h1>
+            <p className={subTextClass}>Venda um serviço para um cliente</p>
           </div>
         </div>
 
@@ -223,7 +223,7 @@ function VenderPacote() {
           <div className={`${cardClass} rounded-2xl p-5`}>
             <div className="flex items-center gap-2 mb-4">
               <Package className={`w-5 h-5 ${subTextClass}`} />
-              <h2 className={`font-medium ${textClass}`}>Pacote</h2>
+              <h2 className={`font-medium ${textClass}`}>Serviço</h2>
             </div>
             <select
               value={form.pacoteId}
@@ -231,7 +231,7 @@ function VenderPacote() {
               className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
               required
             >
-              <option value="">Selecione um pacote</option>
+              <option value="">Selecione um serviço</option>
               {pacotes.map(pacote => (
                 <option key={pacote._id} value={pacote._id}>
                   {pacote.nome} - {pacote.sessoes} sessões - €{pacote.valor?.toFixed(2)}
@@ -398,7 +398,7 @@ function VenderPacote() {
               <h2 className={`font-medium ${textClass} mb-4`}>📋 Resumo da Venda</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className={subTextClass}>Pacote</span>
+                  <span className={subTextClass}>Serviço</span>
                   <span className={textClass}>{pacoteSelecionado.nome}</span>
                 </div>
                 <div className="flex justify-between">
@@ -455,7 +455,7 @@ function VenderPacote() {
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5" />
-                  Vender Pacote
+                  Vender Serviço
                 </>
               )}
             </button>
