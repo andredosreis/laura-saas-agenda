@@ -136,7 +136,7 @@ function EditarCliente() {
   const getInputClasses = (fieldName) => {
     const state = getInputState(fieldName);
     const baseClasses =
-      'mt-1 block w-full rounded border p-2 shadow-sm focus:ring focus:ring-blue-200 transition-all';
+      'mt-1 block w-full rounded border p-2 md:p-3 shadow-sm focus:ring focus:ring-blue-200 transition-all text-sm md:text-base text-gray-900';
 
     switch (state) {
       case 'error':
@@ -287,7 +287,7 @@ function EditarCliente() {
         <div>
           <label
             htmlFor="nome"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm md:text-base font-medium text-gray-900"
           >
             Nome
           </label>
@@ -308,7 +308,7 @@ function EditarCliente() {
         <div>
           <label
             htmlFor="telefone"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm md:text-base font-medium text-gray-900"
           >
             Telefone
           </label>
@@ -330,7 +330,7 @@ function EditarCliente() {
         <div>
           <label
             htmlFor="dataNascimento"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm md:text-base font-medium text-gray-900"
           >
             Data de Nascimento
           </label>
@@ -350,7 +350,7 @@ function EditarCliente() {
         <div>
           <label
             htmlFor="pacote"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm md:text-base font-medium text-gray-900"
           >
             Pacote
           </label>
@@ -382,7 +382,7 @@ function EditarCliente() {
         <div>
           <label
             htmlFor="sessoesRestantes"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm md:text-base font-medium text-gray-900"
           >
             Sessões Restantes
           </label>
@@ -403,7 +403,7 @@ function EditarCliente() {
         <div>
           <label
             htmlFor="observacoes"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm md:text-base font-medium text-gray-900"
           >
             Observações
           </label>
