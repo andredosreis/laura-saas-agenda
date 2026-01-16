@@ -28,6 +28,7 @@ import transacaoRoutes from './routes/transacaoRoutes.js'; // 💰 FASE 3: Trans
 import compraPacoteRoutes from './routes/compraPacoteRoutes.js'; // 💰 FASE 3: Compra de Pacotes
 import pagamentoRoutes from './routes/pagamentoRoutes.js'; // 💰 FASE 3: Pagamentos
 import caixaRoutes from './routes/caixaRoutes.js'; // 💰 FASE 3: Controle de Caixa
+import historicoAtendimentoRoutes from './routes/historicoAtendimentoRoutes.js'; // 📋 FASE 4: Histórico de Atendimentos
 
 const app = express();
 
@@ -95,6 +96,9 @@ app.use('/api/transacoes', transacaoRoutes);
 app.use('/api/compras-pacotes', compraPacoteRoutes);
 app.use('/api/pagamentos', pagamentoRoutes);
 app.use('/api/caixa', caixaRoutes);
+
+// 📋 FASE 4: Histórico de Atendimentos
+app.use('/api/historico-atendimentos', historicoAtendimentoRoutes);
 
 // Webhook Z-API para confirmações de agendamento
 app.use('/webhook', webhookRoutes);

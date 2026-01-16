@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import { subscribeToPush, getPushStatus, unsubscribeFromPush } from '../services/notificationService';
+import FinalizarAtendimentoModal from '../components/FinalizarAtendimentoModal';
 
 function Agendamentos() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ function Agendamentos() {
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [confirmando, setConfirmando] = useState(null);
   const [enviandoLembrete, setEnviandoLembrete] = useState(null);
+  const [modalFinalizarAberto, setModalFinalizarAberto] = useState(false);
+  const [agendamentoParaFinalizar, setAgendamentoParaFinalizar] = useState(null);
   
   const [pushStatus, setPushStatus] = useState({
     supported: false,
@@ -400,7 +403,23 @@ function Agendamentos() {
                       </div>
                     )}
 
-                    {/* Linha 2: Botão de lembrete + editar/deletar */}
+                    {/* Linha 2: Botão Finalizar Atendimento (apenas para Confirmado/Realizado) */}
+                    {(agendamento.status === 'Confirmado' || agendamento.status === 'Realizado') && (
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            setAgendamentoParaFinalizar(agendamento);
+                            setModalFinalizarAberto(true);
+                          }}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition-colors"
+                          title="Finalizar atendimento e registrar histórico"
+                        >
+                          ✓ Finalizar Atendimento
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Linha 3: Botão de lembrete + editar/deletar */}
                     <div className="flex gap-2 justify-end">
                       <button
                         onClick={() => enviarLembrete(agendamento._id, agendamento.cliente?.nome)}
@@ -430,6 +449,21 @@ function Agendamentos() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal de Finalizar Atendimento */}
+      <FinalizarAtendimentoModal
+        isOpen={modalFinalizarAberto}
+        onClose={() => {
+          setModalFinalizarAberto(false);
+          setAgendamentoParaFinalizar(null);
+        }}
+        agendamento={agendamentoParaFinalizar}
+        onSuccess={() => {
+          carregarAgendamentos();
+          setModalFinalizarAberto(false);
+          setAgendamentoParaFinalizar(null);
+        }}
+      />
     </div>
   );
 }

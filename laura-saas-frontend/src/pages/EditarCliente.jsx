@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, XCircle, Package, Calendar, TrendingUp } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, Calendar, TrendingUp, User, FileText } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { clienteSchema, formatPhone } from '../schemas/validationSchemas';
+import HistoricoAtendimentos from '../components/HistoricoAtendimentos';
 
 function EditarCliente() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ function EditarCliente() {
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState('dados');
 
   // React Hook Form com Zod
   const {
@@ -184,6 +186,37 @@ function EditarCliente() {
 
   return (
     <div className="max-w-4xl mx-auto mt-10 p-6">
+      {/* Tabs de Navegação */}
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setAbaAtiva('dados')}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
+              abaAtiva === 'dados'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            Dados do Cliente
+          </button>
+          <button
+            onClick={() => setAbaAtiva('historico')}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
+              abaAtiva === 'historico'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Histórico de Atendimentos
+          </button>
+        </nav>
+      </div>
+
+      {/* Conteúdo da Aba Dados */}
+      {abaAtiva === 'dados' && (
+        <>
       {/* Seção de Pacotes Ativos */}
       {pacotesDoCliente.length > 0 && (
         <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg shadow">
@@ -439,6 +472,15 @@ function EditarCliente() {
         </div>
       </form>
       </div>
+        </>
+      )}
+
+      {/* Conteúdo da Aba Histórico */}
+      {abaAtiva === 'historico' && (
+        <div className="bg-white border border-gray-300 shadow-lg rounded-lg p-6">
+          <HistoricoAtendimentos clienteId={id} />
+        </div>
+      )}
     </div>
   );
 }
