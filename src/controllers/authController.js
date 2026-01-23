@@ -10,7 +10,7 @@ import { sendPasswordResetEmail } from '../services/emailService.js';
 // =============================================
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
-const ACCESS_TOKEN_EXPIRES = '15m';
+const ACCESS_TOKEN_EXPIRES = '1h'; // Aumentado de 15m para 1h para evitar expiração durante preenchimento de formulários
 const REFRESH_TOKEN_EXPIRES = '7d';
 
 // =============================================

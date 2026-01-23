@@ -106,12 +106,21 @@ api.interceptors.response.use(
             }
           } catch (refreshError) {
             isRefreshing = false;
-            // Refresh falhou, fazer logout
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_KEY);
-            localStorage.removeItem('laura_user');
-            localStorage.removeItem('laura_tenant');
-            window.location.href = '/login';
+            // Refresh falhou, avisar usuário com tempo para reagir
+            toast.warning('⚠️ Sua sessão expirou! Você tem 30 segundos para copiar seus dados antes de ser redirecionado para o login.', {
+              autoClose: 30000,
+              position: "top-center",
+              style: { fontSize: '16px', fontWeight: 'bold' }
+            });
+
+            setTimeout(() => {
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(REFRESH_TOKEN_KEY);
+              localStorage.removeItem('laura_user');
+              localStorage.removeItem('laura_tenant');
+              window.location.href = '/login';
+            }, 30000);
+
             return Promise.reject(refreshError);
           }
         }
@@ -126,11 +135,19 @@ api.interceptors.response.use(
       }
 
       // 401 sem código de expiração = credenciais inválidas
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      localStorage.removeItem('laura_user');
-      localStorage.removeItem('laura_tenant');
-      window.location.href = '/login';
+      toast.warning('⚠️ Autenticação inválida! Você tem 30 segundos para copiar seus dados antes de ser redirecionado para o login.', {
+        autoClose: 30000,
+        position: "top-center",
+        style: { fontSize: '16px', fontWeight: 'bold' }
+      });
+
+      setTimeout(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        localStorage.removeItem('laura_user');
+        localStorage.removeItem('laura_tenant');
+        window.location.href = '/login';
+      }, 30000);
     }
 
     console.error('Erro na API:', error);

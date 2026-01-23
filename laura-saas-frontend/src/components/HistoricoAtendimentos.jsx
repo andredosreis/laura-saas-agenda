@@ -253,12 +253,12 @@ const HistoricoAtendimentos = ({ clienteId }) => {
                 >
                   {/* Header do card */}
                   <div className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
                         <h3 className={`text-lg font-semibold ${textClass} mb-1`}>
                           {historico.servico}
                         </h3>
-                        <div className="flex items-center gap-4 text-sm">
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
                           <div className="flex items-center gap-1">
                             <Calendar className={`w-4 h-4 ${subTextClass}`} />
                             <span className={subTextClass}>
@@ -291,7 +291,7 @@ const HistoricoAtendimentos = ({ clienteId }) => {
                       </div>
 
                       {/* Botões de ação */}
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                           onClick={(e) => handleEditar(e, historico)}
                           className={`p-2 rounded-lg transition-colors ${
