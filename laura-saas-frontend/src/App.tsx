@@ -11,8 +11,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import InstallPrompt from './components/InstallPrompt';
 
-// 🆕 Página de Landing (Pública)
-import LandingPage from './pages/LandingPage';
+// 🆕 Página de Landing (Pública) - COMENTADO: promete funcionalidades não implementadas
+// import LandingPage from './pages/LandingPage';
 
 // 🆕 Páginas de Autenticação
 import Login from './pages/Login';
@@ -57,8 +57,8 @@ const App = () => {
       <AuthProvider>
         <Router>
           <Routes>
-            {/* 🆕 Página de Apresentação (Pública) */}
-            <Route path="/" element={<LandingPage />} />
+            {/* 🆕 Página Inicial - Login direto (LandingPage comentada) */}
+            <Route path="/" element={<Login />} />
 
             {/* 🆕 Rotas Públicas (sem navbar) */}
             <Route path="/login" element={<Login />} />
