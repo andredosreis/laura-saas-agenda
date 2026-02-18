@@ -19,6 +19,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerificarEmail from './pages/VerificarEmail';
 
 // Páginas Protegidas
 import Agendamentos from './pages/Agendamentos';
@@ -68,6 +69,7 @@ const App = () => {
             <Route path="/registrar" element={<Register />} />
             <Route path="/esqueci-senha" element={<ForgotPassword />} />
             <Route path="/reset-senha/:token" element={<ResetPassword />} />
+            <Route path="/verificar-email/:token" element={<VerificarEmail />} />
 
             {/* 🔐 Rotas Protegidas (com navbar) */}
             <Route path="/dashboard" element={

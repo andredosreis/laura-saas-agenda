@@ -175,8 +175,108 @@ Se você não solicitou esta alteração, por favor ignore este email.
     return sendEmail({ to: email, subject, html, text });
 };
 
+// Template de email para verificação de conta
+export const sendEmailVerificationEmail = async (email, verificationToken, userName) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verifyLink = `${frontendUrl}/verificar-email/${verificationToken}`;
+
+    const subject = 'Confirme o seu email - Laura SAAS';
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+                <tr>
+                    <td align="center">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 40px;">
+                            <tr>
+                                <td align="center" style="padding-bottom: 30px;">
+                                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 28px;">✅</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="padding-bottom: 20px;">
+                                    <h1 style="margin: 0; color: #f8fafc; font-size: 24px; font-weight: 600;">
+                                        Confirme o seu email
+                                    </h1>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 30px;">
+                                    <p style="margin: 0 0 15px 0; color: #94a3b8; font-size: 16px; line-height: 1.6;">
+                                        Olá${userName ? `, ${userName}` : ''}!
+                                    </p>
+                                    <p style="margin: 0; color: #94a3b8; font-size: 16px; line-height: 1.6;">
+                                        Obrigado por criar a sua conta no Laura SAAS. Clique no botão abaixo para confirmar o seu email e ativar a sua conta.
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="padding-bottom: 30px;">
+                                    <a href="${verifyLink}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #ffffff; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);">
+                                        Confirmar Email
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                                    <p style="margin: 0; color: #fbbf24; font-size: 14px; line-height: 1.5;">
+                                        ⚠️ Este link expira em <strong>24 horas</strong>. Se não foi você, ignore este email.
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-top: 30px;">
+                                    <p style="margin: 0 0 10px 0; color: #64748b; font-size: 13px;">
+                                        Se o botão não funcionar, copie e cole este link no seu navegador:
+                                    </p>
+                                    <p style="margin: 0; color: #6366f1; font-size: 13px; word-break: break-all;">
+                                        ${verifyLink}
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="padding-top: 40px; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 40px;">
+                                    <p style="margin: 0; color: #475569; font-size: 12px;">
+                                        © ${new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+    `;
+
+    const text = `
+Olá${userName ? `, ${userName}` : ''}!
+
+Obrigado por criar a sua conta no Laura SAAS. Acesse o link abaixo para confirmar o seu email:
+${verifyLink}
+
+Este link expira em 24 horas.
+
+Se não foi você, ignore este email.
+
+---
+© ${new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+    `;
+
+    return sendEmail({ to: email, subject, html, text });
+};
+
 export default {
     initEmailService,
     sendEmail,
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    sendEmailVerificationEmail
 };

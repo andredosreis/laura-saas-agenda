@@ -17,7 +17,6 @@ const clienteSchema = new mongoose.Schema({
   telefone: {
     type: String,
     required: [true, 'Telefone é obrigatório'],
-    unique: true,
     minlength: [9, 'Telefone deve ter no mínimo 9 dígitos'],
     maxlength: [15, 'Telefone deve ter no máximo 15 dígitos'],
     match: [/^[\d\+\-\(\)\s]+$/, 'Formato de telefone inválido.'],
@@ -34,20 +33,13 @@ const clienteSchema = new mongoose.Schema({
   },
   dataNascimento: {
     type: Date,
-    required: [true, 'Data de nascimento é obrigatória'],
+    required: false,
     validate: {
       validator: function (data) {
-        const hoje = new Date();
-        let idade = hoje.getFullYear() - data.getFullYear(); // Corrigido para let
-        const mesAtual = hoje.getMonth() - data.getMonth();
-
-        if (mesAtual < 0 || (mesAtual === 0 && hoje.getDate() < data.getDate())) {
-          idade--;
-        }
-
-        return data <= hoje && idade >= 16;
+        if (!data) return true;
+        return data <= new Date();
       },
-      message: 'Data de nascimento inválida. Cliente deve ter pelo menos 16 anos.'
+      message: 'Data de nascimento não pode ser uma data futura.'
     }
   },
   sessoesRestantes: {
@@ -129,7 +121,9 @@ clienteSchema.virtual('idade').get(function () {
   return idade;
 });
 
+// Índice composto: unicidade de telefone por tenant (não global)
+clienteSchema.index({ tenantId: 1, telefone: 1 }, { unique: true });
+
 const Cliente = mongoose.model('Cliente', clienteSchema);
 
-// A correção principal está aqui
 export default Cliente;

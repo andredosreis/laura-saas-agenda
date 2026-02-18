@@ -10,7 +10,8 @@ import {
     changePassword,
     forgotPassword,
     resetPassword,
-    verifyResetToken
+    verifyResetToken,
+    verifyEmail
 } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 
@@ -61,6 +62,13 @@ router.post('/reset-password', resetPassword);
  * @access  Public
  */
 router.get('/verify-reset-token/:token', verifyResetToken);
+
+/**
+ * @route   GET /api/auth/verify-email/:token
+ * @desc    Confirmar email do usuário
+ * @access  Public
+ */
+router.get('/verify-email/:token', verifyEmail);
 
 // =============================================
 // ROTAS PROTEGIDAS (requer autenticação)

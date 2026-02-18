@@ -58,7 +58,7 @@ const TenantSchema = new Schema({
             enum: ['trial', 'ativo', 'suspenso', 'cancelado', 'expirado'],
             default: 'trial'
         },
-        trialDias: { type: Number, default: 14 },
+        trialDias: { type: Number, default: 7 },
         stripeCustomerId: String,
         stripeSubscriptionId: String
     },

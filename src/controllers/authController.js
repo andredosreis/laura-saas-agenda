@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
-import { sendPasswordResetEmail } from '../services/emailService.js';
+import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../services/emailService.js';
 
 // =============================================
 // CONFIGURAÇÕES JWT
@@ -85,6 +85,15 @@ export const register = async (req, res) => {
             });
         }
 
+        // Fix #5: Verificar se email já está registrado globalmente
+        const emailEmUso = await User.findOne({ email: email.toLowerCase() });
+        if (emailEmUso) {
+            return res.status(400).json({
+                success: false,
+                error: 'Este email já está registrado'
+            });
+        }
+
         // Gerar slug único para o tenant
         let baseSlug = nomeEmpresa
             .toLowerCase()
@@ -113,21 +122,43 @@ export const register = async (req, res) => {
             }
         });
 
-        // Criar User Admin
-        const user = await User.createWithPassword({
-            tenantId: tenant._id,
-            email,
-            password,
-            nome,
-            telefone,
-            role: 'admin',
-            emailVerificado: false, // TODO: Implementar verificação de email
-            permissoes: User.getDefaultPermissions('admin')
-        });
+        // Criar User Admin — com rollback do tenant se falhar (Fix #3)
+        let user;
+        try {
+            user = await User.createWithPassword({
+                tenantId: tenant._id,
+                email,
+                password,
+                nome,
+                telefone,
+                role: 'admin',
+                emailVerificado: false,
+                permissoes: User.getDefaultPermissions('admin')
+            });
+        } catch (userError) {
+            await Tenant.findByIdAndDelete(tenant._id);
+            throw userError;
+        }
 
         // Atualizar tenant com o criador
         tenant.criadoPor = user._id;
         await tenant.save();
+
+        // Fix #4: Gerar token de verificação de email e enviar
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationTokenHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+
+        await User.findByIdAndUpdate(user._id, {
+            emailVerificationToken: verificationTokenHash,
+            emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000 // 24 horas
+        });
+
+        try {
+            await sendEmailVerificationEmail(user.email, verificationToken, user.nome);
+        } catch (emailError) {
+            console.error('Aviso: Falha ao enviar email de verificação:', emailError.message);
+            // Não bloqueia o registro — usuário já está criado
+        }
 
         // Gerar tokens
         const accessToken = generateAccessToken(user, tenant);
@@ -161,7 +192,7 @@ export const register = async (req, res) => {
                 tokens: {
                     accessToken,
                     refreshToken,
-                    expiresIn: 900 // 15 minutos em segundos
+                    expiresIn: 3600 // 1 hora em segundos
                 }
             }
         });
@@ -300,7 +331,7 @@ export const login = async (req, res) => {
                 tokens: {
                     accessToken,
                     refreshToken,
-                    expiresIn: 900
+                    expiresIn: 3600
                 }
             }
         });
@@ -393,7 +424,7 @@ export const refreshToken = async (req, res) => {
                 tokens: {
                     accessToken: newAccessToken,
                     refreshToken: newRefreshToken,
-                    expiresIn: 900
+                    expiresIn: 3600
                 }
             }
         });
@@ -781,6 +812,42 @@ export const verifyResetToken = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/auth/verify-email/:token
+ * Confirmar email do usuário
+ */
+export const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        if (!token) {
+            return res.status(400).json({ success: false, error: 'Token é obrigatório' });
+        }
+
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            emailVerificationToken: tokenHash,
+            emailVerificationExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, error: 'Token inválido ou expirado' });
+        }
+
+        await User.findByIdAndUpdate(user._id, {
+            $set: { emailVerificado: true },
+            $unset: { emailVerificationToken: 1, emailVerificationExpires: 1 }
+        });
+
+        res.json({ success: true, message: 'Email verificado com sucesso! Já pode fazer login.' });
+
+    } catch (error) {
+        console.error('Erro ao verificar email:', error);
+        res.status(500).json({ success: false, error: 'Erro interno ao verificar email' });
+    }
+};
+
 export default {
     register,
     login,
@@ -792,5 +859,6 @@ export default {
     changePassword,
     forgotPassword,
     resetPassword,
-    verifyResetToken
+    verifyResetToken,
+    verifyEmail
 };
