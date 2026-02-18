@@ -32,7 +32,13 @@ export const registerSchema = z
     telefone: z
       .string()
       .min(1, 'Telefone é obrigatório')
-      .regex(/^\d{9,15}$/, 'Telefone deve ter entre 9 e 15 dígitos'),
+      .refine(
+        (val) => {
+          const digits = val.replace(/\D/g, '');
+          return digits.length >= 9 && digits.length <= 15;
+        },
+        { message: 'Telefone deve ter entre 9 e 15 dígitos' }
+      ),
     password: z
       .string()
       .min(1, 'Senha é obrigatória')

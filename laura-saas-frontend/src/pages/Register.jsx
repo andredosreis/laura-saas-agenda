@@ -164,7 +164,7 @@ function Register() {
                     {/* Trial Badge */}
                     <div className="mb-6 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                         <p className="text-emerald-400 text-sm text-center font-medium">
-                            ✨ 14 dias grátis para experimentar todas as funcionalidades!
+                            ✨ 7 dias grátis para experimentar todas as funcionalidades!
                         </p>
                     </div>
 
@@ -237,7 +237,7 @@ function Register() {
                                     {...register('telefone')}
                                     onChange={handlePhoneChange}
                                     className={getInputClasses('telefone', true)}
-                                    placeholder="(91) 23456-7890"
+                                    placeholder="912 345 678"
                                 />
                                 <FieldFeedback fieldName="telefone" />
                             </div>

@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticate } from '../middlewares/auth.js';
 // 1. Importamos todas as funções necessárias do controller de forma nomeada
 import {
   getAgendamentosDeHoje,
@@ -12,6 +13,9 @@ import {
 } from '../controllers/dashboardController.js';
 
 const router = express.Router();
+
+// Protege todas as rotas do dashboard
+router.use(authenticate);
 
 // 2. Definimos as rotas usando as funções importadas diretamente
 router.get('/agendamentosHoje', getAgendamentosDeHoje);

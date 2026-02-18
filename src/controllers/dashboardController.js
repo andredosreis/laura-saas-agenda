@@ -6,10 +6,12 @@ import Agendamento from '../models/Agendamento.js';
 // @desc    Agendamentos de hoje
 export const getAgendamentosDeHoje = async (req, res) => {
   try {
+    const { tenantId } = req;
     const inicioDoDia = DateTime.now().setZone('Europe/Lisbon').startOf('day').toJSDate();
     const fimDoDia = DateTime.now().setZone('Europe/Lisbon').endOf('day').toJSDate();
 
     const agendamentos = await Agendamento.find({
+      tenantId,
       dataHora: { $gte: inicioDoDia, $lte: fimDoDia }
     })
       .populate('cliente', 'nome')
@@ -28,10 +30,12 @@ export const getAgendamentosDeHoje = async (req, res) => {
 // @desc    Contagem de agendamentos de amanhã
 export const getContagemAgendamentosAmanha = async (req, res) => {
   try {
+    const { tenantId } = req;
     const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
     const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
 
     const contagem = await Agendamento.countDocuments({
+      tenantId,
       dataHora: { $gte: inicioDeAmanha, $lte: fimDeAmanha }
     });
 
@@ -44,10 +48,12 @@ export const getContagemAgendamentosAmanha = async (req, res) => {
 // @desc    Lista de agendamentos de amanhã
 export const getAgendamentosAmanha = async (req, res) => {
   try {
+    const { tenantId } = req;
     const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
     const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
 
     const agendamentos = await Agendamento.find({
+      tenantId,
       dataHora: { $gte: inicioDeAmanha, $lte: fimDeAmanha }
     })
       .populate('cliente', 'nome')
@@ -64,11 +70,13 @@ export const getAgendamentosAmanha = async (req, res) => {
 // @desc    Clientes atendidos na semana
 export const getClientesAtendidosSemana = async (req, res) => {
   try {
+    const { tenantId } = req;
     const agora = DateTime.now().setZone('Europe/Lisbon');
     const fimDoDia = agora.endOf('day').toJSDate();
     const inicioDosSeteDias = agora.minus({ days: 7 }).startOf('day').toJSDate();
 
     const contagem = await Agendamento.countDocuments({
+      tenantId,
       status: 'Realizado',
       dataHora: { $gte: inicioDosSeteDias, $lte: fimDoDia }
     });
@@ -82,12 +90,14 @@ export const getClientesAtendidosSemana = async (req, res) => {
 // @desc    Totais gerais
 export const getTotaisSistema = async (req, res) => {
   try {
-    const totalClientes = await Cliente.countDocuments();
-    const totalPacotes = await Pacote.countDocuments();
-    const totalAgendamentosGeral = await Agendamento.countDocuments();
+    const { tenantId } = req;
+    const totalClientes = await Cliente.countDocuments({ tenantId });
+    const totalPacotes = await Pacote.countDocuments({ tenantId });
+    const totalAgendamentosGeral = await Agendamento.countDocuments({ tenantId });
     const agora = DateTime.now().setZone('Europe/Lisbon').toJSDate();
 
     const totalAgendamentosFuturos = await Agendamento.countDocuments({
+      tenantId,
       dataHora: { $gte: agora }
     });
 
@@ -105,8 +115,10 @@ export const getTotaisSistema = async (req, res) => {
 // @desc    Clientes com sessões baixas
 export const getClientesComSessoesBaixas = async (req, res) => {
   try {
+    const { tenantId } = req;
     const limite = parseInt(req.query.limite, 10) || 2;
     const clientesBaixos = await Cliente.find({
+      tenantId,
       sessoesRestantes: { $lte: limite }
     }).select('nome telefone sessoesRestantes');
 
@@ -119,10 +131,11 @@ export const getClientesComSessoesBaixas = async (req, res) => {
 // @desc    Próximos agendamentos
 export const getProximosAgendamentos = async (req, res) => {
   try {
+    const { tenantId } = req;
     const limit = parseInt(req.query.limit, 10) || 5;
     const agora = DateTime.now().setZone('Europe/Lisbon').toJSDate();
 
-    const agendamentos = await Agendamento.find({ dataHora: { $gt: agora } })
+    const agendamentos = await Agendamento.find({ tenantId, dataHora: { $gt: agora } })
       .populate('cliente', 'nome')
       .populate('pacote', 'nome')
       .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
@@ -138,6 +151,7 @@ export const getProximosAgendamentos = async (req, res) => {
 // @desc    Dados Financeiros (Faturamento e Comparecimento)
 export const getDadosFinanceiros = async (req, res) => {
   try {
+    const { tenantId } = req;
     const agora = DateTime.now().setZone('Europe/Lisbon');
     const inicioMes = agora.startOf('month').toJSDate();
     const fimMes = agora.endOf('month').toJSDate();
@@ -145,6 +159,7 @@ export const getDadosFinanceiros = async (req, res) => {
     // 1. Faturamento Mensal (apenas servicos avulsos realizados por enquanto)
     // TODO: Incluir vendas de pacotes quando houver modelo de transação
     const agendamentosRealizados = await Agendamento.find({
+      tenantId,
       status: 'Realizado',
       dataHora: { $gte: inicioMes, $lte: fimMes }
     }).select('servicoAvulsoValor');
@@ -154,11 +169,13 @@ export const getDadosFinanceiros = async (req, res) => {
     // 2. Taxa de Comparecimento
     // Considera: Realizado, Cancelado (ambos), Não Compareceu
     const agendamentosTotaisMes = await Agendamento.countDocuments({
+      tenantId,
       dataHora: { $gte: inicioMes, $lte: fimMes },
       status: { $in: ['Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'] }
     });
 
     const agendamentosComparecidos = await Agendamento.countDocuments({
+      tenantId,
       dataHora: { $gte: inicioMes, $lte: fimMes },
       status: 'Realizado'
     });
@@ -173,6 +190,7 @@ export const getDadosFinanceiros = async (req, res) => {
     const fimMesAnterior = agora.minus({ months: 1 }).endOf('month').toJSDate();
 
     const realizadosMesAnterior = await Agendamento.find({
+      tenantId,
       status: 'Realizado',
       dataHora: { $gte: inicioMesAnterior, $lte: fimMesAnterior }
     }).select('servicoAvulsoValor');
