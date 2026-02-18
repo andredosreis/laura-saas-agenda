@@ -227,6 +227,9 @@ export const updateStatusAgendamento = async (req, res) => {
         // A transação de receita já foi criada na VENDA do pacote (compraPacoteController.venderPacote)
         // Aqui apenas registramos o USO da sessão no histórico do pacote
 
+        // Armazenar valor por sessão no agendamento para auditoria
+        agendamentoAtual.valorCobrado = valorPorSessao;
+
         // Atualizar status de pagamento do agendamento (já pago na compra do pacote)
         agendamentoAtual.statusPagamento = 'Pago';
         await agendamentoAtual.save();
@@ -569,6 +572,151 @@ _La Estética Avançada_`;
     console.error('[Agendamento] ❌ Erro ao enviar lembrete manual:', error);
     res.status(500).json({
       message: "Erro ao enviar lembrete.",
+      details: error.message
+    });
+  }
+};
+
+// @desc    Buscar histórico de atendimentos (apenas realizados, cancelados, não compareceu)
+// @route   GET /api/agendamentos/historico
+// @access  Private
+export const getHistorico = async (req, res) => {
+  try {
+    const { dataInicio, dataFim, status, cliente, page = 1, limit = 50 } = req.query;
+
+    // Filtro base: apenas status de histórico
+    const filtro = {
+      tenantId: req.tenantId,
+      status: { $in: ['Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'] }
+    };
+
+    // Filtros opcionais
+    if (dataInicio || dataFim) {
+      filtro.dataHora = {};
+      if (dataInicio) filtro.dataHora.$gte = new Date(dataInicio);
+      if (dataFim) filtro.dataHora.$lte = new Date(dataFim);
+    }
+
+    if (status) {
+      filtro.status = status;
+    }
+
+    if (cliente) {
+      filtro.cliente = cliente;
+    }
+
+    // Buscar com paginação
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const agendamentos = await Agendamento.find(filtro)
+      .populate('cliente', 'nome telefone email')
+      .populate('compraPacote')
+      .populate('transacao')
+      .populate('profissional', 'nome')
+      .sort({ dataHora: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Agendamento.countDocuments(filtro);
+
+    res.status(200).json({
+      success: true,
+      data: agendamentos,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+
+  } catch (error) {
+    console.error('[Agendamento] ❌ Erro ao buscar histórico:', error);
+    res.status(500).json({
+      message: "Erro ao buscar histórico de atendimentos.",
+      details: error.message
+    });
+  }
+};
+
+// @desc    Buscar estatísticas do mês
+// @route   GET /api/agendamentos/stats/mes
+// @access  Private
+export const getStatsMes = async (req, res) => {
+  try {
+    const { mes, ano } = req.query;
+
+    // Definir período (mês atual se não especificado)
+    const now = DateTime.now();
+    const mesAtual = mes ? parseInt(mes) : now.month;
+    const anoAtual = ano ? parseInt(ano) : now.year;
+
+    const dataInicio = DateTime.fromObject({ year: anoAtual, month: mesAtual, day: 1 }).startOf('day').toJSDate();
+    const dataFim = DateTime.fromObject({ year: anoAtual, month: mesAtual }).endOf('month').toJSDate();
+
+    // Buscar agendamentos do período
+    const agendamentos = await Agendamento.find({
+      tenantId: req.tenantId,
+      dataHora: { $gte: dataInicio, $lte: dataFim }
+    }).populate('compraPacote');
+
+    // Calcular estatísticas
+    const totalAgendamentos = agendamentos.length;
+    const totalRealizados = agendamentos.filter(a => a.status === 'Realizado').length;
+    const totalCancelados = agendamentos.filter(a =>
+      a.status === 'Cancelado Pelo Cliente' || a.status === 'Cancelado Pelo Salão'
+    ).length;
+    const totalNaoCompareceu = agendamentos.filter(a => a.status === 'Não Compareceu').length;
+    const totalPendentes = agendamentos.filter(a =>
+      a.status === 'Agendado' || a.status === 'Confirmado'
+    ).length;
+
+    // Calcular receita total (apenas realizados)
+    const receitaTotal = agendamentos
+      .filter(a => a.status === 'Realizado')
+      .reduce((acc, a) => {
+        if (a.valorCobrado) {
+          return acc + a.valorCobrado;
+        } else if (a.servicoAvulsoValor) {
+          return acc + a.servicoAvulsoValor;
+        } else if (a.compraPacote?.pacote?.valor && a.compraPacote?.pacote?.sessoes) {
+          return acc + (a.compraPacote.pacote.valor / a.compraPacote.pacote.sessoes);
+        }
+        return acc;
+      }, 0);
+
+    // Taxa de sucesso
+    const taxaSucesso = totalAgendamentos > 0
+      ? ((totalRealizados / totalAgendamentos) * 100).toFixed(1)
+      : 0;
+
+    // Taxa de não comparecimento
+    const taxaNaoComparecimento = totalAgendamentos > 0
+      ? ((totalNaoCompareceu / totalAgendamentos) * 100).toFixed(1)
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      periodo: {
+        mes: mesAtual,
+        ano: anoAtual,
+        dataInicio,
+        dataFim
+      },
+      estatisticas: {
+        totalAgendamentos,
+        totalRealizados,
+        totalCancelados,
+        totalNaoCompareceu,
+        totalPendentes,
+        receitaTotal: parseFloat(receitaTotal.toFixed(2)),
+        taxaSucesso: parseFloat(taxaSucesso),
+        taxaNaoComparecimento: parseFloat(taxaNaoComparecimento)
+      }
+    });
+
+  } catch (error) {
+    console.error('[Agendamento] ❌ Erro ao buscar estatísticas:', error);
+    res.status(500).json({
+      message: "Erro ao buscar estatísticas.",
       details: error.message
     });
   }

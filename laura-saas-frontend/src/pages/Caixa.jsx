@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import api from '../services/api';
-import { DollarSign, TrendingUp, TrendingDown, AlertCircle, Plus, Minus, Lock, Unlock } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { DollarSign, TrendingUp, TrendingDown, AlertCircle, Plus, Minus, Lock, Unlock, Loader2, X } from 'lucide-react';
 
 function Caixa() {
+  const { isDarkMode } = useTheme();
   const [statusCaixa, setStatusCaixa] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [modalAbrir, setModalAbrir] = useState(false);
@@ -19,6 +21,17 @@ function Caixa() {
   const [motivoSangria, setMotivoSangria] = useState('');
   const [valorSuprimento, setValorSuprimento] = useState('');
   const [motivoSuprimento, setMotivoSuprimento] = useState('');
+
+  // Theme classes
+  const cardClass = isDarkMode
+    ? 'bg-slate-800/50 border-white/10'
+    : 'bg-white border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const subTextClass = isDarkMode ? 'text-slate-400' : 'text-gray-600';
+  const inputClass = isDarkMode
+    ? 'bg-slate-700/50 border-white/10 text-white placeholder-slate-400 focus:border-indigo-500'
+    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-indigo-500';
+  const modalBg = isDarkMode ? 'bg-slate-800' : 'bg-white';
 
   const carregarStatusCaixa = async () => {
     setIsLoading(true);
@@ -66,7 +79,6 @@ function Caixa() {
       setObservacoes('');
       carregarStatusCaixa();
 
-      // Mostrar diferença se houver
       if (response.data.fechamento?.diferenca !== 0) {
         const diferenca = response.data.fechamento.diferenca;
         if (diferenca > 0) {
@@ -119,8 +131,8 @@ function Caixa() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className={`min-h-screen flex justify-center items-center ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'}`}>
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
       </div>
     );
   }
@@ -128,158 +140,191 @@ function Caixa() {
   const caixaAberto = statusCaixa?.status === 'Aberto';
 
   return (
-    <div className="container mx-auto px-4 py-8 pt-24">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Controle de Caixa</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">{statusCaixa?.data}</p>
-        </div>
+    <div className={`min-h-screen pt-24 pb-8 px-4 ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'}`}>
+      <div className="max-w-7xl mx-auto">
 
-        <div className="flex items-center gap-3">
-          {caixaAberto ? (
-            <>
-              <span className="flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg font-medium border-2 border-green-300 dark:border-green-700">
-                <Unlock className="w-5 h-5" />
-                <span className="font-bold">Caixa Aberto</span>
-              </span>
-              <button
-                onClick={() => setModalFechar(true)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-lg shadow-red-500/30 border-2 border-red-700"
-              >
-                <Lock className="w-5 h-5" />
-                Fechar Caixa
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium border-2 border-gray-400 dark:border-gray-600">
-                <Lock className="w-5 h-5" />
-                <span className="font-bold">Caixa Fechado</span>
-              </span>
-              <button
-                onClick={() => setModalAbrir(true)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30 border-2 border-indigo-700"
-              >
-                <Unlock className="w-5 h-5" />
-                Abrir Caixa
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Saldo Atual</span>
-            <DollarSign className="w-5 h-5 text-primary-600" />
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className={`text-2xl font-bold ${textClass} flex items-center gap-3`}>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              Controle de Caixa
+            </h1>
+            <p className={`${subTextClass} mt-1`}>{statusCaixa?.data}</p>
           </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            €{statusCaixa?.movimentacao?.saldoAtual?.toFixed(2) || '0.00'}
-          </p>
-        </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Receitas</span>
-            <TrendingUp className="w-5 h-5 text-green-600" />
+          <div className="flex items-center gap-3">
+            {caixaAberto ? (
+              <>
+                <span className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border ${isDarkMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                  <Unlock className="w-4 h-4" />
+                  Caixa Aberto
+                </span>
+                <button
+                  onClick={() => setModalFechar(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:opacity-90 transition font-medium shadow-lg shadow-red-500/20"
+                >
+                  <Lock className="w-4 h-4" />
+                  Fechar Caixa
+                </button>
+              </>
+            ) : (
+              <>
+                <span className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border ${isDarkMode ? 'bg-slate-700/50 border-white/10 text-slate-400' : 'bg-gray-100 border-gray-200 text-gray-600'}`}>
+                  <Lock className="w-4 h-4" />
+                  Caixa Fechado
+                </span>
+                <button
+                  onClick={() => setModalAbrir(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:opacity-90 transition font-medium shadow-lg shadow-indigo-500/20"
+                >
+                  <Unlock className="w-4 h-4" />
+                  Abrir Caixa
+                </button>
+              </>
+            )}
           </div>
-          <p className="text-3xl font-bold text-green-600">
-            €{statusCaixa?.movimentacao?.receitas?.toFixed(2) || '0.00'}
-          </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Despesas</span>
-            <TrendingDown className="w-5 h-5 text-red-600" />
-          </div>
-          <p className="text-3xl font-bold text-red-600">
-            €{statusCaixa?.movimentacao?.despesas?.toFixed(2) || '0.00'}
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Pagamentos</span>
-            <AlertCircle className="w-5 h-5 text-blue-600" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {statusCaixa?.detalhes?.quantidadePagamentos || 0}
-          </p>
-        </div>
-      </div>
-
-      {/* Botões de Ação */}
-      {caixaAberto && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <button
-            onClick={() => setModalSangria(true)}
-            className="flex items-center justify-center gap-3 p-6 bg-white dark:bg-gray-800 border-2 border-dashed border-red-300 dark:border-red-700 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-          >
-            <Minus className="w-6 h-6 text-red-600" />
-            <div className="text-left">
-              <p className="font-semibold text-gray-900 dark:text-white">Registrar Sangria</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Retirada de dinheiro do caixa</p>
+        {/* Cards de Resumo */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className={`rounded-2xl border ${cardClass} p-5`}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className={`text-sm font-medium ${subTextClass}`}>Saldo Atual</p>
+                <p className={`text-2xl font-bold ${textClass} mt-1`}>
+                  €{statusCaixa?.movimentacao?.saldoAtual?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
             </div>
-          </button>
+          </div>
 
-          <button
-            onClick={() => setModalSuprimento(true)}
-            className="flex items-center justify-center gap-3 p-6 bg-white dark:bg-gray-800 border-2 border-dashed border-green-300 dark:border-green-700 rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20 transition"
-          >
-            <Plus className="w-6 h-6 text-green-600" />
-            <div className="text-left">
-              <p className="font-semibold text-gray-900 dark:text-white">Registrar Suprimento</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Entrada de dinheiro no caixa</p>
+          <div className={`rounded-2xl border ${cardClass} p-5`}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className={`text-sm font-medium ${subTextClass}`}>Receitas</p>
+                <p className="text-2xl font-bold text-emerald-500 mt-1">
+                  €{statusCaixa?.movimentacao?.receitas?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
             </div>
-          </button>
-        </div>
-      )}
+          </div>
 
-      {/* Totais por Forma de Pagamento */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Formas de Pagamento</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Forma</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Receitas</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Despesas</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Quantidade</th>
-              </tr>
-            </thead>
-            <tbody>
-              {statusCaixa?.totaisPorForma && Object.entries(statusCaixa.totaisPorForma).map(([forma, dados]) => (
-                <tr key={forma} className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 text-gray-900 dark:text-white font-medium">{forma}</td>
-                  <td className="py-3 px-4 text-right text-green-600 font-semibold">
-                    €{dados.receitas?.toFixed(2) || '0.00'}
-                  </td>
-                  <td className="py-3 px-4 text-right text-red-600 font-semibold">
-                    €{dados.despesas?.toFixed(2) || '0.00'}
-                  </td>
-                  <td className="py-3 px-4 text-right text-gray-700 dark:text-gray-300">
-                    {dados.quantidade}
-                  </td>
+          <div className={`rounded-2xl border ${cardClass} p-5`}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className={`text-sm font-medium ${subTextClass}`}>Despesas</p>
+                <p className="text-2xl font-bold text-red-500 mt-1">
+                  €{statusCaixa?.movimentacao?.despesas?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+                <TrendingDown className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border ${cardClass} p-5`}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className={`text-sm font-medium ${subTextClass}`}>Pagamentos</p>
+                <p className={`text-2xl font-bold ${textClass} mt-1`}>
+                  {statusCaixa?.detalhes?.quantidadePagamentos || 0}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Botões de Ação */}
+        {caixaAberto && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <button
+              onClick={() => setModalSangria(true)}
+              className={`flex items-center justify-center gap-3 p-5 rounded-2xl border-2 border-dashed transition-all ${isDarkMode ? 'border-red-500/30 hover:bg-red-500/10 text-slate-300' : 'border-red-200 hover:bg-red-50 text-gray-700'}`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <Minus className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="text-left">
+                <p className={`font-semibold ${textClass}`}>Registrar Sangria</p>
+                <p className={`text-sm ${subTextClass}`}>Retirada de dinheiro do caixa</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setModalSuprimento(true)}
+              className={`flex items-center justify-center gap-3 p-5 rounded-2xl border-2 border-dashed transition-all ${isDarkMode ? 'border-emerald-500/30 hover:bg-emerald-500/10 text-slate-300' : 'border-emerald-200 hover:bg-emerald-50 text-gray-700'}`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <Plus className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div className="text-left">
+                <p className={`font-semibold ${textClass}`}>Registrar Suprimento</p>
+                <p className={`text-sm ${subTextClass}`}>Entrada de dinheiro no caixa</p>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Totais por Forma de Pagamento */}
+        <div className={`rounded-2xl border ${cardClass} p-5`}>
+          <h2 className={`text-lg font-semibold ${textClass} mb-4`}>Formas de Pagamento</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                  <th className={`text-left py-3 px-4 text-sm font-semibold ${subTextClass}`}>Forma</th>
+                  <th className={`text-right py-3 px-4 text-sm font-semibold ${subTextClass}`}>Receitas</th>
+                  <th className={`text-right py-3 px-4 text-sm font-semibold ${subTextClass}`}>Despesas</th>
+                  <th className={`text-right py-3 px-4 text-sm font-semibold ${subTextClass}`}>Quantidade</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className={`divide-y ${isDarkMode ? 'divide-white/5' : 'divide-gray-100'}`}>
+                {statusCaixa?.totaisPorForma && Object.entries(statusCaixa.totaisPorForma).map(([forma, dados]) => (
+                  <tr key={forma} className={isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'}>
+                    <td className={`py-3 px-4 font-medium ${textClass}`}>{forma}</td>
+                    <td className="py-3 px-4 text-right text-emerald-500 font-semibold">
+                      €{dados.receitas?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="py-3 px-4 text-right text-red-500 font-semibold">
+                      €{dados.despesas?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className={`py-3 px-4 text-right ${subTextClass}`}>
+                      {dados.quantidade}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* Modal Abrir Caixa */}
       {modalAbrir && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Abrir Caixa</h3>
-            <form onSubmit={handleAbrirCaixa}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${modalBg} rounded-2xl w-full max-w-md p-6`}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className={`text-lg font-semibold ${textClass}`}>Abrir Caixa</h3>
+              <button onClick={() => setModalAbrir(false)} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}>
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+            <form onSubmit={handleAbrirCaixa} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>
                   Valor Inicial (Opcional)
                 </label>
                 <input
@@ -288,21 +333,21 @@ function Caixa() {
                   min="0"
                   value={valorInicial}
                   onChange={(e) => setValorInicial(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalAbrir(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className={`flex-1 px-4 py-3 rounded-xl border ${isDarkMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition font-medium`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Abrir Caixa
                 </button>
@@ -314,17 +359,22 @@ function Caixa() {
 
       {/* Modal Fechar Caixa */}
       {modalFechar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Fechar Caixa</h3>
-            <form onSubmit={handleFecharCaixa}>
-              <div className="mb-4">
-                <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg mb-4">
-                  <p className="text-sm text-blue-800 dark:text-blue-300">
-                    <span className="font-semibold">Saldo Esperado:</span> €{statusCaixa?.movimentacao?.saldoAtual?.toFixed(2) || '0.00'}
-                  </p>
-                </div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${modalBg} rounded-2xl w-full max-w-md p-6`}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className={`text-lg font-semibold ${textClass}`}>Fechar Caixa</h3>
+              <button onClick={() => setModalFechar(false)} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}>
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+            <form onSubmit={handleFecharCaixa} className="space-y-4">
+              <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'}`}>
+                <p className={`text-sm ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                  <span className="font-semibold">Saldo Esperado:</span> €{statusCaixa?.movimentacao?.saldoAtual?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>
                   Saldo Contado *
                 </label>
                 <input
@@ -334,33 +384,33 @@ function Caixa() {
                   value={saldoContado}
                   onChange={(e) => setSaldoContado(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>
                   Observações
                 </label>
                 <textarea
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
                   rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none ${inputClass}`}
                   placeholder="Observações sobre o fechamento..."
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalFechar(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className={`flex-1 px-4 py-3 rounded-xl border ${isDarkMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition font-medium`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Fechar Caixa
                 </button>
@@ -372,14 +422,17 @@ function Caixa() {
 
       {/* Modal Sangria */}
       {modalSangria && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Registrar Sangria</h3>
-            <form onSubmit={handleRegistrarSangria}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Valor *
-                </label>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${modalBg} rounded-2xl w-full max-w-md p-6`}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className={`text-lg font-semibold ${textClass}`}>Registrar Sangria</h3>
+              <button onClick={() => setModalSangria(false)} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}>
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+            <form onSubmit={handleRegistrarSangria} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>Valor *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -387,34 +440,32 @@ function Caixa() {
                   value={valorSangria}
                   onChange={(e) => setValorSangria(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Motivo *
-                </label>
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>Motivo *</label>
                 <input
                   type="text"
                   value={motivoSangria}
                   onChange={(e) => setMotivoSangria(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 ${inputClass}`}
                   placeholder="Ex: Pagamento de fornecedor"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalSangria(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className={`flex-1 px-4 py-3 rounded-xl border ${isDarkMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition font-medium`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Registrar
                 </button>
@@ -426,14 +477,17 @@ function Caixa() {
 
       {/* Modal Suprimento */}
       {modalSuprimento && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Registrar Suprimento</h3>
-            <form onSubmit={handleRegistrarSuprimento}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Valor *
-                </label>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${modalBg} rounded-2xl w-full max-w-md p-6`}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className={`text-lg font-semibold ${textClass}`}>Registrar Suprimento</h3>
+              <button onClick={() => setModalSuprimento(false)} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}>
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+            <form onSubmit={handleRegistrarSuprimento} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>Valor *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -441,34 +495,32 @@ function Caixa() {
                   value={valorSuprimento}
                   onChange={(e) => setValorSuprimento(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Motivo *
-                </label>
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1.5`}>Motivo *</label>
                 <input
                   type="text"
                   value={motivoSuprimento}
                   onChange={(e) => setMotivoSuprimento(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${inputClass}`}
                   placeholder="Ex: Troco inicial"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setModalSuprimento(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className={`flex-1 px-4 py-3 rounded-xl border ${isDarkMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition font-medium`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Registrar
                 </button>

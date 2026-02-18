@@ -10,6 +10,8 @@ import {
   confirmarAgendamento,
   enviarLembreteManual,
   registrarPagamentoServico,
+  getHistorico,
+  getStatsMes,
 } from '../controllers/agendamentoController.js';
 import validateObjectId from '../middlewares/validateObjectId.js';
 
@@ -17,6 +19,10 @@ const router = express.Router();
 
 // 🆕 Proteger todas as rotas
 router.use(authenticate);
+
+// Rotas de histórico e estatísticas (antes das rotas com :id)
+router.get('/historico', getHistorico);
+router.get('/stats/mes', getStatsMes);
 
 // Rotas CRUD para Agendamentos
 router.get('/', getAllAgendamentos);

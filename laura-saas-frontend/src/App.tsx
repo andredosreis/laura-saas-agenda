@@ -8,7 +8,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Componentes de Layout
-import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import InstallPrompt from './components/InstallPrompt';
 
 // 🆕 Página de Landing (Pública) - COMENTADO: promete funcionalidades não implementadas
@@ -22,6 +22,7 @@ import ResetPassword from './pages/ResetPassword';
 
 // Páginas Protegidas
 import Agendamentos from './pages/Agendamentos';
+import Atendimentos from './pages/Atendimentos';
 import Clientes from './pages/Clientes';
 import Pacotes from './pages/Pacotes';
 import CriarCliente from './pages/CriarCliente';
@@ -41,12 +42,14 @@ import PacotesAtivos from './pages/PacotesAtivos';
 import VenderPacote from './pages/VenderPacote';
 import Caixa from './pages/Caixa';
 
-// Componente para layout protegido (com Navbar)
+// Componente para layout protegido (com Sidebar)
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <ProtectedRoute>
-      <Navbar />
-      {children}
+      <Sidebar />
+      <div className="lg:pl-72">
+        {children}
+      </div>
     </ProtectedRoute>
   );
 };
@@ -72,6 +75,9 @@ const App = () => {
             } />
             <Route path="/agendamentos" element={
               <ProtectedLayout><Agendamentos /></ProtectedLayout>
+            } />
+            <Route path="/atendimentos" element={
+              <ProtectedLayout><Atendimentos /></ProtectedLayout>
             } />
             <Route path="/calendario" element={
               <ProtectedLayout><CalendarView /></ProtectedLayout>

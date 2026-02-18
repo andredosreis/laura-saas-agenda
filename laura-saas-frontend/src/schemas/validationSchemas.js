@@ -91,6 +91,11 @@ export const clienteSchema = z.object({
       },
       { message: 'Telefone deve ter entre 9 e 15 dígitos' }
     ),
+  email: z
+    .string()
+    .email('Formato de email inválido')
+    .optional()
+    .or(z.literal('')),
   dataNascimento: z
     .string()
     .optional()

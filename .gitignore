@@ -26,3 +26,6 @@ build/
 
 # Pasta de seeds (opcional se quiser proteger os scripts)
 seeds/
+
+# Documentação de revisão local
+Revisação de md/

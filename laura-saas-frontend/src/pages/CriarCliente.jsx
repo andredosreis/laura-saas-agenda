@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, XCircle, ArrowLeft, User, Phone, Calendar, FileText, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowLeft, User, Phone, Calendar, FileText, Loader2, Mail } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { clienteSchema, formatPhone } from '../schemas/validationSchemas';
@@ -27,6 +27,7 @@ function CriarCliente() {
     defaultValues: {
       nome: '',
       telefone: '',
+      email: '',
       dataNascimento: '',
       observacoes: '',
     },
@@ -47,6 +48,7 @@ function CriarCliente() {
       const dadosParaEnviar = {
         nome: data.nome.trim(),
         telefone: data.telefone.replace(/\D/g, ''),
+        email: data.email?.trim() || undefined,
         dataNascimento: data.dataNascimento || null,
         observacoes: data.observacoes?.trim() || '',
       };
@@ -177,6 +179,25 @@ function CriarCliente() {
               <FieldFeedback fieldName="telefone" />
             </div>
             <ErrorMessage fieldName="telefone" />
+          </div>
+
+          {/* Card Email */}
+          <div className={`${cardClass} rounded-2xl p-5`}>
+            <div className="flex items-center gap-2 mb-4">
+              <Mail className={`w-5 h-5 ${subTextClass}`} />
+              <label className={`font-medium ${textClass}`}>Email</label>
+            </div>
+            <div className="relative">
+              <input
+                type="email"
+                {...register('email')}
+                className={`${getInputClasses('email')} pr-12`}
+                placeholder="cliente@exemplo.com"
+              />
+              <FieldFeedback fieldName="email" />
+            </div>
+            <ErrorMessage fieldName="email" />
+            <p className={`mt-2 text-xs ${subTextClass}`}>Opcional - para envio de confirmações e lembretes</p>
           </div>
 
           {/* Card Data de Nascimento */}

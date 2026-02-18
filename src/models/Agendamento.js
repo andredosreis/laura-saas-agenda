@@ -71,12 +71,6 @@ const agendamentoSchema = new mongoose.Schema({
     min: [0, 'O valor não pode ser negativo']
   },
 
-  // Se for de um pacote comprado
-  compraPacote: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CompraPacote',
-    default: null
-  },
   numeroDaSessao: {
     type: Number,
     default: null,
