@@ -234,7 +234,7 @@ function Dashboard() {
       isPositive: calcularMudanca(financeiro.faturamentoMes, 'faturamento').positivo,
       icon: Euro,
       gradient: 'from-emerald-500 to-teal-500',
-      subtext: 'este mês'
+      subtext: 'total acumulado'
     },
     {
       title: 'Agendamentos',

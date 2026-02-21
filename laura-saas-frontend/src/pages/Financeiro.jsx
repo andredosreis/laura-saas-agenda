@@ -43,7 +43,7 @@ function Financeiro() {
     // State
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedPreset, setSelectedPreset] = useState(1); // Último Mês
+    const [selectedPreset, setSelectedPreset] = useState(3); // Este Ano
     const [periodo, setPeriodo] = useState('dia');
 
     // Data states

@@ -4,6 +4,7 @@ import Cliente from '../models/Cliente.js';
 import Pacote from '../models/Pacote.js';
 import Agendamento from '../models/Agendamento.js';
 import CompraPacote from '../models/CompraPacote.js';
+import logger from '../utils/logger.js';
 
 // @desc    Agendamentos de hoje
 export const getAgendamentosDeHoje = async (req, res) => {
@@ -185,17 +186,44 @@ async function calcularFaturamento(tenantId, inicio, fim) {
 export const getDadosFinanceiros = async (req, res) => {
   try {
     const { tenantId } = req;
+    const tid = new mongoose.Types.ObjectId(tenantId);
     const agora = DateTime.now().setZone('Europe/Lisbon');
     const inicioMes = agora.startOf('month').toJSDate();
     const fimMes = agora.endOf('month').toJSDate();
-    const inicioMesAnterior = agora.minus({ months: 1 }).startOf('month').toJSDate();
-    const fimMesAnterior = agora.minus({ months: 1 }).endOf('month').toJSDate();
 
-    // 1. Faturamento: serviços avulsos + valor proporcional de pacotes
-    const [faturamentoMensal, faturamentoMesAnterior] = await Promise.all([
-      calcularFaturamento(tenantId, inicioMes, fimMes),
-      calcularFaturamento(tenantId, inicioMesAnterior, fimMesAnterior),
+    // 1. Faturamento total acumulado: pacotes (sem filtro de data) + avulsos do mês
+    const [pacotesRes, avulsosRes] = await Promise.all([
+      // Pacotes: total acumulado (sem filtro de data)
+      CompraPacote.aggregate([
+        {
+          $match: {
+            tenantId: tid,
+            status: { $ne: 'Cancelado' }
+          }
+        },
+        { $group: { _id: null, total: { $sum: '$valorPago' } } }
+      ]),
+      // Serviços avulsos: filtrados pelo mês actual
+      Agendamento.aggregate([
+        {
+          $match: {
+            tenantId: tid,
+            status: 'Realizado',
+            dataHora: { $gte: inicioMes, $lte: fimMes },
+            servicoAvulsoValor: { $gt: 0 }
+          }
+        },
+        { $group: { _id: null, total: { $sum: '$servicoAvulsoValor' } } }
+      ])
     ]);
+
+    const faturamentoPacotes = pacotesRes[0]?.total || 0;
+    const faturamentoAvulsos = avulsosRes[0]?.total || 0;
+    const faturamentoMensal = faturamentoPacotes + faturamentoAvulsos;
+
+    // Log de diagnóstico
+    const countPacotes = await CompraPacote.countDocuments({ tenantId: tid, status: { $ne: 'Cancelado' } });
+    logger.info({ tenantId, countPacotes, faturamentoPacotes, faturamentoAvulsos, faturamentoMensal }, 'getDadosFinanceiros — diagnóstico');
 
     // 2. Taxa de Comparecimento
     const [agendamentosTotaisMes, agendamentosComparecidos] = await Promise.all([
@@ -215,23 +243,14 @@ export const getDadosFinanceiros = async (req, res) => {
       ? Math.round((agendamentosComparecidos / agendamentosTotaisMes) * 100)
       : 0;
 
-    let crescimentoFaturamento = 0;
-    if (faturamentoMesAnterior > 0) {
-      crescimentoFaturamento = Math.round(((faturamentoMensal - faturamentoMesAnterior) / faturamentoMesAnterior) * 100);
-    } else if (faturamentoMensal > 0) {
-      crescimentoFaturamento = 100;
-    }
-
     res.status(200).json({
       faturamentoMensal: Math.round(faturamentoMensal * 100) / 100,
-      faturamentoMesAnterior: Math.round(faturamentoMesAnterior * 100) / 100,
-      crescimentoFaturamento,
       taxaComparecimento,
       agendamentosTotaisMes
     });
 
   } catch (error) {
-    console.error('Erro em getDadosFinanceiros:', error);
+    logger.error({ err: error }, 'Erro em getDadosFinanceiros');
     res.status(500).json({ message: 'Erro ao buscar dados financeiros.', details: error.message });
   }
 };

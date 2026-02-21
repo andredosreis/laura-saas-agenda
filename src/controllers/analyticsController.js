@@ -158,8 +158,7 @@ export const getReceitaTemporal = async (req, res) => {
       {
         $match: {
           tenantId,
-          status: { $ne: 'Cancelado' },
-          dataCompra: { $gte: dataInicio.toJSDate(), $lte: dataFim.toJSDate() }
+          status: { $ne: 'Cancelado' }
         }
       },
       {
@@ -297,13 +296,12 @@ export const getDistribuicaoServicos = async (req, res) => {
       }
     ]);
 
-    // Vendas de pacotes no período (agrupadas por nome do pacote)
+    // Vendas de pacotes (total acumulado, sem filtro de data)
     const resultadosPacotes = await CompraPacote.aggregate([
       {
         $match: {
           tenantId,
-          status: { $ne: 'Cancelado' },
-          dataCompra: { $gte: inicio.toJSDate(), $lte: fim.toJSDate() }
+          status: { $ne: 'Cancelado' }
         }
       },
       {
