@@ -121,7 +121,7 @@ function VerificarEmail() {
                 </div>
 
                 <p className="text-center text-gray-500 text-sm mt-8">
-                    © {new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+                    © {new Date().getFullYear()} Marcai. Todos os direitos reservados.
                 </p>
             </div>
         </div>

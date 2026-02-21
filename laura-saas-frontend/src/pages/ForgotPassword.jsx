@@ -198,7 +198,7 @@ function ForgotPassword() {
 
                 {/* Footer */}
                 <p className="text-center text-gray-500 text-sm mt-8">
-                    © 2025 Laura SAAS. Todos os direitos reservados.
+                    © {new Date().getFullYear()} Marcai. Todos os direitos reservados.
                 </p>
             </div>
         </div>

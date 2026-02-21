@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '../schemas/validationSchemas';
+import MarcaiLogo from '../components/MarcaiLogo';
 
 function Login() {
     const navigate = useNavigate();
@@ -103,12 +104,9 @@ function Login() {
                 {/* Glassmorphism card */}
                 <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
                     {/* Logo/Header */}
-                    <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg mb-4">
-                            <span className="text-3xl">💆‍♀️</span>
-                        </div>
-                        <h1 className="text-2xl font-bold text-white">Bem-vindo de volta!</h1>
-                        <p className="text-gray-400 mt-2">Entre na sua conta para continuar</p>
+                    <div className="flex flex-col items-center mb-8">
+                        <MarcaiLogo width={260} height={78} />
+                        <p className="text-gray-400 mt-3">Entre na sua conta para continuar</p>
                     </div>
 
                     {/* Formulário */}
@@ -258,7 +256,7 @@ function Login() {
 
                 {/* Footer */}
                 <p className="text-center text-gray-500 text-sm mt-8">
-                    © 2025 Laura SAAS. Todos os direitos reservados.
+                    © {new Date().getFullYear()} Marcai. Todos os direitos reservados.
                 </p>
             </div>
         </div>

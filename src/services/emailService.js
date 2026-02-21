@@ -32,7 +32,7 @@ export const initEmailService = () => {
 // Enviar email genérico
 export const sendEmail = async ({ to, subject, html, text }) => {
     const mailOptions = {
-        from: process.env.SMTP_FROM || '"Laura SAAS" <noreply@laurasaas.com>',
+        from: process.env.SMTP_FROM || '"Marcai" <noreply@laurasaas.com>',
         to,
         subject,
         html,
@@ -63,7 +63,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendUrl}/reset-senha/${resetToken}`;
 
-    const subject = 'Recuperação de Senha - Laura SAAS';
+    const subject = 'Recuperação de Senha - Marcai';
 
     const html = `
         <!DOCTYPE html>
@@ -144,7 +144,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
                             <tr>
                                 <td align="center" style="padding-top: 40px; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 40px;">
                                     <p style="margin: 0; color: #475569; font-size: 12px;">
-                                        © ${new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+                                        © ${new Date().getFullYear()} Marcai. Todos os direitos reservados.
                                     </p>
                                 </td>
                             </tr>
@@ -159,7 +159,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
     const text = `
 Olá${userName ? `, ${userName}` : ''}!
 
-Recebemos um pedido para redefinir a senha da sua conta Laura SAAS.
+Recebemos um pedido para redefinir a senha da sua conta Marcai.
 
 Para criar uma nova senha, acesse o link abaixo:
 ${resetLink}
@@ -169,7 +169,7 @@ Este link expira em 1 hora.
 Se você não solicitou esta alteração, por favor ignore este email.
 
 ---
-© ${new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+© ${new Date().getFullYear()} Marcai. Todos os direitos reservados.
     `;
 
     return sendEmail({ to: email, subject, html, text });
@@ -180,7 +180,7 @@ export const sendEmailVerificationEmail = async (email, verificationToken, userN
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const verifyLink = `${frontendUrl}/verificar-email/${verificationToken}`;
 
-    const subject = 'Confirme o seu email - Laura SAAS';
+    const subject = 'Confirme o seu email - Marcai';
 
     const html = `
         <!DOCTYPE html>
@@ -214,7 +214,7 @@ export const sendEmailVerificationEmail = async (email, verificationToken, userN
                                         Olá${userName ? `, ${userName}` : ''}!
                                     </p>
                                     <p style="margin: 0; color: #94a3b8; font-size: 16px; line-height: 1.6;">
-                                        Obrigado por criar a sua conta no Laura SAAS. Clique no botão abaixo para confirmar o seu email e ativar a sua conta.
+                                        Obrigado por criar a sua conta no Marcai. Clique no botão abaixo para confirmar o seu email e ativar a sua conta.
                                     </p>
                                 </td>
                             </tr>
@@ -245,7 +245,7 @@ export const sendEmailVerificationEmail = async (email, verificationToken, userN
                             <tr>
                                 <td align="center" style="padding-top: 40px; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 40px;">
                                     <p style="margin: 0; color: #475569; font-size: 12px;">
-                                        © ${new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+                                        © ${new Date().getFullYear()} Marcai. Todos os direitos reservados.
                                     </p>
                                 </td>
                             </tr>
@@ -260,7 +260,7 @@ export const sendEmailVerificationEmail = async (email, verificationToken, userN
     const text = `
 Olá${userName ? `, ${userName}` : ''}!
 
-Obrigado por criar a sua conta no Laura SAAS. Acesse o link abaixo para confirmar o seu email:
+Obrigado por criar a sua conta no Marcai. Acesse o link abaixo para confirmar o seu email:
 ${verifyLink}
 
 Este link expira em 24 horas.
@@ -268,7 +268,7 @@ Este link expira em 24 horas.
 Se não foi você, ignore este email.
 
 ---
-© ${new Date().getFullYear()} Laura SAAS. Todos os direitos reservados.
+© ${new Date().getFullYear()} Marcai. Todos os direitos reservados.
     `;
 
     return sendEmail({ to: email, subject, html, text });
