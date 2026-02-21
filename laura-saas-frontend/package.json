@@ -22,7 +22,6 @@
     "framer-motion": "^12.24.7",
     "lucide-react": "^0.553.0",
     "luxon": "^3.7.2",
-    "nodemailer": "^7.0.12",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.70.0",
@@ -30,7 +29,6 @@
     "react-toastify": "^11.0.5",
     "recharts": "^3.6.0",
     "vite-plugin-pwa": "^1.1.0",
-    "web-push": "^3.6.7",
     "zod": "^4.3.5"
   },
   "devDependencies": {

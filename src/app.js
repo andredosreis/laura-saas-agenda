@@ -7,6 +7,7 @@ import morgan from 'morgan';
 dotenv.config();
 
 // Middlewares
+import logger from './utils/logger.js';
 import requestLogger from './middlewares/requestLogger.js';
 import errorHandler from './middlewares/errorHandler.js';
 
@@ -47,31 +48,21 @@ const whiteList = [
   'https://api.z-api.io'                        // Webhook Z-API
 ];
 
-// 🔍 DEBUG: Log do ambiente
-console.log(`[APP] NODE_ENV: "${process.env.NODE_ENV}"`);
+logger.info({ NODE_ENV: process.env.NODE_ENV }, '[APP] Ambiente detectado');
 
 if (process.env.NODE_ENV === 'development') {
-  console.log('[APP] 🟢 Modo DESENVOLVIMENTO - CORS liberado para todos');
+  logger.info('[APP] Modo DESENVOLVIMENTO - CORS liberado para todos');
   app.use(cors()); // Desenvolvimento: permite tudo
 } else {
-  console.log('[APP] 🔴 Modo PRODUÇÃO - CORS restrito');
+  logger.info('[APP] Modo PRODUÇÃO - CORS restrito');
   app.use(cors({
     origin: (origin, callback) => {
-      // 🔍 DEBUG: Log SEMPRE será executado
-      console.log(`[CORS] ========================================`);
-      console.log(`[CORS] Origin recebido: "${origin}"`);
-      console.log(`[CORS] Tipo: ${typeof origin}`);
-      console.log(`[CORS] É undefined?: ${origin === undefined}`);
-      console.log(`[CORS] É null?: ${origin === null}`);
-      console.log(`[CORS] Avaliação !origin: ${!origin}`);
-      console.log(`[CORS] ========================================`);
-
       // Permite se: sem origin (webhooks/Postman) OU está na whitelist
       if (!origin || whiteList.includes(origin)) {
-        console.log(`[CORS] ✅ PERMITIDO`);
+        logger.debug({ origin }, '[CORS] Permitido');
         callback(null, true);
       } else {
-        console.log(`[CORS] ❌ REJEITADO - Origin "${origin}" não está na whitelist`);
+        logger.warn({ origin }, '[CORS] Rejeitado');
         callback(new Error('Not allowed by CORS'));
       }
     },

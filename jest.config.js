@@ -1,5 +1,8 @@
-module.exports = {
-    testEnvironment: 'node',
-    testTimeout: 10000
-  };
-  
+export default {
+  testEnvironment: 'node',
+  testTimeout: 30000,
+  testMatch: ['**/tests/**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', '/laura-saas-frontend/'],
+  clearMocks: true,
+  restoreMocks: true,
+};

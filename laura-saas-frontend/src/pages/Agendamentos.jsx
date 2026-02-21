@@ -27,7 +27,7 @@ function Agendamentos() {
     setIsLoading(true);
     try {
       const response = await api.get('/agendamentos');
-      setAgendamentos(response.data || []);
+      setAgendamentos(response.data?.data || []);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast.error('Erro ao carregar agendamentos. Tente novamente mais tarde.');

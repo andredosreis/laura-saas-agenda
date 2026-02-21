@@ -96,7 +96,7 @@ function Financeiro() {
             // Calculate KPIs
             const totalReceita = servicosRes.data?.totalReceita || 0;
             const totalAgendamentos = (receitaRes.data?.dados || []).reduce((acc, d) => acc + d.agendamentos, 0);
-            const totalClientesAtivos = todosClientesRes.data?.length || 0;
+            const totalClientesAtivos = todosClientesRes.data?.data?.length || 0;
 
             setKpis({
                 totalReceita,

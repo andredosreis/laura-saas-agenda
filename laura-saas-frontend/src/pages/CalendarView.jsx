@@ -99,9 +99,9 @@ function CalendarView() {
                 api.get('/pacotes')
             ]);
 
-            setAgendamentos(agendamentosRes.data || []);
-            setClientes(clientesRes.data || []);
-            setPacotes(pacotesRes.data || []);
+            setAgendamentos(agendamentosRes.data?.data || []);
+            setClientes(clientesRes.data?.data || []);
+            setPacotes(pacotesRes.data?.data || []);
         } catch (error) {
             console.error('Erro ao carregar dados:', error);
             toast.error('Erro ao carregar agendamentos');

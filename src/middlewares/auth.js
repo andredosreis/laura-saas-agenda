@@ -2,8 +2,6 @@ import jwt from 'jsonwebtoken';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
-
 // =============================================
 // MIDDLEWARE: AUTHENTICATE
 // Verifica se o usuário está autenticado via JWT
@@ -25,7 +23,7 @@ export const authenticate = async (req, res, next) => {
         // Verificar token
         let decoded;
         try {
-            decoded = jwt.verify(token, JWT_SECRET);
+            decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-key-change-in-production');
         } catch (error) {
             if (error.name === 'TokenExpiredError') {
                 return res.status(401).json({
@@ -296,7 +294,7 @@ export const optionalAuth = async (req, res, next) => {
         const token = authHeader.split(' ')[1];
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET);
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-key-change-in-production');
             req.user = decoded;
             req.tenantId = decoded.tenantId;
         } catch (error) {

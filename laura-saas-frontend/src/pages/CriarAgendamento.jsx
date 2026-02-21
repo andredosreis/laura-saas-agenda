@@ -83,8 +83,8 @@ function CriarAgendamento() {
           api.get('/clientes'),
           api.get('/pacotes'),
         ]);
-        setClientes(clientesRes.data);
-        setPacotes(pacotesRes.data);
+        setClientes(clientesRes.data?.data || []);
+        setPacotes(pacotesRes.data?.data || []);
       } catch (error) {
         toast.error('Erro ao carregar dados necessários');
         console.error('Erro ao carregar dados:', error);

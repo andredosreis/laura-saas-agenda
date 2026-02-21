@@ -1,7 +1,7 @@
 # Melhorias Identificadas — Marcai
 
 Registo das melhorias e problemas conhecidos, organizados por prioridade.
-Actualizado a: 2026-02-21
+Actualizado a: 2026-02-21 (Batches 1-3 concluídos)
 
 ---
 
@@ -12,27 +12,25 @@ Actualizado a: 2026-02-21
 - **Impacto:** utilizadores com emails errados ficam sem recuperação de senha
 - **Solução:** bloquear acesso até verificar, ou pelo menos mostrar banner persistente
 
-### 2. Sem rate limiting nas rotas públicas
-- **Estado:** `/auth/register`, `/auth/login`, `/auth/forgot-password` sem limite
-- **Impacto:** vulnerável a brute force e spam de emails
-- **Solução:** `express-rate-limit` nas rotas públicas (ex: 5 req/min no login)
+### 2. Sem rate limiting nas rotas públicas ✅ CONCLUÍDO
+- **Estado:** ~~`/auth/register`, `/auth/login`, `/auth/forgot-password` sem limite~~
+- **Solução aplicada:** `rateLimiter.js` com `express-rate-limit`, aplicado em `authRoutes.js`
 
-### 3. Webhook WhatsApp sem validação de assinatura
-- **Estado:** qualquer POST ao `/webhook/whatsapp` é processado
-- **Impacto:** possível abuso/spam do chatbot
-- **Solução:** validar token Z-API no header de cada request
+### 3. Webhook WhatsApp sem validação de assinatura ✅ CONCLUÍDO
+- **Estado:** ~~qualquer POST ao `/webhook/whatsapp` é processado~~
+- **Solução aplicada:** `webhookAuth.js` middleware com validação de token Z-API
 
 ---
 
 ## Importantes (melhoram qualidade)
 
-### 4. Sem paginação consistente em todas as listagens
-- **Estado:** alguns endpoints sem paginação — podem retornar centenas de documentos
-- **Solução:** padronizar `?page=1&limit=20` com resposta `{ data, total, page, pages }`
+### 4. Sem paginação consistente em todas as listagens ✅ CONCLUÍDO
+- **Estado:** ~~alguns endpoints sem paginação~~
+- **Solução aplicada:** `?page&limit` em `clienteController`, `agendamentoController`, `pacoteController`. Resposta: `{ success, data, pagination: { total, page, pages, limit } }`. Frontend actualizado.
 
-### 5. Sem logging estruturado
-- **Estado:** apenas `console.log/error`
-- **Solução:** Winston ou Pino com níveis (info, warn, error) e output JSON em produção
+### 5. Sem logging estruturado ✅ CONCLUÍDO
+- **Estado:** ~~apenas `console.log/error`~~
+- **Solução aplicada:** `src/utils/logger.js` com Pino. `errorHandler.js`, `app.js`, `server.js` actualizados.
 
 ### 6. Cobertura de testes muito baixa
 - **Estado:** ~0% de testes activos (jest configurado mas sem testes)
@@ -55,13 +53,16 @@ Actualizado a: 2026-02-21
 - **Estado:** KPIs em números, sem visualização temporal
 - **Solução:** Recharts (já instalado) para gráfico de agendamentos por semana/mês
 
-### 10. Sem notificação de trial a expirar
-- **Estado:** utilizador não é alertado quando o trial está a terminar
-- **Solução:** banner no dashboard quando `diasRestantesTrial <= 3`
+### 10. Sem notificação de trial a expirar ✅ CONCLUÍDO
+- **Estado:** ~~utilizador não é alertado quando o trial está a terminar~~
+- **Solução aplicada:** banner âmbar no Dashboard quando `tenant.plano.status === 'trial' && diasRestantesTrial <= 3`
 
-### 11. Página de configurações do tenant incompleta
-- **Estado:** não existe página para editar dados da empresa (nome, contacto, timezone)
-- **Solução:** página `/configuracoes` com form para editar `Tenant.contato` e `Tenant.configuracoes`
+### 1. Sem verificação de email — banner ✅ CONCLUÍDO (parcial)
+- **Solução aplicada:** banner azul no Dashboard quando `user.emailVerificado === false`
+
+### 11. Página de configurações do tenant incompleta ✅ CONCLUÍDO
+- **Estado:** ~~não existe página para editar dados da empresa~~
+- **Solução aplicada:** `src/pages/Configuracoes.jsx` + rota `/configuracoes` em `App.tsx` + endpoint `PUT /api/auth/tenant`
 
 ### 12. Sem confirmação de agendamento por WhatsApp
 - **Estado:** lembrete enviado mas cliente não pode confirmar/cancelar via WhatsApp
@@ -79,22 +80,17 @@ Actualizado a: 2026-02-21
 
 ## Dívida técnica
 
-### 15. `manifest.json` duplicado
-- **Estado:** existe `/public/manifest.json` e o manifest gerado pelo `vite-plugin-pwa`
-- **Risco:** conflito entre os dois
-- **Solução:** remover `/public/manifest.json` e deixar apenas o do Vite PWA
+### 15. `manifest.json` duplicado ✅ CONCLUÍDO
+- **Solução aplicada:** `/public/manifest.json` removido; apenas o do Vite PWA permanece.
 
-### 16. `nodemailer` no frontend
-- **Estado:** `nodemailer` está nas dependências do frontend (não serve para nada no browser)
-- **Solução:** remover da `laura-saas-frontend/package.json`
+### 16. `nodemailer` no frontend ✅ CONCLUÍDO
+- **Solução aplicada:** removido de `laura-saas-frontend/package.json`
 
-### 17. `web-push` no frontend
-- **Estado:** mesma situação — `web-push` é uma lib de servidor, não de browser
-- **Solução:** remover da `laura-saas-frontend/package.json`
+### 17. `web-push` no frontend ✅ CONCLUÍDO
+- **Solução aplicada:** removido de `laura-saas-frontend/package.json`
 
-### 18. `service-worker.ts` e `service-worker.js` duplicados em `/public`
-- **Estado:** dois ficheiros de service worker manuais coexistem com o do Vite PWA
-- **Solução:** remover os manuais, usar apenas o gerado pelo plugin
+### 18. `service-worker.ts` e `service-worker.js` duplicados em `/public` ✅ CONCLUÍDO
+- **Solução aplicada:** ambos removidos; apenas o service worker do Vite PWA é usado
 
 ---
 

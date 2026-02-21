@@ -71,7 +71,7 @@ function Pacotes() {
       setIsLoading(true);
       try {
         const response = await api.get("/pacotes");
-        setPacotes(response.data || []); // Garante que pacotes seja sempre um array
+        setPacotes(response.data?.data || []); // Garante que pacotes seja sempre um array
       } catch (error) {
         console.error("Erro ao buscar serviços:", error);
         toast.error("Não foi possível carregar os serviços. Tente novamente mais tarde.");

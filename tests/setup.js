@@ -1,22 +1,26 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
 let mongoServer;
 
-beforeAll(async () => {
+export async function setupTestDB() {
   mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
   process.env.MONGODB_URI = uri;
-  await mongoose.connect(uri)
-});
+  process.env.JWT_SECRET = 'test-jwt-secret-key';
+  process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-key';
+  process.env.NODE_ENV = 'test';
+  await mongoose.connect(uri);
+}
 
-afterAll(async () => {
+export async function teardownTestDB() {
   await mongoose.disconnect();
-  // Close the MongoDB Memory Server
-  // This is important to avoid open handles
   await mongoServer.stop();
-});
+}
 
-
-
-//
+export async function clearDB() {
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    await collections[key].deleteMany({});
+  }
+}

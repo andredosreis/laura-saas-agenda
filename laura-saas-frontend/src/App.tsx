@@ -43,6 +43,9 @@ import PacotesAtivos from './pages/PacotesAtivos';
 import VenderPacote from './pages/VenderPacote';
 import Caixa from './pages/Caixa';
 
+// ⚙️ Configurações
+import Configuracoes from './pages/Configuracoes';
+
 // Componente para layout protegido (com Sidebar)
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -127,6 +130,11 @@ const App = () => {
             } />
             <Route path="/caixa" element={
               <ProtectedLayout><Caixa /></ProtectedLayout>
+            } />
+
+            {/* ⚙️ Configurações */}
+            <Route path="/configuracoes" element={
+              <ProtectedLayout><Configuracoes /></ProtectedLayout>
             } />
           </Routes>
 

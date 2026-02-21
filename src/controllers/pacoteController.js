@@ -24,8 +24,25 @@ export const createPacote = async (req, res) => {
 export const getAllPacotes = async (req, res) => {
   try {
     const filter = req.tenantFilter || {};
-    const pacotes = await Pacote.find(filter);
-    res.status(200).json(pacotes);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [pacotes, total] = await Promise.all([
+      Pacote.find(filter).skip(skip).limit(limit),
+      Pacote.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: pacotes,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+      },
+    });
   } catch (error) {
     console.error('Erro ao buscar pacotes:', error.message);
     res.status(500).json({ message: 'Erro interno ao buscar todos os pacotes.' });

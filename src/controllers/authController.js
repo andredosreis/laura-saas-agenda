@@ -8,8 +8,8 @@ import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../services/
 // =============================================
 // CONFIGURAÇÕES JWT
 // =============================================
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
+const getJwtSecret = () => process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
+const getJwtRefreshSecret = () => process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
 const ACCESS_TOKEN_EXPIRES = '1h'; // Aumentado de 15m para 1h para evitar expiração durante preenchimento de formulários
 const REFRESH_TOKEN_EXPIRES = '7d';
 
@@ -30,7 +30,7 @@ const generateAccessToken = (user, tenant) => {
             role: user.role,
             plano: tenant.plano.tipo
         },
-        JWT_SECRET,
+        getJwtSecret(),
         { expiresIn: ACCESS_TOKEN_EXPIRES }
     );
 };
@@ -44,7 +44,7 @@ const generateRefreshToken = (user) => {
             userId: user._id,
             tokenId: crypto.randomBytes(16).toString('hex')
         },
-        JWT_REFRESH_SECRET,
+        getJwtRefreshSecret(),
         { expiresIn: REFRESH_TOKEN_EXPIRES }
     );
     return token;
@@ -363,7 +363,7 @@ export const refreshToken = async (req, res) => {
         // Verificar token
         let decoded;
         try {
-            decoded = jwt.verify(token, JWT_REFRESH_SECRET);
+            decoded = jwt.verify(token, getJwtRefreshSecret());
         } catch (error) {
             return res.status(401).json({
                 success: false,
@@ -848,6 +848,53 @@ export const verifyEmail = async (req, res) => {
     }
 };
 
+/**
+ * PUT /api/auth/tenant
+ * Actualizar dados de contato e configurações do tenant
+ */
+export const updateTenant = async (req, res) => {
+    try {
+        const { contato, configuracoes, nome } = req.body;
+
+        const updates = {};
+        if (nome) updates.nome = nome;
+        if (contato) updates.contato = contato;
+        if (configuracoes) updates.configuracoes = configuracoes;
+
+        const tenant = await Tenant.findByIdAndUpdate(
+            req.user.tenantId,
+            { $set: updates },
+            { new: true, runValidators: true }
+        );
+
+        if (!tenant) {
+            return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Configurações actualizadas com sucesso',
+            data: {
+                tenant: {
+                    id: tenant._id,
+                    nome: tenant.nome,
+                    slug: tenant.slug,
+                    plano: tenant.plano,
+                    branding: tenant.branding,
+                    limites: tenant.limites,
+                    configuracoes: tenant.configuracoes,
+                    contato: tenant.contato,
+                    diasRestantesTrial: tenant.diasRestantesTrial,
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro ao actualizar tenant:', error);
+        res.status(500).json({ success: false, error: 'Erro interno ao actualizar configurações' });
+    }
+};
+
 export default {
     register,
     login,
@@ -856,6 +903,7 @@ export default {
     logoutAll,
     me,
     updateProfile,
+    updateTenant,
     changePassword,
     forgotPassword,
     resetPassword,

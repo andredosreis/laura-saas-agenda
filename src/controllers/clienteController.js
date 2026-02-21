@@ -4,9 +4,27 @@ import Cliente from '../models/Cliente.js';
 // @desc    Listar todos os clientes
 export const getAllClientes = async (req, res) => {
   try {
-    // 🆕 Filtrar apenas pelo tenant do usuário logado
-    const clientes = await Cliente.find({ tenantId: req.tenantId }).populate('pacote');
-    res.status(200).json(clientes);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter = { tenantId: req.tenantId };
+
+    const [clientes, total] = await Promise.all([
+      Cliente.find(filter).populate('pacote').skip(skip).limit(limit),
+      Cliente.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: clientes,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+      },
+    });
   } catch (error) {
     console.error('Erro ao listar clientes:', error.message);
     res.status(500).json({ message: 'Erro interno ao listar clientes.', details: error.message });

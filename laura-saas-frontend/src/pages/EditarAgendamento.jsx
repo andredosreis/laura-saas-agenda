@@ -54,8 +54,8 @@ function EditarAgendamento() {
           tipoServico: isAvulso ? 'avulso' : 'pacote'
         });
 
-        setClientes(clientesResponse.data || []);
-        setPacotes(pacotesResponse.data || []);
+        setClientes(clientesResponse.data?.data || []);
+        setPacotes(pacotesResponse.data?.data || []);
 
         // Carregar dados do cliente selecionado
         if (agendamentoData.cliente) {

@@ -4,6 +4,7 @@ import 'dotenv-flow/config';
 import cron from 'node-cron';
 import connectDB from './config/db.js';
 import app from './app.js';
+import logger from './utils/logger.js';
 import { sendReminderNotifications } from './controllers/agenteController.js';
 import { initEmailService } from './services/emailService.js';
 
@@ -14,31 +15,31 @@ connectDB().then(() => {
 
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
-    console.log(`🖥️  Servidor a rodar na porta ${PORT}`);
+    logger.info({ port: PORT }, 'Servidor a rodar');
   });
 }).catch(err => {
-  console.error("❌ Falha ao conectar ao MongoDB. O servidor não foi iniciado.", err);
+  logger.error({ err }, 'Falha ao conectar ao MongoDB. O servidor não foi iniciado.');
   process.exit(1); // Encerra o processo se a conexão com o BD falhar
 });
 
 // ⏰ CRON JOB: Lembretes diários às 19h (Europe/Lisbon)
 cron.schedule('0 19 * * *', async () => {
-  console.log('⏰ [CRON] Executando lembrete diário de agendamentos...');
+  logger.info('[CRON] Executando lembrete diário de agendamentos...');
   try {
-    const resultado = await sendReminderNotifications(
+    await sendReminderNotifications(
       { method: 'CRON' },
       {
         status: () => ({
-          json: (data) => console.log('[CRON] Resultado:', data),
+          json: (data) => logger.info({ data }, '[CRON] Resultado'),
         }),
       }
     );
-    console.log('✅ [CRON] Tarefa de lembretes concluída');
+    logger.info('[CRON] Tarefa de lembretes concluída');
   } catch (error) {
-    console.error('❌ [CRON] Falha ao executar tarefa:', error);
+    logger.error({ err: error }, '[CRON] Falha ao executar tarefa');
   }
 }, {
   timezone: 'Europe/Lisbon',
 });
 
-console.log('⏰ [CRON] Job registado: Lembretes diários às 19h (Europe/Lisbon)');
+logger.info('[CRON] Job registado: Lembretes diários às 19h (Europe/Lisbon)');

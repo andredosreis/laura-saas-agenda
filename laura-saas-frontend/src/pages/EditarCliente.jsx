@@ -55,7 +55,7 @@ function EditarCliente() {
         ]);
 
         const clienteData = clienteRes.data;
-        setPacotes(pacotesRes.data);
+        setPacotes(pacotesRes.data?.data || []);
         
         // Filtrar apenas pacotes ativos com sessões
         const pacotesAtivos = (pacotesClienteRes.data || []).filter(

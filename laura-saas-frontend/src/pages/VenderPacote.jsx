@@ -59,8 +59,8 @@ function VenderPacote() {
           api.get('/clientes'),
           api.get('/pacotes')
         ]);
-        setClientes(clientesRes.data);
-        setPacotes(pacotesRes.data.filter(p => p.ativo));
+        setClientes(clientesRes.data?.data || []);
+        setPacotes((pacotesRes.data?.data || []).filter(p => p.ativo));
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados');

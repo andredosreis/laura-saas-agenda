@@ -59,7 +59,7 @@ function Clientes() {
 
       console.log("DADOS RECEBIDOS PELA API:", response.data);
 
-      const clientesData = Array.isArray(response.data) ? response.data : [];
+      const clientesData = Array.isArray(response.data?.data) ? response.data.data : [];
       setClientes(clientesData);
       
       // Buscar pacotes de cada cliente

@@ -110,6 +110,9 @@ export const createAgendamento = async (req, res) => {
 export const getAllAgendamentos = async (req, res) => {
   try {
     const { dataInicio, dataFim, status } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
 
     // Base query - sempre filtrar por tenant
     const query = { tenantId: req.tenantId };
@@ -131,11 +134,25 @@ export const getAllAgendamentos = async (req, res) => {
       query.status = status;
     }
 
-    const agendamentos = await Agendamento.find(query)
-      .populate("cliente pacote")
-      .sort({ dataHora: 1 }); // Ordenar por data/hora crescente
+    const [agendamentos, total] = await Promise.all([
+      Agendamento.find(query)
+        .populate("cliente pacote")
+        .sort({ dataHora: 1 })
+        .skip(skip)
+        .limit(limit),
+      Agendamento.countDocuments(query),
+    ]);
 
-    res.status(200).json(agendamentos);
+    res.status(200).json({
+      success: true,
+      data: agendamentos,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: "Erro ao buscar agendamentos.", details: error.message });
   }

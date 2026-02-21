@@ -18,7 +18,8 @@ import {
   Sparkles,
   MoreHorizontal,
   ArrowUpRight,
-  Zap
+  Zap,
+  Mail
 } from 'lucide-react';
 import {
   SkeletonKPIGrid,
@@ -47,6 +48,8 @@ function Dashboard() {
   const [sessoesBaixas, setSessoesBaixas] = useState([]);
   const [enviandoLembrete, setEnviandoLembrete] = useState(null);
   const [financeiro, setFinanceiro] = useState({ faturamentoMes: 0, taxaComparecimento: 0 });
+  const [chartData, setChartData] = useState([]);
+  const [mediaDiaria, setMediaDiaria] = useState(0);
 
   const limiteSessoesBaixasParaFetch = 2;
 
@@ -123,7 +126,7 @@ function Dashboard() {
         setContagemAmanha(resContagemAmanha.data.contagem ?? 0);
         setConcluidosSemana(resSemana.data.contagem ?? 0);
         setSessoesBaixas(Array.isArray(resSessoes.data.clientes) ? resSessoes.data.clientes : []);
-        setAgendamentosSemana(Array.isArray(resAgendamentosSemana.data) ? resAgendamentosSemana.data : []);
+        setAgendamentosSemana(Array.isArray(resAgendamentosSemana.data?.data) ? resAgendamentosSemana.data.data : []);
 
         try {
           const resFinanceiro = await api.get('/dashboard/financeiro');
@@ -136,6 +139,32 @@ function Dashboard() {
         } catch (err) {
           console.error("Erro ao buscar dados financeiros:", err);
           setFinanceiro({ faturamentoMes: 0, taxaComparecimento: 0 });
+        }
+
+        // Gráfico semanal com dados reais
+        try {
+          const resChart = await api.get('/analytics/receita-temporal?periodo=dia&dias=7');
+          const dadosApi = resChart.data?.dados || [];
+          const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+          const agora = new Date();
+          const ultimos7 = [];
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(agora);
+            d.setDate(agora.getDate() - i);
+            const chave = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const encontrado = dadosApi.find(a => a.data === chave);
+            ultimos7.push({
+              name: diasSemana[d.getDay()],
+              atendimentos: encontrado?.agendamentos || 0,
+              receita: encontrado?.receita || 0,
+              isHoje: i === 0,
+            });
+          }
+          setChartData(ultimos7);
+          const total = ultimos7.reduce((s, d) => s + d.atendimentos, 0);
+          setMediaDiaria(total > 0 ? (total / 7).toFixed(1) : 0);
+        } catch (err) {
+          console.error("Erro ao buscar dados do gráfico:", err);
         }
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
@@ -299,6 +328,38 @@ function Dashboard() {
           </button>
         </div>
       </motion.div>
+
+      {/* --- BANNERS --- */}
+      {tenant?.plano?.status === 'trial' && tenant?.diasRestantesTrial <= 3 && (
+        <motion.div
+          variants={itemVariants}
+          className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300"
+        >
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <p className="text-sm flex-1">
+            <span className="font-semibold">Trial a expirar:</span>{' '}
+            {tenant.diasRestantesTrial === 0
+              ? 'O teu período de teste termina hoje.'
+              : `Faltam ${tenant.diasRestantesTrial} dia${tenant.diasRestantesTrial > 1 ? 's' : ''} para o fim do trial.`}{' '}
+            <button onClick={() => {}} className="underline font-medium hover:text-amber-200 transition-colors">
+              Activar plano
+            </button>
+          </p>
+        </motion.div>
+      )}
+
+      {user?.emailVerificado === false && (
+        <motion.div
+          variants={itemVariants}
+          className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300"
+        >
+          <Mail className="w-5 h-5 flex-shrink-0 text-blue-400" />
+          <p className="text-sm flex-1">
+            <span className="font-semibold">Email não verificado.</span>{' '}
+            Verifica o teu email para activar todas as funcionalidades.
+          </p>
+        </motion.div>
+      )}
 
       {/* --- KPI GRID --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-10">
@@ -572,10 +633,12 @@ function Dashboard() {
               <TrendingUp className="w-5 h-5 text-emerald-400" />
               Desempenho Semanal
             </h2>
-            <DashboardChart />
+            <DashboardChart data={chartData} isDark={isDark} />
             <div className={`mt-4 flex justify-between text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               <span>Média diária</span>
-              <span className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>8.5 atendimentos</span>
+              <span className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {mediaDiaria} atendimento{mediaDiaria !== 1 ? 's' : ''}
+              </span>
             </div>
           </div>
 

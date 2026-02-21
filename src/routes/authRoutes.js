@@ -7,6 +7,7 @@ import {
     logoutAll,
     me,
     updateProfile,
+    updateTenant,
     changePassword,
     forgotPassword,
     resetPassword,
@@ -109,5 +110,12 @@ router.put('/profile', authenticate, updateProfile);
  * @access  Private
  */
 router.put('/password', authenticate, changePassword);
+
+/**
+ * @route   PUT /api/auth/tenant
+ * @desc    Actualizar dados de contato e configurações do tenant
+ * @access  Private
+ */
+router.put('/tenant', authenticate, updateTenant);
 
 export default router;

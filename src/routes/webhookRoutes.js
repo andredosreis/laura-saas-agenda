@@ -1,10 +1,11 @@
 import express from 'express';
 import { processarConfirmacaoWhatsapp } from '../controllers/webhookController.js';
+import { validateWebhook } from '../middlewares/webhookAuth.js';
 
 const router = express.Router();
 
 // POST /webhook/zapi - Recebe mensagens do Z-API
-router.post('/zapi', processarConfirmacaoWhatsapp);
+router.post('/zapi', validateWebhook, processarConfirmacaoWhatsapp);
 
 // GET /webhook/zapi - Health check
 router.get('/zapi', (req, res) => {
