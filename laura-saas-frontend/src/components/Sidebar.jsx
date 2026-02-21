@@ -59,7 +59,7 @@ function Sidebar() {
       label: 'FINANÇAS',
       items: [
         { to: "/transacoes", text: "Transações", icon: Receipt },
-        { to: "/caixa", text: "Caixa", icon: DollarSign },
+        // { to: "/caixa", text: "Caixa", icon: DollarSign }, // Temporariamente desactivado
         { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
         { to: "/financeiro", text: "Relatórios", icon: TrendingUp }
       ]

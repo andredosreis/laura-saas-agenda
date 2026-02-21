@@ -1,7 +1,9 @@
 import { DateTime } from 'luxon';
+import mongoose from 'mongoose';
 import Cliente from '../models/Cliente.js';
 import Pacote from '../models/Pacote.js';
 import Agendamento from '../models/Agendamento.js';
+import CompraPacote from '../models/CompraPacote.js';
 
 // @desc    Agendamentos de hoje
 export const getAgendamentosDeHoje = async (req, res) => {
@@ -148,6 +150,37 @@ export const getProximosAgendamentos = async (req, res) => {
   }
 };
 
+// Helper: faturamento = vendas de pacotes (valorPago) + serviços avulsos realizados
+async function calcularFaturamento(tenantId, inicio, fim) {
+  const tid = new mongoose.Types.ObjectId(tenantId);
+  const [pacotesRes, avulsosRes] = await Promise.all([
+    // Vendas de pacotes registadas no período (dinheiro recebido)
+    CompraPacote.aggregate([
+      {
+        $match: {
+          tenantId: tid,
+          status: { $ne: 'Cancelado' },
+          dataCompra: { $gte: inicio, $lte: fim }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$valorPago' } } }
+    ]),
+    // Serviços avulsos realizados no período (sem pacote)
+    Agendamento.aggregate([
+      {
+        $match: {
+          tenantId: tid,
+          status: 'Realizado',
+          dataHora: { $gte: inicio, $lte: fim },
+          servicoAvulsoValor: { $gt: 0 }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$servicoAvulsoValor' } } }
+    ])
+  ]);
+  return (pacotesRes[0]?.total || 0) + (avulsosRes[0]?.total || 0);
+}
+
 // @desc    Dados Financeiros (Faturamento e Comparecimento)
 export const getDadosFinanceiros = async (req, res) => {
   try {
@@ -155,58 +188,43 @@ export const getDadosFinanceiros = async (req, res) => {
     const agora = DateTime.now().setZone('Europe/Lisbon');
     const inicioMes = agora.startOf('month').toJSDate();
     const fimMes = agora.endOf('month').toJSDate();
-
-    // 1. Faturamento Mensal (apenas servicos avulsos realizados por enquanto)
-    // TODO: Incluir vendas de pacotes quando houver modelo de transação
-    const agendamentosRealizados = await Agendamento.find({
-      tenantId,
-      status: 'Realizado',
-      dataHora: { $gte: inicioMes, $lte: fimMes }
-    }).select('servicoAvulsoValor');
-
-    const faturamentoMensal = agendamentosRealizados.reduce((acc, curr) => acc + (curr.servicoAvulsoValor || 0), 0);
-
-    // 2. Taxa de Comparecimento
-    // Considera: Realizado, Cancelado (ambos), Não Compareceu
-    const agendamentosTotaisMes = await Agendamento.countDocuments({
-      tenantId,
-      dataHora: { $gte: inicioMes, $lte: fimMes },
-      status: { $in: ['Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'] }
-    });
-
-    const agendamentosComparecidos = await Agendamento.countDocuments({
-      tenantId,
-      dataHora: { $gte: inicioMes, $lte: fimMes },
-      status: 'Realizado'
-    });
-
-    let taxaComparecimento = 0;
-    if (agendamentosTotaisMes > 0) {
-      taxaComparecimento = Math.round((agendamentosComparecidos / agendamentosTotaisMes) * 100);
-    }
-
-    // Comparativo (Mockado por enquanto para UI, ou calcular mês anterior)
     const inicioMesAnterior = agora.minus({ months: 1 }).startOf('month').toJSDate();
     const fimMesAnterior = agora.minus({ months: 1 }).endOf('month').toJSDate();
 
-    const realizadosMesAnterior = await Agendamento.find({
-      tenantId,
-      status: 'Realizado',
-      dataHora: { $gte: inicioMesAnterior, $lte: fimMesAnterior }
-    }).select('servicoAvulsoValor');
+    // 1. Faturamento: serviços avulsos + valor proporcional de pacotes
+    const [faturamentoMensal, faturamentoMesAnterior] = await Promise.all([
+      calcularFaturamento(tenantId, inicioMes, fimMes),
+      calcularFaturamento(tenantId, inicioMesAnterior, fimMesAnterior),
+    ]);
 
-    const faturamentoMesAnterior = realizadosMesAnterior.reduce((acc, curr) => acc + (curr.servicoAvulsoValor || 0), 0);
+    // 2. Taxa de Comparecimento
+    const [agendamentosTotaisMes, agendamentosComparecidos] = await Promise.all([
+      Agendamento.countDocuments({
+        tenantId,
+        dataHora: { $gte: inicioMes, $lte: fimMes },
+        status: { $in: ['Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'] }
+      }),
+      Agendamento.countDocuments({
+        tenantId,
+        dataHora: { $gte: inicioMes, $lte: fimMes },
+        status: 'Realizado'
+      }),
+    ]);
+
+    const taxaComparecimento = agendamentosTotaisMes > 0
+      ? Math.round((agendamentosComparecidos / agendamentosTotaisMes) * 100)
+      : 0;
 
     let crescimentoFaturamento = 0;
     if (faturamentoMesAnterior > 0) {
       crescimentoFaturamento = Math.round(((faturamentoMensal - faturamentoMesAnterior) / faturamentoMesAnterior) * 100);
     } else if (faturamentoMensal > 0) {
-      crescimentoFaturamento = 100; // Crescimento infinito se partiu de 0
+      crescimentoFaturamento = 100;
     }
 
     res.status(200).json({
-      faturamentoMensal,
-      faturamentoMesAnterior,
+      faturamentoMensal: Math.round(faturamentoMensal * 100) / 100,
+      faturamentoMesAnterior: Math.round(faturamentoMesAnterior * 100) / 100,
       crescimentoFaturamento,
       taxaComparecimento,
       agendamentosTotaisMes

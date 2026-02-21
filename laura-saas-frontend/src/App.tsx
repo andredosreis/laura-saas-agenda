@@ -41,7 +41,7 @@ import Financeiro from './pages/Financeiro';
 import Transacoes from './pages/Transacoes';
 import PacotesAtivos from './pages/PacotesAtivos';
 import VenderPacote from './pages/VenderPacote';
-import Caixa from './pages/Caixa';
+// import Caixa from './pages/Caixa'; // Temporariamente desactivado
 
 // ⚙️ Configurações
 import Configuracoes from './pages/Configuracoes';
@@ -128,9 +128,10 @@ const App = () => {
             <Route path="/vender-pacote" element={
               <ProtectedLayout><VenderPacote /></ProtectedLayout>
             } />
-            <Route path="/caixa" element={
+            {/* Caixa temporariamente desactivada */}
+            {/* <Route path="/caixa" element={
               <ProtectedLayout><Caixa /></ProtectedLayout>
-            } />
+            } /> */}
 
             {/* ⚙️ Configurações */}
             <Route path="/configuracoes" element={
