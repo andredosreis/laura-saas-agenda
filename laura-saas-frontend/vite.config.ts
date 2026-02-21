@@ -24,9 +24,9 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'Laura SaaS',
-        short_name: 'Laura',
-        description: 'Gerenciador de agendamentos - Laura SaaS',
+        name: 'Marcai',
+        short_name: 'Marcai',
+        description: 'Marcai — Sistema de agendamentos para profissionais',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
