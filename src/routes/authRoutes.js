@@ -14,6 +14,7 @@ import {
     verifyEmail
 } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
+import { loginLimiter, registerLimiter, forgotPasswordLimiter } from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
 
@@ -26,14 +27,14 @@ const router = express.Router();
  * @desc    Criar nova conta (tenant + usuário)
  * @access  Public
  */
-router.post('/register', register);
+router.post('/register', registerLimiter, register);
 
 /**
  * @route   POST /api/auth/login
  * @desc    Autenticar usuário
  * @access  Public
  */
-router.post('/login', login);
+router.post('/login', loginLimiter, login);
 
 /**
  * @route   POST /api/auth/refresh
@@ -47,7 +48,7 @@ router.post('/refresh', refreshToken);
  * @desc    Solicitar recuperação de senha
  * @access  Public
  */
-router.post('/forgot-password', forgotPassword);
+router.post('/forgot-password', forgotPasswordLimiter, forgotPassword);
 
 /**
  * @route   POST /api/auth/reset-password

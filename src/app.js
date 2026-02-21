@@ -32,6 +32,9 @@ import historicoAtendimentoRoutes from './routes/historicoAtendimentoRoutes.js';
 
 const app = express();
 
+// Necessário para rate limiting funcionar correctamente atrás de proxy (Render, Vercel)
+app.set('trust proxy', 1);
+
 // Middlewares globais (ANTES do CORS para webhooks funcionarem)
 app.use(express.json()); // para parsear JSON
 app.use(morgan('dev')); // para logs de requisição

@@ -15,7 +15,13 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo 'No build required for Node.js'"
   },
-  "keywords": ["saas", "agendamento", "api", "express", "mongodb"],
+  "keywords": [
+    "saas",
+    "agendamento",
+    "api",
+    "express",
+    "mongodb"
+  ],
   "author": "André dos Reis",
   "license": "ISC",
   "dependencies": {
@@ -24,6 +30,7 @@
     "cors": "^2.8.5",
     "dotenv-flow": "^4.1.0",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.2.1",
     "jsonwebtoken": "^9.0.3",
     "luxon": "^3.7.2",
     "mongodb": "^7.0.0",
