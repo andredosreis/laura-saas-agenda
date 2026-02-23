@@ -1,9 +1,7 @@
-import Agendamento from '../models/Agendamento.js';
-import Cliente from '../models/Cliente.js';
-
 // @desc    Listar todos os clientes
 export const getAllClientes = async (req, res) => {
   try {
+    const { Cliente } = req.models;
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
@@ -34,7 +32,7 @@ export const getAllClientes = async (req, res) => {
 // @desc    Criar um novo cliente
 export const createCliente = async (req, res) => {
   try {
-    // 🆕 Injetar tenantId do usuário logado e garantir que não venha do body
+    const { Cliente } = req.models;
     const novoCliente = new Cliente({
       ...req.body,
       tenantId: req.tenantId
@@ -59,7 +57,7 @@ export const createCliente = async (req, res) => {
 // @desc    Buscar um cliente pelo ID
 export const getCliente = async (req, res) => {
   try {
-    // 🆕 Garantir que o cliente pertença ao tenant
+    const { Cliente } = req.models;
     const cliente = await Cliente.findOne({
       _id: req.params.id,
       tenantId: req.tenantId
@@ -81,7 +79,7 @@ export const getCliente = async (req, res) => {
 // @desc    Atualizar um cliente pelo ID
 export const updateCliente = async (req, res) => {
   try {
-    // 🆕 Garantir update apenas no tenant correto
+    const { Cliente } = req.models;
     const clienteAtualizado = await Cliente.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       req.body,
@@ -94,7 +92,6 @@ export const updateCliente = async (req, res) => {
     res.status(200).json(clienteAtualizado);
   } catch (error) {
     console.error('Erro ao atualizar cliente:', error);
-    // ... (seu excelente tratamento de erros continua aqui)
     res.status(500).json({ message: 'Erro interno ao atualizar o cliente.', details: error.message });
   }
 };
@@ -102,19 +99,18 @@ export const updateCliente = async (req, res) => {
 // @desc    Deletar um cliente pelo ID
 export const deleteCliente = async (req, res) => {
   try {
+    const { Cliente, Agendamento } = req.models;
     const clienteId = req.params.id;
-    // 🆕 Garantir deleção apenas no tenant correto
     const clienteParaDeletar = await Cliente.findOne({ _id: clienteId, tenantId: req.tenantId });
 
     if (!clienteParaDeletar) {
       return res.status(404).json({ message: 'Cliente não encontrado para deleção.' });
     }
-    await Agendamento.deleteMany({ cliente: clienteId, tenantId: req.tenantId }); // Também deletar agendamentos do tenant
-    await Cliente.deleteOne({ _id: clienteId });
+    await Agendamento.deleteMany({ cliente: clienteId, tenantId: req.tenantId });
+    await Cliente.deleteOne({ _id: clienteId, tenantId: req.tenantId });
     res.status(200).json({ message: 'Cliente e seus agendamentos associados foram removidos com sucesso.' });
   } catch (error) {
     console.error('Erro ao deletar cliente e seus agendamentos:', error);
-    // ... (seu excelente tratamento de erros continua aqui)
     res.status(500).json({ message: 'Erro interno ao deletar o cliente.', details: error.message });
   }
 };

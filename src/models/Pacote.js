@@ -41,5 +41,7 @@ const pacoteSchema = new mongoose.Schema({
   timestamps: true // Adiciona createdAt e updatedAt automaticamente
 });
 
-// A correção principal está aqui
+// Exporta schema para uso no registry (database-per-tenant)
+export { pacoteSchema as PacoteSchema };
+
 export default mongoose.model('Pacote', pacoteSchema);

@@ -220,4 +220,7 @@ transacaoSchema.methods.cancelar = function(motivo = '') {
   return this.save();
 };
 
+// Exporta schema para uso no registry (database-per-tenant)
+export { transacaoSchema as TransacaoSchema };
+
 export default mongoose.model('Transacao', transacaoSchema);

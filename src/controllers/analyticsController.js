@@ -1,17 +1,13 @@
-import Cliente from '../models/Cliente.js';
-import Agendamento from '../models/Agendamento.js';
-import Pacote from '../models/Pacote.js';
-import CompraPacote from '../models/CompraPacote.js';
 import { DateTime } from 'luxon';
 import mongoose from 'mongoose';
 
 /**
  * @desc    Busca clientes com um número baixo de sessões restantes num pacote.
  * @route   GET /api/analytics/sessoes-baixas
- * @access  Private
  */
 export const getAlertaSessoesBaixas = async (req, res) => {
   try {
+    const { Cliente } = req.models;
     const tenantId = req.tenantId;
     const limiteSessoes = parseInt(req.query.limite, 10) || 1;
 
@@ -34,20 +30,16 @@ export const getAlertaSessoesBaixas = async (req, res) => {
 /**
  * @desc    Obtém receita temporal agrupada por período
  * @route   GET /api/analytics/receita-temporal
- * @query   periodo ('dia'|'semana'|'mes'), dias (número de dias para trás)
- * @access  Private
  */
 export const getReceitaTemporal = async (req, res) => {
   try {
-    // Converter tenantId para ObjectId para agregação
+    const { Agendamento, CompraPacote } = req.models;
     const tenantId = new mongoose.Types.ObjectId(req.tenantId);
     const { periodo = 'dia', dias = 30 } = req.query;
 
-    // Calcular data de início
     const dataFim = DateTime.now().setZone('Europe/Lisbon').endOf('day');
     const dataInicio = dataFim.minus({ days: parseInt(dias) }).startOf('day');
 
-    // Definir formato de agrupamento baseado no período
     let dateFormat;
     switch (periodo) {
       case 'semana':
@@ -56,20 +48,16 @@ export const getReceitaTemporal = async (req, res) => {
       case 'mes':
         dateFormat = { year: { $year: '$dataHora' }, month: { $month: '$dataHora' } };
         break;
-      default: // 'dia'
+      default:
         dateFormat = { year: { $year: '$dataHora' }, month: { $month: '$dataHora' }, day: { $dayOfMonth: '$dataHora' } };
     }
 
-    // Agregação para calcular receita
     const resultados = await Agendamento.aggregate([
       {
         $match: {
           tenantId: tenantId,
           status: 'Realizado',
-          dataHora: {
-            $gte: dataInicio.toJSDate(),
-            $lte: dataFim.toJSDate()
-          }
+          dataHora: { $gte: dataInicio.toJSDate(), $lte: dataFim.toJSDate() }
         }
       },
       {
@@ -80,12 +68,7 @@ export const getReceitaTemporal = async (req, res) => {
           as: 'pacoteInfo'
         }
       },
-      {
-        $unwind: {
-          path: '$pacoteInfo',
-          preserveNullAndEmptyArrays: true
-        }
-      },
+      { $unwind: { path: '$pacoteInfo', preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
           receita: {
@@ -110,9 +93,7 @@ export const getReceitaTemporal = async (req, res) => {
           agendamentos: { $sum: 1 }
         }
       },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1, '_id.day': 1 }
-      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1, '_id.day': 1 } },
       {
         $project: {
           _id: 0,
@@ -130,7 +111,6 @@ export const getReceitaTemporal = async (req, res) => {
       }
     ]);
 
-    // Helper: converte resultado do aggregate para chave de data formatada
     const formatarChave = (periodo_obj) => {
       if (periodo === 'semana') return `Sem ${periodo_obj.week}/${periodo_obj.year}`;
       if (periodo === 'mes') {
@@ -141,7 +121,6 @@ export const getReceitaTemporal = async (req, res) => {
         .toFormat('dd/MM');
     };
 
-    // Aggregate complementar: vendas de pacotes por data de compra
     let compraPacoteDateFormat;
     switch (periodo) {
       case 'semana':
@@ -171,7 +150,6 @@ export const getReceitaTemporal = async (req, res) => {
       { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1, '_id.day': 1 } }
     ]);
 
-    // Fundir os dois conjuntos de dados por data
     const mapa = new Map();
 
     for (const r of resultados) {
@@ -189,7 +167,6 @@ export const getReceitaTemporal = async (req, res) => {
       });
     }
 
-    // Ordenar por data e calcular média
     const dados = Array.from(mapa.values())
       .map(d => ({
         data: d.data,
@@ -198,36 +175,24 @@ export const getReceitaTemporal = async (req, res) => {
         media: d.agendamentos > 0 ? Math.round((d.receita / d.agendamentos) * 100) / 100 : 0
       }));
 
-    res.status(200).json({
-      success: true,
-      periodo,
-      dias: parseInt(dias),
-      dados
-    });
+    res.status(200).json({ success: true, periodo, dias: parseInt(dias), dados });
 
   } catch (error) {
     console.error('Erro ao buscar receita temporal:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao buscar receita temporal.',
-      details: error.message
-    });
+    res.status(500).json({ success: false, message: 'Erro ao buscar receita temporal.', details: error.message });
   }
 };
 
 /**
  * @desc    Obtém distribuição de serviços por receita
  * @route   GET /api/analytics/distribuicao-servicos
- * @query   dataInicio, dataFim (ISO dates)
- * @access  Private
  */
 export const getDistribuicaoServicos = async (req, res) => {
   try {
-    // Converter tenantId para ObjectId para agregação
+    const { Agendamento, CompraPacote } = req.models;
     const tenantId = new mongoose.Types.ObjectId(req.tenantId);
     const { dataInicio, dataFim } = req.query;
 
-    // Datas padrão: último mês
     const fim = dataFim
       ? DateTime.fromISO(dataFim, { zone: 'Europe/Lisbon' }).endOf('day')
       : DateTime.now().setZone('Europe/Lisbon').endOf('day');
@@ -240,26 +205,11 @@ export const getDistribuicaoServicos = async (req, res) => {
         $match: {
           tenantId: tenantId,
           status: 'Realizado',
-          dataHora: {
-            $gte: inicio.toJSDate(),
-            $lte: fim.toJSDate()
-          }
+          dataHora: { $gte: inicio.toJSDate(), $lte: fim.toJSDate() }
         }
       },
-      {
-        $lookup: {
-          from: 'pacotes',
-          localField: 'pacote',
-          foreignField: '_id',
-          as: 'pacoteInfo'
-        }
-      },
-      {
-        $unwind: {
-          path: '$pacoteInfo',
-          preserveNullAndEmptyArrays: true
-        }
-      },
+      { $lookup: { from: 'pacotes', localField: 'pacote', foreignField: '_id', as: 'pacoteInfo' } },
+      { $unwind: { path: '$pacoteInfo', preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
           nomeServico: {
@@ -284,34 +234,13 @@ export const getDistribuicaoServicos = async (req, res) => {
           }
         }
       },
-      {
-        $group: {
-          _id: '$nomeServico',
-          quantidade: { $sum: 1 },
-          receita: { $sum: '$receita' }
-        }
-      },
-      {
-        $sort: { receita: -1 }
-      }
+      { $group: { _id: '$nomeServico', quantidade: { $sum: 1 }, receita: { $sum: '$receita' } } },
+      { $sort: { receita: -1 } }
     ]);
 
-    // Vendas de pacotes (total acumulado, sem filtro de data)
     const resultadosPacotes = await CompraPacote.aggregate([
-      {
-        $match: {
-          tenantId,
-          status: { $ne: 'Cancelado' }
-        }
-      },
-      {
-        $lookup: {
-          from: 'pacotes',
-          localField: 'pacote',
-          foreignField: '_id',
-          as: 'pacoteInfo'
-        }
-      },
+      { $match: { tenantId, status: { $ne: 'Cancelado' } } },
+      { $lookup: { from: 'pacotes', localField: 'pacote', foreignField: '_id', as: 'pacoteInfo' } },
       { $unwind: { path: '$pacoteInfo', preserveNullAndEmptyArrays: true } },
       {
         $group: {
@@ -322,7 +251,6 @@ export const getDistribuicaoServicos = async (req, res) => {
       }
     ]);
 
-    // Fundir resultados: avulsos realizados + vendas de pacotes
     const mapaServicos = new Map();
 
     for (const r of resultados) {
@@ -336,7 +264,6 @@ export const getDistribuicaoServicos = async (req, res) => {
       mapaServicos.set(nome, { nome, quantidade: existente.quantidade + r.quantidade, receita: existente.receita + r.receita });
     }
 
-    // Calcular total e percentuais
     const totalReceita = Array.from(mapaServicos.values()).reduce((acc, r) => acc + r.receita, 0);
     const servicos = Array.from(mapaServicos.values())
       .sort((a, b) => b.receita - a.receita)
@@ -357,27 +284,20 @@ export const getDistribuicaoServicos = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar distribuição de serviços:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao buscar distribuição de serviços.',
-      details: error.message
-    });
+    res.status(500).json({ success: false, message: 'Erro ao buscar distribuição de serviços.', details: error.message });
   }
 };
 
 /**
  * @desc    Obtém ranking de clientes por receita
  * @route   GET /api/analytics/top-clientes
- * @query   limite (default 10), dataInicio, dataFim
- * @access  Private
  */
 export const getTopClientes = async (req, res) => {
   try {
-    // Converter tenantId para ObjectId para agregação
+    const { Agendamento } = req.models;
     const tenantId = new mongoose.Types.ObjectId(req.tenantId);
     const { limite = 10, dataInicio, dataFim } = req.query;
 
-    // Datas padrão: último mês
     const fim = dataFim
       ? DateTime.fromISO(dataFim, { zone: 'Europe/Lisbon' }).endOf('day')
       : DateTime.now().setZone('Europe/Lisbon').endOf('day');
@@ -390,37 +310,13 @@ export const getTopClientes = async (req, res) => {
         $match: {
           tenantId: tenantId,
           status: 'Realizado',
-          dataHora: {
-            $gte: inicio.toJSDate(),
-            $lte: fim.toJSDate()
-          }
+          dataHora: { $gte: inicio.toJSDate(), $lte: fim.toJSDate() }
         }
       },
-      {
-        $lookup: {
-          from: 'pacotes',
-          localField: 'pacote',
-          foreignField: '_id',
-          as: 'pacoteInfo'
-        }
-      },
-      {
-        $unwind: {
-          path: '$pacoteInfo',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      {
-        $lookup: {
-          from: 'clientes',
-          localField: 'cliente',
-          foreignField: '_id',
-          as: 'clienteInfo'
-        }
-      },
-      {
-        $unwind: '$clienteInfo'
-      },
+      { $lookup: { from: 'pacotes', localField: 'pacote', foreignField: '_id', as: 'pacoteInfo' } },
+      { $unwind: { path: '$pacoteInfo', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'clientes', localField: 'cliente', foreignField: '_id', as: 'clienteInfo' } },
+      { $unwind: '$clienteInfo' },
       {
         $addFields: {
           receita: {
@@ -448,12 +344,8 @@ export const getTopClientes = async (req, res) => {
           agendamentos: { $sum: 1 }
         }
       },
-      {
-        $sort: { receita: -1 }
-      },
-      {
-        $limit: parseInt(limite)
-      },
+      { $sort: { receita: -1 } },
+      { $limit: parseInt(limite) },
       {
         $project: {
           _id: 0,
@@ -474,11 +366,7 @@ export const getTopClientes = async (req, res) => {
       }
     ]);
 
-    // Adicionar ranking
-    const clientes = resultados.map((c, idx) => ({
-      ranking: idx + 1,
-      ...c
-    }));
+    const clientes = resultados.map((c, idx) => ({ ranking: idx + 1, ...c }));
 
     res.status(200).json({
       success: true,
@@ -489,10 +377,6 @@ export const getTopClientes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar top clientes:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao buscar top clientes.',
-      details: error.message
-    });
+    res.status(500).json({ success: false, message: 'Erro ao buscar top clientes.', details: error.message });
   }
 };

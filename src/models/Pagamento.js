@@ -190,4 +190,7 @@ pagamentoSchema.statics.totalPorFormaPagamento = async function(tenantId, dataIn
   ]);
 };
 
+// Exporta schema para uso no registry (database-per-tenant)
+export { pagamentoSchema as PagamentoSchema };
+
 export default mongoose.model('Pagamento', pagamentoSchema);

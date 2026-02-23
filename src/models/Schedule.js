@@ -41,6 +41,8 @@ const scheduleSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-const Schedule = mongoose.model('Schedule', scheduleSchema);
+// Exporta schema para uso no registry (database-per-tenant)
+export { scheduleSchema as ScheduleSchema };
 
+const Schedule = mongoose.model('Schedule', scheduleSchema);
 export default Schedule;

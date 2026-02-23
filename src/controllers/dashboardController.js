@@ -1,14 +1,11 @@
 import { DateTime } from 'luxon';
 import mongoose from 'mongoose';
-import Cliente from '../models/Cliente.js';
-import Pacote from '../models/Pacote.js';
-import Agendamento from '../models/Agendamento.js';
-import CompraPacote from '../models/CompraPacote.js';
 import logger from '../utils/logger.js';
 
 // @desc    Agendamentos de hoje
 export const getAgendamentosDeHoje = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { tenantId } = req;
     const inicioDoDia = DateTime.now().setZone('Europe/Lisbon').startOf('day').toJSDate();
     const fimDoDia = DateTime.now().setZone('Europe/Lisbon').endOf('day').toJSDate();
@@ -22,7 +19,6 @@ export const getAgendamentosDeHoje = async (req, res) => {
       .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
       .sort({ dataHora: 1 });
 
-    // Garante sempre retornar um array, mesmo que a busca falhe por alguma razão
     res.status(200).json(agendamentos || []);
 
   } catch (error) {
@@ -33,6 +29,7 @@ export const getAgendamentosDeHoje = async (req, res) => {
 // @desc    Contagem de agendamentos de amanhã
 export const getContagemAgendamentosAmanha = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { tenantId } = req;
     const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
     const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
@@ -51,6 +48,7 @@ export const getContagemAgendamentosAmanha = async (req, res) => {
 // @desc    Lista de agendamentos de amanhã
 export const getAgendamentosAmanha = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { tenantId } = req;
     const inicioDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).startOf('day').toJSDate();
     const fimDeAmanha = DateTime.now().setZone('Europe/Lisbon').plus({ days: 1 }).endOf('day').toJSDate();
@@ -73,6 +71,7 @@ export const getAgendamentosAmanha = async (req, res) => {
 // @desc    Clientes atendidos na semana
 export const getClientesAtendidosSemana = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { tenantId } = req;
     const agora = DateTime.now().setZone('Europe/Lisbon');
     const fimDoDia = agora.endOf('day').toJSDate();
@@ -93,6 +92,7 @@ export const getClientesAtendidosSemana = async (req, res) => {
 // @desc    Totais gerais
 export const getTotaisSistema = async (req, res) => {
   try {
+    const { Agendamento, Cliente, Pacote } = req.models;
     const { tenantId } = req;
     const totalClientes = await Cliente.countDocuments({ tenantId });
     const totalPacotes = await Pacote.countDocuments({ tenantId });
@@ -118,6 +118,7 @@ export const getTotaisSistema = async (req, res) => {
 // @desc    Clientes com sessões baixas
 export const getClientesComSessoesBaixas = async (req, res) => {
   try {
+    const { Cliente } = req.models;
     const { tenantId } = req;
     const limite = parseInt(req.query.limite, 10) || 2;
     const clientesBaixos = await Cliente.find({
@@ -134,6 +135,7 @@ export const getClientesComSessoesBaixas = async (req, res) => {
 // @desc    Próximos agendamentos
 export const getProximosAgendamentos = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { tenantId } = req;
     const limit = parseInt(req.query.limit, 10) || 5;
     const agora = DateTime.now().setZone('Europe/Lisbon').toJSDate();
@@ -152,10 +154,10 @@ export const getProximosAgendamentos = async (req, res) => {
 };
 
 // Helper: faturamento = vendas de pacotes (valorPago) + serviços avulsos realizados
-async function calcularFaturamento(tenantId, inicio, fim) {
+async function calcularFaturamento(tenantId, inicio, fim, models) {
+  const { CompraPacote, Agendamento } = models;
   const tid = new mongoose.Types.ObjectId(tenantId);
   const [pacotesRes, avulsosRes] = await Promise.all([
-    // Vendas de pacotes registadas no período (dinheiro recebido)
     CompraPacote.aggregate([
       {
         $match: {
@@ -166,7 +168,6 @@ async function calcularFaturamento(tenantId, inicio, fim) {
       },
       { $group: { _id: null, total: { $sum: '$valorPago' } } }
     ]),
-    // Serviços avulsos realizados no período (sem pacote)
     Agendamento.aggregate([
       {
         $match: {
@@ -185,15 +186,14 @@ async function calcularFaturamento(tenantId, inicio, fim) {
 // @desc    Dados Financeiros (Faturamento e Comparecimento)
 export const getDadosFinanceiros = async (req, res) => {
   try {
+    const { Agendamento, CompraPacote } = req.models;
     const { tenantId } = req;
     const tid = new mongoose.Types.ObjectId(tenantId);
     const agora = DateTime.now().setZone('Europe/Lisbon');
     const inicioMes = agora.startOf('month').toJSDate();
     const fimMes = agora.endOf('month').toJSDate();
 
-    // 1. Faturamento total acumulado: pacotes (sem filtro de data) + avulsos do mês
     const [pacotesRes, avulsosRes] = await Promise.all([
-      // Pacotes: total acumulado (sem filtro de data)
       CompraPacote.aggregate([
         {
           $match: {
@@ -203,7 +203,6 @@ export const getDadosFinanceiros = async (req, res) => {
         },
         { $group: { _id: null, total: { $sum: '$valorPago' } } }
       ]),
-      // Serviços avulsos: filtrados pelo mês actual
       Agendamento.aggregate([
         {
           $match: {
@@ -221,11 +220,9 @@ export const getDadosFinanceiros = async (req, res) => {
     const faturamentoAvulsos = avulsosRes[0]?.total || 0;
     const faturamentoMensal = faturamentoPacotes + faturamentoAvulsos;
 
-    // Log de diagnóstico
     const countPacotes = await CompraPacote.countDocuments({ tenantId: tid, status: { $ne: 'Cancelado' } });
     logger.info({ tenantId, countPacotes, faturamentoPacotes, faturamentoAvulsos, faturamentoMensal }, 'getDadosFinanceiros — diagnóstico');
 
-    // 2. Taxa de Comparecimento
     const [agendamentosTotaisMes, agendamentosComparecidos] = await Promise.all([
       Agendamento.countDocuments({
         tenantId,

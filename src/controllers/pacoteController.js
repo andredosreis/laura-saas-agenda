@@ -1,14 +1,12 @@
-import Pacote from '../models/Pacote.js';
-
 // @desc    Criar um novo pacote
 export const createPacote = async (req, res) => {
   try {
-    const novoPacote = new Pacote(req.body);
+    const { Pacote } = req.models;
+    const novoPacote = new Pacote({ ...req.body, tenantId: req.tenantId });
     await novoPacote.save();
     res.status(201).json(novoPacote);
   } catch (error) {
     console.error('Erro ao criar pacote:', error);
-    // Tratamento de erro detalhado
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ message: 'Dados inválidos.', details: messages });
@@ -23,7 +21,8 @@ export const createPacote = async (req, res) => {
 // @desc    Listar todos os pacotes
 export const getAllPacotes = async (req, res) => {
   try {
-    const filter = req.tenantFilter || {};
+    const { Pacote } = req.models;
+    const filter = { tenantId: req.tenantId };
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
@@ -52,8 +51,8 @@ export const getAllPacotes = async (req, res) => {
 // @desc    Buscar um pacote por ID
 export const getPacote = async (req, res) => {
   try {
-    const filter = { _id: req.params.id, ...(req.tenantFilter || {}) };
-    const pacote = await Pacote.findOne(filter);
+    const { Pacote } = req.models;
+    const pacote = await Pacote.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!pacote) {
       return res.status(404).json({ message: 'Pacote não encontrado.' });
     }
@@ -70,9 +69,9 @@ export const getPacote = async (req, res) => {
 // @desc    Atualizar um pacote
 export const updatePacote = async (req, res) => {
   try {
-    const filter = { _id: req.params.id, ...(req.tenantFilter || {}) };
+    const { Pacote } = req.models;
     const pacote = await Pacote.findOneAndUpdate(
-      filter,
+      { _id: req.params.id, tenantId: req.tenantId },
       req.body,
       { new: true, runValidators: true }
     );
@@ -82,7 +81,6 @@ export const updatePacote = async (req, res) => {
     res.status(200).json(pacote);
   } catch (error) {
     console.error('Erro ao atualizar pacote:', error);
-    // Tratamento de erro detalhado, similar à criação
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ message: 'Dados inválidos.', details: messages });
@@ -97,8 +95,8 @@ export const updatePacote = async (req, res) => {
 // @desc    Deletar um pacote
 export const deletePacote = async (req, res) => {
   try {
-    const filter = { _id: req.params.id, ...(req.tenantFilter || {}) };
-    const pacote = await Pacote.findOneAndDelete(filter);
+    const { Pacote } = req.models;
+    const pacote = await Pacote.findOneAndDelete({ _id: req.params.id, tenantId: req.tenantId });
     if (!pacote) {
       return res.status(404).json({ message: 'Pacote não encontrado para deleção.' });
     }

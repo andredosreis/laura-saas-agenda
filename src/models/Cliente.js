@@ -124,6 +124,8 @@ clienteSchema.virtual('idade').get(function () {
 // Índice composto: unicidade de telefone por tenant (não global)
 clienteSchema.index({ tenantId: 1, telefone: 1 }, { unique: true });
 
-const Cliente = mongoose.model('Cliente', clienteSchema);
+// Exporta schema para uso no registry (database-per-tenant)
+export { clienteSchema as ClienteSchema };
 
+const Cliente = mongoose.model('Cliente', clienteSchema);
 export default Cliente;

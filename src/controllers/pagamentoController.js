@@ -1,25 +1,13 @@
-import Pagamento from '../models/Pagamento.js';
-import Transacao from '../models/Transacao.js';
-import CompraPacote from '../models/CompraPacote.js';
 import mongoose from 'mongoose';
 
 // @desc    Listar pagamentos
 // @route   GET /api/pagamentos
-// @access  Private
 export const listarPagamentos = async (req, res) => {
   try {
-    const {
-      transacao,
-      formaPagamento,
-      dataInicio,
-      dataFim,
-      limit = 50,
-      page = 1
-    } = req.query;
+    const { Pagamento } = req.models;
+    const { transacao, formaPagamento, dataInicio, dataFim, limit = 50, page = 1 } = req.query;
 
-    // Construir query
     const query = { tenantId: req.tenantId };
-
     if (transacao) query.transacao = transacao;
     if (formaPagamento) query.formaPagamento = formaPagamento;
 
@@ -29,7 +17,6 @@ export const listarPagamentos = async (req, res) => {
       if (dataFim) query.dataPagamento.$lte = new Date(dataFim);
     }
 
-    // Paginação
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const [pagamentos, total] = await Promise.all([
@@ -41,7 +28,6 @@ export const listarPagamentos = async (req, res) => {
       Pagamento.countDocuments(query)
     ]);
 
-    // Calcular totais
     const totalValor = pagamentos.reduce((sum, pag) => sum + pag.valor, 0);
 
     res.status(200).json({
@@ -52,31 +38,23 @@ export const listarPagamentos = async (req, res) => {
         limite: parseInt(limit),
         totalPaginas: Math.ceil(total / parseInt(limit))
       },
-      totais: {
-        totalValor
-      }
+      totais: { totalValor }
     });
 
   } catch (error) {
     console.error('Erro ao listar pagamentos:', error);
-    res.status(500).json({
-      message: 'Erro ao listar pagamentos',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao listar pagamentos', details: error.message });
   }
 };
 
 // @desc    Buscar detalhes de um pagamento
 // @route   GET /api/pagamentos/:id
-// @access  Private
 export const buscarPagamento = async (req, res) => {
   try {
+    const { Pagamento } = req.models;
     const { id } = req.params;
 
-    const pagamento = await Pagamento.findOne({
-      _id: id,
-      tenantId: req.tenantId
-    }).populate({
+    const pagamento = await Pagamento.findOne({ _id: id, tenantId: req.tenantId }).populate({
       path: 'transacao',
       populate: [
         { path: 'cliente', select: 'nome telefone email' },
@@ -85,51 +63,33 @@ export const buscarPagamento = async (req, res) => {
     });
 
     if (!pagamento) {
-      return res.status(404).json({
-        message: 'Pagamento não encontrado'
-      });
+      return res.status(404).json({ message: 'Pagamento não encontrado' });
     }
 
     res.status(200).json({ pagamento });
 
   } catch (error) {
     console.error('Erro ao buscar pagamento:', error);
-    res.status(500).json({
-      message: 'Erro ao buscar pagamento',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao buscar pagamento', details: error.message });
   }
 };
 
 // @desc    Atualizar dados de um pagamento
 // @route   PUT /api/pagamentos/:id
-// @access  Private
 export const atualizarPagamento = async (req, res) => {
   try {
+    const { Pagamento } = req.models;
     const { id } = req.params;
-    const {
-      observacoes,
-      dadosMBWay,
-      dadosMultibanco,
-      dadosCartao,
-      dadosTransferencia
-    } = req.body;
+    const { observacoes, dadosMBWay, dadosMultibanco, dadosCartao, dadosTransferencia } = req.body;
 
-    const pagamento = await Pagamento.findOne({
-      _id: id,
-      tenantId: req.tenantId
-    });
+    const pagamento = await Pagamento.findOne({ _id: id, tenantId: req.tenantId });
 
     if (!pagamento) {
-      return res.status(404).json({
-        message: 'Pagamento não encontrado'
-      });
+      return res.status(404).json({ message: 'Pagamento não encontrado' });
     }
 
-    // Atualizar campos permitidos
     if (observacoes !== undefined) pagamento.observacoes = observacoes;
 
-    // Atualizar dados específicos da forma de pagamento
     if (dadosMBWay && pagamento.formaPagamento === 'MBWay') {
       pagamento.dadosMBWay = { ...pagamento.dadosMBWay, ...dadosMBWay };
     }
@@ -153,56 +113,37 @@ export const atualizarPagamento = async (req, res) => {
       populate: { path: 'cliente', select: 'nome telefone' }
     });
 
-    res.status(200).json({
-      message: 'Pagamento atualizado com sucesso',
-      pagamento
-    });
+    res.status(200).json({ message: 'Pagamento atualizado com sucesso', pagamento });
 
   } catch (error) {
     console.error('Erro ao atualizar pagamento:', error);
-    res.status(500).json({
-      message: 'Erro ao atualizar pagamento',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao atualizar pagamento', details: error.message });
   }
 };
 
 // @desc    Deletar/Estornar um pagamento
 // @route   DELETE /api/pagamentos/:id
-// @access  Private
 export const deletarPagamento = async (req, res) => {
   try {
+    const { Pagamento, Transacao, CompraPacote } = req.models;
     const { id } = req.params;
     const { motivo } = req.body;
 
-    const pagamento = await Pagamento.findOne({
-      _id: id,
-      tenantId: req.tenantId
-    });
+    const pagamento = await Pagamento.findOne({ _id: id, tenantId: req.tenantId });
 
     if (!pagamento) {
-      return res.status(404).json({
-        message: 'Pagamento não encontrado'
-      });
+      return res.status(404).json({ message: 'Pagamento não encontrado' });
     }
 
-    // Buscar transação relacionada
-    const transacao = await Transacao.findOne({
-      _id: pagamento.transacao,
-      tenantId: req.tenantId
-    });
+    const transacao = await Transacao.findOne({ _id: pagamento.transacao, tenantId: req.tenantId });
 
     if (!transacao) {
-      return res.status(404).json({
-        message: 'Transação relacionada não encontrada'
-      });
+      return res.status(404).json({ message: 'Transação relacionada não encontrada' });
     }
 
-    // Reverter o pagamento na transação
     transacao.valorPago -= pagamento.valor;
     transacao.valorPendente = transacao.valorFinal - transacao.valorPago;
 
-    // Atualizar status da transação
     if (transacao.valorPago <= 0) {
       transacao.statusPagamento = 'Pendente';
       transacao.dataPagamento = null;
@@ -210,7 +151,6 @@ export const deletarPagamento = async (req, res) => {
       transacao.statusPagamento = 'Parcial';
     }
 
-    // Se tiver parcelas, ajustar
     if (transacao.parcelado && transacao.valorParcela > 0) {
       const parcelasPagas = Math.floor(transacao.valorPago / transacao.valorParcela);
       transacao.parcelaAtual = parcelasPagas + 1;
@@ -218,14 +158,12 @@ export const deletarPagamento = async (req, res) => {
 
     await transacao.save();
 
-    // Se for de um pacote, reverter pagamento
     if (transacao.compraPacote) {
-      const compraPacote = await CompraPacote.findById(transacao.compraPacote);
+      const compraPacote = await CompraPacote.findOne({ _id: transacao.compraPacote, tenantId: req.tenantId });
       if (compraPacote) {
         compraPacote.valorPago -= pagamento.valor;
         compraPacote.valorPendente = compraPacote.valorTotal - compraPacote.valorPago;
 
-        // Ajustar parcelas pagas
         if (compraPacote.parcelado && compraPacote.valorParcela > 0) {
           compraPacote.parcelasPagas = Math.floor(compraPacote.valorPago / compraPacote.valorParcela);
         }
@@ -234,7 +172,6 @@ export const deletarPagamento = async (req, res) => {
       }
     }
 
-    // Deletar pagamento
     await pagamento.deleteOne();
 
     res.status(200).json({
@@ -244,18 +181,15 @@ export const deletarPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao deletar pagamento:', error);
-    res.status(500).json({
-      message: 'Erro ao deletar pagamento',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao deletar pagamento', details: error.message });
   }
 };
 
 // @desc    Estatísticas de pagamentos por forma de pagamento
 // @route   GET /api/pagamentos/estatisticas/formas-pagamento
-// @access  Private
 export const estatisticasPorFormaPagamento = async (req, res) => {
   try {
+    const { Pagamento } = req.models;
     const { dataInicio, dataFim } = req.query;
 
     const query = { tenantId: req.tenantId };
@@ -279,14 +213,12 @@ export const estatisticasPorFormaPagamento = async (req, res) => {
       { $sort: { total: -1 } }
     ]);
 
-    // Calcular totais gerais
     const totais = estatisticas.reduce((acc, stat) => {
       acc.totalGeral += stat.total;
       acc.quantidadeGeral += stat.quantidade;
       return acc;
     }, { totalGeral: 0, quantidadeGeral: 0 });
 
-    // Adicionar percentuais
     const estatisticasComPercentual = estatisticas.map(stat => ({
       formaPagamento: stat._id,
       total: stat.total,
@@ -308,50 +240,39 @@ export const estatisticasPorFormaPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({
-      message: 'Erro ao buscar estatísticas',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao buscar estatísticas', details: error.message });
   }
 };
 
 // @desc    Resumo diário de pagamentos
 // @route   GET /api/pagamentos/resumo/diario
-// @access  Private
 export const resumoDiario = async (req, res) => {
   try {
+    const { Pagamento } = req.models;
     const { data } = req.query;
 
     const dataConsulta = data ? new Date(data) : new Date();
     const inicioDia = new Date(dataConsulta);
     inicioDia.setHours(0, 0, 0, 0);
-
     const fimDia = new Date(dataConsulta);
     fimDia.setHours(23, 59, 59, 999);
 
     const pagamentos = await Pagamento.find({
       tenantId: req.tenantId,
-      dataPagamento: {
-        $gte: inicioDia,
-        $lte: fimDia
-      }
+      dataPagamento: { $gte: inicioDia, $lte: fimDia }
     }).populate({
       path: 'transacao',
       select: 'tipo categoria cliente',
       populate: { path: 'cliente', select: 'nome' }
     });
 
-    // Agrupar por forma de pagamento
     const resumoPorForma = {};
     let totalDia = 0;
 
     pagamentos.forEach(pag => {
       const forma = pag.formaPagamento;
       if (!resumoPorForma[forma]) {
-        resumoPorForma[forma] = {
-          quantidade: 0,
-          valor: 0
-        };
+        resumoPorForma[forma] = { quantidade: 0, valor: 0 };
       }
       resumoPorForma[forma].quantidade += 1;
       resumoPorForma[forma].valor += pag.valor;
@@ -361,27 +282,21 @@ export const resumoDiario = async (req, res) => {
     res.status(200).json({
       data: dataConsulta.toISOString().split('T')[0],
       resumoPorForma,
-      totais: {
-        quantidadeTotal: pagamentos.length,
-        valorTotal: totalDia
-      },
+      totais: { quantidadeTotal: pagamentos.length, valorTotal: totalDia },
       pagamentos
     });
 
   } catch (error) {
     console.error('Erro ao buscar resumo diário:', error);
-    res.status(500).json({
-      message: 'Erro ao buscar resumo diário',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao buscar resumo diário', details: error.message });
   }
 };
 
 // @desc    Resumo mensal de pagamentos
 // @route   GET /api/pagamentos/resumo/mensal
-// @access  Private
 export const resumoMensal = async (req, res) => {
   try {
+    const { Pagamento } = req.models;
     const { mes, ano } = req.query;
 
     const anoConsulta = ano ? parseInt(ano) : new Date().getFullYear();
@@ -390,45 +305,33 @@ export const resumoMensal = async (req, res) => {
     const inicioMes = new Date(anoConsulta, mesConsulta - 1, 1);
     const fimMes = new Date(anoConsulta, mesConsulta, 0, 23, 59, 59, 999);
 
-    // Converter tenantId para ObjectId para aggregate
     const tenantIdObj = mongoose.Types.ObjectId.isValid(req.tenantId)
       ? new mongoose.Types.ObjectId(req.tenantId)
       : req.tenantId;
 
     const pagamentos = await Pagamento.find({
       tenantId: req.tenantId,
-      dataPagamento: {
-        $gte: inicioMes,
-        $lte: fimMes
-      }
+      dataPagamento: { $gte: inicioMes, $lte: fimMes }
     });
 
-    // Resumo por forma de pagamento
     const resumoPorForma = {};
     let totalMes = 0;
 
     pagamentos.forEach(pag => {
       const forma = pag.formaPagamento;
       if (!resumoPorForma[forma]) {
-        resumoPorForma[forma] = {
-          quantidade: 0,
-          valor: 0
-        };
+        resumoPorForma[forma] = { quantidade: 0, valor: 0 };
       }
       resumoPorForma[forma].quantidade += 1;
       resumoPorForma[forma].valor += pag.valor;
       totalMes += pag.valor;
     });
 
-    // Resumo por dia (para gráfico)
     const pagamentosPorDia = await Pagamento.aggregate([
       {
         $match: {
           tenantId: tenantIdObj,
-          dataPagamento: {
-            $gte: inicioMes,
-            $lte: fimMes
-          }
+          dataPagamento: { $gte: inicioMes, $lte: fimMes }
         }
       },
       {
@@ -459,9 +362,6 @@ export const resumoMensal = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar resumo mensal:', error);
-    res.status(500).json({
-      message: 'Erro ao buscar resumo mensal',
-      details: error.message
-    });
+    res.status(500).json({ message: 'Erro ao buscar resumo mensal', details: error.message });
   }
 };

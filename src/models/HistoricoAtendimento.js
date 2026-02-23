@@ -320,4 +320,7 @@ historicoAtendimentoSchema.pre('save', function(next) {
   next();
 });
 
+// Exporta schema para uso no registry (database-per-tenant)
+export { historicoAtendimentoSchema as HistoricoAtendimentoSchema };
+
 export default mongoose.model('HistoricoAtendimento', historicoAtendimentoSchema);

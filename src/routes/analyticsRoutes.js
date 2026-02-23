@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticate } from '../middlewares/auth.js';
 import {
     getAlertaSessoesBaixas,
     getReceitaTemporal,
@@ -7,6 +8,9 @@ import {
 } from '../controllers/analyticsController.js';
 
 const router = express.Router();
+
+// Protege todas as rotas de analytics
+router.use(authenticate);
 
 // Existing route
 router.get('/sessoes-baixas', getAlertaSessoesBaixas);

@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
+import { getTenantDB } from '../config/tenantDB.js';
+import { getModels } from '../models/registry.js';
 
 // =============================================
 // MIDDLEWARE: AUTHENTICATE
@@ -41,6 +43,12 @@ export const authenticate = async (req, res, next) => {
         // Adicionar dados do usuário ao request
         req.user = decoded;
         req.tenantId = decoded.tenantId;
+
+        // Injectar DB e models isolados por tenant (database-per-tenant)
+        if (decoded.tenantId) {
+            req.db = getTenantDB(decoded.tenantId);
+            req.models = getModels(req.db);
+        }
 
         next();
     } catch (error) {
@@ -216,17 +224,18 @@ export const checkLimit = (limitType) => {
             let count = 0;
 
             switch (limitType) {
-                case 'maxClientes':
-                    const Cliente = (await import('../models/Cliente.js')).default;
+                case 'maxClientes': {
+                    const { Cliente } = req.models;
                     count = await Cliente.countDocuments({ tenantId: req.tenantId, ativo: true });
                     break;
+                }
 
                 case 'maxUsuarios':
                     count = await User.countDocuments({ tenantId: req.tenantId, ativo: true });
                     break;
 
-                case 'maxAgendamentosMes':
-                    const Agendamento = (await import('../models/Agendamento.js')).default;
+                case 'maxAgendamentosMes': {
+                    const { Agendamento } = req.models;
                     const inicioMes = new Date();
                     inicioMes.setDate(1);
                     inicioMes.setHours(0, 0, 0, 0);
@@ -235,6 +244,7 @@ export const checkLimit = (limitType) => {
                         createdAt: { $gte: inicioMes }
                     });
                     break;
+                }
 
                 default:
                     return next();

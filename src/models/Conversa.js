@@ -45,5 +45,7 @@ ConversaSchema.pre('save', function (next) {
   next();
 });
 
-// A única outra mudança está aqui:
+// Exporta schema para uso no registry (database-per-tenant)
+export { ConversaSchema };
+
 export default mongoose.model('Conversa', ConversaSchema);

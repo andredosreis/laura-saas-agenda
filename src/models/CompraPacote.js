@@ -317,4 +317,7 @@ compraPacoteSchema.statics.buscarComPoucasSessoes = function(tenantId, limite = 
   }).populate('cliente pacote');
 };
 
+// Exporta schema para uso no registry (database-per-tenant)
+export { compraPacoteSchema as CompraPacoteSchema };
+
 export default mongoose.model('CompraPacote', compraPacoteSchema);

@@ -1,10 +1,7 @@
-import Agendamento from "../models/Agendamento.js";
-import Schedule from "../models/Schedule.js"; // Importar o modelo Schedule
-import { DateTime } from "luxon"; // Importar Luxon para manipulação de datas
+import { DateTime } from "luxon";
 import { sendPushNotification } from "../services/pushService.js";
 import UserSubscription from "../models/UserSubscription.js";
-import { sendWhatsAppMessage } from "../utils/zapi_client.js"; // ✨ ADICIONAR Z-API
-
+import { sendWhatsAppMessage } from "../utils/zapi_client.js";
 
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
 const timeToMinutes = (timeString) => {
@@ -16,10 +13,10 @@ const timeToMinutes = (timeString) => {
 // @desc    Criar novo agendamento
 export const createAgendamento = async (req, res) => {
   try {
+    const { Agendamento, Schedule } = req.models;
     const { cliente, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
 
-    // 1. Validar se a dataHora é um formato válido e não está no passado (já existe no middleware do modelo, mas reforçar aqui)
-    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "America/Sao_Paulo" }); // Usar fuso horário adequado
+    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "America/Sao_Paulo" });
     if (!agendamentoDateTime.isValid) {
       return res.status(400).json({ message: "Data e hora do agendamento inválidas." });
     }
@@ -27,19 +24,15 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
 
-    // 2. Obter o dia da semana e o horário do agendamento
-    const dayOfWeek = agendamentoDateTime.weekday === 7 ? 0 : agendamentoDateTime.weekday; // Luxon: 1=Seg, ..., 7=Dom. Mongoose: 0=Dom, ..., 6=Sab
+    const dayOfWeek = agendamentoDateTime.weekday === 7 ? 0 : agendamentoDateTime.weekday;
     const requestedTimeInMinutes = timeToMinutes(agendamentoDateTime.toFormat("HH:mm"));
 
-    // 3. Buscar a disponibilidade para o dia da semana
-    // 🆕 Filtrar pelo tenant
     const schedule = await Schedule.findOne({ dayOfWeek, tenantId: req.tenantId });
 
     if (!schedule || !schedule.isActive) {
       return res.status(400).json({ message: `O salão não está ativo para agendamentos na ${schedule?.label || "este dia da semana"}.` });
     }
 
-    // 4. Verificar se o horário está dentro do período de trabalho
     const startWorkMinutes = timeToMinutes(schedule.startTime);
     const endWorkMinutes = timeToMinutes(schedule.endTime);
 
@@ -47,7 +40,6 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ message: "Horário de agendamento fora do expediente de trabalho." });
     }
 
-    // 5. Verificar se o horário não está dentro do período de pausa
     const breakStartMinutes = timeToMinutes(schedule.breakStartTime);
     const breakEndMinutes = timeToMinutes(schedule.breakEndTime);
 
@@ -56,15 +48,12 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ message: "Horário de agendamento coincide com o período de pausa." });
     }
 
-    // 6. Verificar conflito com agendamentos existentes
-    const agendamentoDurationMinutes = 60; // Assumindo duração padrão de 1 hora. Ajuste conforme a lógica de pacotes/serviços.
-    const requestedEndTimeInMinutes = requestedTimeInMinutes + agendamentoDurationMinutes;
-
+    const agendamentoDurationMinutes = 60;
     const conflictingAgendamento = await Agendamento.findOne({
-      tenantId: req.tenantId, // 🆕 Filtrar conflitos apenas deste tenant
+      tenantId: req.tenantId,
       dataHora: {
-        $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(), // Início do slot anterior
-        $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(), // Fim do slot posterior
+        $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
+        $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
       },
       status: { $in: ["Agendado", "Confirmado"] },
     });
@@ -73,10 +62,8 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ message: "Já existe um agendamento para este horário." });
     }
 
-    // Se todas as validações passarem, criar o agendamento
-    // 🆕 Injectar tenantId
     console.log('[createAgendamento] Dados recebidos:', { cliente, dataHora, pacote, compraPacote, tenantId: req.tenantId });
-    
+
     const novoAgendamento = new Agendamento({
       cliente,
       dataHora,
@@ -87,14 +74,14 @@ export const createAgendamento = async (req, res) => {
       tenantId: req.tenantId
     });
     await novoAgendamento.save();
-    
+
     console.log('[createAgendamento] ✅ Agendamento criado:', {
       _id: novoAgendamento._id,
       cliente: novoAgendamento.cliente,
       compraPacote: novoAgendamento.compraPacote,
       status: novoAgendamento.status
     });
-    
+
     res.status(201).json(novoAgendamento);
   } catch (error) {
     console.error("Erro ao criar agendamento:", error);
@@ -109,27 +96,22 @@ export const createAgendamento = async (req, res) => {
 // @desc    Listar todos os agendamentos (com filtros opcionais)
 export const getAllAgendamentos = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { dataInicio, dataFim, status } = req.query;
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
-    // Base query - sempre filtrar por tenant
     const query = { tenantId: req.tenantId };
 
-    // Filtro de data (para visão semanal, mensal, etc)
     if (dataInicio && dataFim) {
-      query.dataHora = {
-        $gte: new Date(dataInicio),
-        $lte: new Date(dataFim)
-      };
+      query.dataHora = { $gte: new Date(dataInicio), $lte: new Date(dataFim) };
     } else if (dataInicio) {
       query.dataHora = { $gte: new Date(dataInicio) };
     } else if (dataFim) {
       query.dataHora = { $lte: new Date(dataFim) };
     }
 
-    // Filtro de status
     if (status) {
       query.status = status;
     }
@@ -161,7 +143,7 @@ export const getAllAgendamentos = async (req, res) => {
 // @desc    Buscar um agendamento por ID
 export const getAgendamento = async (req, res) => {
   try {
-    // 🆕 Buscar apenas se pertencer ao tenant
+    const { Agendamento } = req.models;
     const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate("cliente pacote");
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
@@ -178,7 +160,7 @@ export const getAgendamento = async (req, res) => {
 // @desc    Atualizar agendamento completo
 export const updateAgendamento = async (req, res) => {
   try {
-    // 🆕 Update seguro com tenantId
+    const { Agendamento } = req.models;
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       req.body,
@@ -201,53 +183,42 @@ export const updateAgendamento = async (req, res) => {
 // @desc    Atualizar status do agendamento
 export const updateStatusAgendamento = async (req, res) => {
   try {
+    const { Agendamento, CompraPacote, Transacao } = req.models;
     const { status } = req.body;
     if (!status) {
       return res.status(400).json({ message: "O campo status é obrigatório." });
     }
-    
+
     console.log(`[updateStatusAgendamento] Alterando status para: ${status}`);
-    
-    // Buscar agendamento atual com populate
+
     const agendamentoAtual = await Agendamento.findOne(
       { _id: req.params.id, tenantId: req.tenantId }
     );
-    
+
     if (!agendamentoAtual) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
-    
+
     console.log(`[updateStatusAgendamento] Agendamento encontrado. compraPacote: ${agendamentoAtual.compraPacote}`);
-    
-    // Se está marcando como Realizado e tem compraPacote vinculada
+
     if (status === 'Realizado' && agendamentoAtual.compraPacote) {
-      const CompraPacote = (await import('../models/CompraPacote.js')).default;
-      const Transacao = (await import('../models/Transacao.js')).default;
-      const compraPacote = await CompraPacote.findById(agendamentoAtual.compraPacote).populate('pacote');
-      
+      const compraPacote = await CompraPacote.findOne({ _id: agendamentoAtual.compraPacote, tenantId: req.tenantId }).populate('pacote');
+
       if (!compraPacote) {
         console.error(`[updateStatusAgendamento] ⚠️ CompraPacote não encontrada: ${agendamentoAtual.compraPacote}`);
         return res.status(404).json({ message: "Pacote comprado não encontrado." });
       }
-      
+
       console.log(`[updateStatusAgendamento] CompraPacote encontrada. Sessões restantes: ${compraPacote.sessoesRestantes}`);
-      
+
       try {
-        // Usar sessão do pacote (decrementa automaticamente)
         const valorPorSessao = compraPacote.pacote?.valor && compraPacote.pacote?.sessoes
           ? compraPacote.pacote.valor / compraPacote.pacote.sessoes
           : 0;
         await compraPacote.usarSessao(agendamentoAtual._id, valorPorSessao, req.user?._id);
         console.log(`✅ Sessão decrementada do pacote ${compraPacote._id}. Restantes: ${compraPacote.sessoesRestantes - 1}`);
 
-        // 💰 IMPORTANTE: NÃO criar transação aqui!
-        // A transação de receita já foi criada na VENDA do pacote (compraPacoteController.venderPacote)
-        // Aqui apenas registramos o USO da sessão no histórico do pacote
-
-        // Armazenar valor por sessão no agendamento para auditoria
         agendamentoAtual.valorCobrado = valorPorSessao;
-
-        // Atualizar status de pagamento do agendamento (já pago na compra do pacote)
         agendamentoAtual.statusPagamento = 'Pago';
         await agendamentoAtual.save();
 
@@ -261,24 +232,19 @@ export const updateStatusAgendamento = async (req, res) => {
         });
       }
     } else if (status === 'Realizado' && !agendamentoAtual.compraPacote && agendamentoAtual.servicoAvulsoValor) {
-      // 🆕 Serviço avulso - NÃO criar transação automaticamente
-      // A transação deve ser criada pelo frontend com a forma de pagamento correta
       console.log(`[updateStatusAgendamento] ⏳ Serviço avulso realizado. Aguardando registro de pagamento pelo frontend.`);
-
-      // Marcar status de pagamento como Pendente
       agendamentoAtual.statusPagamento = 'Pendente';
       await agendamentoAtual.save();
     } else if (status === 'Realizado' && !agendamentoAtual.compraPacote) {
       console.warn(`[updateStatusAgendamento] ⚠️ Agendamento marcado como Realizado mas não tem compraPacote vinculada nem valor avulso`);
     }
-    
-    // Atualizar status do agendamento
+
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       { status },
       { new: true, runValidators: true }
     ).populate('compraPacote cliente');
-    
+
     res.status(200).json(agendamento);
   } catch (error) {
     console.error('[updateStatusAgendamento] Erro:', error);
@@ -289,7 +255,7 @@ export const updateStatusAgendamento = async (req, res) => {
 // @desc    Deletar agendamento
 export const deleteAgendamento = async (req, res) => {
   try {
-    // 🆕 Delete seguro com tenantId
+    const { Agendamento } = req.models;
     const agendamento = await Agendamento.findOneAndDelete({ _id: req.params.id, tenantId: req.tenantId });
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
@@ -303,15 +269,12 @@ export const deleteAgendamento = async (req, res) => {
   }
 };
 
-
-
-
-// @desc    Confirmar ou rejeitar agendamento (NOVO)
+// @desc    Confirmar ou rejeitar agendamento
 export const confirmarAgendamento = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { confirmacao, respondidoPor } = req.body;
 
-    // Validar input
     if (!confirmacao || !['confirmado', 'rejeitado'].includes(confirmacao)) {
       return res.status(400).json({
         message: "Campo 'confirmacao' deve ser 'confirmado' ou 'rejeitado'."
@@ -324,14 +287,11 @@ export const confirmarAgendamento = async (req, res) => {
       });
     }
 
-
-    // Buscar agendamento (seguro)
     const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('cliente');
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
-    // Atualizar confirmação
     agendamento.confirmacao = {
       tipo: confirmacao,
       respondidoEm: new Date(),
@@ -340,12 +300,10 @@ export const confirmarAgendamento = async (req, res) => {
 
     await agendamento.save();
 
-    // 🔔 Notificar o outro lado (se Laura confirmou, notificar cliente e vice-versa)
     try {
       if (respondidoPor === 'laura') {
-        // Laura confirmou/rejeitou, notificar CLIENTE
         const subscriptionCliente = await UserSubscription.findOne({
-          userId: agendamento.cliente._id.toString(), // Converte ObjectId para String
+          userId: agendamento.cliente._id.toString(),
           active: true,
         });
 
@@ -372,7 +330,6 @@ export const confirmarAgendamento = async (req, res) => {
       }
     } catch (notifError) {
       console.error('[AgenteController] ⚠️ Erro ao enviar notificação:', notifError);
-      // Não falhar a requisição se notificação falhar
     }
 
     res.status(200).json({
@@ -390,12 +347,11 @@ export const confirmarAgendamento = async (req, res) => {
   }
 };
 
-
-// @desc    Registrar pagamento de serviço avulso (NOVO)
+// @desc    Registrar pagamento de serviço avulso
 // @route   POST /api/agendamentos/:id/pagamento
-// @access  Private
 export const registrarPagamentoServico = async (req, res) => {
   try {
+    const { Agendamento, Transacao, Pagamento } = req.models;
     const {
       valor,
       formaPagamento,
@@ -406,20 +362,14 @@ export const registrarPagamentoServico = async (req, res) => {
       observacoes
     } = req.body;
 
-    // Validações
     if (!valor || valor <= 0) {
-      return res.status(400).json({
-        message: 'Valor do pagamento deve ser maior que zero'
-      });
+      return res.status(400).json({ message: 'Valor do pagamento deve ser maior que zero' });
     }
 
     if (!formaPagamento) {
-      return res.status(400).json({
-        message: 'Forma de pagamento é obrigatória'
-      });
+      return res.status(400).json({ message: 'Forma de pagamento é obrigatória' });
     }
 
-    // Buscar agendamento
     const agendamento = await Agendamento.findOne({
       _id: req.params.id,
       tenantId: req.tenantId
@@ -429,7 +379,6 @@ export const registrarPagamentoServico = async (req, res) => {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
-    // Verificar se é serviço avulso
     if (agendamento.compraPacote) {
       return res.status(400).json({
         message: 'Este agendamento é de um pacote. Pagamento já foi registrado na compra do pacote.'
@@ -442,11 +391,6 @@ export const registrarPagamentoServico = async (req, res) => {
       });
     }
 
-    // Importar modelos dinamicamente
-    const Transacao = (await import('../models/Transacao.js')).default;
-    const Pagamento = (await import('../models/Pagamento.js')).default;
-
-    // Criar transação
     const transacao = await Transacao.create({
       tenantId: req.tenantId,
       tipo: 'Receita',
@@ -456,15 +400,14 @@ export const registrarPagamentoServico = async (req, res) => {
       profissional: req.user?._id,
       valor: agendamento.servicoAvulsoValor,
       desconto: 0,
-      valorFinal: valor, // Usar valor recebido (pode ser diferente se houver desconto)
+      valorFinal: valor,
       statusPagamento: valor >= agendamento.servicoAvulsoValor ? 'Pago' : 'Parcial',
-      formaPagamento: null, // Será preenchido após criar pagamento
+      formaPagamento: null,
       dataPagamento: new Date(),
       descricao: agendamento.servicoAvulsoNome || 'Serviço avulso',
       observacoes: observacoes || `Serviço realizado em ${new Date(agendamento.dataHora).toLocaleDateString('pt-PT')}`
     });
 
-    // Criar registro de pagamento
     const pagamento = await Pagamento.create({
       tenantId: req.tenantId,
       transacao: transacao._id,
@@ -478,16 +421,13 @@ export const registrarPagamentoServico = async (req, res) => {
       observacoes: observacoes || ''
     });
 
-    // Atualizar transação com forma de pagamento
     transacao.formaPagamento = formaPagamento;
     await transacao.save();
 
-    // Vincular transação ao agendamento
     agendamento.transacao = transacao._id;
     agendamento.statusPagamento = transacao.statusPagamento;
     await agendamento.save();
 
-    // Popular dados
     await transacao.populate([
       { path: 'cliente', select: 'nome telefone' },
       { path: 'profissional', select: 'nome' }
@@ -512,13 +452,12 @@ export const registrarPagamentoServico = async (req, res) => {
   }
 };
 
-// @desc    Enviar lembrete manual via WhatsApp (MODIFICADO)
+// @desc    Enviar lembrete manual via WhatsApp
 export const enviarLembreteManual = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     console.log('[Agendamento] 📱 Enviando lembrete manual via WhatsApp...');
 
-
-    // Buscar agendamento com populate de cliente (seguro)
     const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('cliente');
 
     if (!agendamento) {
@@ -537,12 +476,10 @@ export const enviarLembreteManual = async (req, res) => {
       });
     }
 
-    // Formatar data do agendamento
     const dataAgendamento = DateTime.fromJSDate(new Date(agendamento.dataHora));
     const dataFormatada = dataAgendamento.toFormat('dd/MM/yyyy');
     const horaFormatada = dataAgendamento.toFormat('HH:mm');
 
-    // Preparar mensagem WhatsApp
     const mensagem = `🔔 *Lembrete de Agendamento*
 
 Olá ${agendamento.cliente.nome}!
@@ -559,7 +496,6 @@ Aguardamos por ti! 💆‍♀️✨
 
 _La Estética Avançada_`;
 
-    // Enviar via WhatsApp (Z-API)
     const resultado = await sendWhatsAppMessage(telefone, mensagem);
 
     if (resultado.success) {
@@ -594,35 +530,27 @@ _La Estética Avançada_`;
   }
 };
 
-// @desc    Buscar histórico de atendimentos (apenas realizados, cancelados, não compareceu)
+// @desc    Buscar histórico de atendimentos
 // @route   GET /api/agendamentos/historico
-// @access  Private
 export const getHistorico = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { dataInicio, dataFim, status, cliente, page = 1, limit = 50 } = req.query;
 
-    // Filtro base: apenas status de histórico
     const filtro = {
       tenantId: req.tenantId,
       status: { $in: ['Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'] }
     };
 
-    // Filtros opcionais
     if (dataInicio || dataFim) {
       filtro.dataHora = {};
       if (dataInicio) filtro.dataHora.$gte = new Date(dataInicio);
       if (dataFim) filtro.dataHora.$lte = new Date(dataFim);
     }
 
-    if (status) {
-      filtro.status = status;
-    }
+    if (status) filtro.status = status;
+    if (cliente) filtro.cliente = cliente;
 
-    if (cliente) {
-      filtro.cliente = cliente;
-    }
-
-    // Buscar com paginação
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const agendamentos = await Agendamento.find(filtro)
       .populate('cliente', 'nome telefone email')
@@ -656,12 +584,11 @@ export const getHistorico = async (req, res) => {
 
 // @desc    Buscar estatísticas do mês
 // @route   GET /api/agendamentos/stats/mes
-// @access  Private
 export const getStatsMes = async (req, res) => {
   try {
+    const { Agendamento } = req.models;
     const { mes, ano } = req.query;
 
-    // Definir período (mês atual se não especificado)
     const now = DateTime.now();
     const mesAtual = mes ? parseInt(mes) : now.month;
     const anoAtual = ano ? parseInt(ano) : now.year;
@@ -669,13 +596,11 @@ export const getStatsMes = async (req, res) => {
     const dataInicio = DateTime.fromObject({ year: anoAtual, month: mesAtual, day: 1 }).startOf('day').toJSDate();
     const dataFim = DateTime.fromObject({ year: anoAtual, month: mesAtual }).endOf('month').toJSDate();
 
-    // Buscar agendamentos do período
     const agendamentos = await Agendamento.find({
       tenantId: req.tenantId,
       dataHora: { $gte: dataInicio, $lte: dataFim }
     }).populate('compraPacote');
 
-    // Calcular estatísticas
     const totalAgendamentos = agendamentos.length;
     const totalRealizados = agendamentos.filter(a => a.status === 'Realizado').length;
     const totalCancelados = agendamentos.filter(a =>
@@ -686,7 +611,6 @@ export const getStatsMes = async (req, res) => {
       a.status === 'Agendado' || a.status === 'Confirmado'
     ).length;
 
-    // Calcular receita total (apenas realizados)
     const receitaTotal = agendamentos
       .filter(a => a.status === 'Realizado')
       .reduce((acc, a) => {
@@ -700,24 +624,17 @@ export const getStatsMes = async (req, res) => {
         return acc;
       }, 0);
 
-    // Taxa de sucesso
     const taxaSucesso = totalAgendamentos > 0
       ? ((totalRealizados / totalAgendamentos) * 100).toFixed(1)
       : 0;
 
-    // Taxa de não comparecimento
     const taxaNaoComparecimento = totalAgendamentos > 0
       ? ((totalNaoCompareceu / totalAgendamentos) * 100).toFixed(1)
       : 0;
 
     res.status(200).json({
       success: true,
-      periodo: {
-        mes: mesAtual,
-        ano: anoAtual,
-        dataInicio,
-        dataFim
-      },
+      periodo: { mes: mesAtual, ano: anoAtual, dataInicio, dataFim },
       estatisticas: {
         totalAgendamentos,
         totalRealizados,

@@ -148,4 +148,7 @@ agendamentoSchema.pre('save', function (next) {
   next();
 });
 
+// Exporta schema para uso no registry (database-per-tenant)
+export { agendamentoSchema as AgendamentoSchema };
+
 export default mongoose.model('Agendamento', agendamentoSchema);

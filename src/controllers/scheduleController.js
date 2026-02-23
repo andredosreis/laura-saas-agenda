@@ -1,11 +1,9 @@
 import { DateTime } from 'luxon';
-import Schedule from "../models/Schedule.js";
-import Agendamento from "../models/Agendamento.js";
 
 /**
- * @desc    Garante que os 7 dias da semana existem na base de dados.
+ * @desc    Garante que os 7 dias da semana existem na base de dados para o tenant.
  */
-const initializeSchedules = async () => {
+const initializeSchedules = async (Schedule, tenantId) => {
   const daysOfWeek = [
     { dayOfWeek: 0, label: 'Domingo' }, { dayOfWeek: 1, label: 'Segunda-feira' },
     { dayOfWeek: 2, label: 'Terça-feira' }, { dayOfWeek: 3, label: 'Quarta-feira' },
@@ -13,9 +11,9 @@ const initializeSchedules = async () => {
     { dayOfWeek: 6, label: 'Sábado' },
   ];
   await Promise.all(daysOfWeek.map(async (day) => {
-    const existing = await Schedule.findOne({ dayOfWeek: day.dayOfWeek });
+    const existing = await Schedule.findOne({ dayOfWeek: day.dayOfWeek, tenantId });
     if (!existing) {
-      await Schedule.create(day);
+      await Schedule.create({ ...day, tenantId });
     }
   }));
 };
@@ -40,16 +38,20 @@ const minutesToTime = (totalMinutes) => {
  */
 export const getSchedules = async (req, res) => {
   try {
-    await initializeSchedules();
-    const schedules = await Schedule.find({}).sort({ dayOfWeek: 'asc' });
-    const inicioSemana = DateTime.now().setZone('America/Sao_Paulo').startOf('day').toJSDate(); // Ajustado fuso horário
-    const fimSemana = DateTime.now().setZone('America/Sao_Paulo').plus({ days: 7 }).endOf('day').toJSDate(); // Ajustado fuso horário
-    
+    const { Schedule, Agendamento } = req.models;
+    await initializeSchedules(Schedule, req.tenantId);
+
+    const schedules = await Schedule.find({ tenantId: req.tenantId }).sort({ dayOfWeek: 'asc' });
+
+    const inicioSemana = DateTime.now().setZone('Europe/Lisbon').startOf('day').toJSDate();
+    const fimSemana = DateTime.now().setZone('Europe/Lisbon').plus({ days: 7 }).endOf('day').toJSDate();
+
     const agendamentosExistentes = await Agendamento.find({
+      tenantId: req.tenantId,
       dataHora: { $gte: inicioSemana, $lte: fimSemana },
       status: { $in: ['Agendado', 'Confirmado'] }
     }).populate('cliente', 'nome telefone');
-    
+
     res.status(200).json({
       disponibilidade: schedules,
       agendamentos: agendamentosExistentes,
@@ -68,19 +70,21 @@ export const getSchedules = async (req, res) => {
  */
 export const getAvailableSlots = async (req, res) => {
   try {
+    const { Schedule, Agendamento } = req.models;
     const { date, duration = 60 } = req.query;
+
     if (!date) {
       return res.status(400).json({ message: 'A data (YYYY-MM-DD) é obrigatória.' });
     }
 
-    const targetDate = DateTime.fromISO(date, { zone: 'Europe/Lisbon' }); 
+    const targetDate = DateTime.fromISO(date, { zone: 'Europe/Lisbon' });
     if (!targetDate.isValid) {
       return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD.' });
     }
 
     const dayOfWeek = targetDate.weekday === 7 ? 0 : targetDate.weekday; // Luxon: 1=Seg, ..., 7=Dom. Mongoose: 0=Dom, ..., 6=Sab
 
-    const schedule = await Schedule.findOne({ dayOfWeek });
+    const schedule = await Schedule.findOne({ dayOfWeek, tenantId: req.tenantId });
 
     if (!schedule || !schedule.isActive) {
       return res.status(200).json({ availableSlots: [], message: 'O salão não está ativo para agendamentos neste dia.' });
@@ -92,6 +96,7 @@ export const getAvailableSlots = async (req, res) => {
     const breakEndMinutes = timeToMinutes(schedule.breakEndTime);
 
     const existingAgendamentos = await Agendamento.find({
+      tenantId: req.tenantId,
       dataHora: {
         $gte: targetDate.startOf('day').toJSDate(),
         $lte: targetDate.endOf('day').toJSDate(),
@@ -100,9 +105,8 @@ export const getAvailableSlots = async (req, res) => {
     });
 
     const occupiedSlots = existingAgendamentos.map(ag => {
-      const agendamentoStart = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }); // Ajustado fuso horário
+      const agendamentoStart = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' });
       const agendamentoStartMinutes = timeToMinutes(agendamentoStart.toFormat('HH:mm'));
-      // Assumindo que a duração do agendamento é a mesma do serviço que está sendo buscado
       const agendamentoEndMinutes = agendamentoStartMinutes + Number(duration);
       return { start: agendamentoStartMinutes, end: agendamentoEndMinutes };
     });
@@ -111,17 +115,14 @@ export const getAvailableSlots = async (req, res) => {
     for (let time = startWorkMinutes; time < endWorkMinutes; time += Number(duration)) {
       const slotEnd = time + Number(duration);
 
-      // Verificar se o slot está dentro do horário de trabalho
       if (slotEnd > endWorkMinutes) continue;
 
-      // Verificar se o slot não se sobrepõe à pausa
       if (breakStartMinutes !== null && breakEndMinutes !== null) {
         if ((time < breakEndMinutes && slotEnd > breakStartMinutes)) {
-          continue; // Slot se sobrepõe à pausa
+          continue;
         }
       }
 
-      // Verificar se o slot não se sobrepõe a agendamentos existentes
       const isOccupied = occupiedSlots.some(occupied => {
         return (time < occupied.end && slotEnd > occupied.start);
       });
@@ -145,20 +146,23 @@ export const getAvailableSlots = async (req, res) => {
  */
 export const updateSchedule = async (req, res) => {
   try {
+    const { Schedule } = req.models;
     const { dayOfWeek } = req.params;
     const { isActive, startTime, endTime, breakStartTime, breakEndTime } = req.body;
+
     const updatedSchedule = await Schedule.findOneAndUpdate(
-      { dayOfWeek },
+      { dayOfWeek, tenantId: req.tenantId },
       { isActive, startTime, endTime, breakStartTime, breakEndTime },
       { new: true, runValidators: true }
     );
+
     if (!updatedSchedule) {
       return res.status(404).json({ message: 'Dia da semana não encontrado' });
     }
+
     res.status(200).json(updatedSchedule);
   } catch (error) {
     console.error('Erro em updateSchedule:', error);
     res.status(500).json({ message: 'Erro ao atualizar horário', error: error.message });
   }
 };
-
