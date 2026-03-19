@@ -176,7 +176,12 @@ function AppointmentDetailModal({
                     </button>
                     <button
                         onClick={() => {
-                            const phone = appointment.cliente?.telefone?.replace(/\D/g, '');
+                            const raw = appointment.cliente?.telefone?.replace(/[\s\-\(\)\+]/g, '');
+                            const phone = raw
+                                ? raw.startsWith('351') ? raw
+                                    : (raw.startsWith('9') || raw.startsWith('2')) ? `351${raw}`
+                                    : raw
+                                : null;
                             if (phone) {
                                 const clientName = appointment.cliente?.nome || 'Cliente';
                                 const serviceName = appointment.pacote?.nome || appointment.servicoAvulsoNome || 'Serviço';
