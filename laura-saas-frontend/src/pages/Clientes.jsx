@@ -49,7 +49,13 @@ function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [pacotesClientes, setPacotesClientes] = useState({}); // { clienteId: [pacotes] }
   const [isLoading, setIsLoading] = useState(true);
+  const [busca, setBusca] = useState('');
   const navigate = useNavigate();
+
+  const clientesFiltrados = clientes.filter(c =>
+    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+    c.telefone?.includes(busca)
+  );
 
   // Função para buscar clientes otimizada
   const fetchClientes = async () => {
@@ -121,7 +127,7 @@ function Clientes() {
   return (
     <ErrorBoundary>
       <div className="pt-24 px-4 pb-4 max-w-7xl mx-auto min-h-screen bg-slate-900">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">Lista de Clientes</h1>
           <button
             onClick={() => navigate('/criar-cliente')}
@@ -131,6 +137,14 @@ function Clientes() {
           </button>
         </div>
 
+        <input
+          type="text"
+          placeholder="Buscar por nome ou telefone..."
+          value={busca}
+          onChange={e => setBusca(e.target.value)}
+          className="w-full mb-6 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+        />
+
         {clientes.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-600">Nenhum cliente encontrado.</p>
@@ -138,7 +152,10 @@ function Clientes() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {clientes.map((cliente) => (
+            {clientesFiltrados.length === 0 && (
+              <p className="text-slate-400 col-span-full text-center py-4">Nenhum cliente encontrado para "{busca}".</p>
+            )}
+            {clientesFiltrados.map((cliente) => (
               <ClienteCard
                 key={cliente._id}
                 cliente={cliente}

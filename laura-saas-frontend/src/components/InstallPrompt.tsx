@@ -79,7 +79,7 @@ const InstallPrompt = () => {
 
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-            Instalar Laura
+            Instalar Marcai
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
             Instale o app na tela inicial para acesso rápido e uso offline!

@@ -12,7 +12,9 @@ export const venderPacote = async (req, res) => {
       parcelado,
       numeroParcelas,
       valorPago,
-      formaPagamento
+      formaPagamento,
+      sessoesUsadas = 0,
+      valorTotal: valorTotalCustom
     } = req.body;
 
     if (!clienteId || !pacoteId) {
@@ -28,20 +30,25 @@ export const venderPacote = async (req, res) => {
     if (!pacote)  return res.status(404).json({ message: 'Pacote não encontrado' });
     if (!pacote.ativo) return res.status(400).json({ message: 'Pacote não está ativo' });
 
+    const sessoesContratadas = pacote.sessoes;
+    const sessoesUsadasFinal = Math.min(parseInt(sessoesUsadas) || 0, sessoesContratadas - 1);
+    const sessoesRestantes = sessoesContratadas - sessoesUsadasFinal;
+    const valorTotal = valorTotalCustom > 0 ? parseFloat(valorTotalCustom) : pacote.valor;
+
     const compraPacote = await CompraPacote.create({
       tenantId: req.tenantId,
       cliente: clienteId,
       pacote: pacoteId,
-      sessoesContratadas: pacote.sessoes,
-      sessoesUsadas: 0,
-      sessoesRestantes: pacote.sessoes,
-      valorTotal: pacote.valor,
+      sessoesContratadas,
+      sessoesUsadas: sessoesUsadasFinal,
+      sessoesRestantes,
+      valorTotal,
       valorPago: valorPago || 0,
-      valorPendente: pacote.valor - (valorPago || 0),
+      valorPendente: valorTotal - (valorPago || 0),
       parcelado: parcelado || false,
       numeroParcelas: parcelado ? (numeroParcelas || 1) : 1,
       parcelasPagas: valorPago > 0 ? 1 : 0,
-      valorParcela: parcelado ? pacote.valor / (numeroParcelas || 1) : pacote.valor,
+      valorParcela: parcelado ? valorTotal / (numeroParcelas || 1) : valorTotal,
       diasValidade: diasValidade || null,
       dataCompra: new Date()
     });
@@ -50,18 +57,18 @@ export const venderPacote = async (req, res) => {
       tenantId: req.tenantId,
       tipo: 'Receita',
       categoria: 'Pacote',
-      valor: pacote.valor,
+      valor: valorTotal,
       desconto: 0,
-      valorFinal: pacote.valor,
+      valorFinal: valorTotal,
       descricao: `Venda de pacote: ${pacote.nome} - ${cliente.nome}`,
       cliente: clienteId,
       compraPacote: compraPacote._id,
       parcelado: parcelado || false,
       numeroParcelas: parcelado ? (numeroParcelas || 1) : 1,
       parcelaAtual: valorPago > 0 ? 2 : 1,
-      statusPagamento: !valorPago ? 'Pendente' : (valorPago >= pacote.valor ? 'Pago' : 'Parcial'),
+      statusPagamento: !valorPago ? 'Pendente' : (valorPago >= valorTotal ? 'Pago' : 'Parcial'),
       formaPagamento: formaPagamento || null,
-      dataPagamento: valorPago >= pacote.valor ? new Date() : null
+      dataPagamento: valorPago >= valorTotal ? new Date() : null
     });
 
     await compraPacote.populate([

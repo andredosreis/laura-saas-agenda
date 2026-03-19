@@ -44,7 +44,9 @@ function VenderPacote() {
     pagarAgora: true,
     valorPago: 0,
     formaPagamento: 'Dinheiro',
-    telefoneMBWay: ''
+    telefoneMBWay: '',
+    sessoesJaRealizadas: 0,
+    valorPersonalizado: ''
   });
   
   // Pacote selecionado
@@ -76,49 +78,67 @@ function VenderPacote() {
     if (form.pacoteId) {
       const pacote = pacotes.find(p => p._id === form.pacoteId);
       setPacoteSelecionado(pacote);
-      if (pacote && form.pagarAgora && !form.parcelado) {
-        setForm(prev => ({ ...prev, valorPago: pacote.valor }));
+      if (pacote) {
+        setForm(prev => ({
+          ...prev,
+          sessoesJaRealizadas: 0,
+          valorPersonalizado: pacote.valor,
+          valorPago: prev.pagarAgora && !prev.parcelado ? pacote.valor : prev.valorPago
+        }));
       }
     } else {
       setPacoteSelecionado(null);
     }
   }, [form.pacoteId, pacotes]);
 
-  // Calcular valor da parcela
+  // Calcular valores derivados
+  const valorTotal = pacoteSelecionado
+    ? (parseFloat(form.valorPersonalizado) > 0 ? parseFloat(form.valorPersonalizado) : pacoteSelecionado.valor)
+    : 0;
   const valorParcela = pacoteSelecionado && form.numeroParcelas > 0
-    ? (pacoteSelecionado.valor / form.numeroParcelas).toFixed(2)
+    ? (valorTotal / form.numeroParcelas).toFixed(2)
+    : 0;
+  const sessoesRestantes = pacoteSelecionado
+    ? pacoteSelecionado.sessoes - (parseInt(form.sessoesJaRealizadas) || 0)
     : 0;
 
   // Handlers
   const handleChange = (campo, valor) => {
     setForm(prev => {
       const newForm = { ...prev, [campo]: valor };
-      
+      const vTotal = parseFloat(campo === 'valorPersonalizado' ? valor : prev.valorPersonalizado) || pacoteSelecionado?.valor || 0;
+
       // Se mudar parcelamento, atualizar valor pago
       if (campo === 'parcelado') {
         if (valor && pacoteSelecionado) {
-          newForm.valorPago = pacoteSelecionado.valor / newForm.numeroParcelas;
+          newForm.valorPago = vTotal / newForm.numeroParcelas;
         } else if (pacoteSelecionado && newForm.pagarAgora) {
-          newForm.valorPago = pacoteSelecionado.valor;
+          newForm.valorPago = vTotal;
         }
       }
-      
+
       // Se mudar número de parcelas
       if (campo === 'numeroParcelas' && pacoteSelecionado && newForm.parcelado) {
-        newForm.valorPago = pacoteSelecionado.valor / valor;
+        newForm.valorPago = vTotal / valor;
       }
-      
+
+      // Se mudar valor personalizado e pagando agora
+      if (campo === 'valorPersonalizado' && pacoteSelecionado && newForm.pagarAgora) {
+        const v = parseFloat(valor) || 0;
+        newForm.valorPago = newForm.parcelado ? v / newForm.numeroParcelas : v;
+      }
+
       // Se desmarcar pagar agora
       if (campo === 'pagarAgora' && !valor) {
         newForm.valorPago = 0;
       } else if (campo === 'pagarAgora' && valor && pacoteSelecionado) {
         if (newForm.parcelado) {
-          newForm.valorPago = pacoteSelecionado.valor / newForm.numeroParcelas;
+          newForm.valorPago = vTotal / newForm.numeroParcelas;
         } else {
-          newForm.valorPago = pacoteSelecionado.valor;
+          newForm.valorPago = vTotal;
         }
       }
-      
+
       return newForm;
     });
   };
@@ -137,6 +157,17 @@ function VenderPacote() {
       return;
     }
 
+    const sessoesJaRealizadasNum = parseInt(form.sessoesJaRealizadas) || 0;
+    if (pacoteSelecionado && sessoesJaRealizadasNum >= pacoteSelecionado.sessoes) {
+      toast.error('Sessões já realizadas deve ser menor que o total de sessões do pacote');
+      return;
+    }
+
+    if (valorTotal < 0) {
+      toast.error('Valor total não pode ser negativo');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const dados = {
@@ -146,7 +177,9 @@ function VenderPacote() {
         parcelado: form.parcelado,
         numeroParcelas: form.parcelado ? form.numeroParcelas : 1,
         valorPago: form.pagarAgora ? form.valorPago : 0,
-        formaPagamento: form.pagarAgora ? form.formaPagamento : null
+        formaPagamento: form.pagarAgora ? form.formaPagamento : null,
+        sessoesUsadas: sessoesJaRealizadasNum,
+        valorTotal: valorTotal
       };
 
       await api.post('/compras-pacotes', dados);
@@ -241,23 +274,54 @@ function VenderPacote() {
 
             {/* Detalhes do Pacote */}
             {pacoteSelecionado && (
-              <div className={`mt-4 p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-gray-100'}`}>
-                <h3 className={`font-medium ${textClass} mb-2`}>{pacoteSelecionado.nome}</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className={subTextClass}>Sessões:</span>
-                    <span className={textClass}>{pacoteSelecionado.sessoes}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={subTextClass}>Valor Total:</span>
-                    <span className={`font-bold text-emerald-500`}>€{pacoteSelecionado.valor?.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={subTextClass}>Valor/Sessão:</span>
-                    <span className={textClass}>€{(pacoteSelecionado.valor / pacoteSelecionado.sessoes).toFixed(2)}</span>
+              <>
+                <div className={`mt-4 p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-gray-100'}`}>
+                  <h3 className={`font-medium ${textClass} mb-2`}>{pacoteSelecionado.nome}</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className={subTextClass}>Total sessões:</span>
+                      <span className={textClass}>{pacoteSelecionado.sessoes}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className={subTextClass}>Preço padrão:</span>
+                      <span className={`font-bold text-emerald-500`}>€{pacoteSelecionado.valor?.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                {/* Sessões já realizadas */}
+                <div className="mt-4">
+                  <label className={`block text-sm ${subTextClass} mb-1`}>Sessões já realizadas</label>
+                  <input
+                    type="number"
+                    value={form.sessoesJaRealizadas}
+                    onChange={(e) => handleChange('sessoesJaRealizadas', parseInt(e.target.value) || 0)}
+                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    min="0"
+                    max={pacoteSelecionado.sessoes - 1}
+                  />
+                  <p className={`text-xs mt-1 font-medium ${sessoesRestantes > 0 ? 'text-indigo-500' : 'text-red-500'}`}>
+                    Sessões restantes: {sessoesRestantes}
+                  </p>
+                </div>
+
+                {/* Valor total editável */}
+                <div className="mt-4">
+                  <label className={`block text-sm ${subTextClass} mb-1`}>Valor total</label>
+                  <input
+                    type="number"
+                    value={form.valorPersonalizado}
+                    onChange={(e) => handleChange('valorPersonalizado', e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    min="0"
+                    step="0.01"
+                    placeholder={pacoteSelecionado.valor?.toFixed(2)}
+                  />
+                  <p className={`text-xs ${subTextClass} mt-1`}>
+                    Valor por sessão: €{pacoteSelecionado.sessoes > 0 ? (valorTotal / pacoteSelecionado.sessoes).toFixed(2) : '0.00'}
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
@@ -376,7 +440,7 @@ function VenderPacote() {
                     {form.parcelado ? 'Valor da 1ª parcela:' : 'Valor a pagar:'}
                   </span>
                   <span className={`text-2xl font-bold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                    €{(form.parcelado ? parseFloat(valorParcela) : pacoteSelecionado?.valor || 0).toFixed(2)}
+                    €{(form.parcelado ? parseFloat(valorParcela) : valorTotal).toFixed(2)}
                   </span>
                 </div>
               </>
@@ -402,12 +466,24 @@ function VenderPacote() {
                   <span className={textClass}>{pacoteSelecionado.nome}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className={subTextClass}>Sessões</span>
+                  <span className={subTextClass}>Sessões contratadas</span>
                   <span className={textClass}>{pacoteSelecionado.sessoes}</span>
                 </div>
+                {(parseInt(form.sessoesJaRealizadas) || 0) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className={subTextClass}>Sessões já realizadas</span>
+                      <span className="text-amber-500">{form.sessoesJaRealizadas}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className={subTextClass}>Sessões restantes</span>
+                      <span className="text-indigo-500 font-medium">{sessoesRestantes}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className={subTextClass}>Valor Total</span>
-                  <span className={textClass}>€{pacoteSelecionado.valor?.toFixed(2)}</span>
+                  <span className={textClass}>€{valorTotal.toFixed(2)}</span>
                 </div>
                 {form.parcelado && (
                   <div className="flex justify-between">
@@ -423,8 +499,8 @@ function VenderPacote() {
                 <div className="flex justify-between font-medium">
                   <span className={textClass}>Pagamento Inicial</span>
                   <span className={form.pagarAgora ? 'text-emerald-500' : 'text-amber-500'}>
-                    {form.pagarAgora 
-                      ? `€${(form.parcelado ? parseFloat(valorParcela) : pacoteSelecionado.valor).toFixed(2)}`
+                    {form.pagarAgora
+                      ? `€${(form.parcelado ? parseFloat(valorParcela) : valorTotal).toFixed(2)}`
                       : 'Pendente'
                     }
                   </span>

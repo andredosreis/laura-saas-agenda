@@ -438,13 +438,13 @@ function CalendarView() {
                 </div>
 
                 {/* Calendar */}
-                <div className={`rounded-2xl border ${cardClass} p-4 overflow-hidden`}>
+                <div className={`rounded-2xl border ${cardClass} p-4 ${currentView === 'timeGridWeek' ? 'overflow-x-auto' : 'overflow-hidden'}`}>
                     {loading ? (
                         <div className="flex items-center justify-center h-96">
                             <Loader2 className={`w-8 h-8 animate-spin ${subtextClass}`} />
                         </div>
                     ) : (
-                        <div className={`calendar-container ${isDarkMode ? 'dark-calendar' : 'light-calendar'}`}>
+                        <div className={`calendar-container ${isDarkMode ? 'dark-calendar' : 'light-calendar'} ${currentView === 'timeGridWeek' ? 'min-w-[1000px]' : ''}`}>
                             <FullCalendar
                                 ref={handleCalendarRef}
                                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, luxonPlugin]}
@@ -482,13 +482,13 @@ function CalendarView() {
                                     const serviceName = arg.event.extendedProps.pacote?.nome || arg.event.extendedProps.servicoAvulsoNome || 'Serviço';
 
                                     return (
-                                        <div className="px-2 py-1 sm:p-2 h-full flex flex-col justify-center">
-                                            {/* Nome do Cliente - GRANDE e VISÍVEL */}
-                                            <div className="font-extrabold text-sm sm:text-base text-white whitespace-nowrap overflow-hidden text-ellipsis w-full mb-0.5">
+                                        <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">
+                                            {/* Nome do Cliente */}
+                                            <div className="font-bold text-xs leading-tight text-white break-words w-full mb-0.5">
                                                 {clienteName}
                                             </div>
-                                            {/* Serviço - Pequeno abaixo */}
-                                            <div className="text-[10px] sm:text-xs text-white/80 font-normal whitespace-nowrap overflow-hidden text-ellipsis w-full">
+                                            {/* Serviço */}
+                                            <div className="text-[10px] leading-tight text-white/80 font-normal break-words w-full">
                                                 {serviceName}
                                             </div>
                                         </div>
@@ -631,6 +631,11 @@ function CalendarView() {
 
         .fc-timegrid-slot {
           height: 48px;
+        }
+
+        /* Week view: guarantee minimum column width so names are readable */
+        .fc-timeGridWeek-view .fc-timegrid-col {
+          min-width: 130px;
         }
 
         /* 📱 Mobile Optimizations */
