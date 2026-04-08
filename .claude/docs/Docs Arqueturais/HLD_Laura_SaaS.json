@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "system": "Laura SaaS Agenda",
+    "hld_owner": "André dos Reis",
+    "version": "1.0",
+    "date": "2026-04-07"
+  },
+  "objective": {
+    "technical_goal": "Prover uma plataforma SaaS multi-tenant robusta (Node.js/React) para automação de agendamentos na área da saúde e estética. O sistema assegura isolamento total de dados por tenantId e orquestra automações resolvendo a dependência de agendamento manual, efetuando o desacoplamento de custos de APIs através de infraestrutura auto-hospedada (WhatsApp) associada à IA semântica inteligente.",
+    "problems_addressed": [
+      "Agendamento manual descentralizado via WhatsApp.",
+      "Altos custos operacionais com provedores de WA pagos (Z-API).",
+      "Faltas e não comparecimentos por falta de lembretes estruturados."
+    ],
+    "linked_systems": [
+      "Evolution API (WhatsApp)",
+      "OpenAI API",
+      "Gateway Web Push"
+    ]
+  },
+  "architecture": {
+    "topology_overview": "O sistema comporta a topologia central de Monolito em Camadas Modular, o que desmembra o Front-end PWA mantendo a Core API sem estado interno salvaguardado na memória (stateless).",
+    "technologies": [
+      "Node.js (Express)",
+      "MongoDB",
+      "React (Vite)",
+      "Tailwind CSS",
+      "BullMQ (Futuro)",
+      "Redis (Futuro)"
+    ],
+    "deployment": "cloud",
+    "patterns": [
+      "Monolito em Camadas",
+      "Multi-tenant"
+    ]
+  },
+  "components": [
+    {
+      "name": "App Frontend PWA",
+      "responsibilities": [
+        "Interface de consumo visual dos dados e Dashboards.",
+        "Experiência app e caching offline."
+      ],
+      "dependencies": [
+        "API Backend"
+      ]
+    },
+    {
+      "name": "API Backend (Core)",
+      "responsibilities": [
+        "Regras de negócio, manipulação CRUD.",
+        "Segurança Middleware, Rate Limiting."
+      ],
+      "dependencies": [
+        "MongoDB",
+        "Sentry"
+      ]
+    },
+    {
+      "name": "Job Scheduler (CRON)",
+      "responsibilities": [
+        "Pings de tempo assíncronos e verificação global.",
+        "Atingir marca temporal para Lembretes WhatsApp."
+      ],
+      "dependencies": [
+        "Evolution API",
+        "API Backend"
+      ]
+    },
+    {
+      "name": "Gateway Evolution APP",
+      "responsibilities": [
+        "Interagir com rede web do WhatsApp Client.",
+        "Encaminhar post/webhooks pro backend na entrada de dados."
+      ],
+      "dependencies": [
+        "Endpoint Webhook Interno"
+      ]
+    },
+    {
+      "name": "NLP & IA Module",
+      "responsibilities": [
+        "Transformar texto NL em Function Calls com intenções de agendamento."
+      ],
+      "dependencies": [
+        "OpenAI API"
+      ]
+    }
+  ],
+  "flows": {
+    "request_flow": [
+      "Cliente entra em contato pelo WhatsApp ligado ao Tenant.",
+      "Evolution API recebe o texto e emite POST Webhook à nossa API Core.",
+      "A API Core converte as verificações HTTP e joga para analise por IA.",
+      "Intenção decodificada (Function Calling) é salva com confirmação."
+    ],
+    "data_flow": [
+      "User WA → EvolutionGateway → API Auth/Rate Limiting → IA NLP Service → MongoDB Persist(tenantId safe) → API Dispatch → EvolutionGateway (User WA)."
+    ]
+  },
+  "data_model": {
+    "entities": [
+      "Tenant",
+      "Cliente",
+      "Agendamento",
+      "Pacote",
+      "Financeiro"
+    ],
+    "relationships": [
+      "1 Tenant possui N Clientes, N Agendamentos e N Transações (Ligação Estrita por tenantId isolado)."
+    ],
+    "source_of_truth": "MongoDB Atlas"
+  },
+  "interfaces": [
+    {
+      "name": "Private Frontend API",
+      "kind": "api",
+      "protocol": "REST",
+      "exposure": "internal",
+      "sla_limits": "Timeout standard de cloud HTTP (p95 < 500ms)."
+    },
+    {
+      "name": "Public Evolution Webhook Inbound",
+      "kind": "api",
+      "protocol": "REST",
+      "exposure": "external",
+      "sla_limits": "Limitador estrito pelo Express Rate Limit."
+    }
+  ],
+  "scalability_availability": {
+    "strategies": [
+      "Scaling horizontal com ambiente stateless Cloud na Vercel."
+    ],
+    "caching": "React PWA Local state caching.",
+    "partitioning": "Isolamento lógico pelo TenantId via NoSQL.",
+    "sla_target": "99.9%"
+  },
+  "security": {
+    "authentication": "JWT Tokens via modelo Access/Refresh.",
+    "authorization": "Isolamento lógico absoluto pelo tenantId nos fluxos.",
+    "secrets_management": "Variáveis de ambiante OS em nuvem Vercel.",
+    "encryption_in_transit": "End-to-End HTTPS/TLS.",
+    "encryption_at_rest": "BCrypt de senhas. Criptografia transparente Atlas Db.",
+    "pii_policy": "Fase 2 de proteção base tenant (Padrão); Phase 3 prevê plano de Anonimização estrita RGPD."
+  },
+  "observability": {
+    "logs": "Pino interceptando json estruturado + injetando Tenant ID.",
+    "metrics": [
+      "Endpoint `/health` exposto para probes e ping verificação de banco Mongoose."
+    ],
+    "tracing": "Tracing error reporting operado por SDK do Sentry e Sentry.setUser injetado.",
+    "dashboards_alerts": [
+      "Dashboard Sentry e Notificações/Alertas configuradas pro Slack e E-mail de Engenharia."
+    ]
+  },
+  "risks": [
+    {
+      "risk": "Ban WhatsApp Account Target",
+      "probability": "medium",
+      "impact": "Alto (Quebra das comunicações imediatas)",
+      "mitigation": [
+        "Adesão a pausas no envio via configs do Evolution API.",
+        "Fallback para modo 'silencioso'."
+      ],
+      "contingency_plan": "Prover uma pool/lote de chips de sobreaviso para substituições a quente."
+    },
+    {
+      "risk": "Spikes de Custos OpenAI Abusivos",
+      "probability": "low",
+      "impact": "Risco de oneração financeira pesada nas faturas.",
+      "mitigation": [
+        "Rate-limiting estrito em API nos entrypoints expostos ao WPP externo."
+      ],
+      "contingency_plan": "Soft-switch via admin desligando o repasse IA para um Fallback textual básico informando offline ou fila manual."
+    },
+    {
+      "risk": "Fuga ou Vazamento de Sessão de Admin API",
+      "probability": "low",
+      "impact": "Extremo prejuízo e exposição de dados de pacientes (PII).",
+      "mitigation": [
+        "Invalidar e consumir os tokens nos bancos através de Refresh Token Rotation rigoroso."
+      ],
+      "contingency_plan": "Derrubar as instâncias ativas exigindo revalidação e reset global forçado das senhas root."
+    }
+  ],
+  "adrs_next_steps": {
+    "adrs": [
+      "ADR 001 - Migração do Provider Z-API para gateway Evolution API por contenção de custos fixos.",
+      "ADR 002 - Transpasso das Ideias Nativas Mobile p/ Stack Exclusiva em PWA (Rapidez/Custo)."
+    ],
+    "pending_decisions": [
+      "Aberta 1 — Queue (BullMQ vs Serverless)",
+      "Aberta 2 — Provedor Pago Padrão (Stripe V MBway)",
+      "Aberta 3 — PDD Rules (Politíca de anonimização estrita pro RGPD)"
+    ],
+    "next_steps": [
+      "Criação das descrições FDD de rota."
+    ]
+  }
+}

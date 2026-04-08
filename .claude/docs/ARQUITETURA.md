@@ -1,229 +1,112 @@
-# Arquitectura do Sistema — Marcai
+# Diagramas de Arquitetura — Laura SaaS Agenda
 
-## Visão Geral
+Este documento contém a representação visual (C4 Models e Sequência) definidos no High-Level Design (HLD) e no Feature Design Doc (FDD).
 
-O Marcai é um SaaS multi-tenant de agendamentos. Cada profissional que se regista fica isolado no seu próprio contexto de dados (tenant), partilhando a mesma base de dados mas sem acesso aos dados de outros tenants.
+## 1. Diagrama de Contexto (Nível 1 - Visão Global)
+Representação macro de como os atores interagem com a plataforma SaaS e os serviços externos que compõem a esteira.
 
----
+```mermaid
+graph TD
+    %% Estilos
+    classDef usuario fill:#1f3b4d,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef sistema fill:#1168bd,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef externo fill:#999,stroke:#fff,stroke-width:2px,color:#fff;
 
-## Stack
+    %% Atores
+    Prof[Profissional de Saúde/Estética]:::usuario
+    Cli[Cliente da Clínica]:::usuario
 
-```
-Backend:   Node.js (ESM) + Express 4 + MongoDB/Mongoose
-Frontend:  React 19 + TypeScript + Vite 6 + Tailwind CSS
-Auth:      JWT (access 1h + refresh 7d)
-Email:     Nodemailer (SMTP)
-Push:      Web Push (VAPID)
-IA:        OpenAI GPT-4o-mini
-WhatsApp:  Z-API
-```
+    %% Core
+    Sys[Laura SaaS Agenda \nMulti-tenant]:::sistema
 
----
+    %% Externos
+    WPP[WhatsApp]:::externo
+    OpenAI[OpenAI / GPT-4o-mini]:::externo
+    Push[Servidor Web Push]:::externo
 
-## Multi-Tenancy
-
-### Estratégia: Banco partilhado com isolamento por `tenantId`
-
-```
-MongoDB
-└── laura-saas (database)
-    ├── tenants        ← um doc por profissional/empresa
-    ├── users          ← vinculados ao tenantId
-    ├── clientes       ← vinculados ao tenantId
-    ├── agendamentos   ← vinculados ao tenantId
-    ├── pacotes        ← vinculados ao tenantId
-    └── ...
-```
-
-### Como funciona o isolamento
-
-1. Registo → cria `Tenant` + `User` (admin) vinculado ao tenant
-2. Login → JWT inclui `{ userId, tenantId, email, role, plano }`
-3. Middleware `authenticate` extrai `tenantId` do token
-4. Todos os controllers filtram por `tenantId` em cada query
-
-### Índices críticos para isolamento
-
-```javascript
-// Cliente — telefone único POR tenant (não global)
-clienteSchema.index({ tenantId: 1, telefone: 1 }, { unique: true })
-
-// User — email único POR tenant
-UserSchema.index({ tenantId: 1, email: 1 }, { unique: true })
-
-// Email globalmente único verificado no register (antes de criar tenant)
-// para evitar ambiguidade no login
+    %% Ligações
+    Prof -->|Gere agenda e fluxo pelo PWA| Sys
+    Cli -->|Comunica e agenda| WPP
+    WPP -->|Dispara Webhooks| Sys
+    Sys -->|Envia mensagens/lembretes| WPP
+    Sys -->|Interpreta intenção de\nagendamento (NLP)| OpenAI
+    Sys -->|Gera avisos| Push
+    Push -->|Notificação silenciosa| Prof
 ```
 
 ---
 
-## Fluxo de Autenticação
+## 2. Diagrama de Container (Nível 2 - Topologia)
+Visão interna dos blocos de software (onde rodam) e integrações. Mostra a separação entre Cloud Serverless e a infraestrutura externa.
 
-```
-1. POST /api/auth/register
-   → valida email globalmente único
-   → cria Tenant (com rollback se User falhar)
-   → cria User admin vinculado ao Tenant
-   → gera token de verificação de email (24h)
-   → envia email de verificação
-   → retorna accessToken (1h) + refreshToken (7d)
+```mermaid
+graph TD
+    classDef container fill:#1168bd,stroke:#0b4884,stroke-width:2px,color:#fff
+    classDef db fill:#00684a,stroke:#00402e,stroke-width:2px,color:#fff
+    classDef server fill:#4f4f4f,stroke:#2d2d2d,stroke-width:2px,color:#fff
 
-2. POST /api/auth/login
-   → busca User por email (global)
-   → verifica senha (bcrypt)
-   → busca Tenant do user
-   → verifica status do plano (não permite cancelado/expirado)
-   → retorna accessToken + refreshToken
+    subgraph Nuvem[Ambiente Cloud / Vercel]
+        PWA[Frontend PWA\n React / Vite / Tailwind ]:::container
+        API[Core API Backend\n Node.js / Express / Zod ]:::container
+        Cron[Job Scheduler\n CRON de Lembretes ]:::container
+    end
+    
+    DB[(MongoDB Atlas\n NoSQL Database )]:::db
 
-3. POST /api/auth/refresh
-   → verifica refreshToken (JWT + existe no banco)
-   → rotação de token (invalida antigo, emite novo)
-   → retorna novo par de tokens
+    subgraph Infra[Infra Auto-Hospedada]
+        EvoAPI[Gateway Evolution API\n Docker Container ]:::server
+    end
+    
+    OpenAI[Provider de IA\n GPT-4o-mini API ]:::server
 
-4. GET /api/auth/verify-email/:token
-   → hash do token e busca no banco
-   → marca emailVerificado: true
-   → remove token do banco
-```
-
----
-
-## Estrutura de Ficheiros (Backend)
-
-```
-src/
-├── server.js                  # Startup: MongoDB + Express + CRON
-├── app.js                     # Express: middlewares + rotas
-│
-├── controllers/
-│   ├── authController.js      # Register, login, refresh, reset-password, verify-email
-│   ├── clienteController.js   # CRUD clientes
-│   ├── agendamentoController.js
-│   ├── pacoteController.js
-│   ├── dashboardController.js # KPIs filtrados por tenantId
-│   ├── disponibilidadeController.js
-│   ├── financeiroController.js
-│   └── webhookController.js   # Recebe mensagens WhatsApp (Z-API)
-│
-├── models/
-│   ├── Tenant.js              # Empresa/profissional (plano, branding, configurações)
-│   ├── User.js                # Utilizador (roles, permissões, tokens)
-│   ├── Cliente.js             # Cliente final (anamnese, sessões)
-│   ├── Agendamento.js         # Marcações
-│   ├── Pacote.js              # Pacotes de serviços
-│   ├── CompraPacote.js        # Vendas de pacotes
-│   ├── Pagamento.js
-│   ├── Transacao.js
-│   └── HistoricoAtendimento.js
-│
-├── middlewares/
-│   ├── auth.js                # authenticate (JWT) + authorize (roles)
-│   └── validation.js
-│
-├── services/
-│   ├── emailService.js        # Nodemailer: reset-password, verify-email
-│   ├── openaiService.js       # GPT-4o-mini: chatbot WhatsApp
-│   ├── zapiService.js         # Envio de mensagens WhatsApp
-│   └── webPushService.js      # Notificações push (VAPID)
-│
-└── routes/
-    ├── authRoutes.js
-    ├── clienteRoutes.js
-    ├── agendamentoRoutes.js
-    ├── pacoteRoutes.js
-    ├── dashboardRoutes.js
-    ├── disponibilidadeRoutes.js
-    ├── financeiroRoutes.js
-    └── webhookRoutes.js
+    %% Fluxos Internos
+    PWA <-->|REST API JSON\n Auth JWT| API
+    API <-->|Mongoose Queries| DB
+    Cron -.->|Aciona Rotina Interna| API
+    
+    %% Fluxos Externos
+    API <-->|Webhooks & Rest| EvoAPI
+    API <-->|Function Calls| OpenAI
 ```
 
 ---
 
-## Estrutura de Ficheiros (Frontend)
+## 3. Diagrama de Sequência e Barreiras (Fluxo do FDD)
+Demonstração técnica da triagem pre-controller (Invariantes em pipeline) garantindo o Isolamento de Tenant e o barramento por Payload Sujo explicitado no FDD da API.
 
-```
-laura-saas-frontend/src/
-├── App.tsx                    # Router principal
-│
-├── pages/
-│   ├── Login.jsx
-│   ├── Register.jsx
-│   ├── ForgotPassword.jsx
-│   ├── ResetPassword.jsx
-│   ├── VerificarEmail.jsx
-│   ├── Dashboard.jsx
-│   ├── Clientes.jsx / CriarCliente.jsx / EditarCliente.jsx
-│   ├── Agendamentos.jsx / CriarAgendamento.jsx / EditarAgendamento.jsx
-│   ├── Pacotes.jsx / CriarPacote.jsx / EditarPacote.jsx
-│   ├── VenderPacote.jsx / PacotesAtivos.jsx
-│   ├── Financeiro.jsx / Caixa.jsx / Transacoes.jsx
-│   ├── CalendarView.jsx
-│   ├── Atendimentos.jsx
-│   └── Disponibilidade.jsx
-│
-├── components/
-│   ├── MarcaiLogo.jsx         # Logo SVG do produto
-│   ├── Sidebar.jsx            # Navegação lateral com grupos
-│   ├── ProtectedRoute.jsx     # Guard de autenticação + roles + plano
-│   └── InstallPrompt.jsx      # Prompt de instalação PWA
-│
-├── contexts/
-│   ├── AuthContext.jsx        # Estado global de auth (user, tenant, tokens)
-│   └── ThemeContext.jsx
-│
-├── services/
-│   ├── api.js                 # Axios: interceptors, refresh automático, toasts
-│   └── notificationService.ts # Web Push subscription
-│
-└── schemas/
-    └── validationSchemas.js   # Zod: login, register, cliente, agendamento, pacote
-```
+```mermaid
+sequenceDiagram
+    participant PWA as Client (PWA)
+    participant Exp as Express Route
+    participant Auth as Auth Middleware
+    participant Ten as Tenant Middleware
+    participant Zod as Zod Validation
+    participant Ctr as Controller
+    participant DB as MongoDB Atlas
 
----
+    PWA->>Exp: POST /api/agendamentos (Payload + Header JWT)
+    Exp->>Auth: Verifica Token
+    
+    alt Token Inválido/Ausente
+        Auth-->>PWA: 401 Unauthorized
+    else Token Válido
+        Auth->>Ten: Injeta req.user (userId, tenantId)
+        Ten->>Ten: Atesta Autoridade no Tenant
+    end
+    
+    alt Forjado (Cross-tenant)
+        Ten-->>PWA: 403 Forbidden
+    else Aprovado
+        Ten->>Zod: Encaminha Payload Bruto
+        Zod->>Zod: Executa Schema Strip 
+    end
 
-## Modelo de Planos
-
-```javascript
-// Tenant.js
-plano: {
-  tipo:   'basico' | 'pro' | 'elite' | 'custom'
-  status: 'trial' | 'ativo' | 'suspenso' | 'cancelado' | 'expirado'
-  trialDias: 7  // trial gratuito
-}
-
-limites: {
-  maxClientes:          50    // basico
-  maxAgendamentosMes:   100   // basico
-  maxUsuarios:          1
-  iaAtiva:              false
-  whatsappAutomacao:    false
-  analytics:            false
-}
-```
-
----
-
-## CRON Jobs
-
-```javascript
-// Executa diariamente às 19h (Europe/Lisbon)
-// Envia lembretes WhatsApp para agendamentos do dia seguinte
-cron.schedule('0 19 * * *', enviarLembretes, { timezone: 'Europe/Lisbon' })
-```
-
----
-
-## Variáveis de Ambiente Obrigatórias
-
-```env
-MONGODB_URI      # Conexão MongoDB Atlas
-JWT_SECRET       # Assinar access tokens
-JWT_REFRESH_SECRET  # Assinar refresh tokens
-FRONTEND_URL     # Para links nos emails (verify-email, reset-password)
-
-# Opcionais (funcionalidades degradam graciosamente sem elas)
-SMTP_*           # Emails (sem isto, emails são logados no console em dev)
-OPENAI_API_KEY   # Chatbot WhatsApp
-ZAPI_*           # Integração WhatsApp
-VAPID_*          # Notificações push
+    alt Object/Tipagem Incorreta
+        Zod-->>PWA: 400 Bad Request (Return Array Errors)
+    else Payload Sanitizado 100%
+        Zod->>Ctr: req.validatedBody (Clean data)
+        Ctr->>DB: Query (Save Document via Mongoose)
+        DB-->>Ctr: Result Confirmed
+        Ctr-->>PWA: 201 Created { data: {...} }
+    end
 ```
