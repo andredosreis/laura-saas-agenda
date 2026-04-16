@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import api from '../services/api';
 import { subscribeToPush, getPushStatus, unsubscribeFromPush } from '../services/notificationService';
 import FinalizarAtendimentoModal from '../components/FinalizarAtendimentoModal';
+import FunilAvaliacaoModal from '../components/FunilAvaliacaoModal';
 
 function Agendamentos() {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ function Agendamentos() {
   const [enviandoLembrete, setEnviandoLembrete] = useState(null);
   const [modalFinalizarAberto, setModalFinalizarAberto] = useState(false);
   const [agendamentoParaFinalizar, setAgendamentoParaFinalizar] = useState(null);
+  const [modalFunilAberto, setModalFunilAberto] = useState(false);
+  const [agendamentoFunil, setAgendamentoFunil] = useState(null);
   
   const [pushStatus, setPushStatus] = useState({
     supported: false,
@@ -331,7 +334,9 @@ function Agendamentos() {
           <option value="todos">Todos</option>
           <option value="Agendado">Agendado</option>
           <option value="Confirmado">Confirmado</option>
+          <option value="Compareceu">Compareceu</option>
           <option value="Realizado">Realizado</option>
+          <option value="Fechado">Fechado</option>
           <option value="Cancelado Pelo Cliente">Cancelado Pelo Cliente</option>
           <option value="Cancelado Pelo Salão">Cancelado Pelo Salão</option>
           <option value="Não Compareceu">Não Compareceu</option>
@@ -356,7 +361,15 @@ function Agendamentos() {
             {agendamentosFiltrados.map((agendamento) => (
               <tr key={agendamento._id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                  {agendamento.cliente?.nome || 'N/D'}
+                  <div className="flex flex-col">
+                    <span>{agendamento.cliente?.nome || agendamento.lead?.nome || 'N/D'}</span>
+                    {agendamento.tipo === 'Avaliacao' && !agendamento.clienteConvertido && (
+                      <span className="text-xs text-amber-600 font-medium">lead</span>
+                    )}
+                    {agendamento.clienteConvertido && (
+                      <span className="text-xs text-green-600 font-medium">cliente</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                   {agendamento.pacote?.nome || agendamento.servicoAvulsoNome || 'N/D'}
@@ -365,10 +378,12 @@ function Agendamentos() {
                   {formatarData(agendamento.dataHora)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full 
+                  <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full
                     ${agendamento.status === 'Agendado' ? 'bg-blue-100 text-blue-800' : ''}
                     ${agendamento.status === 'Confirmado' ? 'bg-teal-100 text-teal-800' : ''}
+                    ${agendamento.status === 'Compareceu' ? 'bg-purple-100 text-purple-800' : ''}
                     ${agendamento.status === 'Realizado' ? 'bg-green-100 text-green-800' : ''}
+                    ${agendamento.status === 'Fechado' ? 'bg-emerald-100 text-emerald-800' : ''}
                     ${agendamento.status === 'Cancelado Pelo Cliente' || agendamento.status === 'Cancelado Pelo Salão' ? 'bg-red-100 text-red-800' : ''}
                     ${agendamento.status === 'Não Compareceu' ? 'bg-yellow-100 text-yellow-800' : ''}
                   `}>
@@ -403,8 +418,38 @@ function Agendamentos() {
                       </div>
                     )}
 
+                    {/* Funil: Marcar Presença (Agendado ou Confirmado) */}
+                    {(agendamento.status === 'Agendado' || agendamento.status === 'Confirmado') && (
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            setAgendamentoFunil(agendamento);
+                            setModalFunilAberto(true);
+                          }}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded transition-colors"
+                        >
+                          👤 Presença
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Funil: Fechar Avaliação (Compareceu) */}
+                    {agendamento.status === 'Compareceu' && (
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            setAgendamentoFunil(agendamento);
+                            setModalFunilAberto(true);
+                          }}
+                          className="inline-flex items-center px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors"
+                        >
+                          ✓ Fechar
+                        </button>
+                      </div>
+                    )}
+
                     {/* Linha 2: Botão Finalizar Atendimento (apenas para Confirmado/Realizado) */}
-                    {(agendamento.status === 'Confirmado' || agendamento.status === 'Realizado') && (
+                    {(agendamento.status === 'Realizado') && (
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={() => {
@@ -449,6 +494,14 @@ function Agendamentos() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal do Funil de Avaliação */}
+      <FunilAvaliacaoModal
+        isOpen={modalFunilAberto}
+        agendamento={agendamentoFunil}
+        onClose={() => { carregarAgendamentos(); setModalFunilAberto(false); setAgendamentoFunil(null); }}
+        onSuccess={() => { carregarAgendamentos(); setModalFunilAberto(false); setAgendamentoFunil(null); }}
+      />
 
       {/* Modal de Finalizar Atendimento */}
       <FinalizarAtendimentoModal

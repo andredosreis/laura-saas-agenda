@@ -8,10 +8,27 @@ const agendamentoSchema = new mongoose.Schema({
     required: [true, 'TenantId é obrigatório'],
     index: true
   },
+  tipo: {
+    type: String,
+    enum: ['Avaliacao', 'Sessao', 'Retorno'],
+    default: 'Sessao'
+  },
   cliente: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cliente',
-    required: [true, "O cliente é obrigatório."]
+    required: false
+  },
+  // Lead data para agendamentos de avaliação (cliente ainda não cadastrado)
+  lead: {
+    nome:     { type: String, trim: true, default: null },
+    telefone: { type: String, trim: true, default: null },
+    email:    { type: String, trim: true, lowercase: true, default: null }
+  },
+  // Quando lead vira cliente após fechar pacote
+  clienteConvertido: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    default: null
   },
   pacote: {
     type: mongoose.Schema.Types.ObjectId,
@@ -30,8 +47,16 @@ const agendamentoSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Agendado', 'Confirmado', 'Realizado', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'],
+    enum: ['Agendado', 'Confirmado', 'Compareceu', 'Realizado', 'Fechado', 'Avaliacao', 'Cancelado Pelo Cliente', 'Cancelado Pelo Salão', 'Não Compareceu'],
     default: 'Agendado'
+  },
+  compareceu: {
+    type: Boolean,
+    default: null
+  },
+  fechouPacote: {
+    type: Boolean,
+    default: null
   },
   observacoes: {
     type: String,
@@ -135,6 +160,9 @@ agendamentoSchema.index({ status: 1 });
 agendamentoSchema.index({ tenantId: 1, status: 1, dataHora: 1 });
 agendamentoSchema.index({ tenantId: 1, dataHora: 1 });
 agendamentoSchema.index({ tenantId: 1, cliente: 1, status: 1 });
+
+agendamentoSchema.index({ tenantId: 1, tipo: 1 });
+agendamentoSchema.index({ tenantId: 1, compareceu: 1, fechouPacote: 1 });
 
 // 💰 Phase 3: Financial indexes
 agendamentoSchema.index({ tenantId: 1, compraPacote: 1 });

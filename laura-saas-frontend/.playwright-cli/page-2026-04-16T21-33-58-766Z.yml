@@ -1,0 +1,104 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e101]:
+      - generic [ref=e102]:
+        - link [ref=e103] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e104]:
+            - generic [ref=e110]: marca
+            - generic [ref=e111]: ai
+            - generic [ref=e112]: SMART AGENDA
+        - generic [ref=e113]:
+          - generic [ref=e114]: L
+          - generic [ref=e115]:
+            - paragraph [ref=e116]: Laura
+            - paragraph [ref=e117]: laura@laesteticaavancada.pt
+      - navigation [ref=e118]:
+        - generic [ref=e119]:
+          - link "Dashboard" [ref=e122] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e123]
+            - generic [ref=e128]: Dashboard
+          - generic [ref=e129]:
+            - button "FINANÇAS" [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: FINANÇAS
+              - img [ref=e132]
+            - generic [ref=e134]:
+              - link "Transações" [ref=e135] [cursor=pointer]:
+                - /url: /transacoes
+                - img [ref=e136]
+                - generic [ref=e139]: Transações
+              - link "Vendas" [ref=e140] [cursor=pointer]:
+                - /url: /pacotes-ativos
+                - img [ref=e141]
+                - generic [ref=e144]: Vendas
+              - link "Relatórios" [ref=e145] [cursor=pointer]:
+                - /url: /financeiro
+                - img [ref=e146]
+                - generic [ref=e149]: Relatórios
+          - generic [ref=e151]:
+            - button "AGENDAMENTO" [ref=e152] [cursor=pointer]:
+              - generic [ref=e153]: AGENDAMENTO
+              - img [ref=e154]
+            - generic [ref=e156]:
+              - link "Calendário" [ref=e157] [cursor=pointer]:
+                - /url: /calendario
+                - img [ref=e158]
+                - generic [ref=e160]: Calendário
+              - link "Atendimentos" [ref=e161] [cursor=pointer]:
+                - /url: /atendimentos
+                - img [ref=e162]
+                - generic [ref=e166]: Atendimentos
+          - generic [ref=e168]:
+            - button "ADMINISTRATIVO" [ref=e169] [cursor=pointer]:
+              - generic [ref=e170]: ADMINISTRATIVO
+              - img [ref=e171]
+            - generic [ref=e173]:
+              - link "Clientes" [ref=e174] [cursor=pointer]:
+                - /url: /clientes
+                - img [ref=e175]
+                - generic [ref=e180]: Clientes
+              - link "Serviços" [ref=e181] [cursor=pointer]:
+                - /url: /pacotes
+                - img [ref=e182]
+                - generic [ref=e186]: Serviços
+              - link "Disponibilidade" [ref=e187] [cursor=pointer]:
+                - /url: /disponibilidade
+                - img [ref=e188]
+                - generic [ref=e191]: Disponibilidade
+      - button "Sair da Conta" [ref=e194] [cursor=pointer]:
+        - img [ref=e195]
+        - generic [ref=e198]: Sair da Conta
+  - generic [ref=e98]:
+    - generic [ref=e99]:
+      - generic [ref=e199]:
+        - paragraph [ref=e200]: 🔔 Notificações Disponíveis
+        - paragraph [ref=e201]: Ative notificações para receber lembretes de agendamentos.
+      - button "✅ Ativar" [ref=e280] [cursor=pointer]
+    - generic [ref=e203]:
+      - heading "Agendamentos" [level=1] [ref=e204]
+      - button "Novo Agendamento" [ref=e205] [cursor=pointer]
+    - generic [ref=e206]:
+      - text: "Filtrar por status:"
+      - combobox "Filtrar por status:" [ref=e207]:
+        - option "Todos"
+        - option "Agendado" [selected]
+        - option "Confirmado"
+        - option "Compareceu"
+        - option "Realizado"
+        - option "Fechado"
+        - option "Cancelado Pelo Cliente"
+        - option "Cancelado Pelo Salão"
+        - option "Não Compareceu"
+    - table [ref=e209]:
+      - rowgroup [ref=e210]:
+        - row "Cliente Serviço/Pacote Data/Hora Status Confirmação Respondido Ações" [ref=e211]:
+          - columnheader "Cliente" [ref=e212]
+          - columnheader "Serviço/Pacote" [ref=e213]
+          - columnheader "Data/Hora" [ref=e214]
+          - columnheader "Status" [ref=e215]
+          - columnheader "Confirmação" [ref=e216]
+          - columnheader "Respondido" [ref=e217]
+          - columnheader "Ações" [ref=e218]
+      - rowgroup
+  - region "Notifications Alt+T"

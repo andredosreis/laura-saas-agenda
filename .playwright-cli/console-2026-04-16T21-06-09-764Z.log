@@ -1,0 +1,34 @@
+[     110ms] [LOG] %c[Vercel Speed Insights]%c [vitals] color: rgb(120, 120, 120) color: inherit {speed: 4g, metrics: Array(5), scriptVersion: 0.1.3, sdkName: @vercel/speed-insights/react, sdkVersion: 1.3.1} /_vercel/speed-insights/vitals @ https://va.vercel-scripts.com/v1/speed-insights/script.debug.js:0
+[     110ms] [LOG] %c[Vercel Speed Insights]%c [vitals] color: rgb(120, 120, 120) color: inherit {speed: 4g, metrics: Array(1), scriptVersion: 0.1.3, sdkName: @vercel/speed-insights/react, sdkVersion: 1.3.1} /_vercel/speed-insights/vitals @ https://va.vercel-scripts.com/v1/speed-insights/script.debug.js:0
+[     286ms] [LOG] [NotifService] 🔍 DEBUG VAPID: {hasVITE_VAPID_PUBLIC_KEY: true, hasVITE_VAPID_PUBLIC: false, keyLength: 87, allEnvKeys: Array(1)} @ http://localhost:5173/src/services/notificationService.ts:7
+[     302ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=24e6c1e2:20102
+[     450ms] [LOG] %c[Vercel Speed Insights]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit @ https://va.vercel-scripts.com/v1/speed-insights/script.debug.js:0
+[   26147ms] [LOG] %c[Vercel Speed Insights]%c [vitals] color: rgb(120, 120, 120) color: inherit {speed: 4g, metrics: Array(4), scriptVersion: 0.1.3, sdkName: @vercel/speed-insights/react, sdkVersion: 1.3.1} /_vercel/speed-insights/vitals @ https://va.vercel-scripts.com/v1/speed-insights/script.debug.js:0
+[   26251ms] [LOG] [Agendamentos] 🔔 Push status: {supported: true, permission: default, subscribed: false, disabledReason: undefined} @ http://localhost:5173/src/pages/Agendamentos.jsx?t=1776372577719:60
+[   26252ms] [LOG] [Agendamentos] 📢 Tentando auto-subscrever a push... @ http://localhost:5173/src/pages/Agendamentos.jsx?t=1776372577719:63
+[   26252ms] [LOG] [NotifService] 📢 Pedindo permissão de notificações... @ http://localhost:5173/src/services/notificationService.ts:32
+[   26253ms] [LOG] [Agendamentos] 🔔 Push status: {supported: true, permission: default, subscribed: false, disabledReason: undefined} @ http://localhost:5173/src/pages/Agendamentos.jsx?t=1776372577719:60
+[   26253ms] [LOG] [Agendamentos] 📢 Tentando auto-subscrever a push... @ http://localhost:5173/src/pages/Agendamentos.jsx?t=1776372577719:63
+[   26253ms] [LOG] [NotifService] 📢 Pedindo permissão de notificações... @ http://localhost:5173/src/services/notificationService.ts:32
+[   27559ms] [WARNING] [NotifService] ❌ Permissão negada pelo utilizador @ http://localhost:5173/src/services/notificationService.ts:44
+[   27559ms] [WARNING] [NotifService] ⚠️ Utilizador não concedeu permissão @ http://localhost:5173/src/services/notificationService.ts:73
+[   27559ms] [LOG] [Agendamentos] ⚠️ Não foi possível subscrever automaticamente @ http://localhost:5173/src/pages/Agendamentos.jsx?t=1776372577719:71
+[   29409ms] [WARNING] [NotifService] ❌ Permissão negada pelo utilizador @ http://localhost:5173/src/services/notificationService.ts:44
+[   29409ms] [WARNING] [NotifService] ⚠️ Utilizador não concedeu permissão @ http://localhost:5173/src/services/notificationService.ts:73
+[   29409ms] [LOG] [Agendamentos] ⚠️ Não foi possível subscrever automaticamente @ http://localhost:5173/src/pages/Agendamentos.jsx?t=1776372577719:71
+[   84150ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:5173/node_modules/.vite/deps/recharts.js?v=b1439f14:9025
+[   84150ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:5173/node_modules/.vite/deps/recharts.js?v=b1439f14:9025
+[   84151ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:5173/node_modules/.vite/deps/recharts.js?v=b1439f14:9025
+[   84152ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:5173/node_modules/.vite/deps/recharts.js?v=b1439f14:9025

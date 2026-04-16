@@ -10,6 +10,8 @@ import {
   confirmarAgendamento,
   enviarLembreteManual,
   registrarPagamentoServico,
+  marcarComparecimento,
+  fecharPacote,
   getHistorico,
   getStatsMes,
 } from '../controllers/agendamentoController.js';
@@ -35,6 +37,10 @@ router.delete('/:id', validateObjectId, deleteAgendamento);
 // Rotas de confirmação e lembretes
 router.patch('/:id/confirmar', validateObjectId, confirmarAgendamento);
 router.post('/:id/enviar-lembrete', validateObjectId, enviarLembreteManual);
+
+// Funil de avaliação
+router.patch('/:id/comparecimento', validateObjectId, marcarComparecimento);
+router.post('/:id/fechar-pacote', validateObjectId, fecharPacote);
 
 // Rota para registrar pagamento de serviço avulso
 router.post('/:id/pagamento', validateObjectId, registrarPagamentoServico);

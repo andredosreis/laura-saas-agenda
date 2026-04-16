@@ -3,228 +3,199 @@ import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowLeft, UserPlus, Users } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { getAvailableSlots } from '../services/scheduleService';
 
-// Schema de validação específico para agendamento
-const agendamentoFormSchema = z.object({
+const sessaoSchema = z.object({
   cliente: z.string().min(1, 'Selecione um cliente'),
   pacote: z.string().min(1, 'Selecione um pacote do cliente'),
   dataHora: z
     .string()
     .min(1, 'Selecione data e hora')
-    .refine(
-      (val) => {
-        const selectedDate = new Date(val);
-        const now = new Date();
-        return selectedDate > now;
-      },
-      { message: 'A data e hora devem ser no futuro' }
-    ),
+    .refine((val) => new Date(val) > new Date(), { message: 'A data e hora devem ser no futuro' }),
+  observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
+});
+
+const avaliacaoSchema = z.object({
+  leadNome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  leadTelefone: z
+    .string()
+    .min(9, 'Telefone deve ter pelo menos 9 dígitos')
+    .regex(/^[\d\+\-\(\)\s]+$/, 'Formato de telefone inválido'),
+  leadEmail: z.string().email('Email inválido').optional().or(z.literal('')),
+  dataHora: z
+    .string()
+    .min(1, 'Selecione data e hora')
+    .refine((val) => new Date(val) > new Date(), { message: 'A data e hora devem ser no futuro' }),
   observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
 });
 
 function CriarAgendamento() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const [tipo, setTipo] = useState('Sessao');
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dataSelecionada, setDataSelecionada] = useState('');
   const [horariosVagos, setHorariosVagos] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [pacotes, setPacotes] = useState([]);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
 
-  const formatDateForInput = (date) => {
-    return date.toISOString().slice(0, 16);
-  };
+  const formatDateForInput = (date) => date.toISOString().slice(0, 16);
 
-  // React Hook Form
-  const {
-    register,
-    handleSubmit,
-    control,
-    watch,
-    setValue,
-    formState: { errors, dirtyFields },
-  } = useForm({
-    resolver: zodResolver(agendamentoFormSchema),
+  // Formulário para Sessão
+  const sessaoForm = useForm({
+    resolver: zodResolver(sessaoSchema),
     mode: 'onChange',
-    defaultValues: {
-      cliente: '',
-      pacote: '',
-      dataHora: formatDateForInput(new Date()),
-      observacoes: '',
-    },
+    defaultValues: { cliente: '', pacote: '', dataHora: formatDateForInput(new Date()), observacoes: '' },
   });
 
-  const watchObservacoes = watch('observacoes');
+  // Formulário para Avaliação
+  const avaliacaoForm = useForm({
+    resolver: zodResolver(avaliacaoSchema),
+    mode: 'onChange',
+    defaultValues: { leadNome: '', leadTelefone: '', leadEmail: '', dataHora: formatDateForInput(new Date()), observacoes: '' },
+  });
 
-  // Buscar horários disponíveis
+  const watchObsSessao = sessaoForm.watch('observacoes');
+  const watchObsAval = avaliacaoForm.watch('observacoes');
+
   useEffect(() => {
     if (dataSelecionada) {
-      const fetchHorarios = async () => {
-        const slots = await getAvailableSlots(dataSelecionada, 60);
-        setHorariosVagos(slots);
-      };
-      fetchHorarios();
+      getAvailableSlots(dataSelecionada, 60).then(setHorariosVagos);
     }
   }, [dataSelecionada]);
 
-  // Carregar clientes e pacotes
   useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
+    async function fetchClientes() {
+      setIsLoadingData(true);
       try {
-        const [clientesRes, pacotesRes] = await Promise.all([
-          api.get('/clientes'),
-          api.get('/pacotes'),
-        ]);
-        setClientes(clientesRes.data?.data || []);
-        setPacotes(pacotesRes.data?.data || []);
-      } catch (error) {
-        toast.error('Erro ao carregar dados necessários');
-        console.error('Erro ao carregar dados:', error);
+        const res = await api.get('/clientes');
+        setClientes(res.data?.data || []);
+      } catch {
+        toast.error('Erro ao carregar clientes');
       } finally {
-        setIsLoading(false);
+        setIsLoadingData(false);
       }
     }
-    fetchData();
+    fetchClientes();
   }, []);
 
-  // Handler quando cliente é selecionado
   async function handleClienteChange(clienteId) {
     if (!clienteId) {
       setClienteSelecionado(null);
       setPacotesDoCliente([]);
-      setValue('cliente', '', { shouldValidate: true });
-      setValue('pacote', '', { shouldValidate: true });
+      sessaoForm.setValue('cliente', '', { shouldValidate: true });
+      sessaoForm.setValue('pacote', '', { shouldValidate: true });
       return;
     }
-
     try {
-      setIsLoading(true);
-      
-      // Buscar cliente
-      const clienteResponse = await api.get(`/clientes/${clienteId}`);
-      const cliente = clienteResponse.data;
-      setClienteSelecionado(cliente);
-      setValue('cliente', clienteId, { shouldValidate: true });
+      setIsLoadingData(true);
+      const [clienteRes, pacotesRes] = await Promise.all([
+        api.get(`/clientes/${clienteId}`),
+        api.get(`/compras-pacotes/cliente/${clienteId}`),
+      ]);
+      setClienteSelecionado(clienteRes.data);
+      sessaoForm.setValue('cliente', clienteId, { shouldValidate: true });
 
-      // Buscar pacotes ativos do cliente (comprados em Vendas)
-      const pacotesResponse = await api.get(`/compras-pacotes/cliente/${clienteId}`);
-      // A API já retorna array direto
-      const pacotesAtivos = (pacotesResponse.data || []).filter(
+      const pacotesAtivos = (pacotesRes.data || []).filter(
         (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
       );
-      
       setPacotesDoCliente(pacotesAtivos);
 
-      // Verificar se cliente tem pacotes ativos
       if (pacotesAtivos.length === 0) {
-        toast.warning(
-          '⚠️ Este cliente não possui pacotes ativos. Vá em "Vendas" para vender um pacote antes de agendar.',
-          { autoClose: 5000 }
-        );
-        setValue('pacote', '', { shouldValidate: true });
+        toast.warning('Cliente sem pacotes ativos. Vá em "Vendas" para vender um pacote.', { autoClose: 5000 });
+        sessaoForm.setValue('pacote', '', { shouldValidate: true });
       } else if (pacotesAtivos.length === 1) {
-        // Auto-selecionar se houver apenas 1 pacote
-        setValue('pacote', pacotesAtivos[0]._id, { shouldValidate: true });
+        sessaoForm.setValue('pacote', pacotesAtivos[0]._id, { shouldValidate: true });
       }
-    } catch (error) {
+    } catch {
       toast.error('Erro ao carregar dados do cliente');
-      console.error('Erro ao carregar cliente:', error);
       setPacotesDoCliente([]);
     } finally {
-      setIsLoading(false);
+      setIsLoadingData(false);
     }
   }
 
-  // Handler para tipo de serviço - REMOVIDO (só permitiremos pacotes comprados)
-  // const handleTipoServicoChange = (tipo) => {...}
-
-  // Submit
-  const onSubmit = async (data) => {
-    // Verificar se cliente tem pacote ativo
+  const onSubmitSessao = async (data) => {
     if (pacotesDoCliente.length === 0) {
-      toast.error('Cliente não possui pacotes ativos. Venda um pacote antes de agendar.');
+      toast.error('Cliente não possui pacotes ativos.');
       return;
     }
-
-    // Buscar o pacote selecionado para verificar sessões
     const compraPacote = pacotesDoCliente.find((cp) => cp._id === data.pacote);
-    if (!compraPacote) {
-      toast.error('Pacote selecionado não encontrado');
+    if (!compraPacote || compraPacote.sessoesRestantes <= 0) {
+      toast.error('Pacote sem sessões disponíveis');
       return;
     }
-
-    if (compraPacote.sessoesRestantes <= 0) {
-      toast.error('Este pacote não possui sessões disponíveis');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const dadosParaEnviar = {
+      await api.post('/agendamentos', {
+        tipo: 'Sessao',
         cliente: data.cliente,
-        compraPacote: data.pacote, // ID da CompraPacote
+        compraPacote: data.pacote,
         dataHora: data.dataHora,
         observacoes: data.observacoes || '',
         status: 'Agendado',
-      };
-
-      await api.post('/agendamentos', dadosParaEnviar);
-      toast.success('✅ Agendamento criado com sucesso!');
+      });
+      toast.success('Agendamento criado com sucesso!');
       navigate('/agendamentos');
     } catch (error) {
-      console.error('Erro ao criar agendamento:', error);
-      toast.error(error.response?.data?.message || 'Erro ao criar agendamento');
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao criar agendamento');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Helper para estado visual do input
-  const getInputState = (fieldName) => {
-    if (errors[fieldName]) return 'error';
-    if (dirtyFields[fieldName] && !errors[fieldName]) return 'success';
-    return 'default';
-  };
-
-  // Classes dinâmicas
-  const getInputClasses = (fieldName) => {
-    const state = getInputState(fieldName);
-    const baseClasses =
-      'block w-full rounded border p-2 shadow-sm focus:ring focus:ring-amber-200 transition-all text-gray-900 bg-white placeholer:text-gray-400';
-
-    switch (state) {
-      case 'error':
-        return `${baseClasses} border-red-500 focus:border-red-500`;
-      case 'success':
-        return `${baseClasses} border-green-500 focus:border-green-500`;
-      default:
-        return `${baseClasses} border-gray-300 focus:border-amber-500`;
+  const onSubmitAvaliacao = async (data) => {
+    setIsSubmitting(true);
+    try {
+      await api.post('/agendamentos', {
+        tipo: 'Avaliacao',
+        lead: {
+          nome: data.leadNome,
+          telefone: data.leadTelefone,
+          email: data.leadEmail || undefined,
+        },
+        dataHora: data.dataHora,
+        observacoes: data.observacoes || '',
+        status: 'Agendado',
+      });
+      toast.success('Avaliação agendada com sucesso!');
+      navigate('/agendamentos');
+    } catch (error) {
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao criar avaliação');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Componente de erro
-  const ErrorMessage = ({ fieldName }) => {
-    if (!errors[fieldName]) return null;
+  const getInputClasses = (form, fieldName) => {
+    const errors = form.formState.errors;
+    const dirtyFields = form.formState.dirtyFields;
+    const base = 'block w-full rounded border p-2 shadow-sm focus:ring focus:ring-amber-200 transition-all text-gray-900 bg-white placeholder:text-gray-400';
+    if (errors[fieldName]) return `${base} border-red-500 focus:border-red-500`;
+    if (dirtyFields[fieldName]) return `${base} border-green-500 focus:border-green-500`;
+    return `${base} border-gray-300 focus:border-amber-500`;
+  };
+
+  const ErrorMsg = ({ form, name }) => {
+    const err = form.formState.errors[name];
+    if (!err) return null;
     return (
       <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
         <XCircle className="w-4 h-4 flex-shrink-0" />
-        {errors[fieldName].message}
+        {err.message}
       </p>
     );
   };
 
-  if (isLoading && clientes.length === 0) {
+  if (isLoadingData && clientes.length === 0 && tipo === 'Sessao') {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500" />
       </div>
     );
   }
@@ -243,222 +214,267 @@ function CriarAgendamento() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Seção 1: Informações Básicas */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h2 className="text-lg font-medium text-gray-700 mb-3">Informações Básicas</h2>
-
-            {/* Campo Cliente */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cliente <span className="text-red-500">*</span>
-              </label>
-              <Controller
-                name="cliente"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      handleClienteChange(e.target.value);
-                    }}
-                    disabled={isSubmitting}
-                    className={getInputClasses('cliente')}
-                  >
-                    <option value="">Selecione um cliente</option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente._id} value={cliente._id}>
-                        {cliente.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              />
-              <ErrorMessage fieldName="cliente" />
-            </div>
-
-            {/* Campo Data e Hora */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data e Hora <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                {...register('dataHora')}
-                disabled={isSubmitting}
-                className={getInputClasses('dataHora')}
-              />
-              <ErrorMessage fieldName="dataHora" />
-            </div>
+        {/* Toggle de tipo */}
+        <div className="mb-6">
+          <p className="text-sm font-medium text-gray-700 mb-2">Tipo de agendamento</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setTipo('Sessao')}
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 text-sm font-semibold transition-all ${
+                tipo === 'Sessao'
+                  ? 'border-amber-500 bg-amber-50 text-amber-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Sessão / Retorno
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipo('Avaliacao')}
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 text-sm font-semibold transition-all ${
+                tipo === 'Avaliacao'
+                  ? 'border-amber-500 bg-amber-50 text-amber-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              <UserPlus className="w-4 h-4" />
+              Avaliação (lead)
+            </button>
           </div>
+        </div>
 
-          {/* Seção 2: Detalhes do Serviço */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h2 className="text-lg font-medium text-gray-700 mb-3">Pacote do Cliente</h2>
+        {/* ── FORMULÁRIO SESSÃO ── */}
+        {tipo === 'Sessao' && (
+          <form onSubmit={sessaoForm.handleSubmit(onSubmitSessao)} className="space-y-6">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Informações Básicas</h2>
 
-            {/* Mostrar pacotes do cliente ou mensagem de aviso */}
-            {clienteSelecionado && pacotesDoCliente.length === 0 && (
-              <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                <p className="text-sm text-yellow-800 font-medium flex items-center gap-2">
-                  <XCircle className="w-5 h-5" />
-                  Cliente não possui pacotes ativos
-                </p>
-                <p className="text-sm text-yellow-700 mt-2">
-                  Para agendar este cliente, primeiro vá em <strong>"Vendas"</strong> e venda um pacote para ele.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate('/vender-pacote')}
-                  className="mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
-                >
-                  Ir para Vendas
-                </button>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cliente <span className="text-red-500">*</span>
+                </label>
+                <Controller
+                  name="cliente"
+                  control={sessaoForm.control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      onChange={(e) => { field.onChange(e); handleClienteChange(e.target.value); }}
+                      disabled={isSubmitting}
+                      className={getInputClasses(sessaoForm, 'cliente')}
+                    >
+                      <option value="">Selecione um cliente</option>
+                      {clientes.map((c) => (
+                        <option key={c._id} value={c._id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  )}
+                />
+                <ErrorMsg form={sessaoForm} name="cliente" />
               </div>
-            )}
 
-            {/* Lista de pacotes ativos do cliente */}
-            {pacotesDoCliente.length > 0 && (
-              <div className="space-y-3">
-                {pacotesDoCliente.map((compraPacote) => (
-                  <div
-                    key={compraPacote._id}
-                    className="p-3 bg-blue-50 rounded-lg border border-blue-100"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data e Hora <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  {...sessaoForm.register('dataHora')}
+                  disabled={isSubmitting}
+                  className={getInputClasses(sessaoForm, 'dataHora')}
+                />
+                <ErrorMsg form={sessaoForm} name="dataHora" />
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Pacote do Cliente</h2>
+
+              {clienteSelecionado && pacotesDoCliente.length === 0 && (
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="text-sm text-yellow-800 font-medium flex items-center gap-2">
+                    <XCircle className="w-5 h-5" />
+                    Cliente não possui pacotes ativos
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/vender-pacote')}
+                    className="mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm text-blue-900 font-semibold">
-                          {compraPacote.pacote?.nome || 'Pacote'}
-                        </p>
-                        <div className="mt-1 space-y-1 text-xs text-blue-700">
-                          <p>
-                            <CheckCircle2 className="w-3 h-3 inline mr-1" />
-                            Sessões: {compraPacote.sessoesUsadas}/{compraPacote.sessoesContratadas}
-                            <span className="font-medium ml-1">
-                              ({compraPacote.sessoesRestantes} restantes)
-                            </span>
-                          </p>
-                          {compraPacote.dataExpiracao && (
-                            <p>
-                              📅 Válido até:{' '}
-                              {new Date(compraPacote.dataExpiracao).toLocaleDateString('pt-PT')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Campo de seleção de pacote */}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Selecionar Pacote <span className="text-red-500">*</span>
-                  </label>
-                  <Controller
-                    name="pacote"
-                    control={control}
-                    render={({ field }) => (
-                      <select
-                        {...field}
-                        disabled={isSubmitting || pacotesDoCliente.length === 0}
-                        className={getInputClasses('pacote')}
-                      >
-                        <option value="">Selecione o pacote para este agendamento</option>
-                        {pacotesDoCliente.map((cp) => (
-                          <option key={cp._id} value={cp._id}>
-                            {cp.pacote?.nome} - {cp.sessoesRestantes} sessões restantes
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  />
-                  <ErrorMessage fieldName="pacote" />
+                    Ir para Vendas
+                  </button>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Seção 3: Observações */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h2 className="text-lg font-medium text-gray-700 mb-3">Observações</h2>
+              {pacotesDoCliente.length > 0 && (
+                <div className="space-y-3">
+                  {pacotesDoCliente.map((cp) => (
+                    <div key={cp._id} className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <p className="text-sm text-blue-900 font-semibold">{cp.pacote?.nome || 'Pacote'}</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        <CheckCircle2 className="w-3 h-3 inline mr-1" />
+                        {cp.sessoesRestantes} sessões restantes
+                      </p>
+                    </div>
+                  ))}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Selecionar Pacote <span className="text-red-500">*</span>
+                    </label>
+                    <Controller
+                      name="pacote"
+                      control={sessaoForm.control}
+                      render={({ field }) => (
+                        <select
+                          {...field}
+                          disabled={isSubmitting || pacotesDoCliente.length === 0}
+                          className={getInputClasses(sessaoForm, 'pacote')}
+                        >
+                          <option value="">Selecione o pacote</option>
+                          {pacotesDoCliente.map((cp) => (
+                            <option key={cp._id} value={cp._id}>
+                              {cp.pacote?.nome} — {cp.sessoesRestantes} sessões restantes
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                    <ErrorMsg form={sessaoForm} name="pacote" />
+                  </div>
+                </div>
+              )}
+            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observações (opcional)
-              </label>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Observações</h2>
               <textarea
-                {...register('observacoes')}
+                {...sessaoForm.register('observacoes')}
                 disabled={isSubmitting}
-                className={getInputClasses('observacoes')}
+                className={getInputClasses(sessaoForm, 'observacoes')}
                 rows={3}
                 placeholder="Ex: Cliente quer massagem com pressão leve."
               />
-              <ErrorMessage fieldName="observacoes" />
-              <p className="mt-1 text-sm text-gray-500">
-                {watchObservacoes?.length || 0}/500 caracteres
+              <p className="mt-1 text-sm text-gray-500">{watchObsSessao?.length || 0}/500</p>
+            </div>
+
+            <BotoesSubmit isSubmitting={isSubmitting} onVoltar={() => navigate('/agendamentos')} label="Criar Agendamento" />
+          </form>
+        )}
+
+        {/* ── FORMULÁRIO AVALIAÇÃO ── */}
+        {tipo === 'Avaliacao' && (
+          <form onSubmit={avaliacaoForm.handleSubmit(onSubmitAvaliacao)} className="space-y-6">
+            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+              <p className="text-sm text-amber-800">
+                Agendamento de avaliação para lead — o cliente não precisa estar cadastrado. Se fechar pacote, será cadastrado automaticamente.
               </p>
             </div>
-          </div>
 
-          {/* Botões */}
-          <div className="flex gap-4 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Deseja cancelar o agendamento? As alterações serão perdidas.'
-                  )
-                ) {
-                  navigate('/agendamentos');
-                }
-              }}
-              disabled={isSubmitting}
-              className="flex-1 bg-gray-500 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`flex-1 flex items-center justify-center ${isSubmitting
-                  ? 'bg-amber-400 cursor-not-allowed'
-                  : 'bg-amber-500 hover:bg-amber-600'
-                } text-white font-semibold py-2 px-4 rounded transition-colors`}
-            >
-              {isSubmitting ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Criando...
-                </>
-              ) : (
-                'Criar Agendamento'
-              )}
-            </button>
-          </div>
-        </form>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Dados do Lead</h2>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome <span className="text-red-500">*</span>
+                </label>
+                <input
+                  {...avaliacaoForm.register('leadNome')}
+                  disabled={isSubmitting}
+                  className={getInputClasses(avaliacaoForm, 'leadNome')}
+                  placeholder="Nome completo"
+                />
+                <ErrorMsg form={avaliacaoForm} name="leadNome" />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Telefone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  {...avaliacaoForm.register('leadTelefone')}
+                  disabled={isSubmitting}
+                  className={getInputClasses(avaliacaoForm, 'leadTelefone')}
+                  placeholder="910 000 000"
+                />
+                <ErrorMsg form={avaliacaoForm} name="leadTelefone" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email (opcional)
+                </label>
+                <input
+                  {...avaliacaoForm.register('leadEmail')}
+                  disabled={isSubmitting}
+                  className={getInputClasses(avaliacaoForm, 'leadEmail')}
+                  placeholder="email@exemplo.com"
+                />
+                <ErrorMsg form={avaliacaoForm} name="leadEmail" />
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Data e Hora</h2>
+              <input
+                type="datetime-local"
+                {...avaliacaoForm.register('dataHora')}
+                disabled={isSubmitting}
+                className={getInputClasses(avaliacaoForm, 'dataHora')}
+              />
+              <ErrorMsg form={avaliacaoForm} name="dataHora" />
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Observações</h2>
+              <textarea
+                {...avaliacaoForm.register('observacoes')}
+                disabled={isSubmitting}
+                className={getInputClasses(avaliacaoForm, 'observacoes')}
+                rows={3}
+                placeholder="Ex: Lead veio pelo Instagram."
+              />
+              <p className="mt-1 text-sm text-gray-500">{watchObsAval?.length || 0}/500</p>
+            </div>
+
+            <BotoesSubmit isSubmitting={isSubmitting} onVoltar={() => navigate('/agendamentos')} label="Agendar Avaliação" />
+          </form>
+        )}
       </div>
     </ErrorBoundary>
+  );
+}
+
+function BotoesSubmit({ isSubmitting, onVoltar, label }) {
+  return (
+    <div className="flex gap-4 pt-2">
+      <button
+        type="button"
+        onClick={onVoltar}
+        disabled={isSubmitting}
+        className="flex-1 bg-gray-500 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
+      >
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className={`flex-1 flex items-center justify-center ${
+          isSubmitting ? 'bg-amber-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'
+        } text-white font-semibold py-2 px-4 rounded transition-colors`}
+      >
+        {isSubmitting ? (
+          <>
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            A processar...
+          </>
+        ) : label}
+      </button>
+    </div>
   );
 }
 

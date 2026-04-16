@@ -14,7 +14,18 @@ const timeToMinutes = (timeString) => {
 export const createAgendamento = async (req, res) => {
   try {
     const { Agendamento, Schedule } = req.models;
-    const { cliente, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
+    const { tipo = 'Sessao', cliente, lead, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
+
+    // Validação por tipo
+    if (tipo === 'Avaliacao') {
+      if (!lead?.nome || !lead?.telefone) {
+        return res.status(400).json({ success: false, error: 'Avaliação requer lead.nome e lead.telefone' });
+      }
+    } else {
+      if (!cliente) {
+        return res.status(400).json({ success: false, error: 'cliente é obrigatório para agendamentos do tipo Sessao ou Retorno' });
+      }
+    }
 
     const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "America/Sao_Paulo" });
     if (!agendamentoDateTime.isValid) {
@@ -65,7 +76,9 @@ export const createAgendamento = async (req, res) => {
     console.log('[createAgendamento] Dados recebidos:', { cliente, dataHora, pacote, compraPacote, tenantId: req.tenantId });
 
     const novoAgendamento = new Agendamento({
-      cliente,
+      tipo,
+      cliente: tipo === 'Avaliacao' ? undefined : cliente,
+      lead: tipo === 'Avaliacao' ? { nome: lead.nome, telefone: lead.telefone, email: lead.email } : undefined,
       dataHora,
       pacote,
       compraPacote,
@@ -150,10 +163,10 @@ export const getAgendamento = async (req, res) => {
     }
     res.status(200).json(agendamento);
   } catch (error) {
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "ID do agendamento inválido." });
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, error: 'ID inválido' });
     }
-    res.status(500).json({ message: "Erro ao buscar agendamento.", details: error.message });
+    res.status(500).json({ success: false, error: "Erro ao buscar agendamento." });
   }
 };
 
@@ -161,9 +174,10 @@ export const getAgendamento = async (req, res) => {
 export const updateAgendamento = async (req, res) => {
   try {
     const { Agendamento } = req.models;
+    const { dataHora, status, observacoes, profissional, servicoAvulsoNome, servicoAvulsoValor } = req.body;
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      req.body,
+      { dataHora, status, observacoes, profissional, servicoAvulsoNome, servicoAvulsoValor },
       { new: true, runValidators: true }
     ).populate("cliente pacote");
 
@@ -262,10 +276,7 @@ export const deleteAgendamento = async (req, res) => {
     }
     res.status(200).json({ message: "Agendamento deletado com sucesso." });
   } catch (error) {
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "ID do agendamento inválido." });
-    }
-    res.status(500).json({ message: "Erro ao deletar agendamento.", details: error.message });
+    res.status(500).json({ success: false, error: "Erro ao deletar agendamento." });
   }
 };
 
@@ -579,6 +590,107 @@ export const getHistorico = async (req, res) => {
       message: "Erro ao buscar histórico de atendimentos.",
       details: error.message
     });
+  }
+};
+
+// @desc    Marcar presença do cliente no agendamento
+// @route   PATCH /api/agendamentos/:id/comparecimento
+export const marcarComparecimento = async (req, res) => {
+  try {
+    const { Agendamento } = req.models;
+    const { compareceu } = req.body;
+
+    if (typeof compareceu !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'compareceu deve ser true ou false' });
+    }
+
+    const agendamento = await Agendamento.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
+      {
+        compareceu,
+        status: compareceu ? 'Compareceu' : 'Não Compareceu'
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!agendamento) {
+      return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
+    }
+
+    res.json({ success: true, data: agendamento });
+  } catch (error) {
+    console.error('[marcarComparecimento] Erro:', error);
+    res.status(500).json({ success: false, error: 'Erro ao marcar comparecimento' });
+  }
+};
+
+// @desc    Registar encerramento de avaliação (fechou ou não pacote)
+//          Se fechou + lead → converte lead em Cliente
+// @route   POST /api/agendamentos/:id/fechar-pacote
+export const fecharPacote = async (req, res) => {
+  try {
+    const { Agendamento, Cliente } = req.models;
+    const { fechou } = req.body;
+
+    if (typeof fechou !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'fechou deve ser true ou false' });
+    }
+
+    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!agendamento) {
+      return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
+    }
+
+    if (agendamento.compareceu !== true) {
+      return res.status(400).json({ success: false, error: 'É necessário marcar presença antes de registar o encerramento' });
+    }
+
+    const update = {
+      fechouPacote: fechou,
+      status: fechou ? 'Fechado' : agendamento.status,
+    };
+
+    let clienteCriado = null;
+
+    if (fechou && agendamento.tipo === 'Avaliacao' && !agendamento.cliente && agendamento.lead?.nome) {
+      try {
+        clienteCriado = await Cliente.create({
+          tenantId: req.tenantId,
+          nome: agendamento.lead.nome,
+          telefone: agendamento.lead.telefone,
+          ...(agendamento.lead.email && { email: agendamento.lead.email }),
+        });
+      } catch (err) {
+        if (err.code === 11000) {
+          clienteCriado = await Cliente.findOne({
+            tenantId: req.tenantId,
+            telefone: agendamento.lead.telefone.replace(/[^\d]/g, '')
+          });
+        } else {
+          throw err;
+        }
+      }
+
+      if (clienteCriado) {
+        update.clienteConvertido = clienteCriado._id;
+        update.cliente = clienteCriado._id;
+      }
+    }
+
+    const agendamentoAtualizado = await Agendamento.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
+      update,
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      data: agendamentoAtualizado,
+      ...(clienteCriado && { clienteCriado }),
+    });
+  } catch (error) {
+    console.error('[fecharPacote] Erro:', error);
+    res.status(500).json({ success: false, error: 'Erro ao registar encerramento' });
   }
 };
 

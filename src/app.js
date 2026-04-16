@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv-flow';
 import morgan from 'morgan';
 
@@ -36,8 +37,11 @@ const app = express();
 // Necessário para rate limiting funcionar correctamente atrás de proxy (Render, Vercel)
 app.set('trust proxy', 1);
 
+// Security headers
+app.use(helmet());
+
 // Middlewares globais (ANTES do CORS para webhooks funcionarem)
-app.use(express.json()); // para parsear JSON
+app.use(express.json({ limit: '10kb' })); // limitar payload para prevenir DoS
 app.use(morgan('dev')); // para logs de requisição
 app.use(requestLogger);
 

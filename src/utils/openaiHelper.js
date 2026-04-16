@@ -37,7 +37,7 @@ export const chatWithLaura = async ({ userMsg, ctx, toolOutputs }) => {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // ou o modelo que preferir
+      model: "gpt-4o-mini",
       messages: messages,
       tools: functionsSchema,
       tool_choice: "auto",
@@ -45,7 +45,12 @@ export const chatWithLaura = async ({ userMsg, ctx, toolOutputs }) => {
     return response.choices[0].message;
   } catch (error) {
     console.error("Erro ao comunicar com a OpenAI:", error);
-    throw error;
+    // Fallback estático para evitar falha silenciosa quando OpenAI está indisponível
+    return {
+      role: 'assistant',
+      content: 'De momento não consigo processar o pedido. Por favor contacte-nos diretamente pelo telefone ou tente novamente em alguns minutos.',
+      tool_calls: null,
+    };
   }
 };
 

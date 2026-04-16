@@ -1,0 +1,72 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - link [ref=e6] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e7]:
+            - generic [ref=e13]: marca
+            - generic [ref=e14]: ai
+            - generic [ref=e15]: SMART AGENDA
+        - generic [ref=e16]:
+          - generic [ref=e17]: L
+          - generic [ref=e18]:
+            - paragraph [ref=e19]: Laura
+            - paragraph [ref=e20]: laura@laesteticaavancada.pt
+      - navigation [ref=e21]:
+        - generic [ref=e22]:
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e24]
+            - generic [ref=e29]: Dashboard
+          - generic [ref=e30]:
+            - button "FINANÇAS" [ref=e31] [cursor=pointer]:
+              - generic [ref=e32]: FINANÇAS
+              - img [ref=e33]
+            - generic:
+              - link "Transações" [ref=e35] [cursor=pointer]:
+                - /url: /transacoes
+                - img [ref=e36]
+                - generic [ref=e39]: Transações
+              - link "Vendas" [ref=e40] [cursor=pointer]:
+                - /url: /pacotes-ativos
+                - img [ref=e41]
+                - generic [ref=e44]: Vendas
+              - link "Relatórios" [ref=e45] [cursor=pointer]:
+                - /url: /financeiro
+                - img [ref=e46]
+                - generic [ref=e49]: Relatórios
+          - generic [ref=e51]:
+            - button "AGENDAMENTO" [ref=e52] [cursor=pointer]:
+              - generic [ref=e53]: AGENDAMENTO
+              - img [ref=e54]
+            - generic:
+              - link "Calendário" [ref=e56] [cursor=pointer]:
+                - /url: /calendario
+                - img [ref=e57]
+                - generic [ref=e59]: Calendário
+              - link "Atendimentos" [ref=e60] [cursor=pointer]:
+                - /url: /atendimentos
+                - img [ref=e61]
+                - generic [ref=e65]: Atendimentos
+          - generic [ref=e67]:
+            - button "ADMINISTRATIVO" [ref=e68] [cursor=pointer]:
+              - generic [ref=e69]: ADMINISTRATIVO
+              - img [ref=e70]
+            - generic:
+              - link "Clientes" [ref=e72] [cursor=pointer]:
+                - /url: /clientes
+                - img [ref=e73]
+                - generic [ref=e78]: Clientes
+              - link "Serviços" [ref=e79] [cursor=pointer]:
+                - /url: /pacotes
+                - img [ref=e80]
+                - generic [ref=e84]: Serviços
+              - link "Disponibilidade" [ref=e85] [cursor=pointer]:
+                - /url: /disponibilidade
+                - img [ref=e86]
+                - generic [ref=e89]: Disponibilidade
+      - button "Sair da Conta" [ref=e92] [cursor=pointer]:
+        - img [ref=e93]
+        - generic [ref=e96]: Sair da Conta
+  - region "Notifications Alt+T"

@@ -1,0 +1,194 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e259]:
+      - generic [ref=e260]:
+        - link [ref=e261] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e262]:
+            - generic [ref=e268]: marca
+            - generic [ref=e269]: ai
+            - generic [ref=e270]: SMART AGENDA
+        - generic [ref=e271]:
+          - generic [ref=e272]: L
+          - generic [ref=e273]:
+            - paragraph [ref=e274]: Laura
+            - paragraph [ref=e275]: laura@laesteticaavancada.pt
+      - navigation [ref=e276]:
+        - generic [ref=e277]:
+          - link "Dashboard" [ref=e280] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e281]
+            - generic [ref=e286]: Dashboard
+          - generic [ref=e287]:
+            - button "FINANÇAS" [ref=e288] [cursor=pointer]:
+              - generic [ref=e289]: FINANÇAS
+              - img [ref=e290]
+            - generic [ref=e292]:
+              - link "Transações" [ref=e293] [cursor=pointer]:
+                - /url: /transacoes
+                - img [ref=e294]
+                - generic [ref=e297]: Transações
+              - link "Vendas" [ref=e298] [cursor=pointer]:
+                - /url: /pacotes-ativos
+                - img [ref=e299]
+                - generic [ref=e302]: Vendas
+              - link "Relatórios" [ref=e303] [cursor=pointer]:
+                - /url: /financeiro
+                - img [ref=e304]
+                - generic [ref=e307]: Relatórios
+          - generic [ref=e309]:
+            - button "AGENDAMENTO" [ref=e310] [cursor=pointer]:
+              - generic [ref=e311]: AGENDAMENTO
+              - img [ref=e312]
+            - generic [ref=e314]:
+              - link "Calendário" [ref=e315] [cursor=pointer]:
+                - /url: /calendario
+                - img [ref=e316]
+                - generic [ref=e318]: Calendário
+              - link "Atendimentos" [ref=e319] [cursor=pointer]:
+                - /url: /atendimentos
+                - img [ref=e320]
+                - generic [ref=e324]: Atendimentos
+          - generic [ref=e326]:
+            - button "ADMINISTRATIVO" [ref=e327] [cursor=pointer]:
+              - generic [ref=e328]: ADMINISTRATIVO
+              - img [ref=e329]
+            - generic [ref=e331]:
+              - link "Clientes" [ref=e332] [cursor=pointer]:
+                - /url: /clientes
+                - img [ref=e333]
+                - generic [ref=e338]: Clientes
+              - link "Serviços" [ref=e339] [cursor=pointer]:
+                - /url: /pacotes
+                - img [ref=e340]
+                - generic [ref=e344]: Serviços
+              - link "Disponibilidade" [ref=e345] [cursor=pointer]:
+                - /url: /disponibilidade
+                - img [ref=e346]
+                - generic [ref=e349]: Disponibilidade
+      - button "Sair da Conta" [ref=e352] [cursor=pointer]:
+        - img [ref=e353]
+        - generic [ref=e356]: Sair da Conta
+  - generic [ref=e357]:
+    - generic [ref=e358]:
+      - generic [ref=e359]:
+        - paragraph [ref=e360]: 🔔 Notificações Disponíveis
+        - paragraph [ref=e361]: Ative notificações para receber lembretes de agendamentos.
+      - button "✅ Ativar" [ref=e362] [cursor=pointer]
+    - generic [ref=e363]:
+      - heading "Agendamentos" [level=1] [ref=e364]
+      - button "Novo Agendamento" [ref=e365] [cursor=pointer]
+    - generic [ref=e366]:
+      - text: "Filtrar por status:"
+      - combobox "Filtrar por status:" [ref=e367]:
+        - option "Todos" [selected]
+        - option "Agendado"
+        - option "Confirmado"
+        - option "Compareceu"
+        - option "Realizado"
+        - option "Fechado"
+        - option "Cancelado Pelo Cliente"
+        - option "Cancelado Pelo Salão"
+        - option "Não Compareceu"
+    - table [ref=e369]:
+      - rowgroup [ref=e370]:
+        - row "Cliente Serviço/Pacote Data/Hora Status Confirmação Respondido Ações" [ref=e371]:
+          - columnheader "Cliente" [ref=e372]
+          - columnheader "Serviço/Pacote" [ref=e373]
+          - columnheader "Data/Hora" [ref=e374]
+          - columnheader "Status" [ref=e375]
+          - columnheader "Confirmação" [ref=e376]
+          - columnheader "Respondido" [ref=e377]
+          - columnheader "Ações" [ref=e378]
+      - rowgroup [ref=e379]:
+        - row "Cristina Pereira N/D 19/03/2026, 11:00 Realizado ⏳ Pendente - ✅ Confirmar ❌ Rejeitar ✓ Finalizar Atendimento 📱 Lembrete Editar Deletar" [ref=e380]:
+          - cell "Cristina Pereira" [ref=e381]:
+            - generic [ref=e383]: Cristina Pereira
+          - cell "N/D" [ref=e384]
+          - cell "19/03/2026, 11:00" [ref=e385]
+          - cell "Realizado" [ref=e386]:
+            - generic [ref=e387]: Realizado
+          - cell "⏳ Pendente" [ref=e388]:
+            - generic [ref=e389]: ⏳ Pendente
+          - cell "-" [ref=e390]
+          - cell "✅ Confirmar ❌ Rejeitar ✓ Finalizar Atendimento 📱 Lembrete Editar Deletar" [ref=e391]:
+            - generic [ref=e392]:
+              - generic [ref=e393]:
+                - button "✅ Confirmar" [ref=e394] [cursor=pointer]
+                - button "❌ Rejeitar" [ref=e395] [cursor=pointer]
+              - button "✓ Finalizar Atendimento" [ref=e397] [cursor=pointer]
+              - generic [ref=e398]:
+                - button "📱 Lembrete" [ref=e399] [cursor=pointer]
+                - button "Editar" [ref=e400] [cursor=pointer]
+                - button "Deletar" [ref=e401] [cursor=pointer]
+        - row "Joana pombeiro N/D 20/03/2026, 18:00 Agendado ⏳ Pendente - ✅ Confirmar ❌ Rejeitar 👤 Presença 📱 Lembrete Editar Deletar" [ref=e402]:
+          - cell "Joana pombeiro" [ref=e403]:
+            - generic [ref=e405]: Joana pombeiro
+          - cell "N/D" [ref=e406]
+          - cell "20/03/2026, 18:00" [ref=e407]
+          - cell "Agendado" [ref=e408]:
+            - generic [ref=e409]: Agendado
+          - cell "⏳ Pendente" [ref=e410]:
+            - generic [ref=e411]: ⏳ Pendente
+          - cell "-" [ref=e412]
+          - cell "✅ Confirmar ❌ Rejeitar 👤 Presença 📱 Lembrete Editar Deletar" [ref=e413]:
+            - generic [ref=e414]:
+              - generic [ref=e415]:
+                - button "✅ Confirmar" [ref=e416] [cursor=pointer]
+                - button "❌ Rejeitar" [ref=e417] [cursor=pointer]
+              - button "👤 Presença" [ref=e419] [cursor=pointer]
+              - generic [ref=e420]:
+                - button "📱 Lembrete" [ref=e421] [cursor=pointer]
+                - button "Editar" [ref=e422] [cursor=pointer]
+                - button "Deletar" [ref=e423] [cursor=pointer]
+        - row "Maria Silva lead N/D 17/04/2026, 14:00 Agendado ⏳ Pendente - ✅ Confirmar ❌ Rejeitar 👤 Presença 📱 Lembrete Editar Deletar" [ref=e424]:
+          - cell "Maria Silva lead" [ref=e425]:
+            - generic [ref=e426]:
+              - generic [ref=e427]: Maria Silva
+              - generic [ref=e428]: lead
+          - cell "N/D" [ref=e429]
+          - cell "17/04/2026, 14:00" [ref=e430]
+          - cell "Agendado" [ref=e431]:
+            - generic [ref=e432]: Agendado
+          - cell "⏳ Pendente" [ref=e433]:
+            - generic [ref=e434]: ⏳ Pendente
+          - cell "-" [ref=e435]
+          - cell "✅ Confirmar ❌ Rejeitar 👤 Presença 📱 Lembrete Editar Deletar" [ref=e436]:
+            - generic [ref=e437]:
+              - generic [ref=e438]:
+                - button "✅ Confirmar" [ref=e439] [cursor=pointer]
+                - button "❌ Rejeitar" [ref=e440] [cursor=pointer]
+              - button "👤 Presença" [ref=e442] [cursor=pointer]
+              - generic [ref=e443]:
+                - button "📱 Lembrete" [ref=e444] [cursor=pointer]
+                - button "Editar" [ref=e445] [cursor=pointer]
+                - button "Deletar" [ref=e446] [cursor=pointer]
+        - row "andre lead N/D 17/04/2026, 17:00 Realizado ⏳ Pendente - ✅ Confirmar ❌ Rejeitar ✓ Finalizar Atendimento 📱 Lembrete Editar Deletar" [ref=e447]:
+          - cell "andre lead" [ref=e448]:
+            - generic [ref=e449]:
+              - generic [ref=e450]: andre
+              - generic [ref=e451]: lead
+          - cell "N/D" [ref=e452]
+          - cell "17/04/2026, 17:00" [ref=e453]
+          - cell "Realizado" [ref=e454]:
+            - generic [ref=e455]: Realizado
+          - cell "⏳ Pendente" [ref=e456]:
+            - generic [ref=e457]: ⏳ Pendente
+          - cell "-" [ref=e458]
+          - cell "✅ Confirmar ❌ Rejeitar ✓ Finalizar Atendimento 📱 Lembrete Editar Deletar" [ref=e459]:
+            - generic [ref=e460]:
+              - generic [ref=e461]:
+                - button "✅ Confirmar" [ref=e462] [cursor=pointer]
+                - button "❌ Rejeitar" [ref=e463] [cursor=pointer]
+              - button "✓ Finalizar Atendimento" [ref=e465] [cursor=pointer]
+              - generic [ref=e466]:
+                - button "📱 Lembrete" [ref=e467] [cursor=pointer]
+                - button "Editar" [ref=e468] [cursor=pointer]
+                - button "Deletar" [ref=e469] [cursor=pointer]
+  - region "Notifications Alt+T":
+    - alert [ref=e471] [cursor=pointer]:
+      - img [ref=e473]
+      - text: Avaliação agendada com sucesso!
+      - button "close" [ref=e475]:
+        - img [ref=e476]
+      - progressbar "notification timer" [ref=e480]

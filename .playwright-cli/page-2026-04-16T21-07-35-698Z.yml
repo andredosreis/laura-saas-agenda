@@ -1,0 +1,165 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e531]:
+        - generic [ref=e532]:
+          - link [ref=e533] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e534]:
+              - generic [ref=e540]: marca
+              - generic [ref=e541]: ai
+              - generic [ref=e542]: SMART AGENDA
+          - generic [ref=e543]:
+            - generic [ref=e544]: L
+            - generic [ref=e545]:
+              - paragraph [ref=e546]: Laura
+              - paragraph [ref=e547]: laura@laesteticaavancada.pt
+        - navigation [ref=e548]:
+          - generic [ref=e549]:
+            - link "Dashboard" [ref=e552] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e553]
+              - generic [ref=e558]: Dashboard
+            - generic [ref=e559]:
+              - button "FINANÇAS" [ref=e560] [cursor=pointer]:
+                - generic [ref=e561]: FINANÇAS
+                - img [ref=e562]
+              - generic [ref=e564]:
+                - link "Transações" [ref=e565] [cursor=pointer]:
+                  - /url: /transacoes
+                  - img [ref=e566]
+                  - generic [ref=e569]: Transações
+                - link "Vendas" [ref=e570] [cursor=pointer]:
+                  - /url: /pacotes-ativos
+                  - img [ref=e571]
+                  - generic [ref=e574]: Vendas
+                - link "Relatórios" [ref=e575] [cursor=pointer]:
+                  - /url: /financeiro
+                  - img [ref=e576]
+                  - generic [ref=e579]: Relatórios
+            - generic [ref=e581]:
+              - button "AGENDAMENTO" [ref=e582] [cursor=pointer]:
+                - generic [ref=e583]: AGENDAMENTO
+                - img [ref=e584]
+              - generic [ref=e586]:
+                - link "Calendário" [ref=e587] [cursor=pointer]:
+                  - /url: /calendario
+                  - img [ref=e588]
+                  - generic [ref=e590]: Calendário
+                - link "Atendimentos" [ref=e591] [cursor=pointer]:
+                  - /url: /atendimentos
+                  - img [ref=e592]
+                  - generic [ref=e596]: Atendimentos
+            - generic [ref=e598]:
+              - button "ADMINISTRATIVO" [ref=e599] [cursor=pointer]:
+                - generic [ref=e600]: ADMINISTRATIVO
+                - img [ref=e601]
+              - generic [ref=e603]:
+                - link "Clientes" [ref=e604] [cursor=pointer]:
+                  - /url: /clientes
+                  - img [ref=e605]
+                  - generic [ref=e610]: Clientes
+                - link "Serviços" [ref=e611] [cursor=pointer]:
+                  - /url: /pacotes
+                  - img [ref=e612]
+                  - generic [ref=e616]: Serviços
+                - link "Disponibilidade" [ref=e617] [cursor=pointer]:
+                  - /url: /disponibilidade
+                  - img [ref=e618]
+                  - generic [ref=e621]: Disponibilidade
+        - button "Sair da Conta" [ref=e624] [cursor=pointer]:
+          - img [ref=e625]
+          - generic [ref=e628]: Sair da Conta
+    - generic [ref=e630]:
+      - generic [ref=e631]:
+        - generic [ref=e632]:
+          - heading "Financeiro" [level=1] [ref=e633]:
+            - img [ref=e635]
+            - text: Financeiro
+          - paragraph [ref=e638]: Análise de receita, serviços e clientes
+        - button "Atualizar" [ref=e640] [cursor=pointer]:
+          - img [ref=e641]
+      - generic [ref=e647]:
+        - generic [ref=e648]:
+          - button "Última Semana" [ref=e649] [cursor=pointer]
+          - button "Último Mês" [ref=e650] [cursor=pointer]
+          - button "Último Trimestre" [ref=e651] [cursor=pointer]
+          - button "Este Ano" [ref=e652] [cursor=pointer]
+        - generic [ref=e653]:
+          - generic [ref=e654]: "Agrupar por:"
+          - button "Diário" [ref=e655] [cursor=pointer]
+          - button "Semanal" [ref=e656] [cursor=pointer]
+          - button "Mensal" [ref=e657] [cursor=pointer]
+      - generic [ref=e658]:
+        - generic [ref=e660]:
+          - generic [ref=e661]:
+            - paragraph [ref=e662]: Receita Total
+            - paragraph [ref=e663]: €0.00
+          - img [ref=e665]
+        - generic [ref=e668]:
+          - generic [ref=e669]:
+            - paragraph [ref=e670]: Ticket Médio
+            - paragraph [ref=e671]: €0.00
+          - img [ref=e673]
+        - generic [ref=e677]:
+          - generic [ref=e678]:
+            - paragraph [ref=e679]: Taxa de Comparecimento
+            - paragraph [ref=e680]: 100.0%
+          - img [ref=e682]
+        - generic [ref=e687]:
+          - generic [ref=e688]:
+            - paragraph [ref=e689]: Total Clientes
+            - paragraph [ref=e690]: "16"
+          - img [ref=e692]
+      - generic [ref=e697]:
+        - generic [ref=e698]:
+          - heading "Evolução da Receita" [level=3] [ref=e699]
+          - application [ref=e703]:
+            - generic [ref=e710]:
+              - generic [ref=e713]: 19/03
+              - generic [ref=e714]:
+                - generic [ref=e716]: €0
+                - generic [ref=e718]: €1
+                - generic [ref=e720]: €2
+                - generic [ref=e722]: €3
+                - generic [ref=e724]: €4
+        - generic [ref=e725]:
+          - heading "Distribuição por Serviço" [level=3] [ref=e726]
+          - generic [ref=e729]:
+            - generic [ref=e734]: Serviço não identificado
+            - application [ref=e735]
+      - generic [ref=e736]:
+        - heading "Top Clientes" [level=3] [ref=e737]
+        - table [ref=e739]:
+          - rowgroup [ref=e740]:
+            - row "Ranking Cliente Receita Agendamentos Ticket Médio" [ref=e741]:
+              - columnheader "Ranking" [ref=e742]
+              - columnheader "Cliente" [ref=e743]
+              - columnheader "Receita" [ref=e744]
+              - columnheader "Agendamentos" [ref=e745]
+              - columnheader "Ticket Médio" [ref=e746]
+          - rowgroup [ref=e747]:
+            - row "Cristina Pereira 910003891 €0.00 1 €0.00" [ref=e748] [cursor=pointer]:
+              - cell [ref=e749]:
+                - img [ref=e752]
+              - cell "Cristina Pereira 910003891" [ref=e758]:
+                - generic [ref=e759]:
+                  - img [ref=e761]
+                  - generic [ref=e764]:
+                    - paragraph [ref=e765]: Cristina Pereira
+                    - generic [ref=e767]:
+                      - img [ref=e768]
+                      - generic [ref=e770]: "910003891"
+              - cell "€0.00" [ref=e771]:
+                - generic [ref=e772]: €0.00
+              - cell "1" [ref=e773]
+              - cell "€0.00" [ref=e774]:
+                - generic [ref=e775]: €0.00
+    - region "Notifications Alt+T":
+      - alert [ref=e777] [cursor=pointer]:
+        - img [ref=e779]
+        - text: Avaliação encerrada — pacote fechado!
+        - button "close" [ref=e781]:
+          - img [ref=e782]
+        - progressbar "notification timer" [ref=e786]
+  - generic [ref=e787]: €0

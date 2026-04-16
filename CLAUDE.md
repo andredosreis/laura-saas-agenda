@@ -3,6 +3,26 @@
 Sistema SaaS multi-tenant de gestão de agendamentos para profissionais de saúde/estética.
 Produto comercial: **Marcai** (nome fantasia). Backend Node.js/Express no Render, frontend React/Vite PWA no Vercel.
 
+## Library Documentation Lookup
+
+Before implementing any feature, you MUST use the **context7** MCP tool to look up the relevant library APIs and official documentation.
+
+**Always:**
+
+* Check the installed library version in the project manifest
+* Retrieve the corresponding documentation using context7
+* Cross-reference APIs to avoid deprecated or incompatible patterns
+* Follow the official documentation over training data
+
+**Skip documentation lookup only for trivial operations such as:**
+
+* Variable declarations
+* Basic control flow
+* Simple CRUD using established project patterns
+
+If a library  is involved and ther is uncertainty, documentation lookup is mandatory.
+If the documatation returned does not match the installed version, flag the discrepacncy before proceeding.
+
 ## Tech Stack
 
 | Layer | Tech |

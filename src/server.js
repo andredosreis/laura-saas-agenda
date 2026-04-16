@@ -14,9 +14,24 @@ connectDB().then(() => {
   initEmailService();
 
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     logger.info({ port: PORT }, 'Servidor a rodar');
   });
+
+  const shutdown = () => {
+    logger.info('Sinal de encerramento recebido. A fechar conexões...');
+    server.close(() => {
+      import('mongoose').then(({ default: mongoose }) => {
+        mongoose.connection.close().then(() => {
+          logger.info('Servidor encerrado.');
+          process.exit(0);
+        });
+      });
+    });
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }).catch(err => {
   logger.error({ err }, 'Falha ao conectar ao MongoDB. O servidor não foi iniciado.');
   process.exit(1); // Encerra o processo se a conexão com o BD falhar

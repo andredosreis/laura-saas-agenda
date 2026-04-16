@@ -75,11 +75,10 @@ export const getCliente = async (req, res) => {
     }
     res.status(200).json(cliente);
   } catch (error) {
-    console.error('Erro ao buscar cliente por ID:', error.message);
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'ID do cliente inválido.', details: error.message });
+      return res.status(400).json({ success: false, error: 'ID inválido' });
     }
-    res.status(500).json({ message: 'Erro interno ao buscar cliente.', details: error.message });
+    res.status(500).json({ success: false, error: 'Erro interno ao buscar cliente.' });
   }
 };
 
