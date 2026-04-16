@@ -96,15 +96,31 @@ describe('Isolamento Multi-Tenant — Agendamentos', () => {
       .set('Authorization', `Bearer ${tokenB}`)
       .send({ nome: 'Cliente B', telefone: '920000099' });
 
+    // Inicializar e activar schedule para o tenant B via API
+    await request(app)
+      .get('/api/schedules')
+      .set('Authorization', `Bearer ${tokenB}`);
+
+    await Promise.all(
+      [0, 1, 2, 3, 4, 5, 6].map(day =>
+        request(app)
+          .put(`/api/schedules/${day}`)
+          .set('Authorization', `Bearer ${tokenB}`)
+          .send({ isActive: true, startTime: '09:00', endTime: '18:00', breakStartTime: '12:00', breakEndTime: '13:00' })
+      )
+    );
+
+    // Amanhã às 14:00 hora de São Paulo (UTC-3) — dentro do expediente
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    const dataHora = amanha.toISOString().split('T')[0] + 'T14:00:00-03:00';
+
     await request(app)
       .post('/api/agendamentos')
       .set('Authorization', `Bearer ${tokenB}`)
       .send({
-        clienteId: clienteRes.body._id,
-        servico: 'Corte',
-        data: new Date(Date.now() + 86400000).toISOString(),
-        duracao: 60,
-        preco: 25,
+        cliente: clienteRes.body._id,
+        dataHora,
       });
 
     // Tenant A não deve ver agendamentos do B

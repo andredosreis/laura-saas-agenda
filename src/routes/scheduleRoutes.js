@@ -1,6 +1,9 @@
 import express from 'express';
+import { authenticate } from '../middlewares/auth.js';
 import { getSchedules, updateSchedule, getAvailableSlots } from '../controllers/scheduleController.js';
 const router = express.Router();
+
+router.use(authenticate);
 
 // Rota para buscar todos os horários
 router.get('/', getSchedules);

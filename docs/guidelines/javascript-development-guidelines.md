@@ -328,7 +328,11 @@ async function processPayment(tenantId, amount) {
 app.use((err, req, res, next) => {
   const status = err.statusCode || 500;
   logger.error({ err, path: req.path }, err.message);
-  res.status(status).json({ error: err.code, message: err.message });
+  // Contrato fixo: { success, error } — nunca expor stack trace ao cliente
+  res.status(status).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Erro interno do servidor' : err.message,
+  });
 });
 ```
 
@@ -876,7 +880,7 @@ async function processOrder(order) {
 // Mau: lógica de negócio no controller
 app.post('/api/appointments', async (req, res) => {
   const conflict = await Appointment.findOne({ date: req.body.date });
-  if (conflict) return res.status(409).json({ error: 'Conflict' });
+  if (conflict) return res.status(409).json({ success: false, error: 'Conflict' });
   const appt = await Appointment.create(req.body);
   await sendWhatsAppConfirmation(appt);
   res.json(appt);

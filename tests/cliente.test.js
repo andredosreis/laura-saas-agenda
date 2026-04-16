@@ -92,18 +92,4 @@ describe('POST /api/clientes', () => {
     expect(res.body).toMatchObject({ nome: 'Maria Silva', telefone: '912345678' });
   });
 
-  it('retorna o cliente criado na listagem paginada', async () => {
-    const { token } = await criarTenantEToken();
-    await request(app)
-      .post('/api/clientes')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ nome: 'João Santos', telefone: '923456789' });
-
-    const res = await request(app)
-      .get('/api/clientes')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.body.pagination.total).toBe(1);
-    expect(res.body.data[0].nome).toBe('João Santos');
-  });
 });

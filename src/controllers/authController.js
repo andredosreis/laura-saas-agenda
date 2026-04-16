@@ -404,9 +404,10 @@ export const refreshToken = async (req, res) => {
         const newAccessToken = generateAccessToken(user, tenant);
         const newRefreshToken = generateRefreshToken(user);
 
-        // Atualizar refresh token no banco (rotação de token)
+        // Atualizar refresh token no banco (rotação de token) — duas operações separadas
+        // para evitar conflito MongoDB ao usar $pull e $push no mesmo campo
+        await User.findByIdAndUpdate(user._id, { $pull: { refreshTokens: { token } } });
         await User.findByIdAndUpdate(user._id, {
-            $pull: { refreshTokens: { token } },
             $push: {
                 refreshTokens: {
                     token: newRefreshToken,

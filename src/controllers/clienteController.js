@@ -33,6 +33,13 @@ export const getAllClientes = async (req, res) => {
 export const createCliente = async (req, res) => {
   try {
     const { Cliente } = req.models;
+    const telefone = req.body.telefone ? String(req.body.telefone).replace(/[^\d]/g, '') : undefined;
+    if (telefone) {
+      const existente = await Cliente.findOne({ tenantId: req.tenantId, telefone });
+      if (existente) {
+        return res.status(400).json({ message: 'Já existe um cliente com este telefone ou outro campo único.' });
+      }
+    }
     const novoCliente = new Cliente({
       ...req.body,
       tenantId: req.tenantId

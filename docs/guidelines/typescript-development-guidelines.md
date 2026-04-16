@@ -221,10 +221,10 @@ type AsyncState<T> =
 ### 6.1 Signatures
 ```ts
 // Tipos de retorno explícitos em funções públicas
-async function fetchAppointments(tenantId: TenantId): Promise<Appointment[]> {
-  const response = await fetch(`/api/agendamentos?tenantId=${tenantId}`);
-  if (!response.ok) throw new ApiError('Failed to fetch appointments', response.status);
-  return response.json() as Promise<Appointment[]>;
+// Nunca usar fetch directamente — sempre via api.js (tem interceptors de auth + refresh)
+async function fetchAppointments(params: { start: string; end: string }): Promise<Appointment[]> {
+  const { data } = await api.get<Appointment[]>('/agendamentos', { params });
+  return data;
 }
 
 // Parâmetros com objeto quando há mais de 3
@@ -386,20 +386,20 @@ async function sendNotifications(userIds: UserId[]): Promise<void> {
 
 ### 8.2 Cancelamento com AbortController
 ```ts
-// Cancelar fetch quando componente desmonta
+// Cancelar request quando componente desmonta — usar CancelToken do axios
 function useAppointments(tenantId: TenantId) {
   const [data, setData] = React.useState<Appointment[]>([]);
 
   React.useEffect(() => {
     const controller = new AbortController();
 
-    fetch(`/api/agendamentos?tenantId=${tenantId}`, {
+    api.get<Appointment[]>('/agendamentos', {
+      params: { tenantId },
       signal: controller.signal,
     })
-      .then((r) => r.json())
-      .then(setData)
+      .then((r) => setData(r.data))
       .catch((err) => {
-        if (err.name !== 'AbortError') console.error(err);
+        if (err.name !== 'CanceledError') console.error(err);
       });
 
     return () => controller.abort(); // cleanup ao desmontar
@@ -565,11 +565,15 @@ jest.mock('../services/appointment-service', () => ({
   createAppointment: jest.fn().mockResolvedValue({ id: '1' }),
 }));
 
-// Mock de fetch nativo
-global.fetch = jest.fn().mockResolvedValue({
-  ok: true,
-  json: async () => ({ data: [] }),
-} as Response);
+// Mock do api.js (axios) — nunca mockar fetch directamente
+jest.mock('../services/api', () => ({
+  default: {
+    get: jest.fn().mockResolvedValue({ data: [] }),
+    post: jest.fn().mockResolvedValue({ data: {} }),
+    put: jest.fn().mockResolvedValue({ data: {} }),
+    delete: jest.fn().mockResolvedValue({}),
+  },
+}));
 
 // Limpar entre testes
 afterEach(() => jest.clearAllMocks());
@@ -912,9 +916,8 @@ function Clientes() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/clientes?q=${search}`)
-      .then(r => r.json())
-      .then(data => { setClientes(data); setLoading(false); });
+    api.get('/clientes', { params: { search } })
+      .then(r => { setClientes(r.data); setLoading(false); });
   }, [search]);
 
   // ... 100 linhas de UI
