@@ -1,10 +1,20 @@
 {
   "version": 1,
   "skills": {
+    "e2e-nav-test": {
+      "source": "devfullcycle/skills-mba",
+      "sourceType": "github",
+      "computedHash": "c14acc9d6b8f6073015530f9c5f382abd45cc30efb960a687f4bfbc2c32ee88c"
+    },
     "nodejs-backend-patterns": {
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "c6a99966c2565acc388e574039127abc770bb9a3338be761e421e16f023f702b"
+    },
+    "test-guide": {
+      "source": "devfullcycle/skills-mba",
+      "sourceType": "github",
+      "computedHash": "c31f6b6708cffc685a7777314c03190e4b14c8c000a75e14a0bb826fb566d8b3"
     },
     "typescript-advanced-types": {
       "source": "wshobson/agents",

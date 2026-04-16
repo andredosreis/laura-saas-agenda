@@ -2,61 +2,48 @@
 
 ## Project Stack
 
-**User-Specified Libraries**:
-- **Web Framework**: Express (v4.19) - Minimal HTTP framework for Node.js - https://expressjs.com
-- **ODM**: Mongoose (v8.x) - MongoDB object modeling for Node.js - https://mongoosejs.com
-- **Testing**: Jest (v29.x) - JavaScript testing framework with built-in mocking - https://jestjs.io
-- **Logging**: Pino (v9.x) - Low-overhead structured JSON logger - https://getpino.io
-- **HTTP Client**: Axios (v1.x) - Promise-based HTTP client - https://axios-http.com
-- **Validation**: Joi (v17.x) - Schema validation library - https://joi.dev
-
 **Auto-Populated Essential Tools**:
-- **Formatting**: Prettier (v3.x) - Opinionated code formatter - https://prettier.io
+- **Testing**: Jest (v29.7) - JavaScript testing framework with built-in mocking and coverage - https://jestjs.io
+- **Formatting**: Prettier (v3.2) - Opinionated code formatter with zero config - https://prettier.io
 - **Linting**: ESLint (v9.x) - Pluggable JavaScript linter - https://eslint.org
-- **Build Tool**: npm (v10.x) - Node.js package manager - https://npmjs.com
+- **Logging**: pino (v9.x) - Very low overhead Node.js logger - https://getpino.io
+- **Build Tool**: npm (v10) - Node.js package manager, bundled with Node.js
 
-> All code examples use Node.js standard library or language-native features.
-> Principles apply regardless of framework choices.
+> **Note**: All code examples in this guideline use standard JavaScript or Node.js built-in features.
+> Principles apply regardless of framework or library choices.
 
 ---
 
 ## 1. Core Principles
 
 ### 1.1 Philosophy and Style
+- Use `strict mode` implicitly via ES Modules (`import`/`export`)
 - Prefer `const` over `let`; never use `var`
-- Use ES Modules (`import`/`export`) over CommonJS when possible
-- Async/await over raw Promises or callbacks
-- Fail fast: validate inputs at system boundaries
-- One file, one responsibility
+- Enforce style automatically with ESLint + Prettier — no manual debates
+- Prefer async/await over raw Promises; Promises over callbacks
 
-```js
-// Ferramentas obrigatórias em todo projeto
-// .prettierrc
-{
-  "semi": true,
-  "singleQuote": true,
-  "printWidth": 100,
-  "trailingComma": "es5"
-}
+### 1.2 Clarity over Brevity
+- Names communicate intent: `getUserById` not `getU` or `fetch`
+- Avoid one-letter variables outside of loop counters
+- Self-documenting code reduces comment noise
+- No clever hacks: prefer obvious over smart
 
-// .eslintrc.json
-{
-  "env": { "node": true, "es2022": true },
-  "extends": ["eslint:recommended"],
-  "parserOptions": { "ecmaVersion": "latest", "sourceType": "module" },
-  "rules": {
-    "no-unused-vars": "error",
-    "no-console": "warn",
-    "prefer-const": "error"
-  }
-}
+### 1.3 Toolchain Setup
+```bash
+# Prettier
+npm install --save-dev prettier
+echo '{ "singleQuote": true, "semi": true, "printWidth": 100 }' > .prettierrc
+
+# ESLint (v9 flat config)
+npm install --save-dev eslint @eslint/js
+cat > eslint.config.js << 'EOF'
+import js from '@eslint/js';
+export default [
+  js.configs.recommended,
+  { rules: { 'no-unused-vars': 'error', 'no-console': 'warn' } },
+];
+EOF
 ```
-
-### 1.2 Clarity Over Brevity
-- Names communicate intent: `getUserById` not `getU`
-- Avoid clever one-liners when a clear multi-line version exists
-- Extract magic numbers to named constants
-- Keep functions under 30 lines; if longer, extract
 
 ---
 
@@ -66,26 +53,20 @@
 ```bash
 mkdir my-project && cd my-project
 npm init -y
-node --version   # verify >= 18.x LTS
-npm pkg set type="module"
-npm pkg set engines.node=">=18.0.0"
-
-# Configurar ferramentas essenciais
-npm install --save-dev prettier eslint
-npx eslint --init
-echo '{}' > .prettierrc
+npm pkg set type="module"          # enable ES Modules
+npm pkg set engines.node=">=20"    # enforce minimum Node.js version
 ```
 
 ### 2.2 Dependency Management
 ```bash
-npm install <package>             # dependency
-npm install --save-dev <package>  # dev dependency
-npm uninstall <package>
-npm update
-npm outdated                      # listar pacotes desatualizados
-npm audit                         # verificar vulnerabilidades
-npm audit fix                     # corrigir automaticamente
-npm ci                            # install determinístico (CI/CD)
+npm install <package>              # runtime dependency
+npm install --save-dev <package>   # dev-only dependency
+npm uninstall <package>            # remove package
+npm update                         # update within current semver ranges
+npm outdated                       # list packages with newer versions
+npm audit                          # check known vulnerabilities
+npm audit fix                      # auto-fix safe patches
+npm ci                             # clean install from lock file (use in CI)
 ```
 
 ---
@@ -95,43 +76,37 @@ npm ci                            # install determinístico (CI/CD)
 ```
 my-project/
 ├── src/
-│   ├── server.js           # entry point
-│   ├── app.js              # Express setup / framework bootstrap
-│   ├── controllers/        # request handlers
-│   ├── services/           # business logic
-│   ├── models/             # data models / schemas
-│   ├── middlewares/        # Express middlewares
-│   ├── routes/             # route definitions
-│   ├── config/             # configuration loaders
-│   └── utils/              # pure helper functions
+│   ├── index.js            # Application entry point
+│   ├── routes/             # HTTP route definitions
+│   ├── controllers/        # Request/response handling
+│   ├── services/           # Business logic (pure, testable)
+│   ├── models/             # Data models / DB schemas
+│   ├── middlewares/        # HTTP middleware functions
+│   ├── utils/              # Pure helper functions without side effects
+│   └── config/             # Environment and app configuration
 ├── tests/
-│   ├── unit/
-│   └── integration/
-├── scripts/
-│   ├── maintenance/
-│   └── tools/
-├── docs/
-├── .env.example
-├── .eslintrc.json
+│   ├── unit/               # Unit tests (mirror src/ structure)
+│   └── integration/        # Integration tests against real services
+├── .env.example            # Environment variable template (committed)
+├── .env                    # Actual secrets (gitignored)
+├── eslint.config.js
 ├── .prettierrc
 ├── jest.config.js
 ├── package.json
 └── README.md
 ```
 
-**Rules**:
-- `controllers/` never contain business logic — delegate to `services/`
-- `services/` never import from `controllers/` or `routes/`
-- `utils/` contains only pure functions with no side effects
-- Configuration is loaded once in `config/` and injected
-
 ---
 
 ## 4. Container Development (Docker)
 
-### 4.1 Dockerfile (Development)
+### 4.1 Container Philosophy
+Every Node.js project should run in Docker to guarantee a consistent Node.js version
+and OS environment across all developers and CI pipelines.
+
+### 4.2 Dockerfile (Development)
 ```dockerfile
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -140,64 +115,69 @@ RUN npm ci
 
 COPY . .
 
-EXPOSE 3000
-
-CMD ["node", "--watch", "src/server.js"]
+CMD ["sleep", "infinity"]
 ```
 
-### 4.2 Docker Compose
+### 4.3 docker-compose.yaml
 ```yaml
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
     volumes:
       - .:/app
       - /app/node_modules
-    environment:
-      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
     depends_on:
-      mongo:
+      db:
         condition: service_healthy
 
-  mongo:
-    image: mongo:7-jammy
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppass
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "pg_isready -U appuser"]
+      interval: 5s
       retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
 volumes:
-  mongo_data:
+  pgdata:
 ```
 
-### 4.3 .dockerignore
+### 4.4 .dockerignore
 ```
 node_modules
-npm-debug.log
-.env
 .git
-.gitignore
+.env
+*.log
 coverage/
 dist/
-*.md
 ```
 
-### 4.4 Essential Commands
-| Command | Description |
-|---------|-------------|
-| `docker compose up -d` | Start all services |
-| `docker compose logs -f app` | Follow app logs |
-| `docker compose exec app node src/server.js` | Run app manually |
-| `docker compose exec app npm test` | Run tests |
-| `docker compose exec app sh` | Interactive shell |
-| `docker compose down -v` | Stop and remove volumes |
+### 4.5 Essential Commands
+
+| Action | Command |
+|--------|---------|
+| Start environment | `docker compose up -d` |
+| View logs | `docker compose logs -f app` |
+| Run application | `docker compose exec app node src/index.js` |
+| Run tests | `docker compose exec app npm test` |
+| Interactive shell | `docker compose exec app sh` |
+| Stop environment | `docker compose down` |
+| Rebuild image | `docker compose build --no-cache` |
+
+### 4.6 Best Practices
+- Pin the Node.js version (`node:22-alpine`, never `node:latest`)
+- Mount `node_modules` as an anonymous volume to prevent host/container conflicts
+- Use `env_file` in compose — never hardcode env vars directly
+- Use `npm ci` inside containers, not `npm install`
 
 ---
 
@@ -205,26 +185,27 @@ dist/
 
 | Element | Convention | Example |
 |---------|-----------|---------|
-| Files | kebab-case | `user-service.js` |
-| Variables | camelCase | `userId`, `totalAmount` |
-| Functions | camelCase | `getUserById()` |
-| Classes | PascalCase | `UserService` |
-| Constants | UPPER_SNAKE_CASE | `MAX_RETRIES` |
-| Modules/Packages | kebab-case | `auth-middleware` |
-| Env vars | UPPER_SNAKE_CASE | `MONGO_URI` |
-| Test files | `*.test.js` | `user.test.js` |
+| Files | `kebab-case` | `user-service.js`, `auth-middleware.js` |
+| Variables | `camelCase` | `userId`, `maxRetries` |
+| Functions | `camelCase` | `getUserById`, `formatDate` |
+| Classes | `PascalCase` | `UserRepository`, `HttpClient` |
+| Constants | `SCREAMING_SNAKE_CASE` | `MAX_RETRIES`, `DB_TIMEOUT_MS` |
+| Modules/dirs | `kebab-case` | `user-service/`, `rate-limiter.js` |
+| Booleans | `is/has/can` prefix | `isActive`, `hasPermission`, `canEdit` |
+| Event handlers | `on` prefix | `onUserCreated`, `onError` |
 
-```js
-// Bom
-const MAX_LOGIN_ATTEMPTS = 5;
-const userId = req.params.id;
-async function findUserByEmail(email) { ... }
-class AuthService { ... }
+```javascript
+// Good
+const MAX_RETRIES = 3;
+const isUserActive = user.status === 'active';
+function calculateTotalPrice(items) { /* ... */ }
+class OrderService { /* ... */ }
 
-// Mau
-const x = 5;
-const USERID = req.params.id;
-async function FINDuser(e) { ... }
+// Bad
+const x = 3;
+const active = user.status === 'active';
+function calc(i) { /* ... */ }
+class orderservice { /* ... */ }
 ```
 
 ---
@@ -232,77 +213,74 @@ async function FINDuser(e) { ... }
 ## 6. Functions and Methods
 
 ### 6.1 Signatures
-```js
-// Parâmetros claros, sem mais de 3-4 positional args
-async function createAppointment(clientId, date, serviceId) {
-  const client = await Client.findById(clientId);
-  if (!client) throw new NotFoundError(`Client ${clientId} not found`);
+```javascript
+// Named arrow functions for short, pure operations
+const formatCurrency = (amount, currency = 'USD') =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+
+// Named function declarations for complex logic (better stack traces)
+async function createUser(name, email, options = {}) {
+  const { role = 'user', sendWelcome = true } = options;
   // ...
 }
 
-// Quando há muitos parâmetros, usar objeto
-async function sendNotification({ userId, message, channel = 'push', priority = 'normal' }) {
+// Destructure when params exceed 3
+async function sendEmail({ to, subject, body, attachments = [] }) {
   // ...
 }
 ```
 
 ### 6.2 Returns and Errors
 
-**Bom:**
-```js
-async function getUserById(id) {
-  const user = await User.findById(id);
-  if (!user) {
-    throw new NotFoundError(`User not found: ${id}`);
-  }
+```javascript
+// Good — explicit return, no hidden side effects, parameterized query
+async function findUser(id) {
+  if (!id) throw new Error('findUser: id is required');
+  const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+  return rows[0] ?? null;
+}
+
+// Bad — SQL injection, silent null on failure, no input check
+async function findUser(id) {
+  const user = await db.query('SELECT * FROM users WHERE id = ' + id);
   return user;
 }
 ```
 
-**Mau:**
-```js
-async function getUser(id) {
-  try {
-    const user = await User.findById(id);
-    return user; // retorna null silenciosamente sem aviso
-  } catch (err) {
-    // ignora erro completamente
-  }
-}
-```
-
 ### 6.3 Best Practices
-- Funções com uma única responsabilidade
-- Máximo 3-4 parâmetros posicionais; usar objeto para mais
-- Sem side effects escondidos (mutação de argumentos, variáveis globais)
-- Preferir funções puras para lógica de negócio; isolar I/O
-- Arrow functions para callbacks curtos; `function` para top-level e métodos
+- One function, one responsibility
+- Max 3-4 parameters; use an options object for more
+- Functions that modify external state should be clearly named (`updateUser`, not `getUser`)
+- Use default parameters instead of `if (!param) param = defaultValue`
+- Prefer early returns to reduce nesting
 
 ---
 
 ## 7. Error Handling
 
 ### 7.1 Philosophy
-JavaScript usa exceções (`throw`/`catch`) como mecanismo principal. O padrão recomendado é criar classes de erro customizadas para domínio de negócio.
+JavaScript uses exceptions and rejected Promises. In async code, always use
+try/catch with async/await. Create custom Error subclasses for domain errors.
 
-```js
-// classes de erro customizadas
-export class AppError extends Error {
+```javascript
+// Custom error hierarchy
+class AppError extends Error {
   constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
     super(message);
     this.name = this.constructor.name;
     this.statusCode = statusCode;
     this.code = code;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
-export class NotFoundError extends AppError {
-  constructor(message) {
-    super(message, 404, 'NOT_FOUND');
+class NotFoundError extends AppError {
+  constructor(resource, id) {
+    super(`${resource} with id '${id}' not found`, 404, 'NOT_FOUND');
   }
 }
 
-export class ValidationError extends AppError {
+class ValidationError extends AppError {
   constructor(message) {
     super(message, 400, 'VALIDATION_ERROR');
   }
@@ -311,122 +289,109 @@ export class ValidationError extends AppError {
 
 ### 7.2 Conventions
 
-**Bom:**
-```js
-async function processPayment(tenantId, amount) {
-  const tenant = await Tenant.findById(tenantId);
-  if (!tenant) {
-    throw new NotFoundError(`Tenant not found: ${tenantId}`);
+```javascript
+// Good — contextual, rethrows known errors, wraps unknowns
+async function getOrder(orderId) {
+  try {
+    const order = await db.findOrder(orderId);
+    if (!order) throw new NotFoundError('Order', orderId);
+    return order;
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(`getOrder failed: ${err.message}`);
   }
-  if (amount <= 0) {
-    throw new ValidationError(`Invalid amount: ${amount}`);
-  }
-  // ...
 }
 
-// Global error handler (Express)
-app.use((err, req, res, next) => {
-  const status = err.statusCode || 500;
-  logger.error({ err, path: req.path }, err.message);
-  // Contrato fixo: { success, error } — nunca expor stack trace ao cliente
-  res.status(status).json({
-    success: false,
-    error: process.env.NODE_ENV === 'production' ? 'Erro interno do servidor' : err.message,
-  });
-});
-```
-
-**Mau:**
-```js
-async function processPayment(tenantId, amount) {
+// Bad — silent failure, caller never knows what happened
+async function getOrder(orderId) {
   try {
-    const tenant = await Tenant.findById(tenantId);
-    // continua mesmo se tenant for null
-    const result = await charge(tenant.stripeId, amount);
+    return await db.findOrder(orderId);
   } catch (e) {
-    console.log(e); // engole erro sem propagar
+    return null;
   }
 }
 ```
 
 ### 7.3 Best Practices
-- Nunca ignorar erros em `catch` silenciosamente
-- Adicionar contexto: IDs, valores, operação que falhou
-- Erros de domínio com `statusCode` para facilitar respostas HTTP
-- Logar erros apenas nas fronteiras de I/O (controllers, não em services)
-- Usar `process.on('unhandledRejection')` para capturar Promises não tratadas
-
-```js
-process.on('unhandledRejection', (reason, promise) => {
-  logger.fatal({ reason }, 'Unhandled promise rejection — shutting down');
+- Never use empty catch blocks
+- Wrap third-party errors with context (operation name, relevant IDs)
+- Handle unhandled rejections globally:
+```javascript
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ reason }, 'Unhandled Promise rejection — shutting down');
   process.exit(1);
 });
 ```
+- Log errors once at the I/O boundary — not in every layer of the call stack
 
 ---
 
 ## 8. Concurrency and Parallelism
 
 ### 8.1 Concurrency Model
-JavaScript usa um único thread com Event Loop. Concorrência é obtida via `async`/`await` e Promises — operações I/O são não-bloqueantes; CPU-intensive deve ser delegado a `worker_threads`.
+Node.js runs JavaScript on a single thread via an event loop. I/O is non-blocking.
+CPU-intensive tasks must be offloaded to Worker Threads to avoid blocking the event loop.
 
-```js
-// Execução sequencial (lenta)
-const user = await User.findById(id);
-const orders = await Order.find({ userId: id });
-
-// Execução paralela (rápida)
+```javascript
+// Run independent async operations in parallel
 const [user, orders] = await Promise.all([
-  User.findById(id),
-  Order.find({ userId: id }),
+  userService.findById(userId),
+  orderService.findByUser(userId),
 ]);
 
-// Promise.allSettled — quando falhas parciais são aceitáveis
-const results = await Promise.allSettled([
-  sendEmail(user.email),
-  sendPush(user.deviceToken),
-]);
-results.forEach((r) => {
-  if (r.status === 'rejected') logger.warn({ reason: r.reason }, 'Notification failed');
-});
-```
-
-### 8.2 Timeouts e Cancellation
-```js
-// Timeout com AbortController (Node.js 18+)
-async function fetchWithTimeout(url, ms = 5000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ms);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    return await res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-```
-
-### 8.3 Common Pitfalls
-```js
-// Mau: await dentro de loop (sequencial)
-for (const id of ids) {
-  await processItem(id); // processa um de cada vez
-}
-
-// Bom: paralelo com limite de concorrência
+// Controlled concurrency — limit to N simultaneous operations
 import pLimit from 'p-limit';
-const limit = pLimit(5); // máximo 5 simultâneos
-await Promise.all(ids.map((id) => limit(() => processItem(id))));
+const limit = pLimit(5);
+const results = await Promise.all(
+  ids.map((id) => limit(() => processItem(id)))
+);
+```
 
-// Mau: não aguardar Promise em event handler
-emitter.on('data', async (data) => {
-  await save(data); // erro não capturado
-});
+### 8.2 Worker Threads for CPU-Bound Work
+```javascript
+// main.js
+import { Worker } from 'worker_threads';
 
-// Bom: capturar erros em handlers assíncronos
-emitter.on('data', (data) => {
-  save(data).catch((err) => logger.error({ err }, 'Save failed'));
-});
+function runWorker(data) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker('./worker.js', { workerData: data });
+    worker.on('message', resolve);
+    worker.on('error', reject);
+  });
+}
+
+// worker.js
+import { workerData, parentPort } from 'worker_threads';
+const result = heavyComputation(workerData);
+parentPort.postMessage(result);
+```
+
+### 8.3 Best Practices
+- Use `Promise.all` for parallel I/O; never `await` inside a `for` loop
+- Use `Promise.allSettled` when partial failure is acceptable
+- Add timeouts to all async operations using `AbortController`
+- Offload CPU work (hashing, image processing, large JSON parsing) to Worker Threads
+- Drain in-flight requests before shutting down (`SIGTERM` handler)
+
+### 8.4 Common Pitfalls
+```javascript
+// Bad — sequential when parallel is possible
+for (const id of ids) {
+  await processItem(id); // one full round-trip per item
+}
+
+// Good — parallel
+await Promise.all(ids.map((id) => processItem(id)));
+
+// Bad — fire-and-forget drops errors silently
+function doWork() {
+  saveToDb(data); // unhandled rejection if this fails
+}
+
+// Good
+async function doWork() {
+  await saveToDb(data);
+}
 ```
 
 ---
@@ -434,74 +399,59 @@ emitter.on('data', (data) => {
 ## 9. Unit Tests
 
 ### 9.1 Structure
-```js
-// tests/unit/user-service.test.js
+```javascript
+// tests/unit/services/user-service.test.js
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { UserService } from '../../src/services/user-service.js';
+import { createUser } from '../../../src/services/user-service.js';
 
-describe('UserService', () => {
-  let service;
+describe('createUser', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-  beforeEach(() => {
-    service = new UserService();
+  it('returns created user with generated id', async () => {
+    const user = await createUser({ name: 'Alice', email: 'alice@example.com' });
+    expect(user).toMatchObject({ name: 'Alice', email: 'alice@example.com' });
+    expect(user.id).toBeDefined();
   });
 
-  describe('getUserById', () => {
-    it('returns user when found', async () => {
-      // arrange
-      const mockUser = { id: '1', name: 'André' };
-      jest.spyOn(service.repo, 'findById').mockResolvedValue(mockUser);
-
-      // act
-      const result = await service.getUserById('1');
-
-      // assert
-      expect(result).toEqual(mockUser);
-    });
-
-    it('throws NotFoundError when user does not exist', async () => {
-      jest.spyOn(service.repo, 'findById').mockResolvedValue(null);
-      await expect(service.getUserById('999')).rejects.toThrow('User not found: 999');
-    });
+  it('throws ValidationError when email is missing', async () => {
+    await expect(createUser({ name: 'Alice' })).rejects.toThrow('email is required');
   });
 });
 ```
 
 ### 9.2 Table-Driven Tests
-```js
-describe('validateAmount', () => {
-  const cases = [
-    { input: 100,  expected: true,  label: 'valid positive amount' },
-    { input: 0,    expected: false, label: 'zero is invalid' },
-    { input: -50,  expected: false, label: 'negative is invalid' },
-    { input: null, expected: false, label: 'null is invalid' },
-  ];
-
-  it.each(cases)('$label', ({ input, expected }) => {
-    expect(validateAmount(input)).toBe(expected);
+```javascript
+describe('formatCurrency', () => {
+  it.each([
+    [1000,  'USD', '$1,000.00'],
+    [0,     'USD', '$0.00'],
+    [-50,   'EUR', '-€50.00'],
+  ])('formats %d %s as %s', (amount, currency, expected) => {
+    expect(formatCurrency(amount, currency)).toBe(expected);
   });
 });
 ```
 
 ### 9.3 Assertions
-```js
-expect(value).toBe(42);                      // igualdade primitiva
-expect(obj).toEqual({ name: 'André' });       // igualdade profunda
+```javascript
+expect(value).toBe(42);                          // strict equality (===)
+expect(value).toEqual({ id: 1, name: 'Alice' }); // deep equality
 expect(arr).toHaveLength(3);
 expect(fn).toThrow('error message');
-expect(asyncFn).rejects.toThrow(NotFoundError);
-expect(mock).toHaveBeenCalledWith('arg1');
-expect(mock).toHaveBeenCalledTimes(1);
+expect(asyncFn()).rejects.toThrow(NotFoundError);
+expect(obj).toMatchObject({ name: 'Alice' });    // partial match
+expect(spy).toHaveBeenCalledWith('expected-arg');
+expect(spy).toHaveBeenCalledTimes(1);
 ```
 
 ### 9.4 Commands
 ```bash
-npm test                               # todos os testes
-npm test -- --testPathPattern=user     # testes de um ficheiro
-npm test -- --coverage                 # com cobertura
-npm test -- --verbose                  # output detalhado
-npm test -- --watch                    # modo watch
-npm test -- --testNamePattern="login"  # por nome de teste
+npm test                                        # run all tests
+npm test -- --testPathPattern=user-service      # run by file pattern
+npm test -- --coverage                          # run with coverage report
+npm test -- --verbose                           # detailed test output
+npm test -- --watch                             # watch mode for TDD
+npm test -- --testNamePattern="creates user"    # run by test name
 ```
 
 ---
@@ -509,51 +459,54 @@ npm test -- --testNamePattern="login"  # por nome de teste
 ## 10. Mocks and Testability
 
 ### 10.1 Mock Strategies
-```js
-// jest.fn() — mock de função simples
-const mockSend = jest.fn().mockResolvedValue({ messageId: 'abc' });
-
-// jest.spyOn() — espiar método real
-jest.spyOn(console, 'error').mockImplementation(() => {});
-
-// jest.mock() — mock de módulo inteiro
-jest.mock('../../src/services/email-service.js', () => ({
-  sendEmail: jest.fn().mockResolvedValue(true),
+```javascript
+// Module mock — replace entire module
+jest.mock('../../../src/db/client.js', () => ({
+  query: jest.fn(),
 }));
+
+// Spy — wrap real implementation, track calls
+import * as mailer from '../../../src/services/mailer.js';
+jest.spyOn(mailer, 'sendEmail').mockResolvedValue({ messageId: 'test-id' });
+
+// Cleanup between tests
+afterEach(() => jest.clearAllMocks());
 ```
 
-### 10.2 Dependency Injection para Testabilidade
-```js
-// Estruturar com injeção em vez de imports diretos
-export class AppointmentService {
-  constructor({ appointmentRepo, notificationService }) {
-    this.appointmentRepo = appointmentRepo;
-    this.notificationService = notificationService;
-  }
-
-  async create(data) {
-    const appt = await this.appointmentRepo.create(data);
-    await this.notificationService.send(appt);
-    return appt;
-  }
+### 10.2 Dependency Injection for Testability
+```javascript
+// Hard to test — direct import couples to real dependency
+import db from '../db/client.js';
+export async function getUser(id) {
+  return db.query('SELECT * FROM users WHERE id = $1', [id]);
 }
 
-// No teste: injectar dependências falsas
-const service = new AppointmentService({
-  appointmentRepo: { create: jest.fn().mockResolvedValue(mockAppt) },
-  notificationService: { send: jest.fn() },
-});
+// Testable — inject dependency through factory
+export function createUserService({ db }) {
+  return {
+    async getUser(id) {
+      const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+      return rows[0] ?? null;
+    },
+  };
+}
+// In tests: createUserService({ db: { query: jest.fn().mockResolvedValue({ rows: [] }) } })
 ```
 
-### 10.3 Limpar Mocks
-```js
-afterEach(() => {
-  jest.clearAllMocks();  // limpa calls e instances
-});
+### 10.3 Test Doubles
+```javascript
+// Stub — fixed, predictable return value
+const dbStub = { query: jest.fn().mockResolvedValue({ rows: [{ id: 1 }] }) };
 
-afterAll(() => {
-  jest.restoreAllMocks(); // restaura implementações originais
-});
+// Fake — lightweight working in-memory implementation
+const fakeCache = new Map();
+const cacheService = {
+  get: (key) => fakeCache.get(key) ?? null,
+  set: (key, val) => fakeCache.set(key, val),
+};
+
+// Spy — capture calls without altering behavior
+const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 ```
 
 ---
@@ -561,7 +514,29 @@ afterAll(() => {
 ## 11. Integration Tests
 
 ### 11.1 Structure and Organization
-```js
+```javascript
+// tests/integration/user-api.test.js
+describe('[integration] POST /api/users', () => {
+  let server;
+  beforeAll(async () => { server = await startTestServer(); });
+  afterAll(async () => { await server.close(); });
+  beforeEach(async () => { await db.query('DELETE FROM users'); });
+
+  it('creates a user and returns 201', async () => {
+    const res = await fetch('http://localhost:3001/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Alice', email: 'alice@test.com' }),
+    });
+    const body = await res.json();
+    expect(res.status).toBe(201);
+    expect(body).toMatchObject({ name: 'Alice' });
+  });
+});
+```
+
+### 11.2 Selective Execution
+```javascript
 // jest.config.js
 export default {
   projects: [
@@ -570,52 +545,26 @@ export default {
   ],
 };
 ```
-
-```js
-// tests/integration/auth.test.js
-import request from 'supertest';
-import { app } from '../../src/app.js';
-import { connectTestDB, disconnectTestDB } from '../setup.js';
-
-beforeAll(() => connectTestDB());
-afterAll(() => disconnectTestDB());
-
-describe('POST /api/auth/login', () => {
-  it('returns 200 and token on valid credentials', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'test@example.com', password: 'secret' });
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
-  });
-});
-```
-
-### 11.2 Selective Execution
 ```bash
-npm test -- --selectProjects unit         # só unit tests
-npm test -- --selectProjects integration  # só integration tests
-NODE_ENV=test npm test                    # com env de test
+npx jest --selectProjects unit          # unit tests only
+npx jest --selectProjects integration   # integration tests only
 ```
 
-### 11.3 Real Dependencies com mongodb-memory-server
-```js
-// tests/setup.js
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import mongoose from 'mongoose';
+### 11.3 Real Dependencies with Testcontainers
+```bash
+npm install --save-dev @testcontainers/postgresql
+```
+```javascript
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
 
-let mongoServer;
+let container;
+beforeAll(async () => {
+  container = await new PostgreSqlContainer('postgres:16-alpine').start();
+  process.env.DATABASE_URL = container.getConnectionUri();
+  await runMigrations();
+}, 30_000);
 
-export async function connectTestDB() {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri());
-}
-
-export async function disconnectTestDB() {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-}
+afterAll(() => container.stop());
 ```
 
 ---
@@ -623,130 +572,143 @@ export async function disconnectTestDB() {
 ## 12. Load and Stress Tests
 
 ### 12.1 Tools
-| Tool | Use Case | Install |
-|------|----------|---------|
-| Artillery | HTTP load testing | `npm install -g artillery` |
-| k6 | Scripted load tests | `brew install k6` |
-| autocannon | Quick Node.js benchmarks | `npm install -g autocannon` |
-
-### 12.2 Artillery Config
-```yaml
-# artillery.yml
-config:
-  target: "http://localhost:3000"
-  phases:
-    - duration: 60
-      arrivalRate: 10
-      name: "Warm up"
-    - duration: 120
-      arrivalRate: 50
-      name: "Load"
-
-scenarios:
-  - name: "Create appointment"
-    flow:
-      - post:
-          url: "/api/agendamentos"
-          json:
-            clientId: "{{ $randomString() }}"
-            date: "2026-05-01"
-```
+- **k6** — scriptable load testing (JavaScript syntax, runs as standalone binary)
+- **autocannon** — HTTP/1.1 benchmarking tool built for Node.js
+- **artillery** — YAML/JS-defined scenarios, supports HTTP and WebSockets
 
 ```bash
-artillery run artillery.yml
-artillery run --output results.json artillery.yml
-artillery report results.json
+npm install -g autocannon
+autocannon -c 100 -d 30 http://localhost:3000/api/users
 ```
 
-### 12.3 Quick Benchmark
+### 12.2 k6 Load Script
+```javascript
+// load-tests/users.js — runs with k6 binary, not Node.js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export const options = {
+  stages: [
+    { duration: '30s', target: 50 },
+    { duration: '1m',  target: 100 },
+    { duration: '20s', target: 0 },
+  ],
+  thresholds: { http_req_failed: ['rate<0.01'], http_req_duration: ['p(95)<500'] },
+};
+
+export default function () {
+  const res = http.get('http://localhost:3000/api/users');
+  check(res, { 'status 200': (r) => r.status === 200 });
+  sleep(1);
+}
+```
 ```bash
-autocannon -c 10 -d 30 http://localhost:3000/api/health
-# -c: connections simultâneas
-# -d: duração em segundos
+k6 run load-tests/users.js
+```
+
+### 12.3 Concurrency Tests
+```javascript
+it('handles 50 concurrent requests without data corruption', async () => {
+  const requests = Array.from({ length: 50 }, (_, i) =>
+    createUser({ name: `User${i}`, email: `user${i}@test.com` })
+  );
+  const results = await Promise.allSettled(requests);
+  const failures = results.filter((r) => r.status === 'rejected');
+  expect(failures).toHaveLength(0);
+});
 ```
 
 ---
 
 ## 13. Profiling and Diagnostics
 
-### 13.1 CPU e Memory Profiling
+### 13.1 CPU and Memory Profiling
 ```bash
-# CPU profile com Node.js built-in
-node --prof src/server.js
+# Built-in CPU profiler
+node --prof src/index.js
 node --prof-process isolate-*.log > profile.txt
 
-# clinic.js — profiling visual
+# clinic.js — visual profiling suite
 npm install -g clinic
-clinic doctor -- node src/server.js
-clinic flame -- node src/server.js  # flamegraph
+clinic doctor -- node src/index.js      # event loop lag diagnosis
+clinic flame -- node src/index.js       # CPU flame graph
+clinic heapprofiler -- node src/index.js  # memory allocation tracking
 ```
 
-### 13.2 Memory Leaks
+### 13.2 Diagnostic Tools
 ```bash
-# Heap snapshot via Chrome DevTools
-node --inspect src/server.js
-# Abrir chrome://inspect no Chrome
+# Chrome DevTools inspector
+node --inspect src/index.js
+# Open chrome://inspect in Chrome browser
 
-# Verificar memory ao longo do tempo
-node --expose-gc src/server.js
-# Chamar global.gc() em intervalos e monitorar process.memoryUsage()
+# Heap snapshot for memory leak investigation
+node --expose-gc --inspect src/index.js
+
+# Flamegraph profiler
+npm install -g 0x
+0x -- node src/index.js
 ```
 
-### 13.3 Análise de Performance
-```js
-// Instrumentação básica
-const start = performance.now();
+### 13.3 Performance Measurement
+```javascript
+import { performance, PerformanceObserver } from 'perf_hooks';
+
+const obs = new PerformanceObserver((list) => {
+  list.getEntries().forEach((e) => console.log(`${e.name}: ${e.duration.toFixed(2)}ms`));
+});
+obs.observe({ entryTypes: ['measure'] });
+
+performance.mark('op:start');
 await heavyOperation();
-const ms = performance.now() - start;
-logger.info({ durationMs: ms }, 'heavyOperation completed');
+performance.mark('op:end');
+performance.measure('heavyOperation', 'op:start', 'op:end');
 ```
 
 ---
 
 ## 14. Benchmarks
 
-### 14.1 Benchmark com benchmark.js
+### 14.1 Writing Benchmarks
+```javascript
+import { performance } from 'perf_hooks';
+
+function benchmark(name, fn, iterations = 10_000) {
+  const start = performance.now();
+  for (let i = 0; i < iterations; i++) fn();
+  const elapsed = performance.now() - start;
+  console.log(`${name}: ${(elapsed / iterations).toFixed(4)}ms/op`);
+}
+
+benchmark('JSON.parse small', () => JSON.parse('{"id":1,"name":"Alice"}'));
+benchmark('Object spread',    () => ({ ...baseObj, extra: true }));
+```
+
+### 14.2 Structured Benchmarks with tinybench
 ```bash
-npm install --save-dev benchmark
+npm install --save-dev tinybench
+```
+```javascript
+import { Bench } from 'tinybench';
+const bench = new Bench({ time: 1000 });
+
+bench
+  .add('Array.push loop', () => {
+    const arr = [];
+    for (let i = 0; i < 100; i++) arr.push(i);
+  })
+  .add('Array.from', () => Array.from({ length: 100 }, (_, i) => i));
+
+await bench.run();
+console.table(bench.table());
 ```
 
-```js
-// benchmarks/string-concat.bench.js
-import Benchmark from 'benchmark';
-
-const suite = new Benchmark.Suite();
-
-suite
-  .add('Array join', () => {
-    const parts = ['Hello', ' ', 'World'];
-    parts.join('');
-  })
-  .add('Template literal', () => {
-    const a = 'Hello', b = 'World';
-    `${a} ${b}`;
-  })
-  .on('cycle', (event) => console.log(String(event.target)))
-  .on('complete', function () {
-    console.log('Fastest: ' + this.filter('fastest').map('name'));
-  })
-  .run();
-```
-
+### 14.3 Execution and Comparison
 ```bash
-node benchmarks/string-concat.bench.js
-```
+node benchmarks/string-ops.js
 
-### 14.2 Micro-benchmarks com `performance.timerify`
-```js
-import { performance, PerformanceObserver } from 'node:perf_hooks';
-
-const obs = new PerformanceObserver((list) => {
-  list.getEntries().forEach((e) => console.log(e.name, e.duration));
-});
-obs.observe({ entryTypes: ['function'] });
-
-const wrapped = performance.timerify(myFunction);
-wrapped('arg');
+# Compare across Node.js versions with nvm
+nvm use 20 && node benchmarks/string-ops.js
+nvm use 22 && node benchmarks/string-ops.js
 ```
 
 ---
@@ -754,52 +716,50 @@ wrapped('arg');
 ## 15. Optimization
 
 ### 15.1 Principles
-Medir antes de otimizar. Usar `performance.now()` ou `clinic.js` para identificar gargalos reais.
-
-```js
-// Mau: otimizar sem medir
-// Bom: instrumentar primeiro
-const t0 = performance.now();
-const result = await expensiveQuery();
-logger.debug({ durationMs: performance.now() - t0 }, 'expensiveQuery');
-```
+- Profile first — never optimize based on intuition
+- Bottleneck order: I/O latency > algorithmic complexity > memory > micro-opts
+- Document performance trade-offs in comments when code sacrifices readability
 
 ### 15.2 Common Optimizations
-```js
-// Cache de resultados frequentes (in-memory)
-const cache = new Map();
-async function getCachedUser(id) {
-  if (cache.has(id)) return cache.get(id);
-  const user = await User.findById(id);
-  cache.set(id, user);
-  return user;
-}
+```javascript
+// Pre-allocate arrays when size is known
+const results = new Array(items.length);
+for (let i = 0; i < items.length; i++) results[i] = transform(items[i]);
 
-// Lazy loading de módulos pesados
-async function generateReport() {
-  const { default: PDFKit } = await import('pdfkit');
-  // só carrega quando necessário
+// Memoize expensive pure functions
+const memo = new Map();
+function expensiveOp(key) {
+  if (memo.has(key)) return memo.get(key);
+  const result = compute(key);
+  memo.set(key, result);
+  return result;
 }
-
-// Evitar serialização desnecessária
-// Mau: JSON.parse(JSON.stringify(obj)) para clonar
-// Bom: structuredClone(obj) — nativo no Node 17+
-const copy = structuredClone(original);
 ```
 
-### 15.3 Event Loop
-```js
-// Operações CPU-intensas bloqueiam o Event Loop
-// Delegar a worker_threads
-import { Worker } from 'node:worker_threads';
+### 15.3 Memory Optimization
+```javascript
+// Process large files with streams — constant memory regardless of file size
+import { createReadStream } from 'fs';
+import { createInterface } from 'readline';
 
-function runInWorker(script, data) {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(script, { workerData: data });
-    worker.on('message', resolve);
-    worker.on('error', reject);
-  });
+const rl = createInterface({ input: createReadStream('large.csv') });
+for await (const line of rl) {
+  processLine(line);
 }
+
+// WeakMap for object-keyed caches — entries GC'd with their keys
+const cache = new WeakMap();
+```
+
+### 15.4 String and JSON Performance
+```javascript
+// Template literals for string building
+const url = `${baseUrl}/api/v1/${resource}/${id}`;
+
+// Cache repeated deep property lookups in hot loops
+const { length } = arr;
+const { status } = user;
+for (let i = 0; i < length; i++) { /* use status, not user.status each iteration */ }
 ```
 
 ---
@@ -807,46 +767,37 @@ function runInWorker(script, data) {
 ## 16. Security
 
 ### 16.1 Essential Practices
-- Nunca hardcodar secrets — usar variáveis de ambiente
-- Validar e sanitizar todo input externo
-- Usar HTTPS em produção (HSTS)
-- Rate limiting em rotas públicas
-- Atualizar dependências regularmente (`npm audit`)
-- Princípio do menor privilégio para credenciais de banco
-
-```js
-// Nunca fazer isto
-const query = `SELECT * FROM users WHERE id = ${req.params.id}`; // SQL injection
-
-// Sempre usar queries parametrizadas ou ODM com sanitização
-const user = await User.findById(req.params.id); // Mongoose sanitiza automaticamente
-```
+- Load secrets from environment variables; never hardcode them in source
+- Validate and sanitize all external input before processing
+- Use `helmet` middleware for HTTP security headers
+- Configure CORS explicitly; never use `origin: '*'` in production
+- Rate limit public endpoints to prevent brute force and DoS
+- Run `npm audit` before every production release
 
 ### 16.2 Tools
 ```bash
-npm audit                  # vulnerabilidades conhecidas
-npm audit fix              # corrigir automaticamente
-npx snyk test              # análise avançada (Snyk)
-npx retire                 # verificar bibliotecas obsoletas
+npm audit                          # check known vulnerabilities
+npm audit fix                      # auto-apply safe fixes
+npx snyk test                      # deeper vulnerability analysis
+npm audit --audit-level=high       # fail CI on high+ severity CVEs
 ```
 
 ### 16.3 Security at API Boundaries
-```js
-// Validar input antes de processar
-import Joi from 'joi';
-
-const schema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(8).required(),
-});
-
-const { error, value } = schema.validate(req.body);
-if (error) throw new ValidationError(error.details[0].message);
-
-// Sanitizar output — nunca expor campos sensíveis
-const safeUser = { id: user.id, name: user.name, email: user.email };
-// Não: res.json(user) — pode expor passwordHash, tokens, etc.
-res.json(safeUser);
+```javascript
+// Explicit destructure ignores unexpected fields (prevents mass assignment)
+function parseCreateUserInput(body) {
+  const { name, email } = body;
+  if (typeof name !== 'string' || name.trim().length < 2) {
+    throw new ValidationError('name must be at least 2 characters');
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ValidationError('invalid email format');
+  }
+  return { name: name.trim(), email: email.toLowerCase().trim() };
+}
+// Never eval() user input
+// Never pass user data to child_process.exec() or shell commands
+// Always use parameterized queries — never concatenate user input into SQL
 ```
 
 ---
@@ -854,62 +805,53 @@ res.json(safeUser);
 ## 17. Code Patterns
 
 ### 17.1 Early Return
-```js
-// Mau: nesting profundo
-async function processOrder(order) {
+```javascript
+// Good — flat and readable
+function processOrder(order) {
+  if (!order) return null;
+  if (order.status === 'cancelled') return { skipped: true };
+  if (!order.items.length) throw new ValidationError('Order has no items');
+  return calculateTotal(order.items);
+}
+
+// Bad — deeply nested
+function processOrder(order) {
   if (order) {
-    if (order.status === 'pending') {
-      if (order.items.length > 0) {
-        await charge(order);
+    if (order.status !== 'cancelled') {
+      if (order.items.length) {
+        return calculateTotal(order.items);
       }
     }
   }
 }
-
-// Bom: early return
-async function processOrder(order) {
-  if (!order) throw new ValidationError('Order required');
-  if (order.status !== 'pending') return;
-  if (order.items.length === 0) return;
-  await charge(order);
-}
 ```
 
 ### 17.2 Separation of Concerns
-```js
-// Mau: lógica de negócio no controller
-app.post('/api/appointments', async (req, res) => {
-  const conflict = await Appointment.findOne({ date: req.body.date });
-  if (conflict) return res.status(409).json({ success: false, error: 'Conflict' });
-  const appt = await Appointment.create(req.body);
-  await sendWhatsAppConfirmation(appt);
-  res.json(appt);
-});
+```javascript
+// Pure function — no I/O, fully testable in isolation
+function calculateDiscount(price, memberType) {
+  if (memberType === 'premium') return price * 0.2;
+  return price * 0.05;
+}
 
-// Bom: controller delega para service
-app.post('/api/appointments', async (req, res, next) => {
-  try {
-    const appt = await appointmentService.create(req.body);
-    res.json(appt);
-  } catch (err) {
-    next(err);
-  }
-});
+// Orchestrator — manages I/O, delegates logic to pure functions
+async function applyDiscount(orderId, memberType) {
+  const order = await db.findOrder(orderId);
+  const discount = calculateDiscount(order.price, memberType);
+  return db.updateOrder(orderId, { discount });
+}
 ```
 
-### 17.3 DRY e Variable Scope
-```js
-// Extrair duplicação para utilitários
-const paginate = (query, { page = 1, limit = 20 }) =>
-  query.skip((page - 1) * limit).limit(limit);
+### 17.3 DRY and Variable Scope
+```javascript
+// Extract only when same logic appears 3+ times with clear semantics
+const toISODate = (d) => new Date(d).toISOString().split('T')[0];
 
-// Minimizar escopo de variáveis
-// Mau: declarar fora do bloco necessário
-let result;
-if (condition) { result = await fetch(); }
-
-// Bom: declarar no escopo mínimo
-const result = condition ? await fetch() : null;
+// Declare variables close to use; const by default
+for (const item of items) {
+  const processed = transform(item); // scoped to loop body
+  results.push(processed);
+}
 ```
 
 ---
@@ -917,21 +859,19 @@ const result = condition ? await fetch() : null;
 ## 18. Dependency Management
 
 ### 18.1 Principles
-- Standard library primeiro: Node.js tem `fetch`, `crypto`, `path`, `fs/promises`
-- Preferir dependências bem mantidas com histórico ativo
-- Minimizar dependências: cada pacote é superfície de ataque
-- Fixar versões com `package-lock.json` em produção
+- Prefer Node.js built-ins over third-party when capability is equivalent
+- Evaluate by: maintenance activity, weekly downloads, open CVEs, bundle size
+- Pin exact versions in applications; use semver ranges only in published libraries
+- Always commit `package-lock.json`
 
 ### 18.2 Commands
 ```bash
-npm outdated                    # listar desatualizados
-npm update                      # atualizar dentro do semver
-npx npm-check-updates           # ver todas as atualizações disponíveis
-npx npm-check-updates -u        # aplicar todas
-npm audit                       # vulnerabilidades
-npm audit fix --force           # forçar correção (testar depois)
-npm prune                       # remover pacotes não usados
-npm dedupe                      # deduplicar dependências
+npm outdated                       # list packages with newer versions
+npm update                         # update within current semver ranges
+npx npm-check-updates              # preview available major bumps
+npx depcheck                       # find declared but unused dependencies
+npm prune                          # remove unlisted packages
+npm audit --audit-level=high       # fail on high/critical vulnerabilities
 ```
 
 ---
@@ -939,43 +879,36 @@ npm dedupe                      # deduplicar dependências
 ## 19. Comments and Documentation
 
 ### 19.1 Code Comments
-```js
-// Mau: comentar o óbvio
-// Incrementa i
-i++;
+```javascript
+// Good — explains WHY, not WHAT
+// Bypass cache here: user.status changes on every login and stale reads
+// caused billing errors in production (incident #2024-041)
+cache.bypass = true;
 
-// Bom: comentar o porquê
-// Rate limit é 5/15min por IP — ver ADR-004 para contexto de segurança
-const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
-
-// Documentar decisões não-óbvias
-// useDb() em vez de conexões separadas para reutilizar o connection pool
-// Ver docs/adrs/generated/ADR-001 para contexto completo
-const db = mongoose.connection.useDb(tenantId, { useCache: true });
+// Bad — restates the code
+cache.bypass = true; // set bypass to true
 ```
 
-### 19.2 JSDoc para APIs Públicas
-```js
+### 19.2 JSDoc
+```javascript
 /**
- * Cria um agendamento e envia confirmação via WhatsApp.
- * @param {Object} data - Dados do agendamento
- * @param {string} data.clientId - ID do cliente
- * @param {Date}   data.date - Data e hora do agendamento
- * @param {string} data.serviceId - ID do serviço
- * @returns {Promise<Appointment>} Agendamento criado
- * @throws {NotFoundError} Se cliente ou serviço não existir
- * @throws {ConflictError} Se horário já estiver ocupado
+ * Calculates the discounted price for a given membership tier.
+ *
+ * @param {number} price - Original price in cents (positive integer)
+ * @param {'standard'|'premium'|'vip'} memberType - Customer membership tier
+ * @returns {number} Discount amount in cents
+ * @throws {ValidationError} When price is negative or memberType is unknown
  */
-export async function createAppointment(data) { ... }
+function calculateDiscount(price, memberType) { /* ... */ }
 ```
 
 ### 19.3 Module Documentation
-```js
+```javascript
 /**
- * @module appointment-service
- * @description Business logic for appointment lifecycle management.
- * Depends on: appointment-repo, notification-service, whatsapp-service.
- * Does NOT handle HTTP concerns — see controllers/appointment.js.
+ * @module user-service
+ * @description Handles user lifecycle: creation, authentication, profile updates.
+ * Business rules: emails unique per tenant; passwords stored as bcrypt hashes.
+ * All methods require a valid tenantId from the authenticated session.
  */
 ```
 
@@ -984,227 +917,255 @@ export async function createAppointment(data) { ... }
 ## 20. Database
 
 ### 20.1 Approach
-Node.js suporta três abordagens:
-- **ODM** (Mongoose): schema + validação + middleware — ideal para MongoDB
-- **Query Builder** (Knex): flexibilidade com SQL sem ORM pesado
-- **Raw Driver** (pg, mongodb): máximo controlo, mais verboso
+Node.js supports three database access patterns:
+- **Raw SQL drivers** (`mysql2`, `pg`) — full control, best performance, manual schema management
+- **Query builders** (Knex.js) — composable SQL, migration support, no model abstraction overhead
+- **ORMs** (Sequelize, Prisma) — model-centric, higher abstraction cost, auto-migrations
+
+For most projects, a raw driver with a migration tool provides the best balance of control and safety.
 
 ### 20.2 Connection and Driver
-```js
-// Conexão MongoDB com driver nativo
-import { MongoClient } from 'mongodb';
+```javascript
+// Connection pool with native pg driver
+import pg from 'pg';
 
-const client = new MongoClient(process.env.MONGO_URI, {
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
-let db;
+pool.on('error', (err) => {
+  console.error('Unexpected pool error', err);
+  process.exit(1);
+});
 
-export async function connectDB() {
-  await client.connect();
-  db = client.db(process.env.DB_NAME);
-  return db;
-}
-
-export async function disconnectDB() {
-  await client.close();
-}
-
-// Query com parâmetros seguros — nunca concatenar strings
-const userId = req.params.id;
-const user = await db.collection('users').findOne(
-  { _id: new ObjectId(userId) },   // ObjectId valida o formato
-  { projection: { passwordHash: 0 } } // excluir campos sensíveis
-);
-```
-
-### 20.3 Migrations
-MongoDB/Mongoose não tem migrations nativas. Padrões comuns:
-- **migrate-mongo**: framework de migrations por ficheiro versionado
-- **Scripts ad-hoc**: em `scripts/maintenance/` — documentar e registar execução
-- **On-the-fly**: defaults em schema Mongoose para campos novos
-
-```bash
-# migrate-mongo
-npm install migrate-mongo
-npx migrate-mongo init
-npx migrate-mongo create add-etapa-conversa-to-clientes
-npx migrate-mongo up      # aplicar migrations pendentes
-npx migrate-mongo status  # ver estado
-```
-
-### 20.4 Best Practices
-- Queries parametrizadas/sanitizadas — nunca interpolação de strings
-- Índices para campos usados em `find`, `sort`, `where` frequentes
-- Connection pooling — não criar nova conexão por request
-- Fechar conexão gracefully no `SIGTERM`
-- Timeout explícito em operações longas
-
-```js
-// Graceful shutdown
 process.on('SIGTERM', async () => {
-  await disconnectDB();
+  await pool.end();
   process.exit(0);
 });
 ```
+
+```javascript
+// Parameterized query — prevents SQL injection
+async function getUserById(id) {
+  const { rows } = await pool.query(
+    'SELECT id, name, email FROM users WHERE id = $1 AND deleted_at IS NULL',
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
+// Explicit transaction management
+async function transferFunds(fromId, toId, amount) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE accounts SET balance = balance - $1 WHERE id = $2', [amount, fromId]
+    );
+    await client.query(
+      'UPDATE accounts SET balance = balance + $1 WHERE id = $2', [amount, toId]
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release(); // always release back to pool
+  }
+}
+```
+
+### 20.3 Migrations
+Manage schema changes with versioned, sequential migration files.
+Never alter schema manually in production. Popular tools: `node-pg-migrate`, `db-migrate`, `Knex migrations`.
+
+```bash
+npm install db-migrate db-migrate-pg
+npx db-migrate create add-users-table --sql-file  # scaffold migration file
+npx db-migrate up                                  # apply pending migrations
+npx db-migrate down                                # rollback last migration
+```
+
+### 20.4 Best Practices
+- Always use parameterized queries — never concatenate user input into SQL strings
+- Use connection pooling — never open and close a connection per request
+- Always release connections in `finally` blocks to prevent pool exhaustion
+- Index columns used in `WHERE`, `JOIN`, and `ORDER BY`
+- Test transactions: verify rollback on failure, not only the success path
 
 ---
 
 ## 21. Logs and Observability
 
 ### 21.1 Log Levels
-| Level | Quando usar |
+
+| Level | When to use |
 |-------|-------------|
-| `fatal` | Processo vai terminar |
-| `error` | Erro recuperável, operação falhou |
-| `warn` | Situação anormal mas operação continuou |
-| `info` | Eventos de negócio importantes (login, pagamento) |
-| `debug` | Detalhe para debugging (só em desenvolvimento) |
-| `trace` | Máximo detalhe (raramente em produção) |
+| `trace` | Fine-grained diagnostics — loop iterations, low-level I/O |
+| `debug` | Developer diagnostics — request payloads, resolved values |
+| `info`  | Normal operations — service started, request completed |
+| `warn`  | Degraded but continuing — retry attempted, fallback used |
+| `error` | Operation failed — exception caught, action not completed |
+| `fatal` | Process cannot continue — will exit after logging |
 
-### 21.2 Structured Logs
-```js
-// Configuração com console nativo (stdlib)
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
-const levels = { fatal: 0, error: 1, warn: 2, info: 3, debug: 4, trace: 5 };
-const currentLevel = levels[LOG_LEVEL];
+### 21.2 Structured Logging Setup
+```javascript
+// src/logger.js — structured JSON logger using Node.js built-ins
+const LEVELS = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, fatal: 60 };
+const MIN = LEVELS[process.env.LOG_LEVEL ?? 'info'];
 
-function log(level, obj, msg) {
-  if (levels[level] > currentLevel) return;
-  const entry = {
-    level,
-    time: new Date().toISOString(),
-    ...(typeof obj === 'string' ? { msg: obj } : { ...obj, msg }),
-  };
-  process.stdout.write(JSON.stringify(entry) + '\n');
+function log(level, data, message) {
+  if (LEVELS[level] < MIN) return;
+  process.stdout.write(
+    JSON.stringify({
+      level,
+      time: new Date().toISOString(),
+      pid: process.pid,
+      msg: message,
+      ...(data && typeof data === 'object' ? data : { data }),
+    }) + '\n'
+  );
 }
 
 export const logger = {
-  fatal: (obj, msg) => log('fatal', obj, msg),
-  error: (obj, msg) => log('error', obj, msg),
-  warn:  (obj, msg) => log('warn',  obj, msg),
-  info:  (obj, msg) => log('info',  obj, msg),
-  debug: (obj, msg) => log('debug', obj, msg),
+  trace: (d, m) => log('trace', d, m),
+  debug: (d, m) => log('debug', d, m),
+  info:  (d, m) => log('info',  d, m),
+  warn:  (d, m) => log('warn',  d, m),
+  error: (d, m) => log('error', d, m),
+  fatal: (d, m) => log('fatal', d, m),
 };
 ```
 
-### 21.3 Logging com Contexto
-```js
-// Adicionar contexto a cada log
-logger.info({ userId, tenantId, action: 'appointment.created' }, 'Appointment created');
-logger.error({ err, appointmentId }, 'Failed to send WhatsApp confirmation');
+### 21.3 Logging Implementation
+```javascript
+import { logger } from './logger.js';
 
-// Request ID em cada request (middleware)
-app.use((req, res, next) => {
-  req.requestId = crypto.randomUUID();
-  req.log = logger.child({ requestId: req.requestId, path: req.path });
+// Structured context — never interpolate into strings
+logger.info({ userId, orderId, amount }, 'Order payment processed');
+logger.error({ err, userId, action: 'processPayment' }, 'Payment failed');
+
+// Request logger middleware
+export function requestLogger(req, res, next) {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info({
+      method: req.method,
+      path:   req.path,
+      status: res.statusCode,
+      ms:     Date.now() - start,
+      reqId:  req.headers['x-request-id'] ?? 'none',
+    }, 'HTTP request completed');
+  });
   next();
-});
-
-// Usar no controller
-req.log.info({ clientId }, 'Processing appointment');
+}
 ```
 
 ### 21.4 Metrics and Observability
-```js
-// Health endpoint obrigatório
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    timestamp: new Date().toISOString(),
-  });
-});
+```javascript
+// Expose health and metrics via a dedicated port
+import { createServer } from 'http';
 
-// Medir latência de operações críticas
-async function withMetrics(name, fn) {
-  const start = performance.now();
-  try {
-    return await fn();
-  } finally {
-    logger.debug({ operation: name, durationMs: performance.now() - start }, 'Operation completed');
+const metrics = { requests: 0, errors: 0, latencyTotal: 0 };
+
+createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
   }
-}
-
-const result = await withMetrics('db.findUser', () => User.findById(id));
+  if (req.url === '/metrics') {
+    const mem = process.memoryUsage();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      ...metrics,
+      avgLatencyMs: metrics.requests
+        ? (metrics.latencyTotal / metrics.requests).toFixed(2)
+        : 0,
+      heapUsedMB: (mem.heapUsed / 1024 / 1024).toFixed(2),
+    }));
+  }
+  res.writeHead(404); res.end();
+}).listen(9090);
 ```
 
 ---
 
 ## 22. Golden Rules
 
-1. **Simplicidade**: código simples é mais fácil de testar, debugar e manter — resistir à tentação de abstrações prematuras
-2. **Erros explícitos**: nunca engolir erros; sempre propagar com contexto ou logar na fronteira de I/O
-3. **Testes primeiro**: se é difícil de testar, o design está errado — refatorar para injectabilidade
-4. **Async correto**: preferir `Promise.all` para operações paralelas; nunca `await` dentro de `forEach`
-5. **Performance medida**: `performance.now()` e `clinic.js` antes de qualquer otimização
-6. **Dependências mínimas**: cada `npm install` é responsabilidade — avaliar tamanho, manutenção e segurança
-7. **Segredos no ambiente**: nunca em código, nunca em git — `.env` no `.gitignore`, `.env.example` documentado
+1. **Never block the event loop** — async I/O always; Worker Threads for CPU-bound work
+2. **Handle every error explicitly** — no empty catch blocks, no silent failures
+3. **Validate at every boundary** — all incoming HTTP data, all consumed external API responses
+4. **Parameterized queries without exception** — SQL injection is prevented at the driver level
+5. **Measure before optimizing** — profile with clinic.js or `--prof`; intuition wastes time
+6. **Dependencies are liabilities** — minimize count, audit regularly, prefer Node.js built-ins
+7. **Tests are not optional** — unhandled async edge cases fail silently in production
 
 ---
 
 ## 23. Pre-Commit Checklist
 
 ### Code
-- [ ] `npx prettier --check .` sem erros
-- [ ] `npx eslint src/` sem erros críticos
-- [ ] `node src/server.js` inicia sem erros
-- [ ] Sem `console.log` de debug esquecidos
+- [ ] `npx prettier --check .` passes without formatting errors
+- [ ] `npx eslint src/` passes with no critical errors
+- [ ] Application starts cleanly: `node src/index.js`
 
 ### Tests
-- [ ] `npm test` — todos os testes passam
-- [ ] Cobertura >= 70% em código crítico (`npm test -- --coverage`)
-- [ ] Testes de integração executados
-- [ ] Novos endpoints têm pelo menos 1 teste de integração
+- [ ] All unit tests pass: `npx jest --selectProjects unit`
+- [ ] Coverage >= 70% on critical service and utility modules
+- [ ] Integration tests pass against a real database
+- [ ] No `.only` or `.skip` left in any test file
 
 ### Quality
-- [ ] Erros tratados explicitamente (sem `catch` vazio)
-- [ ] Recursos fechados (conexões, streams, timers)
-- [ ] Sem secrets hardcoded
-- [ ] `npm audit` — sem vulnerabilidades críticas
-- [ ] Variáveis de ambiente novas documentadas no `.env.example`
+- [ ] All async functions handle errors explicitly (try/catch or `.catch`)
+- [ ] No `console.log` in `src/` — structured logger used throughout
+- [ ] No hardcoded secrets, API keys, passwords, or IP addresses
+- [ ] `npm audit` shows no high or critical vulnerabilities
 
 ### Documentation
-- [ ] Funções públicas com JSDoc
-- [ ] README atualizado se API mudou
-- [ ] Decisões não-óbvias comentadas com contexto (referência a ADR se aplicável)
+- [ ] Public functions and modules have JSDoc comments
+- [ ] `.env.example` reflects all required environment variables
+- [ ] README updated if setup or deployment steps changed
 
-### Docker (se aplicável)
-- [ ] `docker compose build` sem erros
-- [ ] `docker compose up` — aplicação inicia
-- [ ] `docker compose exec app npm test` — testes passam no container
+### Docker
+- [ ] `docker compose build` completes without errors
+- [ ] `docker compose up -d` starts all services cleanly
+- [ ] Application responds correctly when accessed from inside the container
 
 ---
 
 ## 24. References
 
 ### Official Documentation
-- Node.js Docs: https://nodejs.org/en/docs
-- MDN JavaScript: https://developer.mozilla.org/en-US/docs/Web/JavaScript
-- ECMAScript Spec: https://tc39.es/ecma262/
-- Node.js Best Practices: https://github.com/goldbergyoni/nodebestpractices
+- [MDN JavaScript Guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide)
+- [MDN JavaScript Code Style Guide](https://developer.mozilla.org/en-US/docs/MDN/Writing_guidelines/Code_style_guide/JavaScript)
+- [Node.js Official Documentation](https://nodejs.org/en/docs/)
+- [Node.js Security Best Practices](https://nodejs.org/learn/getting-started/security-best-practices)
+- [Node.js — Don't Block the Event Loop](https://nodejs.org/en/docs/guides/dont-block-the-event-loop)
+- [Node.js Event Loop Guide](https://nodejs.org/learn/asynchronous-work/event-loop-timers-and-nexttick)
 
 ### Style Guides
-- Airbnb JavaScript Style Guide: https://github.com/airbnb/javascript
-- Google JavaScript Style Guide: https://google.github.io/styleguide/jsguide.html
-- ESLint Rules: https://eslint.org/docs/rules/
+- [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascript)
+- [Node.js Best Practices — goldbergyoni](https://github.com/goldbergyoni/nodebestpractices)
+- [JavaScript Testing Best Practices — goldbergyoni](https://github.com/goldbergyoni/javascript-testing-best-practices)
+- [JavaScript Standard Style](https://standardjs.com/)
 
 ### Essential Tools
-- npm: https://docs.npmjs.com
-- Prettier: https://prettier.io/docs/en/
-- ESLint: https://eslint.org/docs/user-guide/
-- Jest: https://jestjs.io/docs/getting-started
+- [ESLint v9](https://eslint.org/) — Pluggable JavaScript linter
+- [Prettier](https://prettier.io/) — Opinionated code formatter
+- [Jest v29](https://jestjs.io/) — JavaScript testing framework with built-in mocking
+- [pino](https://getpino.io) — Very low overhead Node.js logger
+- [Testcontainers for Node.js](https://node.testcontainers.org/)
+- [tinybench](https://github.com/tinylibs/tinybench) — Lightweight benchmarking
 
 ### Testing and Performance
-- Supertest: https://github.com/ladjs/supertest
-- mongodb-memory-server: https://github.com/nodkz/mongodb-memory-server
-- Artillery: https://www.artillery.io/docs
-- clinic.js: https://clinicjs.org
+- [k6 Load Testing](https://k6.io/docs/)
+- [autocannon](https://github.com/mcollina/autocannon)
+- [clinic.js](https://clinicjs.org/)
+- [0x Flamegraph Profiler](https://github.com/davidmarkclements/0x)
 
 ### Community
-- Node.js Discussions: https://github.com/nodejs/node/discussions
-- Awesome Node.js: https://github.com/sindresorhus/awesome-nodejs
-- Node Weekly: https://nodeweekly.com
+- [awesome-nodejs](https://github.com/sindresorhus/awesome-nodejs)
+- [Node Weekly Newsletter](https://nodeweekly.com/)
