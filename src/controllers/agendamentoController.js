@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { sendPushNotification } from "../services/pushService.js";
 import UserSubscription from "../models/UserSubscription.js";
-import { sendWhatsAppMessage } from "../utils/zapi_client.js";
+import { sendWhatsAppMessage } from "../utils/evolutionClient.js";
 import { scheduleNotifications } from "../utils/scheduleNotifications.js";
 
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite

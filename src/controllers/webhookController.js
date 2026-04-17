@@ -1,6 +1,6 @@
 import Agendamento from '../models/Agendamento.js';
 import Cliente from '../models/Cliente.js';
-import { sendWhatsAppMessage } from '../utils/zapi_client.js';
+import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
 import { DateTime } from 'luxon';
 
 /**
@@ -11,14 +11,21 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
   try {
     console.log('[Webhook] 📥 Recebido:', JSON.stringify(req.body, null, 2));
 
-    // 🔍 VALIDAÇÃO 1: Ignora mensagens enviadas pelo próprio salão (fromMe: true)
-    if (req.body.fromMe === true) {
+    // 🔍 VALIDAÇÃO 1: Só processa evento MESSAGES_UPSERT
+    if (req.body.event !== 'messages.upsert') {
+      return res.status(200).json({ message: 'Evento ignorado' });
+    }
+
+    const msgData = req.body.data;
+
+    // 🔍 VALIDAÇÃO 2: Ignora mensagens enviadas pelo próprio salão (fromMe: true)
+    if (msgData?.key?.fromMe === true) {
       console.log('[Webhook] ⏭️ Ignorando mensagem enviada pelo salão (fromMe: true)');
       return res.status(200).json({ message: 'Mensagem do salão ignorada' });
     }
 
-    // 🔍 VALIDAÇÃO 2: Verifica timestamp (só processa mensagens dos últimos 5 minutos)
-    const timestampMensagem = req.body.momment || req.body.timestamp || Date.now();
+    // 🔍 VALIDAÇÃO 3: Verifica timestamp (só processa mensagens dos últimos 5 minutos)
+    const timestampMensagem = (msgData?.messageTimestamp || 0) * 1000 || Date.now();
     const idadeMensagem = Date.now() - timestampMensagem;
     const CINCO_MINUTOS = 5 * 60 * 1000;
 
@@ -27,9 +34,12 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       return res.status(200).json({ message: 'Mensagem antiga ignorada' });
     }
 
-    // Extrai dados do webhook Z-API
-    const telefone = req.body.phone || req.body.data?.phone || req.body.data?.from;
-    const mensagem = req.body.text?.message || req.body.data?.body || '';
+    // Extrai dados do payload Evolution API
+    const remoteJid = msgData?.key?.remoteJid || '';
+    const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
+    const mensagem = msgData?.message?.conversation
+      || msgData?.message?.extendedTextMessage?.text
+      || '';
 
     if (!telefone || !mensagem) {
       console.warn('[Webhook] ⚠️ Dados incompletos:', { telefone, mensagem });
@@ -172,7 +182,8 @@ async function delegarParaIA(req, res) {
   try {
     console.log('[Webhook] 📝 Processando mensagem não-confirmação (resposta automática simples)');
 
-    const telefone = req.body.phone || req.body.data?.phone || req.body.data?.from;
+    const remoteJid = req.body.data?.key?.remoteJid || '';
+    const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
 
     if (!telefone) {
       return res.status(400).json({ error: 'Telefone não fornecido' });

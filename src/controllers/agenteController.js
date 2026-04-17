@@ -8,7 +8,7 @@ import Pacote from "../models/Pacote.js";
 import Mensagem from "../models/Mensagem.js";
 import { chatWithLaura } from "../utils/openaiHelper.js";
 import { dispatch } from "../services/functionDispatcher.js";
-import { sendWhatsAppMessage } from "../utils/zapi_client.js"; // ✨ Já importado
+import { sendWhatsAppMessage } from "../utils/evolutionClient.js";
 import { detectarPalavraChave } from "../utils/notificacaoHelper.js";
 
 console.log("CONTROLLER: agenteController.js carregado (v2)");

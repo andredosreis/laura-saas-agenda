@@ -1,6 +1,6 @@
 import Agendamento from '../models/Agendamento.js';
 import Cliente from '../models/Cliente.js';
-import { sendWhatsAppMessage, sendZapiWhatsAppMessage } from '../utils/zapi_client.js';
+import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
 import { classificarIntencaoCliente } from '../utils/openaiHelper.js';
 
 export const notificarCliente = async (req, res) => {

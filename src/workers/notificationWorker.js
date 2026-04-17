@@ -1,7 +1,7 @@
 import { Worker } from 'bullmq';
 import { DateTime } from 'luxon';
 import { getRedisConnection } from '../queues/redisConnection.js';
-import { sendWhatsAppMessage } from '../utils/zapi_client.js';
+import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
 import logger from '../utils/logger.js';
 
 const ZONA = 'Europe/Lisbon';

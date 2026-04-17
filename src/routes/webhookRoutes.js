@@ -4,14 +4,14 @@ import { validateWebhook } from '../middlewares/webhookAuth.js';
 
 const router = express.Router();
 
-// POST /webhook/zapi - Recebe mensagens do Z-API
-router.post('/zapi', validateWebhook, processarConfirmacaoWhatsapp);
+// POST /webhook/evolution - Recebe mensagens da Evolution API
+router.post('/evolution', validateWebhook, processarConfirmacaoWhatsapp);
 
-// GET /webhook/zapi - Health check
-router.get('/zapi', (req, res) => {
+// GET /webhook/evolution - Health check
+router.get('/evolution', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'Webhook Z-API ativo',
+    message: 'Webhook Evolution API ativo',
     timestamp: new Date().toISOString()
   });
 });
