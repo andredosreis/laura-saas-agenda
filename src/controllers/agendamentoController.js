@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import { sendPushNotification } from "../services/pushService.js";
 import UserSubscription from "../models/UserSubscription.js";
 import { sendWhatsAppMessage } from "../utils/zapi_client.js";
+import { scheduleNotifications } from "../utils/scheduleNotifications.js";
 
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
 const timeToMinutes = (timeString) => {
@@ -94,6 +95,26 @@ export const createAgendamento = async (req, res) => {
       compraPacote: novoAgendamento.compraPacote,
       status: novoAgendamento.status
     });
+
+    // Agendar notificações (confirmação + lembretes)
+    let clienteNome = novoAgendamento.lead?.nome;
+    let clienteTelefone = novoAgendamento.lead?.telefone;
+
+    if (tipo !== 'Avaliacao' && cliente) {
+      const { Cliente } = req.models;
+      const clienteDoc = await Cliente.findOne({ _id: cliente, tenantId: req.tenantId }).select('nome telefone');
+      clienteNome = clienteDoc?.nome;
+      clienteTelefone = clienteDoc?.telefone;
+    }
+
+    scheduleNotifications({
+      agendamentoId: novoAgendamento._id,
+      tenantId: req.tenantId,
+      dataHora: novoAgendamento.dataHora,
+      clienteNome,
+      clienteTelefone,
+      servicoNome: servicoAvulsoNome,
+    }).catch((err) => console.error('[createAgendamento] Falha ao agendar notificações:', err));
 
     res.status(201).json(novoAgendamento);
   } catch (error) {
