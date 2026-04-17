@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, XCircle, Package, Calendar, TrendingUp, User, FileText } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, Calendar, TrendingUp, User, FileText, Mail } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { clienteSchema, formatPhone } from '../schemas/validationSchemas';
@@ -14,6 +14,7 @@ function EditarCliente() {
 
   const [pacotes, setPacotes] = useState([]);
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
+  const [pacotesEncerrados, setPacotesEncerrados] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('dados');
@@ -22,7 +23,6 @@ function EditarCliente() {
   const {
     register,
     handleSubmit,
-    control,
     watch,
     setValue,
     reset,
@@ -33,9 +33,8 @@ function EditarCliente() {
     defaultValues: {
       nome: '',
       telefone: '',
+      email: '',
       dataNascimento: '',
-      pacote: '',
-      sessoesRestantes: '',
       observacoes: '',
     },
   });
@@ -57,24 +56,25 @@ function EditarCliente() {
         const clienteData = clienteRes.data;
         setPacotes(pacotesRes.data?.data || []);
         
-        // Filtrar apenas pacotes ativos com sessões
-        const pacotesAtivos = (pacotesClienteRes.data || []).filter(
-          (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
+        // Separar pacotes ativos dos encerrados
+        const todosPacotes = pacotesClienteRes.data || [];
+        const pacotesAtivos = todosPacotes.filter(
+          (cp) => cp.status === 'Ativo'
+        );
+        const encerrados = todosPacotes.filter(
+          (cp) => cp.status !== 'Ativo'
         );
         setPacotesDoCliente(pacotesAtivos);
+        setPacotesEncerrados(encerrados);
 
         // Popular formulário com dados existentes
         reset({
           nome: clienteData.nome || '',
           telefone: formatPhone(clienteData.telefone || ''),
+          email: clienteData.email || '',
           dataNascimento: clienteData.dataNascimento
             ? clienteData.dataNascimento.substring(0, 10)
             : '',
-          pacote: clienteData.pacote?._id || '',
-          sessoesRestantes:
-            clienteData.sessoesRestantes !== undefined
-              ? String(clienteData.sessoesRestantes)
-              : '0',
           observacoes: clienteData.observacoes || '',
         });
       } catch (err) {
@@ -106,9 +106,8 @@ function EditarCliente() {
       const dadosParaEnviar = {
         nome: data.nome.trim(),
         telefone: data.telefone.replace(/\D/g, ''),
+        email: data.email?.trim() || null,
         dataNascimento: data.dataNascimento,
-        pacote: data.pacote,
-        sessoesRestantes: parseInt(data.sessoesRestantes),
         observacoes: data.observacoes?.trim() || '',
       };
 
@@ -326,6 +325,30 @@ function EditarCliente() {
           <ErrorMessage fieldName="telefone" />
         </div>
 
+        {/* Email */}
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm md:text-base font-medium text-gray-900"
+          >
+            <span className="flex items-center gap-1.5">
+              <Mail className="w-4 h-4" />
+              Email
+            </span>
+          </label>
+          <div className="relative">
+            <input
+              type="email"
+              id="email"
+              {...register('email')}
+              className={`${getInputClasses('email')} pr-10`}
+              placeholder="email@exemplo.com"
+            />
+            <FieldFeedback fieldName="email" />
+          </div>
+          <ErrorMessage fieldName="email" />
+        </div>
+
         {/* Data de nascimento */}
         <div>
           <label
@@ -344,59 +367,6 @@ function EditarCliente() {
             <FieldFeedback fieldName="dataNascimento" />
           </div>
           <ErrorMessage fieldName="dataNascimento" />
-        </div>
-
-        {/* Pacote */}
-        <div>
-          <label
-            htmlFor="pacote"
-            className="block text-sm md:text-base font-medium text-gray-900"
-          >
-            Pacote
-          </label>
-          <div className="relative">
-            <Controller
-              name="pacote"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  id="pacote"
-                  className={`${getInputClasses('pacote')} pr-10`}
-                >
-                  <option value="">Selecione um pacote</option>
-                  {pacotes.map((pacote) => (
-                    <option key={pacote._id} value={pacote._id}>
-                      {pacote.nome}
-                    </option>
-                  ))}
-                </select>
-              )}
-            />
-            <FieldFeedback fieldName="pacote" />
-          </div>
-          <ErrorMessage fieldName="pacote" />
-        </div>
-
-        {/* Sessões restantes */}
-        <div>
-          <label
-            htmlFor="sessoesRestantes"
-            className="block text-sm md:text-base font-medium text-gray-900"
-          >
-            Sessões Restantes
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              id="sessoesRestantes"
-              {...register('sessoesRestantes')}
-              min="0"
-              className={`${getInputClasses('sessoesRestantes')} pr-10`}
-            />
-            <FieldFeedback fieldName="sessoesRestantes" />
-          </div>
-          <ErrorMessage fieldName="sessoesRestantes" />
         </div>
 
         {/* Observações */}

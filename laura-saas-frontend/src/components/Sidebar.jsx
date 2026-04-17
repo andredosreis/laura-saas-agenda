@@ -17,7 +17,8 @@ import {
   Receipt,
   ChevronDown,
   ChevronUp,
-  CalendarClock
+  CalendarClock,
+  ListChecks
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
 
@@ -55,6 +56,15 @@ function Sidebar() {
       ]
     },
     {
+      id: 'agendamento',
+      label: 'AGENDAMENTO',
+      items: [
+        { to: "/agendamentos", text: "Agendamentos", icon: ListChecks },
+        { to: "/calendario", text: "Calendário", icon: Calendar },
+        { to: "/atendimentos", text: "Atendimentos", icon: CalendarClock }
+      ]
+    },
+    {
       id: 'financas',
       label: 'FINANÇAS',
       items: [
@@ -62,14 +72,6 @@ function Sidebar() {
         // { to: "/caixa", text: "Caixa", icon: DollarSign }, // Temporariamente desactivado
         { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
         { to: "/financeiro", text: "Relatórios", icon: TrendingUp }
-      ]
-    },
-    {
-      id: 'agendamento',
-      label: 'AGENDAMENTO',
-      items: [
-        { to: "/calendario", text: "Calendário", icon: Calendar },
-        { to: "/atendimentos", text: "Atendimentos", icon: CalendarClock }
       ]
     },
     {

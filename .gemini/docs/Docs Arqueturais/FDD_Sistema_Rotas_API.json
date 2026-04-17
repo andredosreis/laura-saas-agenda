@@ -1,0 +1,247 @@
+{
+  "meta": {
+    "product_or_system": "Laura SaaS Agenda",
+    "feature_name": "Sistema de Rotas da API",
+    "fdd_owner": "André dos Reis",
+    "version": "1.0",
+    "date": "2026-04-07"
+  },
+  "context": {
+    "technical_motivation": "Endereçar a ausência de validação de input com Zod no backend e estabelecer a especificação de payload, respostas e erros necessária para a criação de testes nestas rotas transacionais internas.",
+    "fit_with_hld": "Este FDD formaliza a proteção declarada no HLD, garantindo os contratos da malha API interna isolada entre Tenant, Frontend e Base de dados.",
+    "actors": [
+      "Frontend PWA da Laura",
+      "API Core",
+      "Database Mongoose"
+    ],
+    "assumptions": [
+      "A base e estrutura HLD já contam com o Express base em uso."
+    ],
+    "constraints": [
+      "O tenantId NUNCA é passado passivamente pelo Payload advindo do PWA, obrigatoriamente sendo sacado em runtime do JWT.",
+      "As assinaturas da API para o Frontend não devem sofrer breaking changes das respostas 'data' da base atual."
+    ]
+  },
+  "technical_objectives": [
+    {
+      "objective": "Erradicar bad requests chegam em runtime da base Mongoose.",
+      "measure_or_invariant": "100% de barramento Zod na API (400 uniformes) pre-controller/runtime."
+    },
+    {
+      "objective": "Garantir Cross-Tenant Isolation absoluto (Leak free).",
+      "measure_or_invariant": "100% dos fluxos bloqueando acessos ilegais a vizinhos no sistema através de HTTP 403 e validação Auth no Middleware."
+    },
+    {
+      "objective": "Afinação de Perfomance.",
+      "measure_or_invariant": "Latência mensurável P95 das rotas restritas em tempo estrito tolerável de < 500ms."
+    }
+  ],
+  "scope": {
+    "included": [
+      "Definição contratual / Validações das Rotas: Clientes, Agendamentos, Pacotes e Financeiro."
+    ],
+    "excluded": [
+      "Validação das rotas de permissão (Autenticação / Sign ins).",
+      "Fluxos não web ou isolados: API Webhook de ingestão do WhatsApp."
+    ]
+  },
+  "detailed_flows": {
+    "main_flow": [
+      "1. Request HTTP entra no Express.",
+      "2. Middleware de Autenticação avalia o JWT e preenche var req.user com userId + tenantId.",
+      "3. Middleware de Autorização assegura validações cross-tenant ou emite um bloqueio precoce (HTTP 403).",
+      "4. Middleware de Validação do Zod testa conformidade dos payload body/queries, efetuando exclusão ('strip'), transpassando-os a 'req.validatedBody' em positivo, ou caindo a falha no erro paramétrico documentado arrays no erro 400 padronizado.",
+      "5. Controller aciona regras finais de modelagem operando mutações diretas com o provider Mongoose injetando informações.",
+      "6. Error Handler globaliza os problemas colaterais (non-caught) da esteira silenciando o 'stack error native trace'.",
+      "7. Callback formatado (201 ou 200 base) transmitido e encerrando pipeline."
+    ],
+    "alternative_flows": [
+      "Payload corrompido -> Interrompe na camada lógica 4 do Zod, devolvendo um Erro Formato sem onerar controllers ou Mongoose DB.",
+      "JWT corrompido / Vazio -> Interrrompe malha express na via Auth(Camada 2), Error HTTP 401 unauthenticated."
+    ],
+    "diagrams": [
+      "Diagrama Sequencial Padrão da API (Cliente -> Express -> AuthMiddleware -> TenantMiddleware -> ZodMiddleware -> Controller -> MongoDB)."
+    ]
+  },
+  "public_contracts": [
+    {
+      "name": "Transacionais Internas Endpoint (Agendamento Ex).",
+      "kind": "http_endpoint",
+      "signature_or_route": "POST /api/agendamentos",
+      "method": "POST",
+      "request_example": {
+        "clienteId": "ObjectId MongoDB",
+        "data": "ISO 8601 YYYY-MM-DD",
+        "hora": "HH:MM",
+        "servico": "String Val",
+        "pacoteId": "ObjectId opcional",
+        "notas": "String opcional"
+      },
+      "response_example": {
+        "data": {
+          "id": "ObjectId",
+          "tenantId": "ObjectId",
+          "clienteId": "ObjectId",
+          "data": "ISO 8601",
+          "hora": "HH:MM",
+          "servico": "String",
+          "estado": "agendado",
+          "pacoteId": "ObjectId | null",
+          "notas": "String | null",
+          "criadoEm": "ISO 8601"
+        }
+      },
+      "headers_semantics": [
+        "Authorization: Bearer <JWT> - Porta de acesso do core PWA.",
+        "Content-Type: application/json - Assinatura do payload em envios formatados."
+      ],
+      "status_semantics": [
+        "200 OK — Devolutiva de Get ou Update transacional.",
+        "201 Created — Criação operada de um Entity Post.",
+        "204 No Content — Exclusões de Entity DELETE efetivas."
+      ],
+      "limits": {
+        "rate": "10 req/15m por IP/TenantIds (Writes); 100 req/15m Genérico.",
+        "payload_size": "Body máximo alocável: 1MB.",
+        "timeout": "Simples (< 500ms). Externos (< 2000ms)."
+      },
+      "versioning": "v1.0 (Não breaking)"
+    }
+  ],
+  "errors_exceptions_fallback": {
+    "error_matrix": [
+      {
+        "condition": "Zod Schema Mismatch / Missing Payload Keys",
+        "treatment": "HTTP 400 Bad Request",
+        "notes": "Devolve formatado: { erro: \"payload_invalido\", detalhes: [ array de descrições dos campos do zod ] }"
+      },
+      {
+        "condition": "Falta do Authentication/JWT Header Valido",
+        "treatment": "HTTP 401 Unauthorized",
+        "notes": "Devolve: { erro: \"nao_autenticado\" }"
+      },
+      {
+        "condition": "Carga provada e tentada fora do isolamento 'Target' do JWT TenantID",
+        "treatment": "HTTP 403 Forbidden",
+        "notes": "Sinalizar possivel flag maliciosa. Acesso negado."
+      },
+      {
+        "condition": "Catching genérico colateral do Servidor",
+        "treatment": "HTTP 500 Internal Error",
+        "notes": "Omitir todo rastro da arquitetura ou exceptions literais da prop."
+      }
+    ],
+    "resilience_strategies": [
+      "timeouts",
+      "error_handlers_globais_passivos"
+    ],
+    "fallback_policy": "Ruptura imediata via HTTP standard. Inoperabilidade orgânica e omissão das regras mal formatadas antes de atingir ou modificar o Banco de dados.",
+    "invariants": [
+      "Payloads HTTP recebidos nas rotas nunca ditam o seu próprio `tenantId` base. Tal regra e validação reside e flui via chaves Server-signed no JWT Header."
+    ]
+  },
+  "observability": {
+    "metrics": [
+      "Taxa bruta / Volume da captação global 5xx (Server Fault).",
+      "Clusters repetidos e suspeitos da recusa 403 forçando cross-tenant.",
+      "Volume da recusa de 400s (Desuso/Desalinhamento visual Front/Base)."
+    ],
+    "logs": {
+      "format": "JSON Formated Via Logger Pino",
+      "fields": [
+        "timestamp",
+        "level",
+        "tenantId",
+        "method",
+        "endpoint",
+        "statusCode",
+        "latencia",
+        "requestId"
+      ]
+    },
+    "tracing": {
+      "spans": [
+        "Sentry: Queries Mongoose de lentidão superando > 300ms na pipeline transacional."
+      ],
+      "sampling": "Vinculação via middleware header paramétrico dinâmico de sessão `requestId` atrelado no ambiente."
+    },
+    "dashboards_alerts": [
+      "Sentry Alertas acionáveis vinculando triggers (Disparo para Slack e Email Engineeer) em falhas concentradas de 403s."
+    ]
+  },
+  "dependencies_compatibility": {
+    "dependencies": [
+      {
+        "component": "node",
+        "min_version": "18.x",
+        "notes": "Obrigatório ESM Nativo e crypto.randomUUID()."
+      },
+      {
+        "component": "mongoose",
+        "min_version": ">=8.0.x",
+        "notes": "Estrutura do provider dos schemas baseados atrelados."
+      },
+      {
+        "component": "zod",
+        "min_version": "latest",
+        "notes": "Provider absoluto validador do inbound transacional das requests de Body/Query."
+      },
+      {
+        "component": "pino / pino-pretty",
+        "min_version": "latest",
+        "notes": "Logger e formatação de saídas estruturadas na IO nativa da cloud."
+      },
+      {
+        "component": "@sentry/node",
+        "min_version": "7.x",
+        "notes": "Base central do tracing cloud intercetando chamadas (Context e Setup user)."
+      },
+      {
+        "component": "express-rate-limit",
+        "min_version": "latest",
+        "notes": "Interceptadores parciais atrelados ás camadas para limitação Write API."
+      }
+    ],
+    "compatibility_guarantees": [
+      "A inserção deste pool validador na rota Zod transacional é uma modificação restrita a Pipeline pre-ingress. Portanto não refatora os Objects de Data do Payload na reposta 200, garantindo o funcionamento natural (no-breaking) contra a interface visual/App."
+    ]
+  },
+  "acceptance_criteria": [
+    "CA-01: Unit Testing (Jest) prova payload falsificado barrado com matriz HTTP 400 prévia a injecção no controller.",
+    "CA-02: Barramento pleno (100% Coverage pass testing) negando com 403 todas interações mascaradas tentando isolamento entre cross-tenants.",
+    "CA-03: Sub-Latência P95 das execuções monitorada em janela média abaixo da régua restritiva dos < 500 ms.",
+    "CA-04: Transmissão rastreável fluida do `requestId` integrando logs passivos (Pino), Reposta e Error Context Spans (Sentry Cloud).",
+    "CA-05: Fim da manifestação da label `ValidationErrors` nativas oriundas do DB Mongoose ocorridos nas esteiras ativas logadas."
+  ],
+  "risks": [
+    {
+      "risk": "RISCO-01: Falsos positivos severos do Zod barrando uso genuíno da PWA.",
+      "probability": "medium",
+      "impact": "Alto. Impede andamento primário do usuário (Ex. Trava inserção agendamento validado visualmente na APP).",
+      "mitigation": [
+        "Adoção de liberação paramétrica relaxada e espaçada via expressões 'regex' elásticas.",
+        "Atenção voltada a relatórios focados pro volume de picos 400x nas abas Sentry."
+      ],
+      "contingency_plan": "Aplicabilidade paralela em runtime contendo as 'Feature Flags' p/ desligar ZOD em target/endpoints sensíveis sem dar rollback total e generalizado do source."
+    },
+    {
+      "risk": "RISCO-02: Rate limiter estrito cortando IPs orgânicos vitais (Webhooks de WA / Pacotes NAT massivos p/ CGNAT).",
+      "probability": "medium",
+      "impact": "Médio (Quebra da integração de bots e cortes parciais geográficos em Redes de Operadoras Partilhadas em PT/BR).",
+      "mitigation": [
+        "Filtragem rate vinculata explicitamente baseada apenas no contexto lógico extraído `tenantId` ignorando peso restritivo sob 'IP Genérico'.",
+        "Configuração explícita atestando na host Node o IP como rede proxy segura proveniente da malha WA (Evolution Webhooks Whitelist)."
+      ],
+      "contingency_plan": "Injetar 'bypass' escalonável da taxa provisoriamente sob queixas diretas atestadas, calibrando-o posteriormente no ambiente."
+    },
+    {
+      "risk": "RISCO-03: Colisão destrutiva mudo da evolução do Payload entre as Zod Schemas do Frontend vs Base Backend.",
+      "probability": "high",
+      "impact": "Alto. Ruptura de consistência. PWA passará a atestar envios seguros que colidem mudos na barreira API restritiva de back.",
+      "mitigation": [
+        "Empregar monorepo partilhado atrelando instâncias e cópia única das keys no path master `/shared/schemas` validado aos dois lados universalmente."
+      ],
+      "contingency_plan": "Utilização e engate de automações com Contract Tests passivos comprovando paridades contínuas num Pipeline / CI Action."
+    }
+  ]
+}
