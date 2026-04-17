@@ -114,11 +114,11 @@ function Configuracoes() {
 
   const card = isDark
     ? 'bg-slate-800/50 border border-white/10 rounded-2xl p-6'
-    : 'bg-white border border-slate-200 rounded-2xl p-6 shadow-sm';
+    : 'bg-white border border-slate-200 rounded-2xl p-6 shadow-xs';
 
   const label = `block text-sm font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`;
 
-  const input = `w-full px-3 py-2 rounded-lg text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+  const input = `w-full px-3 py-2 rounded-lg text-sm transition-colors outline-hidden focus:ring-2 focus:ring-indigo-500/50 ${
     isDark
       ? 'bg-slate-900/60 border border-white/10 text-white placeholder-slate-500'
       : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400'
@@ -130,7 +130,7 @@ function Configuracoes() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
             <Settings className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -345,7 +345,7 @@ function Configuracoes() {
                   role="switch"
                   aria-checked={form.configuracoes.permitirAgendamentoOnline}
                   onClick={() => handleChange('configuracoes', 'permitirAgendamentoOnline', !form.configuracoes.permitirAgendamentoOnline)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-hidden focus:ring-2 focus:ring-indigo-500/50 ${
                     form.configuracoes.permitirAgendamentoOnline ? 'bg-indigo-600' : isDark ? 'bg-slate-600' : 'bg-slate-300'
                   }`}
                 >
@@ -367,7 +367,7 @@ function Configuracoes() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

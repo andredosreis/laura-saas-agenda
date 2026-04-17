@@ -175,7 +175,7 @@ function CriarAgendamento() {
   const getInputClasses = (form, fieldName) => {
     const errors = form.formState.errors;
     const dirtyFields = form.formState.dirtyFields;
-    const base = 'block w-full rounded border p-2 shadow-sm focus:ring focus:ring-amber-200 transition-all text-gray-900 bg-white placeholder:text-gray-400';
+    const base = 'block w-full rounded-sm border p-2 shadow-xs focus:ring-3 focus:ring-amber-200 transition-all text-gray-900 bg-white placeholder:text-gray-400';
     if (errors[fieldName]) return `${base} border-red-500 focus:border-red-500`;
     if (dirtyFields[fieldName]) return `${base} border-green-500 focus:border-green-500`;
     return `${base} border-gray-300 focus:border-amber-500`;
@@ -186,7 +186,7 @@ function CriarAgendamento() {
     if (!err) return null;
     return (
       <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-        <XCircle className="w-4 h-4 flex-shrink-0" />
+        <XCircle className="w-4 h-4 shrink-0" />
         {err.message}
       </p>
     );
@@ -453,7 +453,7 @@ function BotoesSubmit({ isSubmitting, onVoltar, label }) {
         type="button"
         onClick={onVoltar}
         disabled={isSubmitting}
-        className="flex-1 bg-gray-500 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
+        className="flex-1 bg-gray-500 text-white font-semibold py-2 px-4 rounded-sm hover:bg-gray-600 transition-colors disabled:opacity-50"
       >
         Cancelar
       </button>

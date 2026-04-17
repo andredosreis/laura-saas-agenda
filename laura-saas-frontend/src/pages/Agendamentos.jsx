@@ -274,7 +274,7 @@ function Agendamentos() {
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
       {/* Push Notification Status Banner */}
       {pushStatus.supported && !pushStatus.subscribed && pushStatus.permission !== 'denied' && (
-        <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded flex items-start justify-between">
+        <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-sm flex items-start justify-between">
           <div>
             <p className="text-blue-700 font-semibold">🔔 Notificações Disponíveis</p>
             <p className="text-blue-600 text-sm">Ative notificações para receber lembretes de agendamentos.</p>
@@ -282,7 +282,7 @@ function Agendamentos() {
           <button
             onClick={handleManualSubscribe}
             disabled={subscribingToPush}
-            className="ml-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded transition-colors text-sm whitespace-nowrap"
+            className="ml-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-sm transition-colors text-sm whitespace-nowrap"
           >
             {subscribingToPush ? '⏳ Ativando...' : '✅ Ativar'}
           </button>
@@ -290,7 +290,7 @@ function Agendamentos() {
       )}
 
       {pushStatus.subscribed && (
-        <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded flex items-start justify-between">
+        <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-sm flex items-start justify-between">
           <div>
             <p className="text-green-700 font-semibold">✅ Notificações Ativas</p>
             <p className="text-green-600 text-sm">Receberá lembretes de agendamentos via notificações.</p>
@@ -298,7 +298,7 @@ function Agendamentos() {
           <button
             onClick={handleUnsubscribe}
             disabled={subscribingToPush}
-            className="ml-4 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded transition-colors text-sm whitespace-nowrap"
+            className="ml-4 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-sm transition-colors text-sm whitespace-nowrap"
           >
             {subscribingToPush ? '⏳ Desativando...' : '🔕 Desativar'}
           </button>
@@ -306,7 +306,7 @@ function Agendamentos() {
       )}
 
       {pushStatus.permission === 'denied' && (
-        <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+        <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-sm">
           <p className="text-red-700 font-semibold">❌ Notificações Bloqueadas</p>
           <p className="text-red-600 text-sm">Altere as permissões do navegador para ativar notificações.</p>
         </div>
@@ -316,14 +316,14 @@ function Agendamentos() {
         <h1 className="text-3xl font-bold text-gray-800">Agendamentos</h1>
         <button
           onClick={() => navigate('/criar-agendamento')}
-          className="bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out"
+          className="bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out"
         >
           Novo Agendamento
         </button>
       </div>
 
       {/* Filtros */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow">
+      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
         <label htmlFor="filtroStatus" className="mr-2 font-medium text-gray-700">Filtrar por status:</label>
         <select
           id="filtroStatus"
@@ -404,14 +404,14 @@ function Agendamentos() {
                         <button
                           onClick={() => confirmarAgendamento(agendamento._id, 'confirmado')}
                           disabled={confirmando === agendamento._id}
-                          className="inline-flex items-center px-2.5 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                          className="inline-flex items-center px-2.5 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded-sm transition-colors"
                         >
                           {confirmando === agendamento._id ? '⏳' : '✅'} Confirmar
                         </button>
                         <button
                           onClick={() => confirmarAgendamento(agendamento._id, 'rejeitado')}
                           disabled={confirmando === agendamento._id}
-                          className="inline-flex items-center px-2.5 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                          className="inline-flex items-center px-2.5 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded-sm transition-colors"
                         >
                           {confirmando === agendamento._id ? '⏳' : '❌'} Rejeitar
                         </button>
@@ -426,7 +426,7 @@ function Agendamentos() {
                             setAgendamentoFunil(agendamento);
                             setModalFunilAberto(true);
                           }}
-                          className="inline-flex items-center px-2.5 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded transition-colors"
+                          className="inline-flex items-center px-2.5 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-sm transition-colors"
                         >
                           👤 Presença
                         </button>
@@ -441,7 +441,7 @@ function Agendamentos() {
                             setAgendamentoFunil(agendamento);
                             setModalFunilAberto(true);
                           }}
-                          className="inline-flex items-center px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors"
+                          className="inline-flex items-center px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-sm transition-colors"
                         >
                           ✓ Fechar
                         </button>
@@ -456,7 +456,7 @@ function Agendamentos() {
                             setAgendamentoParaFinalizar(agendamento);
                             setModalFinalizarAberto(true);
                           }}
-                          className="inline-flex items-center px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition-colors"
+                          className="inline-flex items-center px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-sm transition-colors"
                           title="Finalizar atendimento e registrar histórico"
                         >
                           ✓ Finalizar Atendimento
@@ -469,7 +469,7 @@ function Agendamentos() {
                       <button
                         onClick={() => enviarLembrete(agendamento._id, agendamento.cliente?.nome)}
                         disabled={enviandoLembrete === agendamento._id}
-                        className="inline-flex items-center px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded transition-colors"
+                        className="inline-flex items-center px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-xs font-semibold rounded-sm transition-colors"
                         title="Enviar lembrete via notificação"
                       >
                         {enviandoLembrete === agendamento._id ? '⏳' : '📱'} Lembrete

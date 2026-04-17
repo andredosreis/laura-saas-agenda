@@ -63,10 +63,10 @@ function Navbar() {
             className="flex items-center gap-2 group"
             onClick={closeMobileMenu}
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+            <span className="text-lg font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-slate-400">
               Laura SAAS
             </span>
           </NavLink>

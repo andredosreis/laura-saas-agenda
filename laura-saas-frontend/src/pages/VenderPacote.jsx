@@ -197,7 +197,7 @@ function VenderPacote() {
   // Estilos condicionais
   const cardClass = isDarkMode 
     ? 'bg-slate-800/50 border border-white/10' 
-    : 'bg-white border border-gray-200 shadow-sm';
+    : 'bg-white border border-gray-200 shadow-xs';
   const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
   const subTextClass = isDarkMode ? 'text-slate-400' : 'text-gray-600';
   const inputClass = isDarkMode
@@ -337,7 +337,7 @@ function VenderPacote() {
                 type="checkbox"
                 checked={form.semValidade}
                 onChange={(e) => handleChange('semValidade', e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className={textClass}>Sem validade (nunca expira)</span>
             </label>
@@ -373,7 +373,7 @@ function VenderPacote() {
                 type="checkbox"
                 checked={form.parcelado}
                 onChange={(e) => handleChange('parcelado', e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className={textClass}>Parcelado</span>
             </label>
@@ -399,7 +399,7 @@ function VenderPacote() {
                 type="checkbox"
                 checked={form.pagarAgora}
                 onChange={(e) => handleChange('pagarAgora', e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className={textClass}>
                 {form.parcelado ? 'Registrar pagamento da 1ª parcela' : 'Registrar pagamento à vista'}
@@ -521,7 +521,7 @@ function VenderPacote() {
             <button
               type="submit"
               disabled={submitting || !form.clienteId || !form.pacoteId}
-              className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-4 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>

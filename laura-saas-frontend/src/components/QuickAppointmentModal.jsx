@@ -133,7 +133,7 @@ function QuickAppointmentModal({
                             value={formData.cliente}
                             onChange={handleChange}
                             required
-                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                         >
                             <option value="">Selecione um cliente</option>
                             {clientes.map(cliente => (
@@ -150,7 +150,7 @@ function QuickAppointmentModal({
                             type="button"
                             onClick={() => setUseAvulso(false)}
                             className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${!useAvulso
-                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                                ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                 : `${subtextClass}`
                                 }`}
                         >
@@ -160,7 +160,7 @@ function QuickAppointmentModal({
                             type="button"
                             onClick={() => setUseAvulso(true)}
                             className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${useAvulso
-                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                                ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                 : `${subtextClass}`
                                 }`}
                         >
@@ -180,7 +180,7 @@ function QuickAppointmentModal({
                                 value={formData.pacote}
                                 onChange={handleChange}
                                 required={!useAvulso}
-                                className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                                className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                             >
                                 <option value="">Selecione um pacote</option>
                                 {pacotes.map(pacote => (
@@ -204,7 +204,7 @@ function QuickAppointmentModal({
                                     onChange={handleChange}
                                     placeholder="Ex: Massagem Relaxante"
                                     required={useAvulso}
-                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                                 />
                             </div>
                             <div className="col-span-2">
@@ -220,7 +220,7 @@ function QuickAppointmentModal({
                                     step="0.01"
                                     min="0"
                                     required={useAvulso}
-                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                                 />
                             </div>
                         </div>
@@ -238,7 +238,7 @@ function QuickAppointmentModal({
                             value={formData.dataHora}
                             onChange={handleChange}
                             required
-                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                         />
                     </div>
 
@@ -254,7 +254,7 @@ function QuickAppointmentModal({
                             onChange={handleChange}
                             placeholder="Observações adicionais..."
                             rows={2}
-                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none`}
+                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none`}
                         />
                     </div>
 
@@ -270,7 +270,7 @@ function QuickAppointmentModal({
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <>

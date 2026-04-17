@@ -85,7 +85,7 @@ function RescheduleConfirmModal({
                                 {formatDateTime(oldDateTime)}
                             </p>
                         </div>
-                        <ArrowRight className={`w-5 h-5 ${subtextClass} flex-shrink-0`} />
+                        <ArrowRight className={`w-5 h-5 ${subtextClass} shrink-0`} />
                         <div className={`flex-1 p-3 rounded-xl ${isDarkMode ? 'bg-green-500/10 border-green-500/20' : 'bg-green-50 border-green-200'} border`}>
                             <div className="flex items-center gap-2 mb-1">
                                 <Calendar className="w-4 h-4 text-green-400" />
@@ -142,7 +142,7 @@ function RescheduleConfirmModal({
                             onChange={(e) => setNotes(e.target.value)}
                             placeholder="Ex: Cliente solicitou remarcação por telefone"
                             rows={3}
-                            className={`w-full px-3 py-2 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none`}
+                            className={`w-full px-3 py-2 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none`}
                         />
                     </div>
                 </div>
@@ -158,7 +158,7 @@ function RescheduleConfirmModal({
                     <button
                         onClick={handleConfirm}
                         disabled={loading}
-                        className={`flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${hasWarnings ? 'from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' : ''}`}
+                        className={`flex-1 px-4 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${hasWarnings ? 'from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' : ''}`}
                     >
                         {loading ? 'Salvando...' : hasWarnings ? 'Confirmar Mesmo Assim' : 'Confirmar Remarcação'}
                     </button>

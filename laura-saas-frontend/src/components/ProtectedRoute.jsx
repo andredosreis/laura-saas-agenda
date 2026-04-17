@@ -78,7 +78,7 @@ function ProtectedRoute({ children, allowedRoles, requiredPlans }) {
                         </p>
                         <a
                             href="/configuracoes/plano"
-                            className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl transition-all"
+                            className="inline-block px-6 py-3 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl transition-all"
                         >
                             Fazer Upgrade
                         </a>

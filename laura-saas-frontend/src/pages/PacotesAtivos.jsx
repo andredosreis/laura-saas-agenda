@@ -129,7 +129,7 @@ function PacotesAtivos() {
   // Estilos condicionais
   const cardClass = isDarkMode 
     ? 'bg-slate-800/50 border border-white/10' 
-    : 'bg-white border border-gray-200 shadow-sm';
+    : 'bg-white border border-gray-200 shadow-xs';
   const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
   const subTextClass = isDarkMode ? 'text-slate-400' : 'text-gray-600';
   const inputClass = isDarkMode
@@ -166,7 +166,7 @@ function PacotesAtivos() {
             </select>
             <button
               onClick={() => navigate('/vender-pacote')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
             >
               <Plus className="w-4 h-4" />
               Vender Serviço
@@ -266,7 +266,7 @@ function PacotesAtivos() {
             </p>
             <button
               onClick={() => navigate('/vender-pacote')}
-              className="mt-4 px-6 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
+              className="mt-4 px-6 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
             >
               Vender Pacote
             </button>
@@ -375,7 +375,7 @@ function PacotesAtivos() {
                     {compra.status === 'Ativo' && compra.sessoesRestantes > 0 && (
                       <button
                         onClick={() => navigate('/criar-agendamento', { state: { clienteId: compra.cliente?._id } })}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all text-sm font-medium"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all text-sm font-medium"
                       >
                         <CalendarPlus className="w-4 h-4" />
                         Agendar Sessão
@@ -562,7 +562,7 @@ function PacotesAtivos() {
               <button
                 onClick={handleConfirmarExtensao}
                 disabled={estendendoPrazo || diasExtensao <= 0}
-                className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {estendendoPrazo ? (
                   <>

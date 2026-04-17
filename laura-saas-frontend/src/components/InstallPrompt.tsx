@@ -73,7 +73,7 @@ const InstallPrompt = () => {
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 z-50 animate-slide-up">
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+        <div className="shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
           <Download className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
         </div>
 
@@ -94,7 +94,7 @@ const InstallPrompt = () => {
             </button>
             <button
               onClick={handleDismiss}
-              className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 p-2 rounded-lg transition-colors"
+              className="shrink-0 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 p-2 rounded-lg transition-colors"
               aria-label="Dispensar"
             >
               <X className="w-5 h-5" />

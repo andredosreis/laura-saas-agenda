@@ -343,7 +343,7 @@ function CalendarView() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                     <div>
                         <h1 className={`text-2xl font-bold ${textClass} flex items-center gap-3`}>
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
                                 <CalendarIcon className="w-5 h-5 text-white" />
                             </div>
                             Calendário
@@ -357,7 +357,7 @@ function CalendarView() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => navigate('/criar-agendamento')}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20"
+                            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20"
                         >
                             <Plus className="w-4 h-4" />
                             <span className="hidden sm:inline">Novo Agendamento</span>
@@ -409,7 +409,7 @@ function CalendarView() {
                                     key={key}
                                     onClick={() => calendarApi?.changeView(key)}
                                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${currentView === key
-                                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                                        ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                         : `${subtextClass} ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-white'}`
                                         }`}
                                 >
@@ -484,11 +484,11 @@ function CalendarView() {
                                     return (
                                         <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">
                                             {/* Nome do Cliente */}
-                                            <div className="font-bold text-xs leading-tight text-white break-words w-full mb-0.5">
+                                            <div className="font-bold text-xs leading-tight text-white wrap-break-word w-full mb-0.5">
                                                 {clienteName}
                                             </div>
                                             {/* Serviço */}
-                                            <div className="text-[10px] leading-tight text-white/80 font-normal break-words w-full">
+                                            <div className="text-[10px] leading-tight text-white/80 font-normal wrap-break-word w-full">
                                                 {serviceName}
                                             </div>
                                         </div>

@@ -126,7 +126,7 @@ function Atendimentos() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="p-4 lg:p-6 pb-20">
         {/* Header */}
         <div className="mb-6">

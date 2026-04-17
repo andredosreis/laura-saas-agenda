@@ -69,7 +69,7 @@ function CriarCliente() {
   // Estilos condicionais
   const cardClass = isDarkMode 
     ? 'bg-slate-800/50 border border-white/10' 
-    : 'bg-white border border-gray-200 shadow-sm';
+    : 'bg-white border border-gray-200 shadow-xs';
   const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
   const subTextClass = isDarkMode ? 'text-slate-400' : 'text-gray-600';
   const inputClass = isDarkMode
@@ -86,13 +86,13 @@ function CriarCliente() {
   // Classes dinâmicas para inputs
   const getInputClasses = (fieldName) => {
     const state = getInputState(fieldName);
-    const baseClasses = `w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 ${inputClass}`;
+    const baseClasses = `w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 ${inputClass}`;
 
     switch (state) {
       case 'error':
-        return `${baseClasses} !border-red-500 focus:ring-red-500/20`;
+        return `${baseClasses} border-red-500! focus:ring-red-500/20`;
       case 'success':
-        return `${baseClasses} !border-emerald-500 focus:ring-emerald-500/20`;
+        return `${baseClasses} border-emerald-500! focus:ring-emerald-500/20`;
       default:
         return baseClasses;
     }
@@ -119,7 +119,7 @@ function CriarCliente() {
 
     return (
       <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-        <XCircle className="w-4 h-4 flex-shrink-0" />
+        <XCircle className="w-4 h-4 shrink-0" />
         {errors[fieldName].message}
       </p>
     );
@@ -255,7 +255,7 @@ function CriarCliente() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-4 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>

@@ -135,7 +135,7 @@ function EditarCliente() {
   const getInputClasses = (fieldName) => {
     const state = getInputState(fieldName);
     const baseClasses =
-      'mt-1 block w-full rounded border p-2 md:p-3 shadow-sm focus:ring focus:ring-blue-200 transition-all text-sm md:text-base text-gray-900';
+      'mt-1 block w-full rounded-sm border p-2 md:p-3 shadow-xs focus:ring-3 focus:ring-blue-200 transition-all text-sm md:text-base text-gray-900';
 
     switch (state) {
       case 'error':
@@ -168,7 +168,7 @@ function EditarCliente() {
 
     return (
       <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-        <XCircle className="w-4 h-4 flex-shrink-0" />
+        <XCircle className="w-4 h-4 shrink-0" />
         {errors[fieldName].message}
       </p>
     );
@@ -218,7 +218,7 @@ function EditarCliente() {
         <>
       {/* Seção de Pacotes Ativos */}
       {pacotesDoCliente.length > 0 && (
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg shadow">
+        <div className="mb-6 p-4 bg-linear-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <Package className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-semibold text-gray-800">
@@ -229,7 +229,7 @@ function EditarCliente() {
             {pacotesDoCliente.map((cp) => (
               <div
                 key={cp._id}
-                className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition"
+                className="p-3 bg-white border border-gray-200 rounded-lg shadow-xs hover:shadow-md transition"
               >
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold text-gray-800">
@@ -397,7 +397,7 @@ function EditarCliente() {
           <button
             type="button"
             onClick={() => navigate('/clientes')}
-            className="flex-1 py-2 px-4 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+            className="flex-1 py-2 px-4 rounded-sm border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
           >
             Cancelar
           </button>

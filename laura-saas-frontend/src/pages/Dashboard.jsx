@@ -298,7 +298,7 @@ function Dashboard() {
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-10 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3 flex-wrap">
-            {getSaudacao()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">{getPrimeiroNome()}</span> 👋
+            {getSaudacao()}, <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-400 to-purple-400">{getPrimeiroNome()}</span> 👋
           </h1>
           <p className="text-slate-400 mt-1 flex items-center gap-2 text-sm sm:text-base">
             <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4 text-slate-500" />
@@ -320,7 +320,7 @@ function Dashboard() {
           </button>
           <button
             onClick={() => navigate('/criar-agendamento')}
-            className="flex-1 md:flex-none px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 text-sm sm:text-base"
+            className="flex-1 md:flex-none px-3 sm:px-4 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 text-sm sm:text-base"
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden sm:inline">Novo Agendamento</span>
@@ -335,7 +335,7 @@ function Dashboard() {
           variants={itemVariants}
           className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300"
         >
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />
           <p className="text-sm flex-1">
             <span className="font-semibold">Trial a expirar:</span>{' '}
             {tenant.diasRestantesTrial === 0
@@ -353,7 +353,7 @@ function Dashboard() {
           variants={itemVariants}
           className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300"
         >
-          <Mail className="w-5 h-5 flex-shrink-0 text-blue-400" />
+          <Mail className="w-5 h-5 shrink-0 text-blue-400" />
           <p className="text-sm flex-1">
             <span className="font-semibold">Email não verificado.</span>{' '}
             Verifica o teu email para activar todas as funcionalidades.
@@ -374,10 +374,10 @@ function Dashboard() {
             }`}
           >
             {/* Gradient Background Hover */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${kpi.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+            <div className={`absolute inset-0 bg-linear-to-br ${kpi.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
 
             <div className="flex justify-between items-start mb-3 sm:mb-4">
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${kpi.gradient} flex items-center justify-center shadow-lg`}>
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-linear-to-br ${kpi.gradient} flex items-center justify-center shadow-lg`}>
                 <kpi.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${kpi.isPositive ? 'text-emerald-500 bg-emerald-500/10' : 'text-red-500 bg-red-500/10'}`}>
@@ -424,7 +424,7 @@ function Dashboard() {
                   {agendamentosHoje.map((ag, i) => (
                     <div key={ag._id} className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all duration-300">
                       {/* Time Block */}
-                      <div className="flex flex-col items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-900 border border-white/10 group-hover:border-indigo-500/50 transition-colors flex-shrink-0">
+                      <div className="flex flex-col items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-900 border border-white/10 group-hover:border-indigo-500/50 transition-colors shrink-0">
                         <span className="text-base sm:text-lg font-bold text-white">{formatarDataHora(ag.dataHora)}</span>
                       </div>
 
@@ -432,13 +432,13 @@ function Dashboard() {
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-base sm:text-lg text-white mb-1 truncate">{ag.cliente?.nome}</h4>
                         <p className="text-slate-400 text-xs sm:text-sm flex items-center gap-2 truncate">
-                          <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0"></span>
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
                           <span className="truncate">{ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço Geral'}</span>
                         </p>
                       </div>
 
                       {/* Status & Actions */}
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                         <div className={`px-2 sm:px-3 py-1 rounded-full border text-[10px] sm:text-xs font-medium whitespace-nowrap ${getStatusColor(ag.status)}`}>
                           {ag.status}
                         </div>
@@ -566,7 +566,7 @@ function Dashboard() {
                         {/* Data */}
                         <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-lg ${
                           isHoje
-                            ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
+                            ? 'bg-linear-to-br from-indigo-500 to-purple-600 text-white'
                             : isDark ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700 border border-slate-200'
                         }`}>
                           <span className="text-[10px] uppercase font-medium">{diaSemana}</span>
@@ -581,7 +581,7 @@ function Dashboard() {
                               {ag.cliente?.nome || 'Cliente'}
                             </span>
                             {isHoje && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-medium">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-indigo-500/20 text-indigo-400 font-medium">
                                 HOJE
                               </span>
                             )}
@@ -594,7 +594,7 @@ function Dashboard() {
                         </div>
 
                         {/* Arrow */}
-                        <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
+                        <ChevronRight className={`w-4 h-4 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
                       </div>
                     );
                   })}
@@ -720,7 +720,7 @@ function Dashboard() {
                 <div key={ag._id} className={`flex items-center gap-3 p-3 rounded-xl ${
                   isDark ? 'bg-white/5 border border-white/5' : 'bg-slate-50 border border-slate-200'
                 }`}>
-                  <div className="text-center min-w-[3rem]">
+                  <div className="text-center min-w-12">
                     <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{formatarDataHora(ag.dataHora)}</p>
                   </div>
                   <div className="min-w-0">

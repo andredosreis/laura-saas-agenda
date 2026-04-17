@@ -66,7 +66,7 @@ function CriarPacote() {
 
   const getInputClasses = (fieldName) => {
     const state = getInputState(fieldName);
-    const baseClasses = `mt-1 block w-full rounded-md p-2 shadow-sm focus:ring-amber-500 transition-all ${
+    const baseClasses = `mt-1 block w-full rounded-md p-2 shadow-xs focus:ring-amber-500 transition-all ${
       isDarkMode 
         ? 'bg-gray-700 border-gray-600 text-gray-100' 
         : 'bg-white border-gray-300 text-gray-900'
@@ -99,7 +99,7 @@ function CriarPacote() {
     if (!errors[fieldName]) return null;
     return (
       <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-        <XCircle className="w-4 h-4 flex-shrink-0" />
+        <XCircle className="w-4 h-4 shrink-0" />
         {errors[fieldName].message}
       </p>
     );
@@ -111,7 +111,7 @@ function CriarPacote() {
         <div className="max-w-2xl mx-auto">
           <button
             onClick={() => navigate('/pacotes')}
-            className={`mb-6 inline-flex items-center gap-2 px-4 py-2 border rounded-lg shadow-sm text-sm font-medium transition-colors ${
+            className={`mb-6 inline-flex items-center gap-2 px-4 py-2 border rounded-lg shadow-xs text-sm font-medium transition-colors ${
               isDarkMode 
                 ? 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700' 
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -231,7 +231,7 @@ function CriarPacote() {
                 id="ativo"
                 type="checkbox"
                 {...register('ativo')}
-                className="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                className="h-4 w-4 text-amber-600 border-gray-300 rounded-sm focus:ring-amber-500"
               />
               <label htmlFor="ativo" className={`ml-2 block text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
                 Serviço Ativo
@@ -242,7 +242,7 @@ function CriarPacote() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
             >
               {isSubmitting ? 'A criar serviço...' : 'Criar Serviço'}
             </button>

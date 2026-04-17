@@ -148,7 +148,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
         <div className="max-w-2xl mx-auto">
           <button
             onClick={() => navigate('/pacotes')}
-            className={`mb-6 inline-flex items-center gap-2 px-4 py-2 border rounded-lg shadow-sm text-sm font-medium transition-colors ${
+            className={`mb-6 inline-flex items-center gap-2 px-4 py-2 border rounded-lg shadow-xs text-sm font-medium transition-colors ${
               isDarkMode 
                 ? 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700' 
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -178,7 +178,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                   id="nome"
                   value={formData.nome}
                   onChange={handleChange}
-                  className={`mt-1 block w-full rounded-md p-2 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${
+                  className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
                     isDarkMode 
                       ? 'bg-gray-700 border-gray-600 text-gray-100' 
                       : 'bg-white border-gray-300 text-gray-900'
@@ -198,7 +198,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                   id="categoria"
                   value={formData.categoria}
                   onChange={handleChange}
-                  className={`mt-1 block w-full rounded-md p-2 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${
+                  className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
                     isDarkMode 
                       ? 'bg-gray-700 border-gray-600 text-gray-100' 
                       : 'bg-white border-gray-300 text-gray-900'
@@ -220,7 +220,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                     min="1"
                     value={formData.sessoes}
                     onChange={handleChange}
-                    className={`mt-1 block w-full rounded-md p-2 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${
+                    className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
                       isDarkMode 
                         ? 'bg-gray-700 border-gray-600 text-gray-100' 
                         : 'bg-white border-gray-300 text-gray-900'
@@ -243,7 +243,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                     min="0"
                     step="0.01"
                     placeholder="Ex: 50.00"
-                    className={`mt-1 block w-full rounded-md p-2 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${
+                    className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
                       isDarkMode 
                         ? 'bg-gray-700 border-gray-600 text-gray-100' 
                         : 'bg-white border-gray-300 text-gray-900'
@@ -264,7 +264,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                   rows="3"
                   value={formData.descricao}
                   onChange={handleChange}
-                  className={`mt-1 block w-full rounded-md p-2 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${
+                  className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
                     isDarkMode 
                       ? 'bg-gray-700 border-gray-600 text-gray-100' 
                       : 'bg-white border-gray-300 text-gray-900'
@@ -280,7 +280,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
                   type="checkbox"
                   checked={formData.ativo}
                   onChange={handleChange}
-                  className="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                  className="h-4 w-4 text-amber-600 border-gray-300 rounded-sm focus:ring-amber-500"
                 />
                 <label htmlFor="ativo" className={`ml-2 block text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
                   Serviço Ativo
@@ -291,7 +291,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
               <button
                 type="submit"
                 disabled={isSubmitting || isLoading}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
               >
                 {isSubmitting ? 'A guardar alterações...' : 'Salvar Alterações'}
               </button>

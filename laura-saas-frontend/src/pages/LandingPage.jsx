@@ -157,10 +157,10 @@ const LandingPage = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
                                 <Sparkles className="w-5 h-5 text-white" />
                             </div>
-                            <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                            <span className="text-xl font-bold bg-linear-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
                                 Laura SAAS
                             </span>
                         </div>
@@ -179,7 +179,7 @@ const LandingPage = () => {
                             </Link>
                             <Link
                                 to="/registrar"
-                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-medium shadow-lg shadow-indigo-500/25"
+                                className="px-4 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-medium shadow-lg shadow-indigo-500/25"
                             >
                                 Começar Grátis
                             </Link>
@@ -194,7 +194,7 @@ const LandingPage = () => {
                             </Link>
                             <Link
                                 to="/registrar"
-                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 font-medium text-sm"
+                                className="px-4 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 font-medium text-sm"
                             >
                                 Começar
                             </Link>
@@ -209,7 +209,7 @@ const LandingPage = () => {
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/30 rounded-full blur-[100px]" />
                     <div className="absolute top-20 -left-40 w-80 h-80 bg-indigo-500/30 rounded-full blur-[100px]" />
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-linear-to-r from-transparent via-indigo-500/50 to-transparent" />
                 </div>
 
                 <motion.div
@@ -233,7 +233,7 @@ const LandingPage = () => {
                         className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
                     >
                         <span className="block">Sua Agenda no</span>
-                        <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                        <span className="bg-linear-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                             Piloto Automático
                         </span>
                     </motion.h1>
@@ -255,7 +255,7 @@ const LandingPage = () => {
                     >
                         <Link
                             to="/registrar"
-                            className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-2xl shadow-indigo-500/25 hover:shadow-indigo-500/40"
+                            className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-2xl shadow-indigo-500/25 hover:shadow-indigo-500/40"
                         >
                             Começar Grátis
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -270,11 +270,11 @@ const LandingPage = () => {
 
                     {/* Hero Image / Dashboard Preview */}
                     <motion.div variants={scaleIn} className="relative max-w-5xl mx-auto">
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent z-10 pointer-events-none" />
+                        <div className="absolute inset-0 bg-linear-to-t from-slate-900 via-transparent to-transparent z-10 pointer-events-none" />
                         <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-purple-500/10 bg-slate-800/50 backdrop-blur-sm">
-                            <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+                            <div className="aspect-video bg-linear-to-br from-slate-800 to-slate-900 flex items-center justify-center">
                                 <div className="text-center p-8">
-                                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/30">
+                                    <div className="w-24 h-24 rounded-2xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/30">
                                         <Calendar className="w-12 h-12 text-white" />
                                     </div>
                                     <p className="text-slate-400 text-lg">Dashboard Premium</p>
@@ -339,7 +339,7 @@ const LandingPage = () => {
                                 className="group relative p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all duration-300"
                             >
                                 {/* Icon */}
-                                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                                <div className={`w-14 h-14 rounded-xl bg-linear-to-br ${feature.gradient} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                                     <feature.icon className="w-7 h-7 text-white" />
                                 </div>
 
@@ -363,25 +363,25 @@ const LandingPage = () => {
                 >
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                         <motion.div variants={fadeInUp}>
-                            <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-2">
+                            <div className="text-4xl md:text-5xl font-bold bg-linear-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-2">
                                 98%
                             </div>
                             <p className="text-slate-400">Taxa de Satisfação</p>
                         </motion.div>
                         <motion.div variants={fadeInUp}>
-                            <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-2">
+                            <div className="text-4xl md:text-5xl font-bold bg-linear-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-2">
                                 -70%
                             </div>
                             <p className="text-slate-400">Redução de No-Shows</p>
                         </motion.div>
                         <motion.div variants={fadeInUp}>
-                            <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent mb-2">
+                            <div className="text-4xl md:text-5xl font-bold bg-linear-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent mb-2">
                                 24/7
                             </div>
                             <p className="text-slate-400">Disponibilidade IA</p>
                         </motion.div>
                         <motion.div variants={fadeInUp}>
-                            <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent mb-2">
+                            <div className="text-4xl md:text-5xl font-bold bg-linear-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent mb-2">
                                 5min
                             </div>
                             <p className="text-slate-400">Para Começar</p>
@@ -448,7 +448,7 @@ const LandingPage = () => {
                         >
                             <div className="relative w-72 h-[580px] rounded-[3rem] bg-slate-800 border-4 border-slate-700 shadow-2xl overflow-hidden">
                                 {/* Phone Screen */}
-                                <div className="absolute inset-4 rounded-[2.5rem] bg-gradient-to-b from-slate-700 to-slate-800 overflow-hidden">
+                                <div className="absolute inset-4 rounded-[2.5rem] bg-linear-to-b from-slate-700 to-slate-800 overflow-hidden">
                                     {/* WhatsApp Header */}
                                     <div className="bg-green-600 p-4 flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
@@ -529,13 +529,13 @@ const LandingPage = () => {
                                 key={index}
                                 variants={fadeInUp}
                                 className={`relative rounded-2xl p-8 transition-all duration-300 ${plan.popular
-                                    ? 'bg-gradient-to-b from-indigo-500/20 to-purple-500/10 border-2 border-indigo-500/50 scale-105 shadow-2xl shadow-indigo-500/20'
+                                    ? 'bg-linear-to-b from-indigo-500/20 to-purple-500/10 border-2 border-indigo-500/50 scale-105 shadow-2xl shadow-indigo-500/20'
                                     : 'bg-white/5 border border-white/10 hover:border-white/20'
                                     }`}
                             >
                                 {/* Popular Badge */}
                                 {plan.popular && (
-                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-medium shadow-lg">
+                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-linear-to-r from-indigo-500 to-purple-600 text-sm font-medium shadow-lg">
                                         Mais Popular
                                     </div>
                                 )}
@@ -568,7 +568,7 @@ const LandingPage = () => {
                                 <Link
                                     to="/registrar"
                                     className={`block w-full py-3 rounded-xl font-semibold text-center transition-all duration-300 ${plan.popular
-                                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25'
+                                        ? 'bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25'
                                         : 'bg-white/10 hover:bg-white/20 border border-white/10'
                                         }`}
                                 >
@@ -677,20 +677,20 @@ const LandingPage = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-300">Nome</label>
-                                        <input type="text" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-none text-white placeholder:text-slate-600" placeholder="Seu nome" />
+                                        <input type="text" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-hidden text-white placeholder:text-slate-600" placeholder="Seu nome" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-300">Empresa</label>
-                                        <input type="text" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-none text-white placeholder:text-slate-600" placeholder="Sua clínica" />
+                                        <input type="text" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-hidden text-white placeholder:text-slate-600" placeholder="Sua clínica" />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-slate-300">Email</label>
-                                    <input type="email" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-none text-white placeholder:text-slate-600" placeholder="seu@email.com" />
+                                    <input type="email" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-hidden text-white placeholder:text-slate-600" placeholder="seu@email.com" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-slate-300">Mensagem</label>
-                                    <textarea rows="4" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-none text-white placeholder:text-slate-600 resize-none" placeholder="Como podemos ajudar?"></textarea>
+                                    <textarea rows="4" className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 focus:border-indigo-500 outline-hidden text-white placeholder:text-slate-600 resize-none" placeholder="Como podemos ajudar?"></textarea>
                                 </div>
                                 <button className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors font-semibold text-white shadow-lg shadow-indigo-500/25">
                                     Enviar Mensagem
@@ -710,9 +710,9 @@ const LandingPage = () => {
                     viewport={{ once: true, margin: "-100px" }}
                     variants={scaleIn}
                 >
-                    <div className="p-12 rounded-3xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 relative overflow-hidden">
+                    <div className="p-12 rounded-3xl bg-linear-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 relative overflow-hidden">
                         {/* Background decoration */}
-                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent" />
 
                         <div className="relative">
                             <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -723,7 +723,7 @@ const LandingPage = () => {
                             </p>
                             <Link
                                 to="/registrar"
-                                className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-2xl shadow-indigo-500/25"
+                                className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-2xl shadow-indigo-500/25"
                             >
                                 Criar Conta Grátis
                                 <ArrowRight className="w-5 h-5" />
@@ -741,7 +741,7 @@ const LandingPage = () => {
                 <div className="max-w-7xl mx-auto">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
                                 <Sparkles className="w-5 h-5 text-white" />
                             </div>
                             <span className="text-lg font-bold">Laura SAAS</span>

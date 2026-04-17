@@ -160,7 +160,7 @@ function Financeiro() {
                             </div>
                         )}
                     </div>
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colorStyles[color]} flex items-center justify-center shadow-lg`}>
+                    <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${colorStyles[color]} flex items-center justify-center shadow-lg`}>
                         <Icon className="w-6 h-6 text-white" />
                     </div>
                 </div>
@@ -176,7 +176,7 @@ function Financeiro() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                     <div>
                         <h1 className={`text-2xl font-bold ${textClass} flex items-center gap-3`}>
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center">
                                 <TrendingUp className="w-5 h-5 text-white" />
                             </div>
                             Financeiro
@@ -210,7 +210,7 @@ function Financeiro() {
                                     key={idx}
                                     onClick={() => setSelectedPreset(idx)}
                                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedPreset === idx
-                                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                                            ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                             : `${subtextClass} ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-white'}`
                                         }`}
                                 >
@@ -227,7 +227,7 @@ function Financeiro() {
                                     key={value}
                                     onClick={() => setPeriodo(value)}
                                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${periodo === value
-                                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                                            ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                             : `${subtextClass} ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-white'}`
                                         }`}
                                 >

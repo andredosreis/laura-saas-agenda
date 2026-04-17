@@ -342,7 +342,7 @@ function EditarAgendamento() {
       <div className="max-w-2xl mx-auto">
         <button
           onClick={() => navigate('/agendamentos')}
-          className="mb-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          className="mb-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-gray-600 hover:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
           &larr; Voltar para Agendamentos
         </button>
@@ -358,7 +358,7 @@ function EditarAgendamento() {
               type="button"
               onClick={() => handleStatusChange('Realizado')}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors"
+              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-hidden focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors"
             >
               ✓ Marcar como Realizado
             </button>
@@ -366,7 +366,7 @@ function EditarAgendamento() {
               type="button"
               onClick={() => handleStatusChange('Cancelado Pelo Cliente')}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition-colors"
+              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition-colors"
             >
               ✗ Cancelar (Cliente)
             </button>
@@ -374,7 +374,7 @@ function EditarAgendamento() {
               type="button"
               onClick={() => handleStatusChange('Cancelado Pelo Salão')}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors"
+              className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors"
             >
               ✗ Cancelar (Salão)
             </button>
@@ -396,7 +396,7 @@ function EditarAgendamento() {
                   value={formData.clienteId}
                   onChange={(e) => handleClienteChange(e.target.value)}
                   disabled={isSubmitting}
-                  className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
                 >
                   <option value="">Selecione um cliente</option>
                   {clientes.map((cliente) => (
@@ -439,7 +439,7 @@ function EditarAgendamento() {
                   value={formData.dataHora}
                   onChange={handleChange}
                   disabled={isSubmitting}
-                  className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.dataHora ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.dataHora ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 {fieldErrors.dataHora && <p className="mt-1 text-sm text-red-500">{fieldErrors.dataHora}</p>}
               </div>
@@ -500,7 +500,7 @@ function EditarAgendamento() {
 
                 {/* Se for pacote e o cliente tem pacote, mostramos o pacote fixo */}
                 {formData.tipoServico === 'pacote' && clienteTemPacote ? (
-                  <div className="p-2 bg-gray-100 border border-gray-300 rounded text-gray-700">
+                  <div className="p-2 bg-gray-100 border border-gray-300 rounded-sm text-gray-700">
                     {clienteSelecionado.pacote.nome}
                   </div>
                 ) : (
@@ -511,7 +511,7 @@ function EditarAgendamento() {
                     value={formData.pacoteId}
                     onChange={handleChange}
                     disabled={isSubmitting || (formData.tipoServico === 'pacote' && clienteTemPacote)}
-                    className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.pacoteId ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.pacoteId ? 'border-red-500' : 'border-gray-300'}`}
                   >
                     <option value="">Selecione um serviço</option>
                     {pacotes.map((pacote) => (
@@ -541,7 +541,7 @@ function EditarAgendamento() {
                   value={formData.observacoes}
                   onChange={handleChange}
                   disabled={isSubmitting}
-                  className="block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 border-gray-300"
+                  className="block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 border-gray-300"
                   rows="3"
                   placeholder="Ex: Cliente quer massagem com pressão leve."
                 ></textarea>
@@ -558,7 +558,7 @@ function EditarAgendamento() {
                   value={formData.status}
                   onChange={handleChange}
                   disabled={isSubmitting}
-                  className={`block w-full rounded-md p-3 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-200 ${fieldErrors.status ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.status ? 'border-red-500' : 'border-gray-300'}`}
                 >
                   <option value="Agendado">Agendado</option>
                   <option value="Confirmado">Confirmado</option>
@@ -576,7 +576,7 @@ function EditarAgendamento() {
                 type="submit"
                 disabled={isSubmitting}
                 className={`w-full py-3 px-4 rounded-md font-semibold text-white transition-colors ${
-                  isSubmitting ? 'bg-amber-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500'
+                  isSubmitting ? 'bg-amber-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-amber-500'
                 }`}
               >
                 {isSubmitting ? 'A guardar...' : 'Salvar Alterações'}

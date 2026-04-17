@@ -291,7 +291,7 @@ const HistoricoAtendimentos = ({ clienteId }) => {
                       </div>
 
                       {/* Botões de ação */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={(e) => handleEditar(e, historico)}
                           className={`p-2 rounded-lg transition-colors ${

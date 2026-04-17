@@ -147,7 +147,7 @@ function Caixa() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className={`text-2xl font-bold ${textClass} flex items-center gap-3`}>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-white" />
               </div>
               Controle de Caixa
@@ -164,7 +164,7 @@ function Caixa() {
                 </span>
                 <button
                   onClick={() => setModalFechar(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:opacity-90 transition font-medium shadow-lg shadow-red-500/20"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-red-500 to-red-600 text-white rounded-xl hover:opacity-90 transition font-medium shadow-lg shadow-red-500/20"
                 >
                   <Lock className="w-4 h-4" />
                   Fechar Caixa
@@ -178,7 +178,7 @@ function Caixa() {
                 </span>
                 <button
                   onClick={() => setModalAbrir(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:opacity-90 transition font-medium shadow-lg shadow-indigo-500/20"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:opacity-90 transition font-medium shadow-lg shadow-indigo-500/20"
                 >
                   <Unlock className="w-4 h-4" />
                   Abrir Caixa
@@ -198,7 +198,7 @@ function Caixa() {
                   €{statusCaixa?.movimentacao?.saldoAtual?.toFixed(2) || '0.00'}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -212,7 +212,7 @@ function Caixa() {
                   €{statusCaixa?.movimentacao?.receitas?.toFixed(2) || '0.00'}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-emerald-500 to-green-600 flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -226,7 +226,7 @@ function Caixa() {
                   €{statusCaixa?.movimentacao?.despesas?.toFixed(2) || '0.00'}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-red-500 to-rose-600 flex items-center justify-center">
                 <TrendingDown className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -240,7 +240,7 @@ function Caixa() {
                   {statusCaixa?.detalhes?.quantidadePagamentos || 0}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
                 <AlertCircle className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -333,7 +333,7 @@ function Caixa() {
                   min="0"
                   value={valorInicial}
                   onChange={(e) => setValorInicial(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
@@ -347,7 +347,7 @@ function Caixa() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:opacity-90 transition font-medium"
+                  className="flex-1 px-4 py-3 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Abrir Caixa
                 </button>
@@ -384,7 +384,7 @@ function Caixa() {
                   value={saldoContado}
                   onChange={(e) => setSaldoContado(e.target.value)}
                   required
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
@@ -396,7 +396,7 @@ function Caixa() {
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
                   rows="3"
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 resize-none ${inputClass}`}
                   placeholder="Observações sobre o fechamento..."
                 />
               </div>
@@ -410,7 +410,7 @@ function Caixa() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:opacity-90 transition font-medium"
+                  className="flex-1 px-4 py-3 bg-linear-to-r from-red-500 to-rose-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Fechar Caixa
                 </button>
@@ -440,7 +440,7 @@ function Caixa() {
                   value={valorSangria}
                   onChange={(e) => setValorSangria(e.target.value)}
                   required
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-red-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
@@ -451,7 +451,7 @@ function Caixa() {
                   value={motivoSangria}
                   onChange={(e) => setMotivoSangria(e.target.value)}
                   required
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-red-500/20 ${inputClass}`}
                   placeholder="Ex: Pagamento de fornecedor"
                 />
               </div>
@@ -465,7 +465,7 @@ function Caixa() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:opacity-90 transition font-medium"
+                  className="flex-1 px-4 py-3 bg-linear-to-r from-red-500 to-rose-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Registrar
                 </button>
@@ -495,7 +495,7 @@ function Caixa() {
                   value={valorSuprimento}
                   onChange={(e) => setValorSuprimento(e.target.value)}
                   required
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 ${inputClass}`}
                   placeholder="0.00"
                 />
               </div>
@@ -506,7 +506,7 @@ function Caixa() {
                   value={motivoSuprimento}
                   onChange={(e) => setMotivoSuprimento(e.target.value)}
                   required
-                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${inputClass}`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 ${inputClass}`}
                   placeholder="Ex: Troco inicial"
                 />
               </div>
@@ -520,7 +520,7 @@ function Caixa() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:opacity-90 transition font-medium"
+                  className="flex-1 px-4 py-3 bg-linear-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:opacity-90 transition font-medium"
                 >
                   Registrar
                 </button>

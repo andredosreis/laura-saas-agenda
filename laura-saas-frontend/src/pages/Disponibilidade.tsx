@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, Edit2, Check, X, Calendar } from 
 
 // Componente para um "slot" de agendamento na agenda
 const AgendamentoSlot = ({ agendamento }: { agendamento: Agendamento }) => (
-  <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-l-4 border-indigo-500 p-2 rounded-r-md shadow-lg text-xs absolute w-[calc(100%-8px)] left-1 backdrop-blur-sm">
+  <div className="bg-linear-to-r from-indigo-500/20 to-purple-500/20 border-l-4 border-indigo-500 p-2 rounded-r-md shadow-lg text-xs absolute w-[calc(100%-8px)] left-1 backdrop-blur-sm">
     <p className="font-bold text-indigo-700 dark:text-indigo-300">{agendamento.cliente.nome}</p>
     <p className="text-indigo-600 dark:text-indigo-400">{agendamento.cliente.telefone}</p>
   </div>
@@ -85,7 +85,7 @@ const EditScheduleModal = ({
               id="isActive"
               checked={formData.isActive}
               onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
+              className="w-5 h-5 rounded-sm border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
             />
             <label htmlFor="isActive" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
               Dia ativo para agendamentos
@@ -170,7 +170,7 @@ const EditScheduleModal = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/30 flex items-center gap-2"
+              className="px-6 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/30 flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
               Salvar
@@ -265,7 +265,7 @@ const AgendaDisponibilidade = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center">
           <RefreshCw className="w-12 h-12 text-indigo-500 animate-spin mx-auto mb-4" />
           <p className="text-slate-600 dark:text-slate-400 font-medium">A carregar agenda...</p>
@@ -276,7 +276,7 @@ const AgendaDisponibilidade = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <X className="w-8 h-8 text-red-500" />
@@ -288,13 +288,13 @@ const AgendaDisponibilidade = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6 lg:p-8">
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-linear-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                 Agenda Semanal
               </h1>
               <p className="text-slate-500 dark:text-slate-400 mt-1">
@@ -305,7 +305,7 @@ const AgendaDisponibilidade = () => {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={goToPreviousWeek}
-                className="px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all border border-slate-300 dark:border-slate-600 shadow-sm flex items-center gap-2 font-medium"
+                className="px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all border border-slate-300 dark:border-slate-600 shadow-xs flex items-center gap-2 font-medium"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Anterior
@@ -313,7 +313,7 @@ const AgendaDisponibilidade = () => {
 
               <button
                 onClick={goToCurrentWeek}
-                className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/30 font-medium"
+                className="px-4 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/30 font-medium"
               >
                 Hoje
               </button>
@@ -324,7 +324,7 @@ const AgendaDisponibilidade = () => {
 
               <button
                 onClick={goToNextWeek}
-                className="px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all border border-slate-300 dark:border-slate-600 shadow-sm flex items-center gap-2 font-medium"
+                className="px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all border border-slate-300 dark:border-slate-600 shadow-xs flex items-center gap-2 font-medium"
               >
                 Próxima
                 <ChevronRight className="w-4 h-4" />
@@ -359,7 +359,7 @@ const AgendaDisponibilidade = () => {
                     {daySchedule && (
                       <button
                         onClick={() => handleEditSchedule(daySchedule)}
-                        className="px-3 py-1.5 text-xs bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md flex items-center gap-1.5 font-medium"
+                        className="px-3 py-1.5 text-xs bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md flex items-center gap-1.5 font-medium"
                       >
                         <Edit2 className="w-3 h-3" />
                         Editar
@@ -442,19 +442,19 @@ const AgendaDisponibilidade = () => {
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Legenda</h3>
           <div className="flex flex-wrap gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-700 rounded"></div>
+              <div className="w-6 h-6 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-700 rounded-sm"></div>
               <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Horário disponível</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700 rounded"></div>
+              <div className="w-6 h-6 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700 rounded-sm"></div>
               <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Agendamento marcado</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-700 rounded"></div>
+              <div className="w-6 h-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-700 rounded-sm"></div>
               <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Horário de pausa</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-slate-100 dark:bg-slate-900/50 border-2 border-slate-300 dark:border-slate-700 rounded"></div>
+              <div className="w-6 h-6 bg-slate-100 dark:bg-slate-900/50 border-2 border-slate-300 dark:border-slate-700 rounded-sm"></div>
               <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Fora do expediente</span>
             </div>
           </div>

@@ -266,7 +266,7 @@ function Transacoes() {
   // Estilos condicionais
   const cardClass = isDarkMode 
     ? 'bg-slate-800/50 border border-white/10' 
-    : 'bg-white border border-gray-200 shadow-sm';
+    : 'bg-white border border-gray-200 shadow-xs';
   const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
   const subTextClass = isDarkMode ? 'text-slate-400' : 'text-gray-600';
   const inputClass = isDarkMode
@@ -299,7 +299,7 @@ function Transacoes() {
             </button>
             <button
               onClick={() => setShowNovaDespesa(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-pink-600 text-white hover:opacity-90 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-red-500 to-pink-600 text-white hover:opacity-90 transition-all"
             >
               <Plus className="w-4 h-4" />
               Nova Despesa
@@ -639,7 +639,7 @@ function Transacoes() {
                 <button
                   type="submit"
                   disabled={salvandoDespesa}
-                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-red-500 to-pink-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {salvandoDespesa ? (
                     <>
@@ -869,7 +869,7 @@ function Transacoes() {
                 <button
                   type="submit"
                   disabled={salvandoEdicao}
-                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {salvandoEdicao ? (
                     <>

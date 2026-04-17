@@ -14,7 +14,7 @@ const ClienteCard = ({ cliente, pacotes = [], onEdit, onDelete }) => {
   const primeiroPacote = pacotes[0];
 
   return (
-    <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition duration-300">
+    <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-xs hover:shadow-md transition duration-300">
       <h2 className="text-lg font-semibold text-gray-800">
         {cliente.nome || 'Nome não informado'}
       </h2>
@@ -30,13 +30,13 @@ const ClienteCard = ({ cliente, pacotes = [], onEdit, onDelete }) => {
       <div className="mt-4 flex gap-2">
         <button
           onClick={() => onEdit(cliente._id)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-sm text-sm"
         >
           Editar
         </button>
         <button
           onClick={() => onDelete(cliente._id)}
-          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-sm text-sm"
         >
           Deletar
         </button>
@@ -131,7 +131,7 @@ function Clientes() {
           <h1 className="text-2xl font-bold">Lista de Clientes</h1>
           <button
             onClick={() => navigate('/criar-cliente')}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-sm"
           >
             Novo Cliente
           </button>
@@ -142,7 +142,7 @@ function Clientes() {
           placeholder="Buscar por nome ou telefone..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
-          className="w-full mb-6 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+          className="w-full mb-6 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-400 focus:outline-hidden focus:border-indigo-500"
         />
 
         {clientes.length === 0 ? (

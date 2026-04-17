@@ -31,7 +31,7 @@ function VerificarEmail() {
     }, [token]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
@@ -78,7 +78,7 @@ function VerificarEmail() {
                             </p>
                             <Link
                                 to="/login"
-                                className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                                className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                             >
                                 Fazer login
                             </Link>
@@ -104,14 +104,14 @@ function VerificarEmail() {
                             <div className="space-y-3">
                                 <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
                                     <p className="text-indigo-300 text-sm flex items-start gap-2">
-                                        <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                        <Mail className="w-4 h-4 mt-0.5 shrink-0" />
                                         Se a sua conta já estiver ativa, pode fazer login normalmente. O email de verificação é opcional.
                                     </p>
                                 </div>
 
                                 <Link
                                     to="/login"
-                                    className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                                    className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                                 >
                                     Ir para o login
                                 </Link>
