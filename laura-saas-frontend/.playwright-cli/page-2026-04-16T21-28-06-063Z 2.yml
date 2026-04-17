@@ -1,0 +1,207 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - link [ref=e61] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e62]:
+              - generic [ref=e68]: marca
+              - generic [ref=e69]: ai
+              - generic [ref=e70]: SMART AGENDA
+          - generic [ref=e71]:
+            - generic [ref=e72]: L
+            - generic [ref=e73]:
+              - paragraph [ref=e74]: Laura
+              - paragraph [ref=e75]: laura@laesteticaavancada.pt
+        - navigation [ref=e76]:
+          - generic [ref=e77]:
+            - link "Dashboard" [ref=e80] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e81]
+              - generic [ref=e86]: Dashboard
+            - generic [ref=e87]:
+              - button "FINANÇAS" [ref=e88] [cursor=pointer]:
+                - generic [ref=e89]: FINANÇAS
+                - img [ref=e90]
+              - generic [ref=e92]:
+                - link "Transações" [ref=e93] [cursor=pointer]:
+                  - /url: /transacoes
+                  - img [ref=e94]
+                  - generic [ref=e97]: Transações
+                - link "Vendas" [ref=e98] [cursor=pointer]:
+                  - /url: /pacotes-ativos
+                  - img [ref=e99]
+                  - generic [ref=e102]: Vendas
+                - link "Relatórios" [ref=e103] [cursor=pointer]:
+                  - /url: /financeiro
+                  - img [ref=e104]
+                  - generic [ref=e107]: Relatórios
+            - generic [ref=e109]:
+              - button "AGENDAMENTO" [ref=e110] [cursor=pointer]:
+                - generic [ref=e111]: AGENDAMENTO
+                - img [ref=e112]
+              - generic [ref=e114]:
+                - link "Calendário" [ref=e115] [cursor=pointer]:
+                  - /url: /calendario
+                  - img [ref=e116]
+                  - generic [ref=e118]: Calendário
+                - link "Atendimentos" [ref=e119] [cursor=pointer]:
+                  - /url: /atendimentos
+                  - img [ref=e120]
+                  - generic [ref=e124]: Atendimentos
+            - generic [ref=e126]:
+              - button "ADMINISTRATIVO" [ref=e127] [cursor=pointer]:
+                - generic [ref=e128]: ADMINISTRATIVO
+                - img [ref=e129]
+              - generic [ref=e131]:
+                - link "Clientes" [ref=e132] [cursor=pointer]:
+                  - /url: /clientes
+                  - img [ref=e133]
+                  - generic [ref=e138]: Clientes
+                - link "Serviços" [ref=e139] [cursor=pointer]:
+                  - /url: /pacotes
+                  - img [ref=e140]
+                  - generic [ref=e144]: Serviços
+                - link "Disponibilidade" [ref=e145] [cursor=pointer]:
+                  - /url: /disponibilidade
+                  - img [ref=e146]
+                  - generic [ref=e149]: Disponibilidade
+        - button "Sair da Conta" [ref=e152] [cursor=pointer]:
+          - img [ref=e153]
+          - generic [ref=e156]: Sair da Conta
+    - generic [ref=e158]:
+      - generic [ref=e159]:
+        - generic [ref=e160]:
+          - heading "Boa noite, Laura 👋" [level=1] [ref=e161]:
+            - text: Boa noite,
+            - generic [ref=e162]: Laura
+            - text: 👋
+          - paragraph [ref=e163]:
+            - img [ref=e164]
+            - generic [ref=e166]: quinta-feira, 16 de abril
+        - generic [ref=e167]:
+          - button "Ativar modo escuro" [ref=e168] [cursor=pointer]:
+            - img [ref=e169]
+          - button [ref=e171] [cursor=pointer]:
+            - img [ref=e172]
+          - button [ref=e175] [cursor=pointer]:
+            - img [ref=e176]
+          - button "Novo Agendamento" [ref=e181] [cursor=pointer]:
+            - img [ref=e182]
+            - generic [ref=e185]: Novo Agendamento
+      - generic [ref=e186]:
+        - generic [ref=e187]:
+          - generic [ref=e189]:
+            - img [ref=e191]
+            - generic [ref=e193]:
+              - text: +5%
+              - img [ref=e194]
+          - generic [ref=e197]:
+            - paragraph [ref=e198]: Faturamento
+            - heading "€0" [level=3] [ref=e199]
+            - paragraph [ref=e200]: total acumulado
+        - generic [ref=e201]:
+          - generic [ref=e203]:
+            - img [ref=e205]
+            - generic [ref=e207]:
+              - text: +3%
+              - img [ref=e208]
+          - generic [ref=e211]:
+            - paragraph [ref=e212]: Agendamentos
+            - heading "0" [level=3] [ref=e213]
+            - paragraph [ref=e214]: hoje e amanhã
+        - generic [ref=e215]:
+          - generic [ref=e217]:
+            - img [ref=e219]
+            - generic [ref=e224]:
+              - text: +12%
+              - img [ref=e225]
+          - generic [ref=e228]:
+            - paragraph [ref=e229]: Clientes Ativos
+            - heading "17" [level=3] [ref=e230]
+            - paragraph [ref=e231]: base total
+        - generic [ref=e232]:
+          - generic [ref=e234]:
+            - img [ref=e236]
+            - generic [ref=e238]:
+              - text: "-2%"
+              - img [ref=e239]
+          - generic [ref=e242]:
+            - paragraph [ref=e243]: Comparecimento
+            - heading "0%" [level=3] [ref=e244]
+            - paragraph [ref=e245]: taxa mensal
+      - generic [ref=e246]:
+        - generic [ref=e247]:
+          - generic [ref=e248]:
+            - generic [ref=e249]:
+              - heading "Agenda de Hoje" [level=2] [ref=e250]:
+                - img [ref=e251]
+                - text: Agenda de Hoje
+              - button "Ver completa" [ref=e253] [cursor=pointer]
+            - generic [ref=e255]:
+              - img [ref=e257]
+              - paragraph [ref=e259]: Nenhum agendamento para hoje.
+              - button "Agendar agora" [ref=e260] [cursor=pointer]
+          - generic [ref=e261]:
+            - generic [ref=e262]:
+              - heading "Visão Semanal 0 agendamentos" [level=2] [ref=e263]:
+                - img [ref=e264]
+                - text: Visão Semanal
+                - generic [ref=e266]: 0 agendamentos
+              - button "Ver Calendário" [ref=e267] [cursor=pointer]:
+                - img [ref=e268]
+                - generic [ref=e270]: Ver Calendário
+            - generic [ref=e271]:
+              - generic [ref=e274]: Agendado
+              - generic [ref=e277]: Confirmado
+              - generic [ref=e280]: Realizado
+            - generic [ref=e281]:
+              - img [ref=e283]
+              - paragraph [ref=e285]: Nenhum agendamento para os próximos 7 dias
+              - button "Criar agendamento" [ref=e286] [cursor=pointer]
+        - generic [ref=e287]:
+          - generic [ref=e288]:
+            - heading "Desempenho Semanal" [level=2] [ref=e289]:
+              - img [ref=e290]
+              - text: Desempenho Semanal
+            - application [ref=e296]:
+              - generic [ref=e298]:
+                - generic [ref=e300]: Sex
+                - generic [ref=e302]: Sáb
+                - generic [ref=e304]: Dom
+                - generic [ref=e306]: Seg
+                - generic [ref=e308]: Ter
+                - generic [ref=e310]: Qua
+                - generic [ref=e312]: Qui
+            - generic [ref=e313]:
+              - generic [ref=e314]: Média diária
+              - generic [ref=e315]: 0 atendimentos
+          - generic [ref=e316]:
+            - heading "Ações Pendentes" [level=2] [ref=e317]:
+              - img [ref=e318]
+              - text: Ações Pendentes
+            - generic [ref=e320]:
+              - generic [ref=e321]:
+                - generic [ref=e322]:
+                  - img [ref=e324]
+                  - generic [ref=e329]:
+                    - heading "Renovação Necessária" [level=4] [ref=e330]
+                    - paragraph [ref=e331]: 17 clientes com sessões baixas
+                - button "Ver Clientes" [ref=e332] [cursor=pointer]
+              - generic [ref=e333]:
+                - generic [ref=e334]:
+                  - img [ref=e336]
+                  - generic [ref=e338]:
+                    - heading "Confirmações" [level=4] [ref=e339]
+                    - paragraph [ref=e340]: 3 agendamentos pendentes
+                - button "Ver Agendamentos" [ref=e342] [cursor=pointer]
+          - generic [ref=e343]:
+            - generic [ref=e344]:
+              - heading "Amanhã" [level=2] [ref=e345]:
+                - img [ref=e346]
+                - text: Amanhã
+              - generic [ref=e349]: "0"
+            - paragraph [ref=e351]: Agenda livre amanhã.
+    - region "Notifications Alt+T"
+  - generic [ref=e352]: Sex

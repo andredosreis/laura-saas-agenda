@@ -1,0 +1,110 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e100]:
+      - generic [ref=e101]:
+        - link [ref=e102] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e103]:
+            - generic [ref=e109]: marca
+            - generic [ref=e110]: ai
+            - generic [ref=e111]: SMART AGENDA
+        - generic [ref=e112]:
+          - generic [ref=e113]: L
+          - generic [ref=e114]:
+            - paragraph [ref=e115]: Laura
+            - paragraph [ref=e116]: laura@laesteticaavancada.pt
+      - navigation [ref=e117]:
+        - generic [ref=e118]:
+          - link "Dashboard" [ref=e121] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e122]
+            - generic [ref=e127]: Dashboard
+          - generic [ref=e128]:
+            - button "FINANÇAS" [ref=e129] [cursor=pointer]:
+              - generic [ref=e130]: FINANÇAS
+              - img [ref=e131]
+            - generic [ref=e133]:
+              - link "Transações" [ref=e134] [cursor=pointer]:
+                - /url: /transacoes
+                - img [ref=e135]
+                - generic [ref=e138]: Transações
+              - link "Vendas" [ref=e139] [cursor=pointer]:
+                - /url: /pacotes-ativos
+                - img [ref=e140]
+                - generic [ref=e143]: Vendas
+              - link "Relatórios" [ref=e144] [cursor=pointer]:
+                - /url: /financeiro
+                - img [ref=e145]
+                - generic [ref=e148]: Relatórios
+          - generic [ref=e150]:
+            - button "AGENDAMENTO" [ref=e151] [cursor=pointer]:
+              - generic [ref=e152]: AGENDAMENTO
+              - img [ref=e153]
+            - generic [ref=e155]:
+              - link "Calendário" [ref=e156] [cursor=pointer]:
+                - /url: /calendario
+                - img [ref=e157]
+                - generic [ref=e159]: Calendário
+              - link "Atendimentos" [ref=e160] [cursor=pointer]:
+                - /url: /atendimentos
+                - img [ref=e161]
+                - generic [ref=e165]: Atendimentos
+          - generic [ref=e167]:
+            - button "ADMINISTRATIVO" [ref=e168] [cursor=pointer]:
+              - generic [ref=e169]: ADMINISTRATIVO
+              - img [ref=e170]
+            - generic [ref=e172]:
+              - link "Clientes" [ref=e173] [cursor=pointer]:
+                - /url: /clientes
+                - img [ref=e174]
+                - generic [ref=e179]: Clientes
+              - link "Serviços" [ref=e180] [cursor=pointer]:
+                - /url: /pacotes
+                - img [ref=e181]
+                - generic [ref=e185]: Serviços
+              - link "Disponibilidade" [ref=e186] [cursor=pointer]:
+                - /url: /disponibilidade
+                - img [ref=e187]
+                - generic [ref=e190]: Disponibilidade
+      - button "Sair da Conta" [ref=e193] [cursor=pointer]:
+        - img [ref=e194]
+        - generic [ref=e197]: Sair da Conta
+  - generic [ref=e198]:
+    - generic [ref=e199]:
+      - heading "Novo Agendamento" [level=1] [ref=e200]
+      - button "Voltar" [ref=e201] [cursor=pointer]:
+        - img [ref=e202]
+        - text: Voltar
+    - generic [ref=e204]:
+      - paragraph [ref=e205]: Tipo de agendamento
+      - generic [ref=e206]:
+        - button "Sessão / Retorno" [ref=e207] [cursor=pointer]:
+          - img [ref=e208]
+          - text: Sessão / Retorno
+        - button "Avaliação (lead)" [active] [ref=e213] [cursor=pointer]:
+          - img [ref=e214]
+          - text: Avaliação (lead)
+    - generic [ref=e235]:
+      - paragraph [ref=e237]: Agendamento de avaliação para lead — o cliente não precisa estar cadastrado. Se fechar pacote, será cadastrado automaticamente.
+      - generic [ref=e238]:
+        - heading "Dados do Lead" [level=2] [ref=e239]
+        - generic [ref=e240]:
+          - generic [ref=e241]: Nome *
+          - textbox "Nome completo" [ref=e242]
+        - generic [ref=e243]:
+          - generic [ref=e244]: Telefone *
+          - textbox "910 000 000" [ref=e245]
+        - generic [ref=e246]:
+          - generic [ref=e247]: Email (opcional)
+          - textbox "email@exemplo.com" [ref=e248]
+      - generic [ref=e249]:
+        - heading "Data e Hora" [level=2] [ref=e250]
+        - textbox [ref=e251]: 2026-04-16T21:06
+      - generic [ref=e252]:
+        - heading "Observações" [level=2] [ref=e253]
+        - 'textbox "Ex: Lead veio pelo Instagram." [ref=e254]'
+        - paragraph [ref=e255]: 0/500
+      - generic [ref=e256]:
+        - button "Cancelar" [ref=e257] [cursor=pointer]
+        - button "Agendar Avaliação" [ref=e258] [cursor=pointer]
+  - region "Notifications Alt+T"

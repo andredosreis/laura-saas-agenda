@@ -13,7 +13,7 @@
 | 2 | Link de Agendamentos não visível no menu | ✅ Resolvido | Adicionado link `/agendamentos` com ícone ListChecks |
 | 3 | Lead fecha pacote → não abre vendas com nome/valor | ✅ Resolvido | Adicionado Step 3 no FunilAvaliacaoModal com seleção de serviço, valor e registo automático |
 | 4 | Nome do cliente não aparece em Finanças | ✅ Resolvido | Venda via `/compras-pacotes` API associa cliente automaticamente à transação |
-| 5 | Deploy na Vercel não chega com mudanças | ✅ Resolvido | Merge do branch `Colcando_skills` para `main` concluído e push feito com sucesso |
+| 5 | Deploy na Vercel não chega com mudanças | ⏳ Pendente | Necessário merge do branch `Colcando_skills` para `main` + push |
 | 6 | Email não aparece ao editar cliente | ✅ Resolvido | Campo email adicionado ao formulário EditarCliente |
 | 7 | Sessões contratadas não aparecem na ficha | ✅ Resolvido | Filtro relaxado para mostrar todos os pacotes ativos |
 | 8 | Sessões não diminuem quando usadas | ✅ Resolvido | Removidos campos legados; dados reais vêm de CompraPacote |

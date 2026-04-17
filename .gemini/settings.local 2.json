@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude plugin:*)",
+      "Bash(npm test *)",
+      "Bash(ls src/services/)",
+      "Bash(ls src/utils/)",
+      "Bash(npm install *)"
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "e2e-nav-test": {
+      "source": "devfullcycle/skills-mba",
+      "sourceType": "github",
+      "computedHash": "c14acc9d6b8f6073015530f9c5f382abd45cc30efb960a687f4bfbc2c32ee88c"
+    },
+    "nodejs-backend-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "c6a99966c2565acc388e574039127abc770bb9a3338be761e421e16f023f702b"
+    },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "computedHash": "ad055544599481182d0079c4198e85da26677cb408a677be2da04915375f0427"
+    },
+    "test-guide": {
+      "source": "devfullcycle/skills-mba",
+      "sourceType": "github",
+      "computedHash": "c31f6b6708cffc685a7777314c03190e4b14c8c000a75e14a0bb826fb566d8b3"
+    },
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "3a3be8c925f96ac4e1280db28a01677e7ca5197f3792de2bbf35ab3bb324b6dd"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
+    }
+  }
+}
