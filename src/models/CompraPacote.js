@@ -162,7 +162,7 @@ compraPacoteSchema.index({ dataExpiracao: 1 });
 compraPacoteSchema.index({ tenantId: 1, dataExpiracao: 1, status: 1 });
 
 // Middleware: Calcular campos derivados antes de salvar
-compraPacoteSchema.pre('save', function(next) {
+compraPacoteSchema.pre('save', function() {
   // Calcular sessões restantes
   this.sessoesRestantes = this.sessoesContratadas - this.sessoesUsadas;
 
@@ -189,8 +189,6 @@ compraPacoteSchema.pre('save', function(next) {
   if (this.sessoesRestantes === 0 && this.status === 'Ativo') {
     this.status = 'Concluído';
   }
-
-  next();
 });
 
 // Método: Usar uma sessão do pacote

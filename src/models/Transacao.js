@@ -166,7 +166,7 @@ transacaoSchema.index({ tenantId: 1, cliente: 1 });
 transacaoSchema.index({ tenantId: 1, createdAt: -1 });
 
 // Middleware: Calcular valorFinal automaticamente
-transacaoSchema.pre('save', function(next) {
+transacaoSchema.pre('save', function() {
   // Calcular valor final
   this.valorFinal = this.valor - this.desconto;
 
@@ -174,8 +174,6 @@ transacaoSchema.pre('save', function(next) {
   if (this.comissao && this.comissao.percentual > 0 && this.valorFinal > 0) {
     this.comissao.valor = (this.valorFinal * this.comissao.percentual) / 100;
   }
-
-  next();
 });
 
 // Método: Registrar pagamento

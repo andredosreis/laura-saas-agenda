@@ -201,7 +201,7 @@ TenantSchema.statics.createWithDefaults = async function (data) {
 // =============================================
 
 // Antes de salvar, garantir que slug é único
-TenantSchema.pre('save', async function (next) {
+TenantSchema.pre('save', async function () {
     if (this.isModified('slug')) {
         const existing = await this.constructor.findOne({
             slug: this.slug,
@@ -210,10 +210,9 @@ TenantSchema.pre('save', async function (next) {
         if (existing) {
             const error = new Error('Este slug já está em uso');
             error.code = 11000;
-            return next(error);
+            throw error;
         }
     }
-    next();
 });
 
 // =============================================

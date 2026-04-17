@@ -309,15 +309,14 @@ historicoAtendimentoSchema.statics.tecnicasMaisUsadas = async function(clienteId
 // ============================================
 
 // Antes de salvar, impedir edição se já estiver finalizado
-historicoAtendimentoSchema.pre('save', function(next) {
+historicoAtendimentoSchema.pre('save', function() {
   if (!this.isNew && this.status === 'Finalizado' && !this.podeEditar) {
     const modifiedPaths = this.modifiedPaths();
     // Permite apenas mudança de status
     if (modifiedPaths.length > 0 && !modifiedPaths.includes('status')) {
-      return next(new Error('Atendimento finalizado não pode ser editado'));
+      throw new Error('Atendimento finalizado não pode ser editado');
     }
   }
-  next();
 });
 
 // Exporta schema para uso no registry (database-per-tenant)

@@ -40,9 +40,8 @@ const ConversaSchema = new mongoose.Schema({
 });
 
 // Atualiza automaticamente a data da última interação
-ConversaSchema.pre('save', function (next) {
+ConversaSchema.pre('save', function () {
   this.ultimaInteracao = new Date();
-  next();
 });
 
 // Exporta schema para uso no registry (database-per-tenant)

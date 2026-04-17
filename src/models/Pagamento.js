@@ -143,26 +143,24 @@ pagamentoSchema.index({ tenantId: 1, formaPagamento: 1 });
 pagamentoSchema.index({ tenantId: 1, createdAt: -1 });
 
 // Validação: Telefone MBWay deve ter 9 dígitos
-pagamentoSchema.pre('save', function(next) {
+pagamentoSchema.pre('save', function() {
   if (this.formaPagamento === 'MBWay') {
     if (!this.dadosMBWay || !this.dadosMBWay.telefone) {
-      return next(new Error('Telefone MBWay é obrigatório'));
+      throw new Error('Telefone MBWay é obrigatório');
     }
   }
 
   if (this.formaPagamento === 'Multibanco') {
     if (!this.dadosMultibanco || !this.dadosMultibanco.referencia) {
-      return next(new Error('Referência Multibanco é obrigatória'));
+      throw new Error('Referência Multibanco é obrigatória');
     }
   }
 
   if (this.formaPagamento === 'Cartão de Débito' || this.formaPagamento === 'Cartão de Crédito') {
     if (!this.dadosCartao || !this.dadosCartao.ultimos4Digitos) {
-      return next(new Error('Últimos 4 dígitos do cartão são obrigatórios'));
+      throw new Error('Últimos 4 dígitos do cartão são obrigatórios');
     }
   }
-
-  next();
 });
 
 // Método estático: Total de pagamentos por forma de pagamento

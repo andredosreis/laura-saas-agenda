@@ -169,11 +169,10 @@ agendamentoSchema.index({ tenantId: 1, compraPacote: 1 });
 agendamentoSchema.index({ tenantId: 1, statusPagamento: 1 });
 agendamentoSchema.index({ tenantId: 1, profissional: 1, status: 1 });
 
-agendamentoSchema.pre('save', function (next) {
+agendamentoSchema.pre('save', function () {
   if (this.isNew && this.dataHora < new Date()) {
-    return next(new Error('Não é possível criar agendamentos com data no passado.'));
+    throw new Error('Não é possível criar agendamentos com data no passado.');
   }
-  next();
 });
 
 // Exporta schema para uso no registry (database-per-tenant)
