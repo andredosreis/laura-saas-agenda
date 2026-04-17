@@ -425,10 +425,10 @@ UserSchema.statics.getDefaultPermissions = function (role) {
 // =============================================
 
 // Antes de salvar, hash da senha se modificada (caso não use createWithPassword)
-UserSchema.pre('save', async function (next) {
+UserSchema.pre('save', async function () {
     // Se a senha não foi modificada, continuar
     if (!this.isModified('passwordHash') && this.passwordHash) {
-        return next();
+        return;
     }
 
     // Se há uma senha em texto plano (campo temporário), fazer hash
@@ -437,16 +437,13 @@ UserSchema.pre('save', async function (next) {
         this.passwordHash = await bcrypt.hash(this._password, salt);
         delete this._password;
     }
-
-    next();
 });
 
 // Definir permissões padrão baseadas no role ao criar
-UserSchema.pre('save', function (next) {
+UserSchema.pre('save', function () {
     if (this.isNew && !this.permissoes) {
         this.permissoes = this.constructor.getDefaultPermissions(this.role);
     }
-    next();
 });
 
 // =============================================
