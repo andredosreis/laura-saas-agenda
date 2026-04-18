@@ -18,7 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   CalendarClock,
-  ListChecks
+  ListChecks,
+  Settings
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
 
@@ -80,7 +81,8 @@ function Sidebar() {
       items: [
         { to: "/clientes", text: "Clientes", icon: Users },
         { to: "/pacotes", text: "Serviços", icon: Package },
-        { to: "/disponibilidade", text: "Disponibilidade", icon: Clock }
+        { to: "/disponibilidade", text: "Disponibilidade", icon: Clock },
+        { to: "/configuracoes", text: "Configurações", icon: Settings }
       ]
     }
   ];
