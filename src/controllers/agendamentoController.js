@@ -28,11 +28,11 @@ export const createAgendamento = async (req, res) => {
       }
     }
 
-    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "America/Sao_Paulo" });
+    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "Europe/Lisbon" });
     if (!agendamentoDateTime.isValid) {
       return res.status(400).json({ message: "Data e hora do agendamento inválidas." });
     }
-    if (agendamentoDateTime < DateTime.now().setZone("America/Sao_Paulo")) {
+    if (agendamentoDateTime < DateTime.now().setZone("Europe/Lisbon")) {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
 
@@ -80,7 +80,7 @@ export const createAgendamento = async (req, res) => {
       tipo,
       cliente: tipo === 'Avaliacao' ? undefined : cliente,
       lead: tipo === 'Avaliacao' ? { nome: lead.nome, telefone: lead.telefone, email: lead.email } : undefined,
-      dataHora,
+      dataHora: agendamentoDateTime.toJSDate(),
       pacote,
       compraPacote,
       servicoAvulsoNome,

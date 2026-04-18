@@ -72,36 +72,50 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     console.log(`[Webhook] ✅ Detectado resposta de confirmação: "${mensagem}"`);
 
     // Busca cliente pelo telefone
-    const cliente = await Cliente.findOne({
-      $or: [
-        { telefone: telefoneNormalizado },
-        { telefone: `351${telefoneNormalizado}` },
-        { telefone: telefoneNormalizado.replace(/^351/, '') }
-      ]
-    });
+    const telefoneVariants = [
+      telefoneNormalizado,
+      `351${telefoneNormalizado}`,
+      telefoneNormalizado.replace(/^351/, '')
+    ];
 
-    if (!cliente) {
-      console.warn(`[Webhook] ⚠️ Cliente não encontrado - delegando para IA`);
-      return await delegarParaIA(req, res);
+    const cliente = await Cliente.findOne({ telefone: { $in: telefoneVariants } });
+
+    // Janela de tempo: próximas 48h ou últimas 2h (para respostas tardias)
+    const agora = DateTime.now().setZone('Europe/Lisbon');
+    const duasHorasAtras = agora.minus({ hours: 2 });
+    const doisDias = agora.plus({ days: 2 });
+    const janelaQuery = { $gte: duasHorasAtras.toJSDate(), $lte: doisDias.toJSDate() };
+
+    let agendamento = null;
+    let nomeRemetente = null;
+
+    if (cliente) {
+      console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
+      agendamento = await Agendamento.findOne({
+        cliente: cliente._id,
+        'confirmacao.tipo': 'pendente',
+        dataHora: janelaQuery,
+      }).sort({ dataHora: 1 });
+      nomeRemetente = cliente.nome;
     }
 
-    console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
+    // Se não encontrou agendamento via cliente, tenta via lead (tipo Avaliacao)
+    if (!agendamento) {
+      agendamento = await Agendamento.findOne({
+        tipo: 'Avaliacao',
+        'lead.telefone': { $in: telefoneVariants },
+        'confirmacao.tipo': 'pendente',
+        dataHora: janelaQuery,
+      }).sort({ dataHora: 1 });
 
-    // Busca agendamento pendente nas próximas 48h
-    const agora = DateTime.now().setZone('Europe/Lisbon');
-    const doisDias = agora.plus({ days: 2 });
-
-    const agendamento = await Agendamento.findOne({
-      cliente: cliente._id,
-      'confirmacao.tipo': 'pendente',
-      dataHora: {
-        $gte: agora.toJSDate(),
-        $lte: doisDias.toJSDate()
+      if (agendamento) {
+        nomeRemetente = agendamento.lead.nome;
+        console.log(`[Webhook] ✅ Lead encontrado: ${nomeRemetente}`);
       }
-    }).sort({ dataHora: 1 });
+    }
 
     if (!agendamento) {
-      console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${cliente.nome} - delegando para IA`);
+      console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${telefoneNormalizado} - delegando para IA`);
       return await delegarParaIA(req, res);
     }
 
@@ -121,7 +135,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
         .setZone('Europe/Lisbon')
         .toFormat("dd/MM/yyyy 'às' HH:mm");
 
-      resposta = `✅ Obrigada, ${cliente.nome}! Seu agendamento está confirmado para ${dataFormatada}. Aguardamos você! 💆‍♀️✨`;
+      resposta = `✅ Obrigada, ${nomeRemetente}! Seu agendamento está confirmado para ${dataFormatada}. Aguardamos você! 💆‍♀️✨`;
     }
     // Respostas negativas
     else if (/^(nao|n[aã]o|cancelar|cancel|desmarcar|nope|n)$/.test(mensagemNormalizada)) {
@@ -131,7 +145,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       agendamento.status = 'Cancelado Pelo Cliente';
       novoStatus = 'rejeitado';
 
-      resposta = `❌ Entendido, ${cliente.nome}. Seu agendamento foi cancelado. Se precisar remarcar, é só entrar em contato! 📞`;
+      resposta = `❌ Entendido, ${nomeRemetente}. Seu agendamento foi cancelado. Se precisar remarcar, é só entrar em contato! 📞`;
     }
     // Resposta não reconhecida
     else {
@@ -141,13 +155,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
         .setZone('Europe/Lisbon')
         .toFormat("dd/MM/yyyy 'às' HH:mm");
 
-      resposta = `Olá ${cliente.nome}! 👋
-
-Não consegui entender sua resposta. Você tem um agendamento marcado para ${dataFormatada}.
-
-Por favor, responda:
-✅ *SIM* - para confirmar
-❌ *NÃO* - para cancelar`;
+      resposta = `Olá ${nomeRemetente}! 👋\n\nNão consegui entender sua resposta. Você tem um agendamento marcado para ${dataFormatada}.\n\nPor favor, responda:\n✅ *SIM* - para confirmar\n❌ *NÃO* - para cancelar`;
 
       await sendWhatsAppMessage(telefoneNormalizado, resposta);
       return res.status(200).json({ message: 'Resposta não reconhecida', aguardandoResposta: true });
@@ -157,12 +165,12 @@ Por favor, responda:
     await agendamento.save();
     console.log(`[Webhook] ✅ Agendamento ${novoStatus}: ${agendamento._id}`);
 
-    // Envia resposta ao cliente
+    // Envia resposta ao cliente/lead
     await sendWhatsAppMessage(telefoneNormalizado, resposta);
 
     return res.status(200).json({
       success: true,
-      cliente: cliente.nome,
+      nome: nomeRemetente,
       agendamento: agendamento._id,
       status: novoStatus
     });
@@ -243,14 +251,7 @@ _La Estética Avançada_`;
       await cliente.save();
       console.log(`[Webhook] 📝 Cliente ${cliente.nome} marcado como aguardando_laura`);
     } else {
-      // Se cliente não existe, cria registro temporário para evitar spam
-      await Cliente.create({
-        nome: 'Visitante (aguardando cadastro)',
-        telefone: telefoneNormalizado,
-        dataNascimento: new Date('2000-01-01'), // Placeholder (será atualizado pela Laura)
-        etapaConversa: 'aguardando_laura'
-      });
-      console.log(`[Webhook] 📝 Registro temporário criado para ${telefoneNormalizado}`);
+      console.log(`[Webhook] 📝 Número desconhecido ${telefoneNormalizado} — mensagem automática enviada, sem criação de registo`);
     }
 
     return res.status(200).json({
