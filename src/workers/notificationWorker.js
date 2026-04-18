@@ -33,13 +33,12 @@ function buildMensagem(job) {
 async function processJob(job) {
   const { tipo, clienteTelefone, clienteNome, agendamentoId, tenantId } = job.data;
 
-  if (!clienteTelefone) {
-    logger.warn({ jobId: job.id, tipo }, '[Worker] Sem telefone — job ignorado');
-    return;
-  }
-
   // Lógica especial para lembrete de 1h: verifica estado da confirmação
   if (tipo === 'lembrete-1h') {
+    if (!clienteTelefone) {
+      logger.warn({ jobId: job.id, tipo }, '[Worker] Sem telefone — job ignorado');
+      return;
+    }
     const agendamento = await Agendamento.findById(agendamentoId).lean();
 
     if (!agendamento) {
@@ -103,6 +102,11 @@ async function processJob(job) {
   }
 
   // Todos os outros tipos (confirmacao, lembrete-antecipado)
+  if (!clienteTelefone) {
+    logger.warn({ jobId: job.id, tipo }, '[Worker] Sem telefone — job ignorado');
+    return;
+  }
+
   const mensagem = buildMensagem(job);
   if (!mensagem) {
     logger.warn({ jobId: job.id, tipo }, '[Worker] Tipo de job desconhecido');
