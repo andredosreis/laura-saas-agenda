@@ -855,12 +855,15 @@ export const verifyEmail = async (req, res) => {
  */
 export const updateTenant = async (req, res) => {
     try {
-        const { contato, configuracoes, nome } = req.body;
+        const { contato, configuracoes, nome, whatsapp } = req.body;
 
         const updates = {};
         if (nome) updates.nome = nome;
         if (contato) updates.contato = contato;
         if (configuracoes) updates.configuracoes = configuracoes;
+        if (whatsapp?.numeroWhatsapp !== undefined) {
+            updates['whatsapp.numeroWhatsapp'] = whatsapp.numeroWhatsapp;
+        }
 
         const tenant = await Tenant.findByIdAndUpdate(
             req.user.tenantId,

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 import { toast } from 'react-toastify';
-import { Settings, Building2, Phone, Mail, Globe, Clock, Save, Loader2 } from 'lucide-react';
+import { Settings, Building2, Phone, Mail, Globe, Clock, Save, Loader2, MessageCircle } from 'lucide-react';
 
 const TIMEZONES = [
   'Europe/Lisbon',
@@ -44,6 +44,9 @@ function Configuracoes() {
       antecedenciaMaxAgendamento: 30,
       permitirAgendamentoOnline: false,
     },
+    whatsapp: {
+      numeroWhatsapp: '',
+    },
   });
 
   // Inicializar form com dados do tenant
@@ -71,6 +74,9 @@ function Configuracoes() {
         antecedenciaMinAgendamento: tenant.configuracoes?.antecedenciaMinAgendamento ?? 2,
         antecedenciaMaxAgendamento: tenant.configuracoes?.antecedenciaMaxAgendamento ?? 30,
         permitirAgendamentoOnline: tenant.configuracoes?.permitirAgendamentoOnline ?? false,
+      },
+      whatsapp: {
+        numeroWhatsapp: tenant.whatsapp?.numeroWhatsapp || '',
       },
     });
   }, [tenant]);
@@ -102,6 +108,7 @@ function Configuracoes() {
         nome: form.nome,
         contato: form.contato,
         configuracoes: form.configuracoes,
+        whatsapp: form.whatsapp,
       });
       await refreshAuth();
       toast.success('Configurações guardadas com sucesso!');
@@ -359,6 +366,37 @@ function Configuracoes() {
                   Permitir agendamento online
                 </label>
               </div>
+            </div>
+          </div>
+
+          {/* --- SECÇÃO: WhatsApp --- */}
+          <div className={card}>
+            <h2 className="text-base font-semibold flex items-center gap-2 mb-2">
+              <MessageCircle className="w-4 h-4 text-green-400" />
+              WhatsApp
+            </h2>
+            <p className={`text-xs mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Número que recebe alertas quando um cliente não confirma o agendamento 1h antes.
+            </p>
+
+            <div>
+              <label className={label}>
+                <Phone className="inline w-3.5 h-3.5 mr-1" />
+                Número do Admin (com código do país)
+              </label>
+              <input
+                type="tel"
+                className={input}
+                value={form.whatsapp.numeroWhatsapp}
+                onChange={e => setForm(prev => ({
+                  ...prev,
+                  whatsapp: { ...prev.whatsapp, numeroWhatsapp: e.target.value.replace(/[^\d]/g, '') }
+                }))}
+                placeholder="351912345678"
+              />
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Formato: 351 seguido do número sem espaços. Ex: 351912345678
+              </p>
             </div>
           </div>
 
