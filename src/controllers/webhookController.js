@@ -1,8 +1,58 @@
-import Agendamento from '../models/Agendamento.js';
-import Cliente from '../models/Cliente.js';
 import Tenant from '../models/Tenant.js';
+import { getTenantDB } from '../config/tenantDB.js';
+import { getModels } from '../models/registry.js';
 import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
 import { DateTime } from 'luxon';
+
+/**
+ * Resolve tenant-specific models by searching across all tenant databases.
+ * Tries to find a client matching the given phone variants in each tenant DB.
+ *
+ * @returns {{ models, tenantId, cliente } | null}
+ */
+async function resolveClienteTenant(telefoneVariants) {
+  const tenants = await Tenant.find({ 'plano.status': { $in: ['ativo', 'trial'] } }).lean();
+
+  for (const tenant of tenants) {
+    const db = getTenantDB(tenant._id.toString());
+    const models = getModels(db);
+
+    const cliente = await models.Cliente.findOne({ telefone: { $in: telefoneVariants } });
+    if (cliente) {
+      return { models, tenantId: tenant._id.toString(), cliente };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve tenant-specific models by searching for a lead agendamento
+ * across all tenant databases.
+ *
+ * @returns {{ models, tenantId, agendamento } | null}
+ */
+async function resolveLeadTenant(telefoneVariants, janelaQuery) {
+  const tenants = await Tenant.find({ 'plano.status': { $in: ['ativo', 'trial'] } }).lean();
+
+  for (const tenant of tenants) {
+    const db = getTenantDB(tenant._id.toString());
+    const models = getModels(db);
+
+    const agendamento = await models.Agendamento.findOne({
+      tipo: 'Avaliacao',
+      'lead.telefone': { $in: telefoneVariants },
+      'confirmacao.tipo': 'pendente',
+      dataHora: janelaQuery,
+    }).sort({ dataHora: 1 });
+
+    if (agendamento) {
+      return { models, tenantId: tenant._id.toString(), agendamento };
+    }
+  }
+
+  return null;
+}
 
 /**
  * @description Webhook para processar confirmações de agendamento via WhatsApp
@@ -66,20 +116,18 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     if (!ehRespostaConfirmacao) {
       // ✅ NÃO é confirmação → Delega para IA (chatbot)
       console.log(`[Webhook] 🤖 NÃO é confirmação - delegando para IA: "${mensagem}"`);
-      return await delegarParaIA(req, res);
+      return await delegarParaIA(req, res, telefoneNormalizado);
     }
 
     // ✅ É uma resposta de confirmação (SIM/NÃO) → Continua processando
     console.log(`[Webhook] ✅ Detectado resposta de confirmação: "${mensagem}"`);
 
-    // Busca cliente pelo telefone
+    // Busca cliente pelo telefone (tenant-aware)
     const telefoneVariants = [
       telefoneNormalizado,
       `351${telefoneNormalizado}`,
       telefoneNormalizado.replace(/^351/, '')
     ];
-
-    const cliente = await Cliente.findOne({ telefone: { $in: telefoneVariants } });
 
     // Janela de tempo: próximas 48h ou últimas 2h (para respostas tardias)
     const agora = DateTime.now().setZone('Europe/Lisbon');
@@ -89,10 +137,16 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     let agendamento = null;
     let nomeRemetente = null;
+    let tenantModels = null;
 
-    if (cliente) {
+    // Busca cliente em todos os tenants
+    const clienteResult = await resolveClienteTenant(telefoneVariants);
+
+    if (clienteResult) {
+      const { models, cliente } = clienteResult;
+      tenantModels = models;
       console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
-      agendamento = await Agendamento.findOne({
+      agendamento = await models.Agendamento.findOne({
         cliente: cliente._id,
         'confirmacao.tipo': 'pendente',
         dataHora: janelaQuery,
@@ -102,14 +156,11 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     // Se não encontrou agendamento via cliente, tenta via lead (tipo Avaliacao)
     if (!agendamento) {
-      agendamento = await Agendamento.findOne({
-        tipo: 'Avaliacao',
-        'lead.telefone': { $in: telefoneVariants },
-        'confirmacao.tipo': 'pendente',
-        dataHora: janelaQuery,
-      }).sort({ dataHora: 1 });
+      const leadResult = await resolveLeadTenant(telefoneVariants, janelaQuery);
 
-      if (agendamento) {
+      if (leadResult) {
+        tenantModels = leadResult.models;
+        agendamento = leadResult.agendamento;
         nomeRemetente = agendamento.lead.nome;
         console.log(`[Webhook] ✅ Lead encontrado: ${nomeRemetente}`);
       }
@@ -117,7 +168,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     if (!agendamento) {
       console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${telefoneNormalizado} - delegando para IA`);
-      return await delegarParaIA(req, res);
+      return await delegarParaIA(req, res, telefoneNormalizado);
     }
 
     // Processa resposta
@@ -202,27 +253,28 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
  * Envia mensagem de saudação e notifica Laura
  * IMPORTANTE: Responde APENAS UMA VEZ, nunca mais interage
  */
-async function delegarParaIA(req, res) {
+async function delegarParaIA(req, res, telefoneNormalizado) {
   try {
     console.log('[Webhook] 📝 Processando mensagem não-confirmação (resposta automática simples)');
 
-    const remoteJid = req.body.data?.key?.remoteJid || '';
-    const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
-
-    if (!telefone) {
-      return res.status(400).json({ error: 'Telefone não fornecido' });
+    if (!telefoneNormalizado) {
+      const remoteJid = req.body.data?.key?.remoteJid || '';
+      const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
+      if (!telefone) {
+        return res.status(400).json({ error: 'Telefone não fornecido' });
+      }
+      telefoneNormalizado = telefone.replace(/[^\d]/g, '');
     }
 
-    const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
+    const telefoneVariants = [
+      telefoneNormalizado,
+      `351${telefoneNormalizado}`,
+      telefoneNormalizado.replace(/^351/, '')
+    ];
 
-    // Verifica se já respondemos antes (evita spam)
-    const cliente = await Cliente.findOne({
-      $or: [
-        { telefone: telefoneNormalizado },
-        { telefone: `351${telefoneNormalizado}` },
-        { telefone: telefoneNormalizado.replace(/^351/, '') }
-      ]
-    });
+    // Busca cliente em todos os tenants (tenant-aware)
+    const clienteResult = await resolveClienteTenant(telefoneVariants);
+    const cliente = clienteResult?.cliente || null;
 
     // Se cliente já existe E já tem etapaConversa definida, significa que já respondemos antes
     // Neste caso, NÃO respondemos novamente (Laura vai tratar manualmente)

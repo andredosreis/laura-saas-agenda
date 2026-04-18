@@ -2,8 +2,9 @@ import { Worker } from 'bullmq';
 import { DateTime } from 'luxon';
 import { getRedisConnection } from '../queues/redisConnection.js';
 import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
-import Agendamento from '../models/Agendamento.js';
 import Tenant from '../models/Tenant.js';
+import { getTenantDB } from '../config/tenantDB.js';
+import { getModels } from '../models/registry.js';
 import logger from '../utils/logger.js';
 
 const ZONA = 'Europe/Lisbon';
@@ -32,6 +33,10 @@ function buildMensagem(job) {
 
 async function processJob(job) {
   const { tipo, clienteTelefone, clienteNome, agendamentoId, tenantId } = job.data;
+
+  // Resolver DB do tenant para queries isoladas
+  const tenantDb = getTenantDB(tenantId);
+  const { Agendamento } = getModels(tenantDb);
 
   // Lógica especial para lembrete de 1h: verifica estado da confirmação
   if (tipo === 'lembrete-1h') {
