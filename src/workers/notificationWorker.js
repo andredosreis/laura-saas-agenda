@@ -24,7 +24,7 @@ function buildMensagem(job) {
   }
 
   if (tipo === 'lembrete-1h') {
-    return `⏰ *Sessão em 1 hora!*\n\nOlá ${clienteNome}!\n\nA sua sessão começa às ${horaFormatada} de hoje!\n\nEstamos à sua espera! 💆‍♀️✨\n\n_Marcai_`;
+    return `⏰ *Sessão em 1 hora!*\n\nOlá ${clienteNome}!\n\nA sua sessão começa às *${horaFormatada}* de hoje.\n\nEstá confirmada? Por favor responda:\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_Marcai_`;
   }
 
   return null;
@@ -60,22 +60,45 @@ async function processJob(job) {
       throw new Error(`Falha ao enviar lembrete 1h para ${clienteNome}: ${JSON.stringify(resultado.error)}`);
     }
 
-    // Se confirmação ainda pendente, alerta o admin
+    // Se confirmação ainda pendente, agenda alerta ao admin com 5 minutos de delay
     if (agendamento.confirmacao?.tipo === 'pendente') {
-      const tenant = await Tenant.findById(tenantId).lean();
-      const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
-
-      if (numeroAdmin) {
-        const dt = DateTime.fromISO(job.data.dataHora, { zone: ZONA });
-        const alertaAdmin = `⚠️ *Confirmação Pendente*\n\n${clienteNome} ainda não confirmou o agendamento das *${dt.toFormat('HH:mm')}* de hoje.\n\nPode querer entrar em contacto.`;
-        await sendWhatsAppMessage(numeroAdmin, alertaAdmin);
-        logger.info({ jobId: job.id, clienteNome }, '[Worker] Alerta de pendente enviado ao admin');
-      } else {
-        logger.warn({ jobId: job.id, tenantId }, '[Worker] Número do admin não configurado — alerta não enviado');
+      const { getNotificationQueue } = await import('../queues/notificationQueue.js');
+      const queue = getNotificationQueue();
+      if (queue) {
+        await queue.add(
+          'alerta-admin-pendente',
+          { tipo: 'alerta-admin-pendente', agendamentoId, tenantId, clienteNome, dataHora: job.data.dataHora },
+          { delay: 5 * 60 * 1000 }
+        );
+        logger.info({ jobId: job.id, clienteNome }, '[Worker] Alerta ao admin agendado para daqui a 5 min');
       }
     }
 
     logger.info({ jobId: job.id, tipo, clienteNome }, '[Worker] Notificação enviada');
+    return;
+  }
+
+  // Alerta ao admin 5 min após lembrete 1h (verifica se ainda pendente)
+  if (tipo === 'alerta-admin-pendente') {
+    const agendamento = await Agendamento.findById(agendamentoId).lean();
+
+    if (!agendamento || agendamento.confirmacao?.tipo !== 'pendente') {
+      logger.info({ jobId: job.id, agendamentoId }, '[Worker] Cliente já confirmou — alerta ao admin cancelado');
+      return;
+    }
+
+    const tenant = await Tenant.findById(tenantId).lean();
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+
+    if (!numeroAdmin) {
+      logger.warn({ jobId: job.id, tenantId }, '[Worker] Número do admin não configurado — alerta não enviado');
+      return;
+    }
+
+    const dt = DateTime.fromISO(job.data.dataHora, { zone: ZONA });
+    const alerta = `⚠️ *Confirmação Pendente*\n\nOlá, Administrador!\n\nA sessão de *${clienteNome}* das *${dt.toFormat('HH:mm')}* ainda não foi confirmada.\n\nPode querer entrar em contacto.`;
+    await sendWhatsAppMessage(numeroAdmin, alerta);
+    logger.info({ jobId: job.id, clienteNome }, '[Worker] Alerta de pendente enviado ao admin');
     return;
   }
 

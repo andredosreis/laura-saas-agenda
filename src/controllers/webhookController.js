@@ -1,5 +1,6 @@
 import Agendamento from '../models/Agendamento.js';
 import Cliente from '../models/Cliente.js';
+import Tenant from '../models/Tenant.js';
 import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
 import { DateTime } from 'luxon';
 
@@ -167,6 +168,21 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     // Envia resposta ao cliente/lead
     await sendWhatsAppMessage(telefoneNormalizado, resposta);
+
+    // Notifica admin sobre a resposta do cliente
+    const tenant = await Tenant.findById(agendamento.tenantId).lean();
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    if (numeroAdmin) {
+      const dataFormatadaAdmin = DateTime.fromJSDate(agendamento.dataHora)
+        .setZone('Europe/Lisbon')
+        .toFormat('HH:mm');
+
+      const msgAdmin = novoStatus === 'confirmado'
+        ? `✅ *Agendamento Confirmado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* confirmou a sessão das *${dataFormatadaAdmin}* de hoje.`
+        : `❌ *Agendamento Cancelado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* cancelou a sessão das *${dataFormatadaAdmin}* de hoje.`;
+
+      await sendWhatsAppMessage(numeroAdmin, msgAdmin);
+    }
 
     return res.status(200).json({
       success: true,
