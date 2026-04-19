@@ -1,6 +1,6 @@
 # ADR-014: Migração Z-API → Evolution API (Self-Hosted via Railway)
 
-**Status:** Accepted — Implementado em Abril 2026  
+**Status:** Deprecado — Substituído pelo [ADR-016](./ADR-016-evolution-api-v2-upgrade.md) (Abril 2026)  
 **Data:** 2026-04-18  
 **Módulo:** WA  
 **Autor:** André dos Reis  

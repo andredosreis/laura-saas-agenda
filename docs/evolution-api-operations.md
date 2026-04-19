@@ -1,13 +1,13 @@
-# Evolution API — Operações e Manutenção
+# Evolution API — Operações e Manutenção (v2.x)
 
 ## Infraestrutura
 
 | Componente | Localização | URL |
 |---|---|---|
-| Evolution API | Railway (Docker) | `https://evolution-api-production-d1564.up.railway.app` |
+| Evolution API | Railway (Docker) | `https://evolution-api-production-d1564.up.railway.app` (v1) / *Sua nova URL (v2)* |
 | Backend (Node.js) | Render | `https://laura-saas.onrender.com` |
 | Instância WhatsApp | `marcai` | — |
-| Imagem Docker | `atendai/evolution-api:v1.8.7` | — |
+| Imagem Docker | `atendai/evolution-api:v2.1.1` (ou alvo) | — |
 
 **API Key (Evolution):** `b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f`
 
@@ -17,27 +17,26 @@
 
 ### Render (backend Node.js)
 ```
-EVOLUTION_API_URL=https://evolution-api-production-d1564.up.railway.app
-EVOLUTION_API_KEY=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f
+EVOLUTION_API_URL=https://evolution-api-production-d1564.up.railway.app # (ou NOVA URL v2)
+EVOLUTION_API_KEY=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f # (ou NOVA API KEY v2)
 EVOLUTION_INSTANCE=marcai
-EVOLUTION_WEBHOOK_SECRET=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f
+EVOLUTION_WEBHOOK_SECRET=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f # (ou NOVO SECRET v2)
 ```
 
-### Railway (Evolution API)
+### Railway (Evolution API v2.x)
 ```
 SERVER_TYPE=http
 SERVER_PORT=8080
 AUTHENTICATION_TYPE=apikey
 AUTHENTICATION_API_KEY=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f
 AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+DATABASE_PROVIDER=postgresql
+DATABASE_CONNECTION_URI=${{Postgres.DATABASE_URL}}
+DATABASE_CONNECTION_CLIENT_NAME=evolution_marcai
+CACHE_REDIS_ENABLED=true
+CACHE_REDIS_URI=${{Redis.REDIS_URL}}
 LOG_LEVEL=VERBOSE
-LOG_COLOR=true
-LOG_BAILEYS=error
 DEL_INSTANCE=false
-STORE_MESSAGES=true
-STORE_MESSAGE_UP=true
-STORE_CONTACTS=true
-STORE_CHATS=true
 ```
 
 ---
@@ -166,7 +165,7 @@ curl -s -X POST "https://evolution-api-production-d1564.up.railway.app/webhook/s
 curl -s -X POST "https://evolution-api-production-d1564.up.railway.app/message/sendText/marcai" \
   -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" \
   -H "Content-Type: application/json" \
-  -d '{"number":"351912462033","textMessage":{"text":"✅ Teste — Evolution API a funcionar!"}}' | python3 -c "
+  -d '{"number":"351912462033","text":"✅ Teste — Evolution API v2 a funcionar!"}' | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 print('Resultado:', data.get('status', 'enviado') if 'status' in data else 'ENVIADO OK')
@@ -201,7 +200,7 @@ curl -s -X POST "https://laura-saas.onrender.com/webhook/evolution" \
 ```
 [ ] Evolution API online?
     curl https://evolution-api-production-d1564.up.railway.app
-    → deve devolver {"status":200,"version":"1.8.6",...}
+    → deve devolver {"status":200,"version":"2.x.x",...}
 
 [ ] Instância conectada?
     → Verificar estado (ponto 1) — deve ser "open"
