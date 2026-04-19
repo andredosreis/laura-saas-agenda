@@ -87,6 +87,13 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     // Extrai dados do payload Evolution API
     const remoteJid = msgData?.key?.remoteJid || '';
+
+    // Fallback defensivo para @lid (versão 1.x da Evolution API ou erro temporário)
+    if (remoteJid.endsWith('@lid')) {
+      console.warn('[Webhook] ⚠️ Recebido @lid em vez do JID real. Ignorando mensagem.', { remoteJid });
+      return res.status(200).json({ message: 'LID ignorado, aguardando resolução' });
+    }
+
     const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
     const mensagem = msgData?.message?.conversation
       || msgData?.message?.extendedTextMessage?.text

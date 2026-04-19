@@ -1,11 +1,11 @@
 # Testing
 
-Testes ficam em `src/__tests__/`. Runner: Jest + Supertest + `mongodb-memory-server`.
+Testes ficam em `tests/`. Runner: Jest + Supertest + `mongodb-memory-server`.
 
 ## Setup padrão
 
 ```javascript
-// src/__tests__/setup.js
+// tests/setup.js
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 

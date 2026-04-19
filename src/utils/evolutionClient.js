@@ -23,7 +23,7 @@ export const sendWhatsAppMessage = async (to, message) => {
   try {
     const response = await axios.post(
       `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
-      { number: phoneNormalized, textMessage: { text: message } },
+      { number: phoneNormalized, text: message },
       { headers: { apikey: EVOLUTION_API_KEY, 'Content-Type': 'application/json' } }
     );
     logger.info({ to: phoneNormalized }, '[Evolution] Mensagem enviada');
