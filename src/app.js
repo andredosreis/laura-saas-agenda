@@ -98,8 +98,8 @@ app.use('/api/caixa', caixaRoutes);
 // 📋 FASE 4: Histórico de Atendimentos
 app.use('/api/historico-atendimentos', historicoAtendimentoRoutes);
 
-// Webhook Z-API para confirmações de agendamento
-app.use('/webhook', webhookRoutes);
+// Webhook Evolution API — limite maior para payloads com dados binários de grupos
+app.use('/webhook', express.json({ limit: '1mb' }), webhookRoutes);
 
 // Health check endpoint (para Vercel e monitoramento)
 app.get('/api/health', (req, res) => {

@@ -69,7 +69,13 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     const msgData = req.body.data;
 
-    // 🔍 VALIDAÇÃO 2: Ignora mensagens enviadas pelo próprio salão (fromMe: true)
+    // 🔍 VALIDAÇÃO 2: Ignora mensagens de grupo (@g.us) e reações
+    const remoteJidRaw = msgData?.key?.remoteJid || '';
+    if (remoteJidRaw.endsWith('@g.us') || msgData?.messageType === 'reactionMessage') {
+      return res.status(200).json({ message: 'Grupo ou reação ignorada' });
+    }
+
+    // 🔍 VALIDAÇÃO 3: Ignora mensagens enviadas pelo próprio salão (fromMe: true)
     if (msgData?.key?.fromMe === true) {
       console.log('[Webhook] ⏭️ Ignorando mensagem enviada pelo salão (fromMe: true)');
       return res.status(200).json({ message: 'Mensagem do salão ignorada' });
