@@ -123,9 +123,8 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     const ehRespostaConfirmacao = ehSim || ehNao;
 
     if (!ehRespostaConfirmacao) {
-      // ✅ NÃO é confirmação → Delega para IA (chatbot)
-      console.log(`[Webhook] 🤖 NÃO é confirmação - delegando para IA: "${mensagem}"`);
-      return await delegarParaIA(req, res, telefoneNormalizado);
+      console.log(`[Webhook] ⏭️ Mensagem ignorada (não é confirmação): "${mensagem}"`);
+      return res.status(200).json({ message: 'Mensagem ignorada' });
     }
 
     // ✅ É uma resposta de confirmação (SIM/NÃO) → Continua processando
