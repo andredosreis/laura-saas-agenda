@@ -194,7 +194,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
         .setZone('Europe/Lisbon')
         .toFormat("dd/MM/yyyy 'às' HH:mm");
 
-      resposta = `✅ Obrigada, ${nomeRemetente}! Seu agendamento está confirmado para ${dataFormatada}. Aguardamos você! 💆‍♀️✨`;
+      resposta = `✅ Obrigada pela confirmação, ${nomeRemetente}! A sua sessão está marcada para ${dataFormatada}. Até breve! 💆‍♀️✨`;
     }
     // Respostas negativas
     else if (/^(nao|n[aã]o|cancelar|cancel|desmarcar|nope|n)$/.test(mensagemNormalizada)) {
@@ -204,7 +204,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       agendamento.status = 'Cancelado Pelo Cliente';
       novoStatus = 'rejeitado';
 
-      resposta = `❌ Entendido, ${nomeRemetente}. Seu agendamento foi cancelado. Se precisar remarcar, é só entrar em contato! 📞`;
+      resposta = `Entendido, ${nomeRemetente}. 📅\n\nPara reagendarmos, indique por favor o dia e hora que prefere e iremos analisar a nossa agenda para lhe propor a melhor opção.\n\nObrigada! 💆‍♀️✨`;
     }
     // Resposta não reconhecida
     else {
