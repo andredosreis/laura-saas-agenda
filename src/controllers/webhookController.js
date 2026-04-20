@@ -117,8 +117,10 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     console.log(`[Webhook] 📱 Telefone: ${telefoneNormalizado}, Mensagem: "${mensagemNormalizada}"`);
 
     // 🔍 ROTEAMENTO INTELIGENTE: Detecta se é confirmação (SIM/NÃO) ou conversa normal
-    const padraoConfirmacao = /^(sim|confirmo|confirmar|ok|certo|confirma|yes|s|nao|não|cancelar|cancel|desmarcar|nope|n)$/;
-    const ehRespostaConfirmacao = padraoConfirmacao.test(mensagemNormalizada);
+    // Aceita resposta exacta OU mensagem que comece com palavra-chave (ex: "Sim, claro", "Não vou conseguir")
+    const ehSim = /^(sim|confirmo|confirmar|ok|certo|confirma|yes)\b|^s$/.test(mensagemNormalizada);
+    const ehNao = /^(nao|cancelar|cancel|desmarcar|nope)\b|^n$/.test(mensagemNormalizada);
+    const ehRespostaConfirmacao = ehSim || ehNao;
 
     if (!ehRespostaConfirmacao) {
       // ✅ NÃO é confirmação → Delega para IA (chatbot)
@@ -183,7 +185,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     let novoStatus = '';
 
     // Respostas positivas
-    if (/^(sim|confirmo|confirmar|ok|certo|confirma|yes|s)$/.test(mensagemNormalizada)) {
+    if (ehSim) {
       agendamento.confirmacao.tipo = 'confirmado';
       agendamento.confirmacao.respondidoEm = new Date();
       agendamento.confirmacao.respondidoPor = 'cliente';
@@ -197,7 +199,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       resposta = `✅ Obrigada pela confirmação, ${nomeRemetente}! A sua sessão está marcada para ${dataFormatada}. Até breve! 💆‍♀️✨`;
     }
     // Respostas negativas
-    else if (/^(nao|n[aã]o|cancelar|cancel|desmarcar|nope|n)$/.test(mensagemNormalizada)) {
+    else if (ehNao) {
       agendamento.confirmacao.tipo = 'rejeitado';
       agendamento.confirmacao.respondidoEm = new Date();
       agendamento.confirmacao.respondidoPor = 'cliente';
