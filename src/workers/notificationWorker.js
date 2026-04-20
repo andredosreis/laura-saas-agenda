@@ -16,16 +16,16 @@ function buildMensagem(job) {
   const horaFormatada = dt.toFormat('HH:mm');
 
   if (tipo === 'confirmacao') {
-    return `✅ *Agendamento Confirmado!*\n\nOlá ${clienteNome}!\n\nO seu agendamento foi marcado com sucesso:\n📅 Data: ${dataFormatada}\n🕐 Horário: ${horaFormatada}\n\nAté breve! 💆‍♀️✨\n\n_Marcai_`;
+    return `✅ *Agendamento Confirmado!*\n\nOlá ${clienteNome}!\n\nO seu agendamento foi marcado com sucesso:\n📅 Data: ${dataFormatada}\n🕐 Horário: ${horaFormatada}\n\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
   }
 
   if (tipo === 'lembrete-antecipado') {
     const quando = diasAntes === 1 ? 'AMANHÃ' : `daqui a ${diasAntes} dias`;
-    return `🔔 *Lembrete de Agendamento*\n\nOlá ${clienteNome}!\n\nLembramos que tem uma sessão marcada para *${quando}*:\n📅 Data: ${dataFormatada}\n🕐 Horário: ${horaFormatada}\n\nAté breve! 💆‍♀️✨\n\n_Marcai_`;
+    return `🔔 *Lembrete de Agendamento*\n\nOlá ${clienteNome}!\n\nLembramos que tem uma sessão marcada para *${quando}*:\n📅 Data: ${dataFormatada}\n🕐 Horário: ${horaFormatada}\n\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
   }
 
   if (tipo === 'lembrete-1h') {
-    return `⏰ *Sessão em 1 hora!*\n\nOlá ${clienteNome}!\n\nA sua sessão começa às *${horaFormatada}* de hoje.\n\nEstá confirmada? Por favor responda:\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_Marcai_`;
+    return `⏰ *Sessão em 1 hora!*\n\nOlá ${clienteNome}!\n\nA sua sessão começa às *${horaFormatada}* de hoje.\n\nEstá confirmada? Por favor responda:\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
   }
 
   return null;
