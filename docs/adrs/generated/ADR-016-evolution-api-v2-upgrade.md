@@ -256,7 +256,7 @@ Se falhar em qualquer fase pós-deploy:
 ## Fase 4 — Testes Locais
 - [ ] `npm run dev` sobe sem erros
 - [ ] `curl http://localhost:5000/api/auth/me` → 401 JSON
-- [ ] `npm test -- --testPathPattern=webhook` → todos passam
+- [x] `npm test -- --testPathPattern=webhook` → 5/5 testes passam (auth + fromMe + fallback LID)
 - [x] Grep `textMessage` em `src/` — deve voltar sem matches (excepto comentários)
 - [ ] Teste manual de envio: forçar lembrete via rota admin → mensagem chega ao telemóvel teste
 - [ ] Teste manual de recepção: responder "SIM" → logs mostram telefone correcto (sem `@lid`)
