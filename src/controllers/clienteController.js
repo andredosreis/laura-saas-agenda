@@ -9,7 +9,7 @@ export const getAllClientes = async (req, res) => {
     const filter = { tenantId: req.tenantId };
 
     const [clientes, total] = await Promise.all([
-      Cliente.find(filter).populate('pacote').skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Cliente.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }),
       Cliente.countDocuments(filter),
     ]);
 
@@ -76,10 +76,10 @@ export const getCliente = async (req, res) => {
     const cliente = await Cliente.findOne({
       _id: req.params.id,
       tenantId: req.tenantId
-    }).populate('pacote');
+    });
 
     if (!cliente) {
-      return res.status(404).json({ message: 'Cliente não encontrado.' });
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado.' });
     }
     res.status(200).json(cliente);
   } catch (error) {
@@ -94,19 +94,21 @@ export const getCliente = async (req, res) => {
 export const updateCliente = async (req, res) => {
   try {
     const { Cliente } = req.models;
+    const { nome, telefone, email, dataNascimento, observacoes } = req.body;
+
     const clienteAtualizado = await Cliente.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      req.body,
+      { nome, telefone, email: email || undefined, dataNascimento: dataNascimento || null, observacoes },
       { new: true, runValidators: true }
-    ).populate('pacote');
+    );
 
     if (!clienteAtualizado) {
-      return res.status(404).json({ message: 'Cliente não encontrado para atualização.' });
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado.' });
     }
-    res.status(200).json(clienteAtualizado);
+    res.status(200).json({ success: true, data: clienteAtualizado });
   } catch (error) {
     console.error('Erro ao atualizar cliente:', error);
-    res.status(500).json({ message: 'Erro interno ao atualizar o cliente.', details: error.message });
+    res.status(500).json({ success: false, error: 'Erro interno ao atualizar o cliente.' });
   }
 };
 
