@@ -90,6 +90,9 @@ function Clientes() {
         });
         setPacotesClientes(pacotesMap);
       }
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar lista de clientes.');
     } finally {
       setIsLoading(false);
     }

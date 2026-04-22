@@ -9,7 +9,7 @@ export const getAllClientes = async (req, res) => {
     const filter = { tenantId: req.tenantId };
 
     const [clientes, total] = await Promise.all([
-      Cliente.find(filter).populate('pacote').skip(skip).limit(limit),
+      Cliente.find(filter).populate('pacote').skip(skip).limit(limit).sort({ createdAt: -1 }),
       Cliente.countDocuments(filter),
     ]);
 
@@ -25,7 +25,7 @@ export const getAllClientes = async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao listar clientes:', error.message);
-    res.status(500).json({ message: 'Erro interno ao listar clientes.', details: error.message });
+    res.status(500).json({ success: false, error: 'Erro interno ao listar clientes.' });
   }
 };
 
@@ -33,31 +33,39 @@ export const getAllClientes = async (req, res) => {
 export const createCliente = async (req, res) => {
   try {
     const { Cliente } = req.models;
-    const telefone = req.body.telefone ? String(req.body.telefone).replace(/[^\d]/g, '') : undefined;
-    if (telefone) {
-      const existente = await Cliente.findOne({ tenantId: req.tenantId, telefone });
-      if (existente) {
-        return res.status(400).json({ message: 'Já existe um cliente com este telefone ou outro campo único.' });
-      }
+    const { nome, telefone: telefoneBruto, email, dataNascimento, observacoes } = req.body;
+
+    if (!nome || !telefoneBruto) {
+      return res.status(400).json({ success: false, error: 'Nome e telefone são obrigatórios.' });
     }
-    const novoCliente = new Cliente({
-      ...req.body,
-      tenantId: req.tenantId
+
+    const telefone = String(telefoneBruto).replace(/[^\d]/g, '');
+
+    const existente = await Cliente.findOne({ tenantId: req.tenantId, telefone });
+    if (existente) {
+      return res.status(409).json({ success: false, error: 'Já existe um cliente com este telefone.' });
+    }
+
+    const salvo = await Cliente.create({
+      nome,
+      telefone,
+      email: email || undefined,
+      dataNascimento: dataNascimento || null,
+      observacoes: observacoes || '',
+      tenantId: req.tenantId,
     });
-    const salvo = await novoCliente.save();
-    res.status(201).json(salvo);
+
+    res.status(201).json({ success: true, data: salvo });
   } catch (error) {
     console.error('Erro ao criar cliente:', error);
     if (error.code === 11000) {
-      return res.status(400).json({
-        message: 'Já existe um cliente com este telefone ou outro campo único.',
-      });
+      return res.status(409).json({ success: false, error: 'Já existe um cliente com este telefone ou email.' });
     }
     if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({ field: err.path, message: err.message }));
-      return res.status(400).json({ message: 'Dados inválidos ao criar cliente.', details: errors });
+      const msgs = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ success: false, error: msgs });
     }
-    res.status(500).json({ message: 'Erro interno ao criar cliente.', details: error.message });
+    res.status(500).json({ success: false, error: 'Erro interno ao criar cliente.' });
   }
 };
 

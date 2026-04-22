@@ -58,8 +58,7 @@ function CriarCliente() {
       reset();
       navigate('/clientes');
     } catch (error) {
-      console.error('Erro completo:', error);
-      const mensagemErro = error.response?.data?.message || 'Erro ao cadastrar cliente';
+      const mensagemErro = error.response?.data?.error || error.response?.data?.message || 'Erro ao cadastrar cliente';
       toast.error(mensagemErro);
     } finally {
       setIsSubmitting(false);
