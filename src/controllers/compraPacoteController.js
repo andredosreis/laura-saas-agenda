@@ -11,6 +11,7 @@ export const venderPacote = async (req, res) => {
       diasValidade,
       parcelado,
       numeroParcelas,
+      valorEntrada,
       valorPago,
       formaPagamento,
       sessoesUsadas = 0,
@@ -35,6 +36,19 @@ export const venderPacote = async (req, res) => {
     const sessoesRestantes = sessoesContratadas - sessoesUsadasFinal;
     const valorTotal = valorTotalCustom > 0 ? parseFloat(valorTotalCustom) : pacote.valor;
 
+    // Fluxo lead (valorEntrada explícito): entrada livre + resto parcelado
+    // Fluxo VenderPacote (sem valorEntrada): valorPago = 1ª parcela
+    const temEntrada = valorEntrada !== undefined && valorEntrada !== null;
+    const valorPagoFinal = temEntrada ? (parseFloat(valorEntrada) || 0) : (parseFloat(valorPago) || 0);
+    const valorPendente = Math.max(0, valorTotal - valorPagoFinal);
+    const numParcelas = parcelado ? (parseInt(numeroParcelas) || 1) : 1;
+
+    const valorParcelaCalc = !parcelado
+      ? valorTotal
+      : temEntrada
+        ? valorPendente / numParcelas
+        : valorTotal / numParcelas;
+
     const compraPacote = await CompraPacote.create({
       tenantId: req.tenantId,
       cliente: clienteId,
@@ -43,12 +57,13 @@ export const venderPacote = async (req, res) => {
       sessoesUsadas: sessoesUsadasFinal,
       sessoesRestantes,
       valorTotal,
-      valorPago: valorPago || 0,
-      valorPendente: valorTotal - (valorPago || 0),
+      valorPago: valorPagoFinal,
+      valorPendente,
       parcelado: parcelado || false,
-      numeroParcelas: parcelado ? (numeroParcelas || 1) : 1,
-      parcelasPagas: valorPago > 0 ? 1 : 0,
-      valorParcela: parcelado ? valorTotal / (numeroParcelas || 1) : valorTotal,
+      numeroParcelas: numParcelas,
+      // Em fluxo lead a entrada não conta como parcela; no fluxo VenderPacote o valorPago representa a 1ª parcela
+      parcelasPagas: (parcelado && temEntrada) ? 0 : (valorPagoFinal > 0 ? 1 : 0),
+      valorParcela: valorParcelaCalc,
       diasValidade: diasValidade || null,
       dataCompra: new Date()
     });
@@ -64,11 +79,11 @@ export const venderPacote = async (req, res) => {
       cliente: clienteId,
       compraPacote: compraPacote._id,
       parcelado: parcelado || false,
-      numeroParcelas: parcelado ? (numeroParcelas || 1) : 1,
-      parcelaAtual: valorPago > 0 ? 2 : 1,
-      statusPagamento: !valorPago ? 'Pendente' : (valorPago >= valorTotal ? 'Pago' : 'Parcial'),
+      numeroParcelas: numParcelas,
+      parcelaAtual: (parcelado && temEntrada) ? 1 : (valorPagoFinal > 0 ? 2 : 1),
+      statusPagamento: !valorPagoFinal ? 'Pendente' : (valorPagoFinal >= valorTotal ? 'Pago' : 'Parcial'),
       formaPagamento: formaPagamento || null,
-      dataPagamento: valorPago >= valorTotal ? new Date() : null
+      dataPagamento: valorPagoFinal >= valorTotal ? new Date() : null
     });
 
     await compraPacote.populate([
@@ -376,6 +391,119 @@ export const estatisticasPacotes = async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
     res.status(500).json({ message: 'Erro ao buscar estatísticas', details: error.message });
+  }
+};
+
+// @desc    Editar venda de pacote existente
+// @route   PUT /api/compras-pacotes/:id
+// Permite corrigir valores, parcelamento e sessões já realizadas.
+// Mantém os Pagamentos já registados (histórico imutável) mas recalcula o status
+// da Transação com base em `valorPago` actual (soma dos pagamentos) vs `valorTotal` novo.
+export const editarVenda = async (req, res) => {
+  try {
+    const { CompraPacote, Transacao, Pagamento } = req.models;
+    const { id } = req.params;
+    const {
+      valorTotal: valorTotalNovo,
+      parcelado,
+      numeroParcelas,
+      valorEntrada,
+      sessoesUsadas,
+      diasValidade,
+      formaPagamento
+    } = req.body;
+
+    const compraPacote = await CompraPacote.findOne({ _id: id, tenantId: req.tenantId });
+    if (!compraPacote) {
+      return res.status(404).json({ message: 'Compra de pacote não encontrada' });
+    }
+
+    if (compraPacote.status === 'Cancelado') {
+      return res.status(400).json({ message: 'Não é possível editar pacote cancelado' });
+    }
+
+    // Pagamentos existentes mantêm-se; valorPago é a soma real dos pagamentos
+    const pagamentos = await Pagamento.find({
+      tenantId: req.tenantId,
+      transacao: { $in: await Transacao.find({ compraPacote: id, tenantId: req.tenantId }).distinct('_id') }
+    });
+    const valorPagoReal = pagamentos.reduce((sum, p) => sum + (p.valor || 0), 0);
+
+    // Aplicar alterações
+    const valorTotalFinal = valorTotalNovo !== undefined && valorTotalNovo !== null && valorTotalNovo > 0
+      ? parseFloat(valorTotalNovo)
+      : compraPacote.valorTotal;
+
+    const sessoesUsadasFinal = sessoesUsadas !== undefined
+      ? Math.max(0, Math.min(parseInt(sessoesUsadas) || 0, compraPacote.sessoesContratadas))
+      : compraPacote.sessoesUsadas;
+
+    const parceladoFinal = parcelado !== undefined ? !!parcelado : compraPacote.parcelado;
+    const numParcelasFinal = parceladoFinal
+      ? Math.max(1, Math.min(4, parseInt(numeroParcelas) || compraPacote.numeroParcelas || 1))
+      : 1;
+
+    // Se frontend enviar valorEntrada explícito, recalcula valorParcela com base no restante
+    // Caso contrário, valorParcela = valorTotal / numParcelas (comportamento antigo)
+    const temEntrada = valorEntrada !== undefined && valorEntrada !== null;
+    const entradaNum = temEntrada ? Math.max(0, parseFloat(valorEntrada) || 0) : 0;
+    const valorParcelaNovo = !parceladoFinal
+      ? valorTotalFinal
+      : temEntrada
+        ? Math.max(0, (valorTotalFinal - entradaNum)) / numParcelasFinal
+        : valorTotalFinal / numParcelasFinal;
+
+    // Actualizar compraPacote
+    compraPacote.valorTotal = valorTotalFinal;
+    compraPacote.valorPago = valorPagoReal; // usa soma real dos pagamentos
+    compraPacote.valorPendente = Math.max(0, valorTotalFinal - valorPagoReal);
+    compraPacote.parcelado = parceladoFinal;
+    compraPacote.numeroParcelas = numParcelasFinal;
+    compraPacote.valorParcela = valorParcelaNovo;
+    compraPacote.sessoesUsadas = sessoesUsadasFinal;
+    compraPacote.sessoesRestantes = compraPacote.sessoesContratadas - sessoesUsadasFinal;
+    if (parceladoFinal && compraPacote.valorParcela > 0) {
+      compraPacote.parcelasPagas = Math.floor(valorPagoReal / compraPacote.valorParcela);
+    }
+    if (diasValidade !== undefined) {
+      compraPacote.diasValidade = diasValidade || null;
+    }
+
+    await compraPacote.save();
+
+    // Sincronizar Transação associada
+    const transacao = await Transacao.findOne({ compraPacote: id, tenantId: req.tenantId });
+    if (transacao) {
+      transacao.valor = valorTotalFinal;
+      transacao.valorFinal = valorTotalFinal;
+      transacao.parcelado = parceladoFinal;
+      transacao.numeroParcelas = numParcelasFinal;
+      transacao.statusPagamento = valorPagoReal >= valorTotalFinal
+        ? 'Pago'
+        : (valorPagoReal > 0 ? 'Parcial' : 'Pendente');
+      if (formaPagamento) transacao.formaPagamento = formaPagamento;
+      if (valorPagoReal >= valorTotalFinal && !transacao.dataPagamento) {
+        transacao.dataPagamento = new Date();
+      } else if (valorPagoReal < valorTotalFinal) {
+        transacao.dataPagamento = null;
+      }
+      await transacao.save();
+    }
+
+    await compraPacote.populate([
+      { path: 'cliente', select: 'nome telefone email' },
+      { path: 'pacote' }
+    ]);
+
+    res.status(200).json({
+      message: 'Venda atualizada com sucesso',
+      compraPacote,
+      transacao
+    });
+
+  } catch (error) {
+    console.error('Erro ao editar venda:', error);
+    res.status(500).json({ message: 'Erro ao editar venda', details: error.message });
   }
 };
 

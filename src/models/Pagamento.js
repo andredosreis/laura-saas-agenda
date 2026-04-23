@@ -96,7 +96,7 @@ const pagamentoSchema = new mongoose.Schema({
       type: Number,
       default: 1,
       min: [1, 'Deve ter pelo menos 1 parcela'],
-      max: [12, 'Máximo de 12 parcelas']
+      max: [4, 'Máximo de 4 parcelas']
     },
     nsu: {
       type: String,

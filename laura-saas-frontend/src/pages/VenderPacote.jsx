@@ -111,8 +111,13 @@ function VenderPacote() {
       // Se mudar parcelamento, atualizar valor pago
       if (campo === 'parcelado') {
         if (valor && pacoteSelecionado) {
+          // Ao activar parcelado, garantir nº parcelas >= 2 (estado inicial é 1)
+          if (!newForm.numeroParcelas || newForm.numeroParcelas < 2) {
+            newForm.numeroParcelas = 2;
+          }
           newForm.valorPago = vTotal / newForm.numeroParcelas;
         } else if (pacoteSelecionado && newForm.pagarAgora) {
+          newForm.numeroParcelas = 1;
           newForm.valorPago = vTotal;
         }
       }
@@ -386,8 +391,8 @@ function VenderPacote() {
                   onChange={(e) => handleChange('numeroParcelas', parseInt(e.target.value))}
                   className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
                 >
-                  {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                    <option key={n} value={n}>{n}x de €{valorParcela}</option>
+                  {[2, 3, 4].map(n => (
+                    <option key={n} value={n}>{n}x de €{(valorTotal / n).toFixed(2)}</option>
                   ))}
                 </select>
               </div>

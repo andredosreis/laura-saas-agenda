@@ -27,6 +27,7 @@
 | 011 | [Desacoplamento Agendamento/Financeiro + Modular Monolith](./ADR-011-modular-monolith-agendamento-financeiro.md) | ARCH | ✅ Accepted | 2026-04-12 | 145 |
 | 012 | [Containerização Docker com Evolução para Microserviços](./ADR-012-docker-containerization-strategy.md) | INFRA | ✅ Accepted — Implementação planeada Fase 2 | 2026-04-12 | 130 |
 | 013 | [Notification Pipeline com BullMQ + Redis](./ADR-013-notification-pipeline-bullmq.md) | NOTIF | ✅ Accepted — Implementação planeada Fase 2 | 2026-04-12 | 135 |
+| 017 | [Lembretes Automáticos de Parcelas via WhatsApp (Evolution)](./ADR-017-lembretes-whatsapp-parcelas.md) | NOTIF | 🟡 Proposed | 2026-04-23 | 125 |
 
 ---
 

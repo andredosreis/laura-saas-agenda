@@ -16,7 +16,8 @@ import {
   X,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  CreditCard
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
@@ -83,6 +84,18 @@ function Transacoes() {
     formaPagamento: ''
   });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  // Modal de registo de pagamento (parcelas)
+  const [showRegistrarPagamento, setShowRegistrarPagamento] = useState(false);
+  const [transacaoPagando, setTransacaoPagando] = useState(null);
+  const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
+  const [pagamentoForm, setPagamentoForm] = useState({
+    valor: '',
+    formaPagamento: 'Dinheiro',
+    dataPagamento: DateTime.now().toISODate(),
+    observacoes: ''
+  });
+  const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
   // Buscar transações
   const fetchTransacoes = useCallback(async () => {
@@ -218,6 +231,64 @@ function Transacoes() {
       toast.error(error.response?.data?.message || 'Erro ao atualizar transação');
     } finally {
       setSalvandoEdicao(false);
+    }
+  };
+
+  const handleAbrirRegistrarPagamento = async (transacao) => {
+    try {
+      const response = await api.get(`/transacoes/${transacao._id}`);
+      const pagamentos = response.data.pagamentos || [];
+      const totalPago = pagamentos.reduce((sum, p) => sum + (p.valor || 0), 0);
+      const restante = Math.max(0, (transacao.valorFinal || 0) - totalPago);
+
+      setTransacaoPagando({ ...transacao, totalPago, restante });
+      setPagamentosExistentes(pagamentos);
+      setPagamentoForm({
+        valor: restante > 0 ? restante.toFixed(2) : '',
+        formaPagamento: transacao.formaPagamento || 'Dinheiro',
+        dataPagamento: DateTime.now().toISODate(),
+        observacoes: ''
+      });
+      setShowRegistrarPagamento(true);
+    } catch (error) {
+      console.error('Erro ao carregar detalhes para pagamento:', error);
+      toast.error('Erro ao carregar detalhes');
+    }
+  };
+
+  const handleSalvarPagamento = async (e) => {
+    e.preventDefault();
+
+    const valor = parseFloat(pagamentoForm.valor);
+    if (!valor || valor <= 0) {
+      toast.error('Valor do pagamento deve ser maior que zero');
+      return;
+    }
+
+    if (transacaoPagando && valor > transacaoPagando.restante + 0.01) {
+      toast.error(`Valor excede o restante (€${transacaoPagando.restante.toFixed(2)})`);
+      return;
+    }
+
+    setSalvandoPagamento(true);
+    try {
+      await api.post(`/transacoes/${transacaoPagando._id}/pagamento`, {
+        valor,
+        formaPagamento: pagamentoForm.formaPagamento,
+        dataPagamento: pagamentoForm.dataPagamento,
+        observacoes: pagamentoForm.observacoes
+      });
+
+      toast.success('Pagamento registado com sucesso!');
+      setShowRegistrarPagamento(false);
+      setTransacaoPagando(null);
+      setPagamentosExistentes([]);
+      fetchTransacoes();
+    } catch (error) {
+      console.error('Erro ao registar pagamento:', error);
+      toast.error(error.response?.data?.message || 'Erro ao registar pagamento');
+    } finally {
+      setSalvandoPagamento(false);
     }
   };
 
@@ -497,6 +568,16 @@ function Transacoes() {
                             >
                               <Eye className={`w-4 h-4 ${subTextClass}`} />
                             </button>
+                            {transacao.tipo === 'Receita' &&
+                              (transacao.statusPagamento === 'Pendente' || transacao.statusPagamento === 'Parcial') && (
+                              <button
+                                onClick={() => handleAbrirRegistrarPagamento(transacao)}
+                                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-emerald-500/10' : 'hover:bg-emerald-50'} transition-colors`}
+                                title="Registar pagamento"
+                              >
+                                <CreditCard className="w-4 h-4 text-emerald-500" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleEditarTransacao(transacao)}
                               className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50'} transition-colors`}
@@ -762,6 +843,139 @@ function Transacoes() {
             >
               Fechar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registar Pagamento */}
+      {showRegistrarPagamento && transacaoPagando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`${cardClass} rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${textClass}`}>💳 Registar Pagamento</h2>
+              <button
+                onClick={() => { setShowRegistrarPagamento(false); setTransacaoPagando(null); setPagamentosExistentes([]); }}
+                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+              >
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+
+            {/* Resumo */}
+            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-gray-100'} mb-4 space-y-2 text-sm`}>
+              <p className={`font-medium ${textClass}`}>{transacaoPagando.descricao}</p>
+              {transacaoPagando.cliente?.nome && (
+                <p className={subTextClass}>Cliente: {transacaoPagando.cliente.nome}</p>
+              )}
+              <div className={`h-px ${isDarkMode ? 'bg-white/10' : 'bg-gray-200'} my-2`} />
+              <div className="flex justify-between">
+                <span className={subTextClass}>Valor total:</span>
+                <span className={`font-medium ${textClass}`}>€{transacaoPagando.valorFinal?.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={subTextClass}>Já pago:</span>
+                <span className="font-medium text-emerald-500">€{transacaoPagando.totalPago.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={subTextClass}>Falta:</span>
+                <span className="font-bold text-amber-500">€{transacaoPagando.restante.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Histórico de pagamentos */}
+            {pagamentosExistentes.length > 0 && (
+              <div className="mb-4">
+                <p className={`text-xs font-medium ${subTextClass} mb-2 uppercase tracking-wider`}>Pagamentos anteriores</p>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {pagamentosExistentes.map((p, idx) => (
+                    <div key={idx} className={`flex justify-between text-xs p-2 rounded-lg ${isDarkMode ? 'bg-slate-700/30' : 'bg-gray-50'}`}>
+                      <span className={subTextClass}>
+                        {DateTime.fromISO(p.dataPagamento).toFormat('dd/MM/yyyy')} · {p.formaPagamento}
+                      </span>
+                      <span className={`font-medium ${textClass}`}>€{p.valor?.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSalvarPagamento} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Valor do pagamento (€) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={transacaoPagando.restante}
+                  value={pagamentoForm.valor}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, valor: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="0.00"
+                  required
+                />
+                <p className={`text-xs ${subTextClass} mt-1`}>Máximo: €{transacaoPagando.restante.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Data do pagamento *</label>
+                <input
+                  type="date"
+                  value={pagamentoForm.dataPagamento}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, dataPagamento: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Forma de pagamento *</label>
+                <select
+                  value={pagamentoForm.formaPagamento}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  required
+                >
+                  {FORMAS_PAGAMENTO.map(forma => (
+                    <option key={forma} value={forma}>{forma}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Observações</label>
+                <textarea
+                  value={pagamentoForm.observacoes}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, observacoes: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass} resize-none`}
+                  rows="2"
+                  placeholder="Ex: Parcela 2 de 3..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowRegistrarPagamento(false); setTransacaoPagando(null); setPagamentosExistentes([]); }}
+                  className={`flex-1 px-4 py-3 rounded-xl border ${cardClass} ${textClass} hover:opacity-80 transition-all`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvandoPagamento}
+                  className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-emerald-500 to-green-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {salvandoPagamento ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    'Registar Pagamento'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

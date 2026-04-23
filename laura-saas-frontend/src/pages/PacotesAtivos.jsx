@@ -37,11 +37,23 @@ function PacotesAtivos() {
   const [showHistorico, setShowHistorico] = useState(false);
   const [showEstender, setShowEstender] = useState(false);
   const [pacoteSelecionado, setPacoteSelecionado] = useState(null);
-  
+
   // Estados do modal Estender
   const [diasExtensao, setDiasExtensao] = useState(30);
   const [motivoExtensao, setMotivoExtensao] = useState('');
   const [estendendoPrazo, setEstendendoPrazo] = useState(false);
+
+  // Estados do modal Editar
+  const [showEditar, setShowEditar] = useState(false);
+  const [pacoteEditando, setPacoteEditando] = useState(null);
+  const [editForm, setEditForm] = useState({
+    valorTotal: '',
+    parcelado: false,
+    numeroParcelas: 2,
+    valorEntrada: '',
+    sessoesUsadas: 0
+  });
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   // Buscar compras de pacotes
   const fetchComprasPacotes = useCallback(async () => {
@@ -81,6 +93,53 @@ function PacotesAtivos() {
     setDiasExtensao(30);
     setMotivoExtensao('');
     setShowEstender(true);
+  };
+
+  const handleEditarPacote = (pacote) => {
+    setPacoteEditando(pacote);
+    setEditForm({
+      valorTotal: pacote.valorTotal?.toString() || '',
+      parcelado: !!pacote.parcelado,
+      numeroParcelas: Math.min(4, Math.max(2, pacote.numeroParcelas || 2)),
+      valorEntrada: pacote.valorPago?.toString() || '',
+      sessoesUsadas: pacote.sessoesUsadas || 0
+    });
+    setShowEditar(true);
+  };
+
+  const handleSalvarEdicao = async () => {
+    if (!pacoteEditando) return;
+
+    const valorTotalNum = parseFloat(editForm.valorTotal);
+    if (!valorTotalNum || valorTotalNum <= 0) {
+      toast.error('Valor total inválido');
+      return;
+    }
+
+    const payload = {
+      valorTotal: valorTotalNum,
+      parcelado: editForm.parcelado,
+      numeroParcelas: editForm.parcelado ? editForm.numeroParcelas : 1,
+      sessoesUsadas: parseInt(editForm.sessoesUsadas) || 0,
+    };
+
+    if (editForm.parcelado) {
+      payload.valorEntrada = parseFloat(editForm.valorEntrada) || 0;
+    }
+
+    setSalvandoEdicao(true);
+    try {
+      await api.put(`/compras-pacotes/${pacoteEditando._id}`, payload);
+      toast.success('Venda atualizada com sucesso!');
+      setShowEditar(false);
+      setPacoteEditando(null);
+      fetchComprasPacotes();
+    } catch (error) {
+      console.error('Erro ao editar venda:', error);
+      toast.error(error.response?.data?.message || 'Erro ao editar venda');
+    } finally {
+      setSalvandoEdicao(false);
+    }
   };
 
   const handleDeletarPacote = async (pacote) => {
@@ -304,6 +363,15 @@ function PacotesAtivos() {
                       }`}>
                         {compra.status}
                       </span>
+                      <button
+                        onClick={() => handleEditarPacote(compra)}
+                        className={`p-1.5 rounded-lg ${
+                          isDarkMode ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50'
+                        } text-indigo-500 transition-colors`}
+                        title="Editar venda"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleDeletarPacote(compra)}
                         className={`p-1.5 rounded-lg ${
@@ -571,6 +639,139 @@ function PacotesAtivos() {
                   </>
                 ) : (
                   'Confirmar Extensão'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Venda */}
+      {showEditar && pacoteEditando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`${cardClass} rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${textClass}`}>✏️ Editar Venda</h2>
+              <button
+                onClick={() => { setShowEditar(false); setPacoteEditando(null); }}
+                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+              >
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+
+            {/* Info (read-only) */}
+            <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-gray-100'} mb-4 text-sm`}>
+              <p className={`font-medium ${textClass}`}>{pacoteEditando.cliente?.nome}</p>
+              <p className={subTextClass}>{pacoteEditando.pacote?.nome}</p>
+              <div className={`h-px ${isDarkMode ? 'bg-white/10' : 'bg-gray-200'} my-2`} />
+              <div className="flex justify-between">
+                <span className={subTextClass}>Já pago:</span>
+                <span className="font-medium text-emerald-500">€{(pacoteEditando.valorPago || 0).toFixed(2)}</span>
+              </div>
+              <p className={`text-xs ${subTextClass} mt-1`}>
+                Pagamentos registados mantêm-se. Editar só altera valores e parcelas.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Valor total */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Valor total (€) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editForm.valorTotal}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, valorTotal: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* Sessões já usadas */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Sessões já realizadas</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={pacoteEditando.sessoesContratadas}
+                  value={editForm.sessoesUsadas}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, sessoesUsadas: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                />
+                <p className={`text-xs ${subTextClass} mt-1`}>
+                  Contratadas: {pacoteEditando.sessoesContratadas}
+                </p>
+              </div>
+
+              {/* Parcelado */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.parcelado}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, parcelado: e.target.checked }))}
+                  className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className={textClass}>Parcelado</span>
+              </label>
+
+              {editForm.parcelado && (
+                <div className={`space-y-3 p-3 rounded-xl ${isDarkMode ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                  <div>
+                    <label className={`block text-sm ${subTextClass} mb-1`}>Valor de entrada (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={parseFloat(editForm.valorTotal) || 0}
+                      value={editForm.valorEntrada}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, valorEntrada: e.target.value }))}
+                      className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-sm ${subTextClass} mb-1`}>Número de parcelas</label>
+                    <select
+                      value={editForm.numeroParcelas}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, numeroParcelas: parseInt(e.target.value) }))}
+                      className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    >
+                      {[2, 3, 4].map(n => {
+                        const total = parseFloat(editForm.valorTotal) || 0;
+                        const entrada = parseFloat(editForm.valorEntrada) || 0;
+                        const restante = Math.max(0, total - entrada);
+                        return (
+                          <option key={n} value={n}>{n}x de €{(restante / n).toFixed(2)}</option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowEditar(false); setPacoteEditando(null); }}
+                className={`flex-1 px-4 py-3 rounded-xl border ${cardClass} ${textClass} hover:opacity-80 transition-all`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSalvarEdicao}
+                disabled={salvandoEdicao}
+                className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {salvandoEdicao ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Alterações'
                 )}
               </button>
             </div>

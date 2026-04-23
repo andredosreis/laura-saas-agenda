@@ -15,7 +15,10 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
   const [vendaForm, setVendaForm] = useState({
     pacoteId: '',
     valorPersonalizado: '',
-    formaPagamento: 'Dinheiro'
+    formaPagamento: 'Dinheiro',
+    modoPagamento: 'avista', // 'avista' | 'parcelado'
+    valorEntrada: '',
+    numeroParcelas: 2
   });
   const [clienteCriado, setClienteCriado] = useState(null);
   const [registrandoVenda, setRegistrandoVenda] = useState(false);
@@ -26,7 +29,7 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
     if (isOpen && agendamento) {
       setStep(agendamento.compareceu === true ? 2 : 1);
       setClienteCriado(null);
-      setVendaForm({ pacoteId: '', valorPersonalizado: '', formaPagamento: 'Dinheiro' });
+      setVendaForm({ pacoteId: '', valorPersonalizado: '', formaPagamento: 'Dinheiro', modoPagamento: 'avista', valorEntrada: '', numeroParcelas: 2 });
     }
   }, [isOpen, agendamento?._id]);
 
@@ -105,6 +108,14 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
     ? parseFloat(vendaForm.valorPersonalizado)
     : (pacoteSelecionado?.valor || 0);
 
+  const isParcelado = vendaForm.modoPagamento === 'parcelado';
+  const entradaNum = parseFloat(vendaForm.valorEntrada) || 0;
+  const entradaValida = Math.min(Math.max(entradaNum, 0), valorFinal);
+  const valorRestante = Math.max(0, valorFinal - entradaValida);
+  const valorParcela = isParcelado && vendaForm.numeroParcelas > 0
+    ? valorRestante / vendaForm.numeroParcelas
+    : 0;
+
   const handleRegistrarVenda = async () => {
     if (!vendaForm.pacoteId) {
       toast.error('Selecione um serviço/pacote');
@@ -119,17 +130,26 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
 
     setRegistrandoVenda(true);
     try {
-      await api.post('/compras-pacotes', {
+      const payload = {
         clienteId,
         pacoteId: vendaForm.pacoteId,
-        diasValidade: null, // sem validade
-        parcelado: false,
-        numeroParcelas: 1,
-        valorPago: valorFinal,
-        formaPagamento: vendaForm.formaPagamento,
+        diasValidade: null,
         sessoesUsadas: 0,
-        valorTotal: valorFinal
-      });
+        valorTotal: valorFinal,
+        formaPagamento: vendaForm.formaPagamento,
+      };
+
+      if (isParcelado) {
+        payload.parcelado = true;
+        payload.numeroParcelas = vendaForm.numeroParcelas;
+        payload.valorEntrada = entradaValida;
+      } else {
+        payload.parcelado = false;
+        payload.numeroParcelas = 1;
+        payload.valorPago = valorFinal;
+      }
+
+      await api.post('/compras-pacotes', payload);
 
       toast.success(`Venda registada! ${clienteCriado?.nome} — €${valorFinal.toFixed(2)}`);
       onSuccess();
@@ -335,11 +355,104 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
                     </div>
                   )}
 
+                  {/* Modo de pagamento */}
+                  {pacoteSelecionado && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Como pagou?
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setVendaForm(prev => ({ ...prev, modoPagamento: 'avista', valorEntrada: '' }))}
+                          className={`py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                            vendaForm.modoPagamento === 'avista'
+                              ? 'border-amber-500 bg-amber-50 text-amber-700'
+                              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          À vista
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVendaForm(prev => ({ ...prev, modoPagamento: 'parcelado' }))}
+                          className={`py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                            vendaForm.modoPagamento === 'parcelado'
+                              ? 'border-amber-500 bg-amber-50 text-amber-700'
+                              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          Parcelado
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campos de parcelamento */}
+                  {pacoteSelecionado && isParcelado && (
+                    <div className="space-y-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Valor de entrada (€)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={valorFinal}
+                          value={vendaForm.valorEntrada}
+                          onChange={(e) => setVendaForm(prev => ({ ...prev, valorEntrada: e.target.value }))}
+                          className="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-gray-900 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                          placeholder="0,00"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Deixa 0 se o cliente não deu entrada.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Em quantas parcelas?
+                        </label>
+                        <select
+                          value={vendaForm.numeroParcelas}
+                          onChange={(e) => setVendaForm(prev => ({ ...prev, numeroParcelas: parseInt(e.target.value) }))}
+                          className="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-gray-900 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        >
+                          {[2, 3, 4].map(n => (
+                            <option key={n} value={n}>
+                              {n}x de €{(valorRestante / n).toFixed(2)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="pt-2 border-t border-indigo-200 space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Valor total:</span>
+                          <span className="font-medium text-gray-800">€{valorFinal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Entrada:</span>
+                          <span className="font-medium text-emerald-600">€{entradaValida.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Restante:</span>
+                          <span className="font-medium text-gray-800">€{valorRestante.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">{vendaForm.numeroParcelas}x de:</span>
+                          <span className="font-bold text-indigo-600">€{valorParcela.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Forma de pagamento */}
                   {pacoteSelecionado && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Forma de Pagamento
+                        Forma de Pagamento {isParcelado && <span className="text-xs text-gray-500">(da entrada)</span>}
                       </label>
                       <select
                         value={vendaForm.formaPagamento}
@@ -354,7 +467,7 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
                   )}
 
                   {/* Resumo da venda */}
-                  {pacoteSelecionado && (
+                  {pacoteSelecionado && !isParcelado && (
                     <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
                       <div className="flex justify-between text-sm mb-1">
                         <span className="text-gray-600">Cliente:</span>

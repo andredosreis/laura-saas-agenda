@@ -10,7 +10,8 @@ import {
   pacotesExpirando,
   alertasPacotes,
   estatisticasPacotes,
-  deletarPacote
+  deletarPacote,
+  editarVenda
 } from '../controllers/compraPacoteController.js';
 import validateObjectId from '../middlewares/validateObjectId.js';
 import mongoose from 'mongoose';
@@ -41,6 +42,7 @@ router.get('/cliente/:clienteId', validateClienteId, pacotesDoCliente);
 router.get('/:id', validateObjectId, buscarCompraPacote);
 
 // Rotas de gestão de pacotes
+router.put('/:id', validateObjectId, editarVenda);
 router.put('/:id/estender-prazo', validateObjectId, estenderPrazo);
 router.put('/:id/cancelar', validateObjectId, cancelarPacote);
 router.delete('/:id', validateObjectId, deletarPacote);
