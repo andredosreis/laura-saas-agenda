@@ -116,14 +116,52 @@ export const listarTransacoes = async (req, res) => {
       { $group: { _id: '$tipo', total: { $sum: '$valorFinal' }, quantidade: { $sum: 1 } } }
     ]);
 
-    console.log('[listarTransacoes] 📈 Resumo do aggregate:', JSON.stringify(resumo, null, 2));
+    // Calcular "recebido" real: soma dos Pagamentos para receitas + fallback histórico
+    const { Pagamento } = req.models;
+    const receitasNoRange = await Transacao.find({ ...query, tipo: 'Receita' })
+      .select('_id valorFinal statusPagamento')
+      .lean();
+
+    const receitaIds = receitasNoRange.map(r => r._id);
+    const pagamentosAgg = receitaIds.length > 0
+      ? await Pagamento.aggregate([
+          {
+            $match: {
+              tenantId: new mongoose.Types.ObjectId(req.tenantId),
+              transacao: { $in: receitaIds }
+            }
+          },
+          { $group: { _id: '$transacao', total: { $sum: '$valor' } } }
+        ])
+      : [];
+
+    const pagamentosPorTransacao = new Map(
+      pagamentosAgg.map(p => [String(p._id), p.total])
+    );
+
+    let recebido = 0;
+    for (const r of receitasNoRange) {
+      const pago = pagamentosPorTransacao.get(String(r._id)) || 0;
+      if (pago > 0) {
+        recebido += pago;
+      } else if (r.statusPagamento === 'Pago') {
+        // Fallback histórico: transação marcada Pago mas sem Pagamentos registados
+        recebido += r.valorFinal || 0;
+      }
+    }
+
+    const vendido = resumo.find(r => r._id === 'Receita')?.total || 0;
+    const pendente = Math.max(0, vendido - recebido);
 
     const totais = {
-      receitas: resumo.find(r => r._id === 'Receita')?.total || 0,
+      receitas: vendido, // mantém retrocompat — alias para "vendido"
+      vendido,
+      recebido,
+      pendente,
       despesas: resumo.find(r => r._id === 'Despesa')?.total || 0,
       saldo: 0
     };
-    totais.saldo = totais.receitas - totais.despesas;
+    totais.saldo = recebido - totais.despesas;
 
     console.log('[listarTransacoes] 💰 Totais calculados:', totais);
 

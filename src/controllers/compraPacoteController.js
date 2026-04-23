@@ -4,7 +4,7 @@ import { DateTime } from 'luxon';
 // @route   POST /api/compras-pacotes
 export const venderPacote = async (req, res) => {
   try {
-    const { CompraPacote, Transacao, Pacote, Cliente } = req.models;
+    const { CompraPacote, Transacao, Pacote, Cliente, Pagamento } = req.models;
     const {
       clienteId,
       pacoteId,
@@ -85,6 +85,25 @@ export const venderPacote = async (req, res) => {
       formaPagamento: formaPagamento || null,
       dataPagamento: valorPagoFinal >= valorTotal ? new Date() : null
     });
+
+    // Criar registo de Pagamento para a entrada/valor inicial — assegura que os relatórios
+    // de "Recebido vs Pendente" reflectem a realidade desde o momento da venda.
+    if (valorPagoFinal > 0 && formaPagamento) {
+      try {
+        await Pagamento.create({
+          tenantId: req.tenantId,
+          transacao: transacao._id,
+          valor: valorPagoFinal,
+          formaPagamento,
+          dataPagamento: new Date(),
+          observacoes: (parcelado && temEntrada) ? 'Entrada' : 'Pagamento inicial'
+        });
+      } catch (pagErr) {
+        // Forma de pagamento pode exigir dados adicionais (MBWay, Multibanco, Cartão).
+        // Se falhar, log e segue — a transação fica com valorPago mas sem Pagamento detalhado.
+        console.warn('[venderPacote] Não foi possível registar Pagamento detalhado:', pagErr.message);
+      }
+    }
 
     await compraPacote.populate([
       { path: 'cliente', select: 'nome telefone email' },

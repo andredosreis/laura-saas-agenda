@@ -200,6 +200,7 @@ function PacotesAtivos() {
     total: comprasPacotes.length,
     valorTotal: comprasPacotes.reduce((sum, c) => sum + (c.valorTotal || 0), 0),
     valorPago: comprasPacotes.reduce((sum, c) => sum + (c.valorPago || 0), 0),
+    valorPendente: comprasPacotes.reduce((sum, c) => sum + (c.valorPendente || Math.max(0, (c.valorTotal || 0) - (c.valorPago || 0))), 0),
     sessoesTotais: comprasPacotes.reduce((sum, c) => sum + (c.sessoesRestantes || 0), 0)
   };
 
@@ -235,7 +236,7 @@ function PacotesAtivos() {
 
         {/* Estatísticas */}
         {!loading && filtroStatus === 'Ativo' && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className={`${cardClass} rounded-2xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
                 <Package className={`w-4 h-4 ${subTextClass}`} />
@@ -252,15 +253,21 @@ function PacotesAtivos() {
             </div>
             <div className={`${cardClass} rounded-2xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs ${subTextClass}`}>💰 Total Vendido</span>
+                <span className={`text-xs ${subTextClass}`}>💰 Vendido</span>
               </div>
               <p className={`text-2xl font-bold ${textClass}`}>€{stats.valorTotal.toFixed(2)}</p>
             </div>
             <div className={`${cardClass} rounded-2xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs ${subTextClass}`}>✅ Pago</span>
+                <span className={`text-xs ${subTextClass}`}>✅ Recebido</span>
               </div>
               <p className="text-2xl font-bold text-emerald-500">€{stats.valorPago.toFixed(2)}</p>
+            </div>
+            <div className={`${cardClass} rounded-2xl p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs ${subTextClass}`}>⏳ A Receber</span>
+              </div>
+              <p className="text-2xl font-bold text-amber-500">€{stats.valorPendente.toFixed(2)}</p>
             </div>
           </div>
         )}
@@ -739,12 +746,15 @@ function PacotesAtivos() {
                       onChange={(e) => setEditForm(prev => ({ ...prev, numeroParcelas: parseInt(e.target.value) }))}
                       className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
                     >
-                      {[2, 3, 4].map(n => {
+                      {[1, 2, 3, 4].map(n => {
                         const total = parseFloat(editForm.valorTotal) || 0;
                         const entrada = parseFloat(editForm.valorEntrada) || 0;
                         const restante = Math.max(0, total - entrada);
                         return (
-                          <option key={n} value={n}>{n}x de €{(restante / n).toFixed(2)}</option>
+                          <option key={n} value={n}>
+                            {n}x de €{(restante / n).toFixed(2)}
+                            {n === 1 ? ' (restante de uma vez)' : ''}
+                          </option>
                         );
                       })}
                     </select>

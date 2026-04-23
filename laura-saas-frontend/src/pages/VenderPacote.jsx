@@ -391,8 +391,11 @@ function VenderPacote() {
                   onChange={(e) => handleChange('numeroParcelas', parseInt(e.target.value))}
                   className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
                 >
-                  {[2, 3, 4].map(n => (
-                    <option key={n} value={n}>{n}x de €{(valorTotal / n).toFixed(2)}</option>
+                  {[1, 2, 3, 4].map(n => (
+                    <option key={n} value={n}>
+                      {n}x de €{(valorTotal / n).toFixed(2)}
+                      {n === 1 ? ' (pagamento único)' : ''}
+                    </option>
                   ))}
                 </select>
               </div>

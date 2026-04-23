@@ -45,7 +45,7 @@ function Transacoes() {
   // Estados
   const [transacoes, setTransacoes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [totais, setTotais] = useState({ receitas: 0, despesas: 0, saldo: 0 });
+  const [totais, setTotais] = useState({ vendido: 0, recebido: 0, pendente: 0, despesas: 0, saldo: 0 });
   const [paginacao, setPaginacao] = useState({ total: 0, pagina: 1, limite: 20, totalPaginas: 1 });
   
   // Filtros
@@ -114,7 +114,7 @@ function Transacoes() {
       const response = await api.get(`/transacoes?${params.toString()}`);
       
       setTransacoes(response.data.transacoes || []);
-      setTotais(response.data.totais || { receitas: 0, despesas: 0, saldo: 0 });
+      setTotais(response.data.totais || { vendido: 0, recebido: 0, pendente: 0, despesas: 0, saldo: 0 });
       setPaginacao(prev => ({
         ...prev,
         total: response.data.paginacao?.total || 0,
@@ -379,17 +379,33 @@ function Transacoes() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div className={`${cardClass} rounded-2xl p-5`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${subTextClass}`}>Total Receitas</p>
-                <p className={`text-2xl font-bold text-emerald-500`}>
-                  €{totais.receitas?.toFixed(2) || '0.00'}
+                <p className={`text-sm ${subTextClass}`}>Faturado</p>
+                <p className={`text-xl font-bold ${textClass}`}>
+                  €{totais.vendido?.toFixed(2) || '0.00'}
                 </p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>total vendido</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-500/10">
+                <TrendingUp className="w-5 h-5 text-slate-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className={`${cardClass} rounded-2xl p-5`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${subTextClass}`}>Recebido</p>
+                <p className={`text-xl font-bold text-emerald-500`}>
+                  €{totais.recebido?.toFixed(2) || '0.00'}
+                </p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>dinheiro em caixa</p>
               </div>
               <div className="p-3 rounded-xl bg-emerald-500/10">
-                <TrendingUp className="w-6 h-6 text-emerald-500" />
+                <DollarSign className="w-5 h-5 text-emerald-500" />
               </div>
             </div>
           </div>
@@ -397,13 +413,29 @@ function Transacoes() {
           <div className={`${cardClass} rounded-2xl p-5`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${subTextClass}`}>Total Despesas</p>
-                <p className={`text-2xl font-bold text-red-500`}>
+                <p className={`text-sm ${subTextClass}`}>A Receber</p>
+                <p className={`text-xl font-bold text-amber-500`}>
+                  €{totais.pendente?.toFixed(2) || '0.00'}
+                </p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>parcelas em falta</p>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-500/10">
+                <CreditCard className="w-5 h-5 text-amber-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className={`${cardClass} rounded-2xl p-5`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${subTextClass}`}>Despesas</p>
+                <p className={`text-xl font-bold text-red-500`}>
                   €{totais.despesas?.toFixed(2) || '0.00'}
                 </p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>pagas no período</p>
               </div>
               <div className="p-3 rounded-xl bg-red-500/10">
-                <TrendingDown className="w-6 h-6 text-red-500" />
+                <TrendingDown className="w-5 h-5 text-red-500" />
               </div>
             </div>
           </div>
@@ -411,13 +443,14 @@ function Transacoes() {
           <div className={`${cardClass} rounded-2xl p-5`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${subTextClass}`}>Saldo</p>
-                <p className={`text-2xl font-bold ${totais.saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                <p className={`text-sm ${subTextClass}`}>Saldo Real</p>
+                <p className={`text-xl font-bold ${totais.saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                   €{totais.saldo?.toFixed(2) || '0.00'}
                 </p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>recebido − despesas</p>
               </div>
               <div className={`p-3 rounded-xl ${totais.saldo >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                <DollarSign className={`w-6 h-6 ${totais.saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
+                <DollarSign className={`w-5 h-5 ${totais.saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
               </div>
             </div>
           </div>
