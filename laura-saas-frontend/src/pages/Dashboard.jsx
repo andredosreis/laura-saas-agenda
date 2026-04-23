@@ -430,10 +430,10 @@ function Dashboard() {
 
                       {/* Info Block */}
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-base sm:text-lg text-white mb-1 truncate">{ag.cliente?.nome}</h4>
+                        <h4 className="font-semibold text-base sm:text-lg text-white mb-1 truncate">{ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}</h4>
                         <p className="text-slate-400 text-xs sm:text-sm flex items-center gap-2 truncate">
                           <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
-                          <span className="truncate">{ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço Geral'}</span>
+                          <span className="truncate">{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço Geral')}</span>
                         </p>
                       </div>
 
@@ -578,7 +578,7 @@ function Dashboard() {
                           <div className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full ${statusDot}`}></span>
                             <span className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                              {ag.cliente?.nome || 'Cliente'}
+                              {ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}
                             </span>
                             {isHoje && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-indigo-500/20 text-indigo-400 font-medium">
@@ -589,7 +589,7 @@ function Dashboard() {
                           <div className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             <span className="font-medium">{hora}</span>
                             <span className="mx-1.5">•</span>
-                            <span className="truncate">{ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço'}</span>
+                            <span className="truncate">{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço')}</span>
                           </div>
                         </div>
 
@@ -724,8 +724,8 @@ function Dashboard() {
                     <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{formatarDataHora(ag.dataHora)}</p>
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-sm font-medium truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{ag.cliente?.nome}</p>
-                    <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{ag.pacote?.nome || 'Serviço'}</p>
+                    <p className={`text-sm font-medium truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}</p>
+                    <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço')}</p>
                   </div>
                 </div>
               ))}

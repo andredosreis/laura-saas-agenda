@@ -15,7 +15,11 @@ function EditarAgendamento() {
     dataHora: '',
     observacoes: '',
     status: 'Agendado',
-    tipoServico: 'pacote' // 'pacote' ou 'avulso'
+    tipoServico: 'pacote', // 'pacote' ou 'avulso'
+    tipoAgendamento: 'Sessao', // 'Sessao' | 'Retorno' | 'Avaliacao'
+    leadNome: '',
+    leadTelefone: '',
+    leadEmail: ''
   });
 
   const [clientes, setClientes] = useState([]);
@@ -42,6 +46,7 @@ function EditarAgendamento() {
 
         // Determinar o tipo de serviço
         const isAvulso = agendamentoData.servicoAvulsoNome && agendamentoData.servicoAvulsoNome.trim() !== '';
+        const tipoAgendamento = agendamentoData.tipo || 'Sessao';
 
         setFormData({
           clienteId: agendamentoData.cliente?._id || agendamentoData.cliente || '',
@@ -51,7 +56,11 @@ function EditarAgendamento() {
           dataHora: agendamentoData.dataHora ? agendamentoData.dataHora.substring(0, 16) : '',
           observacoes: agendamentoData.observacoes || '',
           status: agendamentoData.status || 'Agendado',
-          tipoServico: isAvulso ? 'avulso' : 'pacote'
+          tipoServico: isAvulso ? 'avulso' : 'pacote',
+          tipoAgendamento,
+          leadNome: agendamentoData.lead?.nome || '',
+          leadTelefone: agendamentoData.lead?.telefone || '',
+          leadEmail: agendamentoData.lead?.email || ''
         });
 
         setClientes(clientesResponse.data?.data || []);
@@ -195,30 +204,28 @@ function EditarAgendamento() {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.clienteId) {
-      newErrors.clienteId = 'Por favor, selecione um cliente.';
-    }
-    if (!formData.dataHora) {
-      newErrors.dataHora = 'A data e hora do agendamento são obrigatórias.';
+
+    if (formData.tipoAgendamento === 'Avaliacao') {
+      if (!formData.leadNome || formData.leadNome.trim() === '') {
+        newErrors.leadNome = 'Nome do lead é obrigatório.';
+      }
+      if (!formData.leadTelefone || formData.leadTelefone.trim() === '') {
+        newErrors.leadTelefone = 'Telefone do lead é obrigatório.';
+      }
     } else {
-      const dataAgendamento = new Date(formData.dataHora);
-      const agora = new Date();
-      agora.setMinutes(agora.getMinutes() - 1); 
-      if (dataAgendamento < agora) {
-        newErrors.dataHora = 'A data e hora do agendamento não podem estar no passado.';
+      if (!formData.clienteId) {
+        newErrors.clienteId = 'Por favor, selecione um cliente.';
       }
     }
+
+    if (!formData.dataHora) {
+      newErrors.dataHora = 'A data e hora do agendamento são obrigatórias.';
+    }
+
     if (!formData.status || formData.status.trim() === '') {
       newErrors.status = 'Por favor, selecione um status para o agendamento.';
     }
-    
-    // Validar campos de serviço avulso
-    if (formData.tipoServico === 'avulso') {
-      if (!formData.pacoteId) {
-        newErrors.pacoteId = 'Por favor, selecione um serviço.';
-      }
-    }
-    
+
     setFieldErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -278,27 +285,46 @@ function EditarAgendamento() {
     setIsSubmitting(true);
     
     // Se for ação rápida, usamos apenas os dados necessários
-    const dadosParaEnviar = isQuickAction ? {
-      status: quickActionStatus,
-      clienteId: formData.clienteId,
-      dataHora: formData.dataHora
-    } : {
-      clienteId: formData.clienteId,
-      pacoteId: formData.tipoServico === 'pacote' ? formData.pacoteId : null,
-      servicoAvulsoNome: formData.tipoServico === 'avulso' ? 
-        (pacotes.find(p => p._id === formData.pacoteId)?.nome || formData.servicoAvulsoNome) : '',
-      servicoAvulsoValor: formData.tipoServico === 'avulso' ? 
-        (pacotes.find(p => p._id === formData.pacoteId)?.valor || 
-         (formData.servicoAvulsoValor !== '' && !isNaN(parseFloat(formData.servicoAvulsoValor)) ? 
-          parseFloat(formData.servicoAvulsoValor) : null)) : null,
-      dataHora: formData.dataHora,
-      observacoes: formData.observacoes.trim(),
-      status: formData.status,
-    };
+    let dadosParaEnviar;
+    if (isQuickAction) {
+      dadosParaEnviar = {
+        status: quickActionStatus,
+        dataHora: formData.dataHora
+      };
+    } else if (formData.tipoAgendamento === 'Avaliacao') {
+      // Fluxo lead (avaliação): editar lead, sem cliente/pacote
+      dadosParaEnviar = {
+        lead: {
+          nome: formData.leadNome.trim(),
+          telefone: formData.leadTelefone.trim(),
+          email: formData.leadEmail.trim() || undefined
+        },
+        dataHora: formData.dataHora,
+        observacoes: formData.observacoes.trim(),
+        status: formData.status
+      };
+    } else {
+      // Fluxo cliente: Sessao/Retorno
+      dadosParaEnviar = {
+        cliente: formData.clienteId,
+        pacote: formData.tipoServico === 'pacote' ? (formData.pacoteId || null) : null,
+        servicoAvulsoNome: formData.tipoServico === 'avulso'
+          ? (pacotes.find(p => p._id === formData.pacoteId)?.nome || formData.servicoAvulsoNome || '')
+          : '',
+        servicoAvulsoValor: formData.tipoServico === 'avulso'
+          ? (pacotes.find(p => p._id === formData.pacoteId)?.valor ||
+             (formData.servicoAvulsoValor !== '' && !isNaN(parseFloat(formData.servicoAvulsoValor))
+               ? parseFloat(formData.servicoAvulsoValor) : null))
+          : null,
+        dataHora: formData.dataHora,
+        observacoes: formData.observacoes.trim(),
+        status: formData.status
+      };
+    }
 
-    // Limpar campos vazios ou nulos
+    // Remover propriedades com valor undefined (mantém null e string vazia — backend trata)
     Object.keys(dadosParaEnviar).forEach(key => {
-      if (dadosParaEnviar[key] === null || dadosParaEnviar[key] === '') {
+      if (dadosParaEnviar[key] === undefined) {
         delete dadosParaEnviar[key];
       }
     });
@@ -383,48 +409,110 @@ function EditarAgendamento() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Seção 1: Informações Básicas */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h2 className="text-lg font-medium text-gray-700 mb-3">Informações Básicas</h2>
-              
-              {/* Campo Cliente */}
-              <div className="mb-4">
-                <label htmlFor="clienteId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="clienteId"
-                  id="clienteId"
-                  value={formData.clienteId}
-                  onChange={(e) => handleClienteChange(e.target.value)}
-                  disabled={isSubmitting}
-                  className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Selecione um cliente</option>
-                  {clientes.map((cliente) => (
-                    <option key={cliente._id} value={cliente._id}>
-                      {cliente.nome}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.clienteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.clienteId}</p>}
-              </div>
-              
-              {/* Informações do cliente selecionado */}
-              {clienteSelecionado && (
-                <div className="p-3 bg-blue-50 rounded-lg mb-4 border border-blue-100">
-                  <p className="text-sm text-blue-800 font-medium">
-                    Cliente: {clienteSelecionado.nome}
-                  </p>
-                  {clienteTemPacote && (
-                    <>
-                      <p className="text-sm text-blue-800">
-                        Pacote atual: {clienteSelecionado.pacote.nome}
+              <h2 className="text-lg font-medium text-gray-700 mb-3">
+                Informações Básicas
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-normal">
+                  {formData.tipoAgendamento === 'Avaliacao' ? 'Avaliação (Lead)' : formData.tipoAgendamento}
+                </span>
+              </h2>
+
+              {formData.tipoAgendamento === 'Avaliacao' ? (
+                <>
+                  {/* Campos editáveis do lead */}
+                  <div className="mb-4">
+                    <label htmlFor="leadNome" className="block text-sm font-medium text-gray-700 mb-1">
+                      Nome do Lead <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="leadNome"
+                      id="leadNome"
+                      value={formData.leadNome}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      placeholder="Nome completo"
+                      className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.leadNome ? 'border-red-500' : 'border-gray-300'}`}
+                    />
+                    {fieldErrors.leadNome && <p className="mt-1 text-sm text-red-500">{fieldErrors.leadNome}</p>}
+                  </div>
+
+                  <div className="mb-4">
+                    <label htmlFor="leadTelefone" className="block text-sm font-medium text-gray-700 mb-1">
+                      Telefone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="leadTelefone"
+                      id="leadTelefone"
+                      value={formData.leadTelefone}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      placeholder="910 000 000"
+                      className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.leadTelefone ? 'border-red-500' : 'border-gray-300'}`}
+                    />
+                    {fieldErrors.leadTelefone && <p className="mt-1 text-sm text-red-500">{fieldErrors.leadTelefone}</p>}
+                  </div>
+
+                  <div className="mb-4">
+                    <label htmlFor="leadEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                      Email (opcional)
+                    </label>
+                    <input
+                      type="email"
+                      name="leadEmail"
+                      id="leadEmail"
+                      value={formData.leadEmail}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      placeholder="email@exemplo.com"
+                      className="block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 border-gray-300"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Campo Cliente (Sessao/Retorno) */}
+                  <div className="mb-4">
+                    <label htmlFor="clienteId" className="block text-sm font-medium text-gray-700 mb-1">
+                      Cliente <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="clienteId"
+                      id="clienteId"
+                      value={formData.clienteId}
+                      onChange={(e) => handleClienteChange(e.target.value)}
+                      disabled={isSubmitting}
+                      className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.clienteId ? 'border-red-500' : 'border-gray-300'}`}
+                    >
+                      <option value="">Selecione um cliente</option>
+                      {clientes.map((cliente) => (
+                        <option key={cliente._id} value={cliente._id}>
+                          {cliente.nome}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.clienteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.clienteId}</p>}
+                  </div>
+
+                  {/* Informações do cliente selecionado */}
+                  {clienteSelecionado && (
+                    <div className="p-3 bg-blue-50 rounded-lg mb-4 border border-blue-100">
+                      <p className="text-sm text-blue-800 font-medium">
+                        Cliente: {clienteSelecionado.nome}
                       </p>
-                      <p className="text-sm text-blue-800">
-                        Sessões restantes: {clienteSelecionado.sessoesRestantes}
-                      </p>
-                    </>
+                      {clienteTemPacote && (
+                        <>
+                          <p className="text-sm text-blue-800">
+                            Pacote atual: {clienteSelecionado.pacote.nome}
+                          </p>
+                          <p className="text-sm text-blue-800">
+                            Sessões restantes: {clienteSelecionado.sessoesRestantes}
+                          </p>
+                        </>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
 
               {/* Campo Data e Hora */}
@@ -445,14 +533,15 @@ function EditarAgendamento() {
               </div>
             </div>
           
-            {/* Seção 2: Detalhes do Serviço */}
+            {/* Seção 2: Detalhes do Serviço — não se aplica a Avaliacao */}
+            {formData.tipoAgendamento !== 'Avaliacao' && (
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h2 className="text-lg font-medium text-gray-700 mb-3">Detalhes do Serviço</h2>
 
               {/* Tipo de Serviço (Radio buttons) */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Serviço <span className="text-red-500">*</span>
+                  Tipo de Serviço
                 </label>
                 <div className="flex space-x-4">
                   <div className="flex items-center">
@@ -495,7 +584,7 @@ function EditarAgendamento() {
               {/* Campo Pacote/Serviço */}
               <div>
                 <label htmlFor="pacoteId" className="block text-sm font-medium text-gray-700 mb-1">
-                  {formData.tipoServico === 'pacote' ? 'Pacote Contratado' : 'Serviço'} <span className="text-red-500">*</span>
+                  {formData.tipoServico === 'pacote' ? 'Pacote Contratado' : 'Serviço (opcional)'}
                 </label>
 
                 {/* Se for pacote e o cliente tem pacote, mostramos o pacote fixo */}
@@ -513,7 +602,7 @@ function EditarAgendamento() {
                     disabled={isSubmitting || (formData.tipoServico === 'pacote' && clienteTemPacote)}
                     className={`block w-full rounded-md p-3 shadow-xs focus:border-amber-500 focus:ring-3 focus:ring-amber-200 ${fieldErrors.pacoteId ? 'border-red-500' : 'border-gray-300'}`}
                   >
-                    <option value="">Selecione um serviço</option>
+                    <option value="">Selecione um serviço (opcional)</option>
                     {pacotes.map((pacote) => (
                       <option key={pacote._id} value={pacote._id}>
                         {pacote.nome} - {pacote.valor} R$
@@ -525,6 +614,7 @@ function EditarAgendamento() {
                 {fieldErrors.pacoteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.pacoteId}</p>}
               </div>
             </div>
+            )}
 
             {/* Seção 3: Observações e Status */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">

@@ -118,8 +118,10 @@ function CalendarView() {
     const events = useMemo(() => {
         return agendamentos.map(agendamento => {
             const statusConfig = STATUS_COLORS[agendamento.status] || STATUS_COLORS['Agendado'];
-            const clienteName = agendamento.cliente?.nome || 'Cliente não identificado';
-            const pacoteName = agendamento.pacote?.nome || agendamento.servicoAvulsoNome || 'Serviço';
+            const clienteName = agendamento.cliente?.nome || agendamento.lead?.nome || 'Sem nome';
+            const pacoteName = agendamento.tipo === 'Avaliacao'
+              ? 'Avaliação'
+              : (agendamento.pacote?.nome || agendamento.servicoAvulsoNome || 'Serviço');
 
             // Calculate end time (default 1 hour if not specified)
             const startDate = DateTime.fromISO(agendamento.dataHora, { zone: 'Europe/Lisbon' });
@@ -478,8 +480,10 @@ function CalendarView() {
                                 eventDrop={handleEventDrop}
                                 datesSet={handleDatesSet}
                                 eventContent={(arg) => {
-                                    const clienteName = arg.event.extendedProps.cliente?.nome || 'Cliente';
-                                    const serviceName = arg.event.extendedProps.pacote?.nome || arg.event.extendedProps.servicoAvulsoNome || 'Serviço';
+                                    const clienteName = arg.event.extendedProps.cliente?.nome || arg.event.extendedProps.lead?.nome || 'Sem nome';
+                                    const serviceName = arg.event.extendedProps.tipo === 'Avaliacao'
+                                      ? 'Avaliação'
+                                      : (arg.event.extendedProps.pacote?.nome || arg.event.extendedProps.servicoAvulsoNome || 'Serviço');
 
                                     return (
                                         <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">

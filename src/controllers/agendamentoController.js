@@ -201,10 +201,34 @@ export const getAgendamento = async (req, res) => {
 export const updateAgendamento = async (req, res) => {
   try {
     const { Agendamento } = req.models;
-    const { dataHora, status, observacoes, profissional, servicoAvulsoNome, servicoAvulsoValor } = req.body;
+    const {
+      dataHora,
+      status,
+      observacoes,
+      profissional,
+      servicoAvulsoNome,
+      servicoAvulsoValor,
+      cliente,
+      pacote,
+      compraPacote,
+      lead
+    } = req.body;
+
+    const update = {};
+    if (dataHora !== undefined) update.dataHora = dataHora;
+    if (status !== undefined) update.status = status;
+    if (observacoes !== undefined) update.observacoes = observacoes;
+    if (profissional !== undefined) update.profissional = profissional;
+    if (servicoAvulsoNome !== undefined) update.servicoAvulsoNome = servicoAvulsoNome;
+    if (servicoAvulsoValor !== undefined) update.servicoAvulsoValor = servicoAvulsoValor;
+    if (cliente !== undefined) update.cliente = cliente || null;
+    if (pacote !== undefined) update.pacote = pacote || null;
+    if (compraPacote !== undefined) update.compraPacote = compraPacote || null;
+    if (lead !== undefined) update.lead = lead || undefined;
+
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { dataHora, status, observacoes, profissional, servicoAvulsoNome, servicoAvulsoValor },
+      update,
       { new: true, runValidators: true }
     ).populate("cliente pacote");
 
