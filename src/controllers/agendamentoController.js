@@ -14,7 +14,7 @@ const timeToMinutes = (timeString) => {
 // @desc    Criar novo agendamento
 export const createAgendamento = async (req, res) => {
   try {
-    const { Agendamento, Schedule } = req.models;
+    const { Agendamento } = req.models; // Schedule desactivado — ver bloco comentado abaixo
     const { tipo = 'Sessao', cliente, lead, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
 
     // Validação por tipo
@@ -36,29 +36,35 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
 
-    const dayOfWeek = agendamentoDateTime.weekday === 7 ? 0 : agendamentoDateTime.weekday;
-    const requestedTimeInMinutes = timeToMinutes(agendamentoDateTime.toFormat("HH:mm"));
-
-    const schedule = await Schedule.findOne({ dayOfWeek, tenantId: req.tenantId });
-
-    if (!schedule || !schedule.isActive) {
-      return res.status(400).json({ message: `O salão não está ativo para agendamentos na ${schedule?.label || "este dia da semana"}.` });
-    }
-
-    const startWorkMinutes = timeToMinutes(schedule.startTime);
-    const endWorkMinutes = timeToMinutes(schedule.endTime);
-
-    if (requestedTimeInMinutes < startWorkMinutes || requestedTimeInMinutes >= endWorkMinutes) {
-      return res.status(400).json({ message: "Horário de agendamento fora do expediente de trabalho." });
-    }
-
-    const breakStartMinutes = timeToMinutes(schedule.breakStartTime);
-    const breakEndMinutes = timeToMinutes(schedule.breakEndTime);
-
-    if (breakStartMinutes !== null && breakEndMinutes !== null &&
-      requestedTimeInMinutes >= breakStartMinutes && requestedTimeInMinutes < breakEndMinutes) {
-      return res.status(400).json({ message: "Horário de agendamento coincide com o período de pausa." });
-    }
+    // TODO: Revisitar se faz sentido reactivar a validação de disponibilidade.
+    // Por agora desactivada — agendamentos livres, sem verificação de expediente/pausa.
+    // const dayOfWeek = agendamentoDateTime.weekday === 7 ? 0 : agendamentoDateTime.weekday;
+    // const requestedTimeInMinutes = timeToMinutes(agendamentoDateTime.toFormat("HH:mm"));
+    //
+    // const tenantHasSchedule = await Schedule.exists({ tenantId: req.tenantId, isActive: true });
+    //
+    // if (tenantHasSchedule) {
+    //   const schedule = await Schedule.findOne({ dayOfWeek, tenantId: req.tenantId });
+    //
+    //   if (!schedule || !schedule.isActive) {
+    //     return res.status(400).json({ message: `O salão não está ativo para agendamentos na ${schedule?.label || "este dia da semana"}.` });
+    //   }
+    //
+    //   const startWorkMinutes = timeToMinutes(schedule.startTime);
+    //   const endWorkMinutes = timeToMinutes(schedule.endTime);
+    //
+    //   if (requestedTimeInMinutes < startWorkMinutes || requestedTimeInMinutes >= endWorkMinutes) {
+    //     return res.status(400).json({ message: "Horário de agendamento fora do expediente de trabalho." });
+    //   }
+    //
+    //   const breakStartMinutes = timeToMinutes(schedule.breakStartTime);
+    //   const breakEndMinutes = timeToMinutes(schedule.breakEndTime);
+    //
+    //   if (breakStartMinutes !== null && breakEndMinutes !== null &&
+    //     requestedTimeInMinutes >= breakStartMinutes && requestedTimeInMinutes < breakEndMinutes) {
+    //     return res.status(400).json({ message: "Horário de agendamento coincide com o período de pausa." });
+    //   }
+    // }
 
     const agendamentoDurationMinutes = 60;
     const conflictingAgendamento = await Agendamento.findOne({

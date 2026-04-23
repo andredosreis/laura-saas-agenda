@@ -81,7 +81,7 @@ function Sidebar() {
       items: [
         { to: "/clientes", text: "Clientes", icon: Users },
         { to: "/pacotes", text: "Serviços", icon: Package },
-        { to: "/disponibilidade", text: "Disponibilidade", icon: Clock },
+        // { to: "/disponibilidade", text: "Disponibilidade", icon: Clock }, // desactivado — ver agendamentoController
         { to: "/configuracoes", text: "Configurações", icon: Settings }
       ]
     }

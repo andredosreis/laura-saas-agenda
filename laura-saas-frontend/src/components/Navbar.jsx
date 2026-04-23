@@ -34,7 +34,7 @@ function Navbar() {
     { to: "/clientes", text: "Clientes", icon: Users },
     { to: "/agendamentos", text: "Agendamentos", icon: Calendar },
     { to: "/calendario", text: "Calendário", icon: CalendarCheck },
-    { to: "/disponibilidade", text: "Disponibilidade", icon: CalendarClock },
+    // { to: "/disponibilidade", text: "Disponibilidade", icon: CalendarClock }, // desactivado — ver agendamentoController
     { to: "/pacotes", text: "Serviços", icon: Package },
     { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
     { to: "/transacoes", text: "Transações", icon: Receipt },
