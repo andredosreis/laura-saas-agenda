@@ -1,52 +1,44 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// 🆕 Contextos
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Componentes de Layout
 import Sidebar from './components/Sidebar';
 import InstallPrompt from './components/InstallPrompt';
 
-// 🆕 Página de Landing (Pública) - COMENTADO: promete funcionalidades não implementadas
-// import LandingPage from './pages/LandingPage';
-
-// 🆕 Páginas de Autenticação
+// Login eager: rota de entrada, precisa pintar imediatamente
 import Login from './pages/Login';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import VerificarEmail from './pages/VerificarEmail';
 
-// Páginas Protegidas
-import Agendamentos from './pages/Agendamentos';
-import Atendimentos from './pages/Atendimentos';
-import Clientes from './pages/Clientes';
-import Pacotes from './pages/Pacotes';
-import CriarCliente from './pages/CriarCliente';
-import CriarAgendamento from './pages/CriarAgendamento';
-import CriarPacote from './pages/CriarPacote';
-import EditarCliente from './pages/EditarCliente';
-import EditarPacote from './pages/EditarPacote';
-import EditarAgendamento from './pages/EditarAgendamento';
-import Dashboard from './pages/Dashboard';
-import Disponibilidade from './pages/Disponibilidade';
-import CalendarView from './pages/CalendarView';
-import Financeiro from './pages/Financeiro';
+// Restantes rotas públicas em lazy — utilizador entra via /login na maioria dos casos
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const VerificarEmail = lazy(() => import('./pages/VerificarEmail'));
 
-// 💰 FASE 3: Páginas do Sistema Financeiro
-import Transacoes from './pages/Transacoes';
-import PacotesAtivos from './pages/PacotesAtivos';
-import VenderPacote from './pages/VenderPacote';
-// import Caixa from './pages/Caixa'; // Temporariamente desactivado
+// Rotas protegidas em lazy — cada uma vira um chunk separado
+const Agendamentos = lazy(() => import('./pages/Agendamentos'));
+const Atendimentos = lazy(() => import('./pages/Atendimentos'));
+const Clientes = lazy(() => import('./pages/Clientes'));
+const Pacotes = lazy(() => import('./pages/Pacotes'));
+const CriarCliente = lazy(() => import('./pages/CriarCliente'));
+const CriarAgendamento = lazy(() => import('./pages/CriarAgendamento'));
+const CriarPacote = lazy(() => import('./pages/CriarPacote'));
+const EditarCliente = lazy(() => import('./pages/EditarCliente'));
+const EditarPacote = lazy(() => import('./pages/EditarPacote'));
+const EditarAgendamento = lazy(() => import('./pages/EditarAgendamento'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Disponibilidade = lazy(() => import('./pages/Disponibilidade'));
+const CalendarView = lazy(() => import('./pages/CalendarView'));
+const Financeiro = lazy(() => import('./pages/Financeiro'));
+const Transacoes = lazy(() => import('./pages/Transacoes'));
+const PacotesAtivos = lazy(() => import('./pages/PacotesAtivos'));
+const VenderPacote = lazy(() => import('./pages/VenderPacote'));
+const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 
-// ⚙️ Configurações
-import Configuracoes from './pages/Configuracoes';
-
-// Componente para layout protegido (com Sidebar)
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <ProtectedRoute>
@@ -58,11 +50,18 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-900">
+    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
 const App = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
         <Router>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* 🆕 Página Inicial - Login direto (LandingPage comentada) */}
             <Route path="/" element={<Login />} />
@@ -138,6 +137,7 @@ const App = () => {
               <ProtectedLayout><Configuracoes /></ProtectedLayout>
             } />
           </Routes>
+          </Suspense>
 
           <ToastContainer
             position="top-right"

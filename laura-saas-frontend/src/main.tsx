@@ -1,13 +1,17 @@
 import './index.css';
 import App from './App.jsx';
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SpeedInsights } from '@vercel/speed-insights/react';
+
+const SpeedInsights = lazy(() =>
+  import('@vercel/speed-insights/react').then((m) => ({ default: m.SpeedInsights }))
+);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
-    <SpeedInsights />
+    <Suspense fallback={null}>
+      <SpeedInsights />
+    </Suspense>
   </StrictMode>,
 );
-//colocando o SpeedInsights para monitoramento de performance
