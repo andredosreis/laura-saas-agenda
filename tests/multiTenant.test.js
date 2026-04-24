@@ -144,7 +144,7 @@ describe('Isolamento Multi-Tenant — Acesso directo por ID', () => {
       .set('Authorization', `Bearer ${tokenB}`)
       .send({ nome: 'Cliente Secreto B', telefone: '930000001' });
 
-    const clienteIdB = criarRes.body._id;
+    const clienteIdB = criarRes.body.data._id;
     expect(clienteIdB).toBeDefined();
 
     // Tenant A tenta aceder a esse cliente por ID

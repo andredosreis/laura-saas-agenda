@@ -36,8 +36,7 @@ async function criarCliente(token, dados = {}) {
     .post('/api/clientes')
     .set('Authorization', `Bearer ${token}`)
     .send({ nome: 'Cliente Teste', telefone: '910000001', ...dados });
-  // controller retorna o objecto directamente (sem wrapper { success, data })
-  return res.body;
+  return res.body.data;
 }
 
 // ──────────────────────────────────────────────
@@ -54,8 +53,8 @@ describe('GET /api/clientes/:id', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body._id).toBe(cliente._id);
-    expect(res.body.nome).toBe('Cliente Teste');
+    expect(res.body.data._id).toBe(cliente._id);
+    expect(res.body.data.nome).toBe('Cliente Teste');
   });
 
   it('retorna 404 para ID inexistente', async () => {
@@ -107,7 +106,7 @@ describe('PUT /api/clientes/:id', () => {
       .send({ nome: 'Nome Actualizado' });
 
     expect(res.status).toBe(200);
-    expect(res.body.nome).toBe('Nome Actualizado');
+    expect(res.body.data.nome).toBe('Nome Actualizado');
   });
 
   it('retorna 404 ao actualizar cliente de outro tenant', async () => {
@@ -209,7 +208,7 @@ describe('POST /api/clientes — conflito de telefone', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ nome: 'Cliente Duplicado', telefone: '910000099' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
   });
 
   it('permite o mesmo telefone em tenants diferentes', async () => {

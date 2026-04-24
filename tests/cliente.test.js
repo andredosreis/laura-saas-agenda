@@ -89,7 +89,7 @@ describe('POST /api/clientes', () => {
       .send({ nome: 'Maria Silva', telefone: '912345678' });
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ nome: 'Maria Silva', telefone: '912345678' });
+    expect(res.body.data).toMatchObject({ nome: 'Maria Silva', telefone: '912345678' });
   });
 
 });

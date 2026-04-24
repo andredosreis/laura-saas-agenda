@@ -81,7 +81,7 @@ export const getCliente = async (req, res) => {
     if (!cliente) {
       return res.status(404).json({ success: false, error: 'Cliente não encontrado.' });
     }
-    res.status(200).json(cliente);
+    res.status(200).json({ success: true, data: cliente });
   } catch (error) {
     if (error.name === 'CastError') {
       return res.status(400).json({ success: false, error: 'ID inválido' });
@@ -120,13 +120,13 @@ export const deleteCliente = async (req, res) => {
     const clienteParaDeletar = await Cliente.findOne({ _id: clienteId, tenantId: req.tenantId });
 
     if (!clienteParaDeletar) {
-      return res.status(404).json({ message: 'Cliente não encontrado para deleção.' });
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado.' });
     }
     await Agendamento.deleteMany({ cliente: clienteId, tenantId: req.tenantId });
     await Cliente.deleteOne({ _id: clienteId, tenantId: req.tenantId });
-    res.status(200).json({ message: 'Cliente e seus agendamentos associados foram removidos com sucesso.' });
+    res.status(200).json({ success: true, data: { message: 'Cliente e agendamentos associados removidos.' } });
   } catch (error) {
     console.error('Erro ao deletar cliente e seus agendamentos:', error);
-    res.status(500).json({ message: 'Erro interno ao deletar o cliente.', details: error.message });
+    res.status(500).json({ success: false, error: 'Erro interno ao deletar o cliente.' });
   }
 };

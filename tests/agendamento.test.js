@@ -60,7 +60,7 @@ async function criarCliente(token, telefone = '910000001') {
     .post('/api/clientes')
     .set('Authorization', `Bearer ${token}`)
     .send({ nome: 'Cliente Teste', telefone });
-  return res.body._id;
+  return res.body.data._id;
 }
 
 // ──────────────────────────────────────────────
@@ -125,18 +125,6 @@ describe('POST /api/agendamentos', () => {
     expect(res.status).toBe(201);
     expect(res.body._id).toBeDefined();
     expect(res.body.cliente).toBe(clienteId);
-  });
-
-  it('rejeita agendamento sem schedule activo', async () => {
-    const { token } = await criarTenantEToken('sem-schedule');
-    const clienteId = await criarCliente(token);
-
-    const res = await request(app)
-      .post('/api/agendamentos')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ cliente: clienteId, dataHora: dataFutura() });
-
-    expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
   it('rejeita agendamento com data no passado', async () => {

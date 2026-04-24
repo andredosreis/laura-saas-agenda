@@ -48,7 +48,7 @@ async function criarCliente(token, telefone = '910000001') {
     .post('/api/clientes')
     .set('Authorization', `Bearer ${token}`)
     .send({ nome: 'Cliente Teste', telefone });
-  return res.body._id;
+  return res.body.data._id;
 }
 
 function dataFutura() {
