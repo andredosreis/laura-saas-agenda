@@ -30,16 +30,11 @@ export const getAllClientes = async (req, res) => {
 };
 
 // @desc    Criar um novo cliente
+// req.body já validado e transformado (telefone sem formatação, email lowercase)
 export const createCliente = async (req, res) => {
   try {
     const { Cliente } = req.models;
-    const { nome, telefone: telefoneBruto, email, dataNascimento, observacoes } = req.body;
-
-    if (!nome || !telefoneBruto) {
-      return res.status(400).json({ success: false, error: 'Nome e telefone são obrigatórios.' });
-    }
-
-    const telefone = String(telefoneBruto).replace(/[^\d]/g, '');
+    const { nome, telefone, email, dataNascimento, observacoes } = req.body;
 
     const existente = await Cliente.findOne({ tenantId: req.tenantId, telefone });
     if (existente) {
@@ -49,9 +44,9 @@ export const createCliente = async (req, res) => {
     const salvo = await Cliente.create({
       nome,
       telefone,
-      email: email || undefined,
-      dataNascimento: dataNascimento || null,
-      observacoes: observacoes || '',
+      email,
+      dataNascimento: dataNascimento ?? null,
+      observacoes: observacoes ?? '',
       tenantId: req.tenantId,
     });
 
@@ -60,10 +55,6 @@ export const createCliente = async (req, res) => {
     console.error('Erro ao criar cliente:', error);
     if (error.code === 11000) {
       return res.status(409).json({ success: false, error: 'Já existe um cliente com este telefone ou email.' });
-    }
-    if (error.name === 'ValidationError') {
-      const msgs = Object.values(error.errors).map(e => e.message).join(', ');
-      return res.status(400).json({ success: false, error: msgs });
     }
     res.status(500).json({ success: false, error: 'Erro interno ao criar cliente.' });
   }
@@ -91,14 +82,13 @@ export const getCliente = async (req, res) => {
 };
 
 // @desc    Atualizar um cliente pelo ID
+// req.body validado; apenas campos presentes são actualizados
 export const updateCliente = async (req, res) => {
   try {
     const { Cliente } = req.models;
-    const { nome, telefone, email, dataNascimento, observacoes } = req.body;
-
     const clienteAtualizado = await Cliente.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { nome, telefone, email: email || undefined, dataNascimento: dataNascimento || null, observacoes },
+      req.body,
       { new: true, runValidators: true }
     );
 
