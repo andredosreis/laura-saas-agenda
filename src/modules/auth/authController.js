@@ -60,33 +60,12 @@ const generateRefreshToken = (user) => {
  */
 export const register = async (req, res) => {
     try {
-        const {
-            // Dados do Tenant
-            nomeEmpresa,
-            // Dados do Usuário
-            nome,
-            email,
-            password,
-            telefone
-        } = req.body;
+        // req.body já validado pelo middleware Zod (registerSchema com .strict())
+        // role, tenantId, emailVerificado etc. são injectados no servidor, nunca do body
+        const { nomeEmpresa, nome, email, password, telefone } = req.body;
 
-        // Validações básicas
-        if (!nomeEmpresa || !nome || !email || !password) {
-            return res.status(400).json({
-                success: false,
-                error: 'Campos obrigatórios: nomeEmpresa, nome, email, password'
-            });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                error: 'Senha deve ter pelo menos 6 caracteres'
-            });
-        }
-
-        // Fix #5: Verificar se email já está registrado globalmente
-        const emailEmUso = await User.findOne({ email: email.toLowerCase() });
+        // Verificar se email já está registrado globalmente
+        const emailEmUso = await User.findOne({ email });
         if (emailEmUso) {
             return res.status(400).json({
                 success: false,
@@ -221,19 +200,10 @@ export const register = async (req, res) => {
  */
 export const login = async (req, res) => {
     try {
+        // req.body já validado e email normalizado (lowercase) pelo middleware Zod
         const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                error: 'Email e senha são obrigatórios'
-            });
-        }
-
-        // Buscar usuário em todos os tenants (por email)
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        }).select('+passwordHash');
+        const user = await User.findOne({ email }).select('+passwordHash');
 
         if (!user) {
             return res.status(401).json({
@@ -575,21 +545,8 @@ export const updateProfile = async (req, res) => {
  */
 export const changePassword = async (req, res) => {
     try {
+        // req.body já validado (currentPassword obrigatório, newPassword com regras strong)
         const { currentPassword, newPassword } = req.body;
-
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({
-                success: false,
-                error: 'Senha atual e nova senha são obrigatórias'
-            });
-        }
-
-        if (newPassword.length < 6) {
-            return res.status(400).json({
-                success: false,
-                error: 'Nova senha deve ter pelo menos 6 caracteres'
-            });
-        }
 
         const user = await User.findById(req.user.userId).select('+passwordHash');
 
@@ -699,21 +656,8 @@ export const forgotPassword = async (req, res) => {
  */
 export const resetPassword = async (req, res) => {
     try {
+        // req.body já validado (token hex64, password com regras strong)
         const { token, password } = req.body;
-
-        if (!token || !password) {
-            return res.status(400).json({
-                success: false,
-                error: 'Token e nova senha são obrigatórios'
-            });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                error: 'A senha deve ter pelo menos 6 caracteres'
-            });
-        }
 
         // Hash do token recebido para comparar com o banco
         const resetTokenHash = crypto

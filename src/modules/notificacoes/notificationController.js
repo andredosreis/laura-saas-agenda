@@ -5,13 +5,6 @@ export const subscribeUser = async (req, res) => {
   try {
     const { subscription, userId } = req.body;
 
-    // Validar
-    if (!subscription || !subscription.endpoint) {
-      return res.status(400).json({ 
-        error: 'Subscription endpoint é obrigatório' 
-      });
-    }
-
     // Buscar subscription existente
     let userSub = await UserSubscription.findOne({ 
       endpoint: subscription.endpoint 
@@ -49,10 +42,6 @@ export const unsubscribeUser = async (req, res) => {
   try {
     const { endpoint } = req.body;
 
-    if (!endpoint) {
-      return res.status(400).json({ error: 'Endpoint é obrigatório' });
-    }
-
     const result = await UserSubscription.updateOne(
       { endpoint },
       { active: false }
@@ -74,10 +63,6 @@ export const unsubscribeUser = async (req, res) => {
 export const getSubscriptionStatus = async (req, res) => {
   try {
     const { userId } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'UserId é obrigatório' });
-    }
 
     const subscription = await UserSubscription.findOne({
       userId,

@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, injectTenant } from '../../middlewares/auth.js';
+import { validate } from '../../middlewares/validate.js';
 import {
   venderPacote,
   listarComprasPacotes,
@@ -13,38 +14,33 @@ import {
   deletarPacote,
   editarVenda
 } from './compraPacoteController.js';
-import validateObjectId from '../../middlewares/validateObjectId.js';
-import mongoose from 'mongoose';
+import {
+  venderPacoteSchema,
+  editarVendaPacoteSchema,
+  estenderPrazoSchema,
+  cancelarPacoteSchema,
+  idParamSchema,
+  clienteIdParamSchema,
+} from './financeiroSchemas.js';
 
 const router = express.Router();
 
-// Middleware para validar clienteId
-const validateClienteId = (req, res, next) => {
-  if (!mongoose.Types.ObjectId.isValid(req.params.clienteId)) {
-    return res.status(400).json({ message: 'O ID do cliente fornecido é inválido.' });
-  }
-  next();
-};
-
-// Proteger todas as rotas
 router.use(authenticate);
 router.use(injectTenant);
 
-// Rotas de alertas e estatísticas (antes de :id para evitar conflitos)
+// Rotas de alertas/estatísticas (antes das rotas :id)
 router.get('/expirando', pacotesExpirando);
 router.get('/alertas', alertasPacotes);
 router.get('/estatisticas', estatisticasPacotes);
 
-// Rotas CRUD
-router.post('/', venderPacote);
+router.post('/', validate(venderPacoteSchema), venderPacote);
 router.get('/', listarComprasPacotes);
-router.get('/cliente/:clienteId', validateClienteId, pacotesDoCliente);
-router.get('/:id', validateObjectId, buscarCompraPacote);
+router.get('/cliente/:clienteId', validate(clienteIdParamSchema, 'params'), pacotesDoCliente);
+router.get('/:id', validate(idParamSchema, 'params'), buscarCompraPacote);
 
-// Rotas de gestão de pacotes
-router.put('/:id', validateObjectId, editarVenda);
-router.put('/:id/estender-prazo', validateObjectId, estenderPrazo);
-router.put('/:id/cancelar', validateObjectId, cancelarPacote);
-router.delete('/:id', validateObjectId, deletarPacote);
+router.put('/:id', validate(idParamSchema, 'params'), validate(editarVendaPacoteSchema), editarVenda);
+router.put('/:id/estender-prazo', validate(idParamSchema, 'params'), validate(estenderPrazoSchema), estenderPrazo);
+router.put('/:id/cancelar', validate(idParamSchema, 'params'), validate(cancelarPacoteSchema), cancelarPacote);
+router.delete('/:id', validate(idParamSchema, 'params'), deletarPacote);
 
 export default router;

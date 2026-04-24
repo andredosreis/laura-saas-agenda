@@ -18,15 +18,13 @@ export const createAgendamento = async (req, res) => {
     const { Agendamento } = req.models; // Schedule desactivado — ver bloco comentado abaixo
     const { tipo = 'Sessao', cliente, lead, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
 
-    // Validação por tipo
+    // Validação contextual que não dá para expressar no Zod sem discriminated union mais complexa
     if (tipo === 'Avaliacao') {
       if (!lead?.nome || !lead?.telefone) {
         return res.status(400).json({ success: false, error: 'Avaliação requer lead.nome e lead.telefone' });
       }
-    } else {
-      if (!cliente) {
-        return res.status(400).json({ success: false, error: 'cliente é obrigatório para agendamentos do tipo Sessao ou Retorno' });
-      }
+    } else if (!cliente) {
+      return res.status(400).json({ success: false, error: 'cliente é obrigatório para agendamentos do tipo Sessao ou Retorno' });
     }
 
     const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "Europe/Lisbon" });

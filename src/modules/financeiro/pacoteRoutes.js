@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, injectTenant } from '../../middlewares/auth.js';
+import { validate } from '../../middlewares/validate.js';
 import {
   createPacote,
   getAllPacotes,
@@ -7,19 +8,21 @@ import {
   updatePacote,
   deletePacote
 } from './pacoteController.js';
-import validateObjectId from '../../middlewares/validateObjectId.js';
+import {
+  criarPacoteSchema,
+  atualizarPacoteSchema,
+  idParamSchema,
+} from './financeiroSchemas.js';
 
 const router = express.Router();
 
-// Proteger todas as rotas e injetar tenantId
 router.use(authenticate);
 router.use(injectTenant);
 
-// Rotas CRUD para Pacotes
 router.get('/', getAllPacotes);
-router.post('/', createPacote);
-router.get('/:id', validateObjectId, getPacote);
-router.put('/:id', validateObjectId, updatePacote);
-router.delete('/:id', validateObjectId, deletePacote);
+router.post('/', validate(criarPacoteSchema), createPacote);
+router.get('/:id', validate(idParamSchema, 'params'), getPacote);
+router.put('/:id', validate(idParamSchema, 'params'), validate(atualizarPacoteSchema), updatePacote);
+router.delete('/:id', validate(idParamSchema, 'params'), deletePacote);
 
 export default router;

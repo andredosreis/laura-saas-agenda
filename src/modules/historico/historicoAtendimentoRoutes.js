@@ -11,6 +11,13 @@ import {
   estatisticasAtendimentos
 } from './historicoAtendimentoController.js';
 import { authenticate, authorize } from '../../middlewares/auth.js';
+import { validate } from '../../middlewares/validate.js';
+import {
+  createHistoricoSchema,
+  updateHistoricoSchema,
+  historicoIdParamSchema,
+  clienteIdParamSchema,
+} from './historicoSchemas.js';
 
 const router = express.Router();
 
@@ -30,6 +37,7 @@ router.post(
   '/',
   authenticate,
   authorize('admin', 'profissional'),
+  validate(createHistoricoSchema),
   criarHistoricoAtendimento
 );
 
@@ -52,6 +60,7 @@ router.get(
 router.get(
   '/:id',
   authenticate,
+  validate(historicoIdParamSchema, 'params'),
   buscarHistoricoPorId
 );
 
@@ -60,6 +69,8 @@ router.put(
   '/:id',
   authenticate,
   authorize('admin', 'profissional'),
+  validate(historicoIdParamSchema, 'params'),
+  validate(updateHistoricoSchema),
   atualizarHistoricoAtendimento
 );
 
@@ -68,6 +79,7 @@ router.put(
   '/:id/finalizar',
   authenticate,
   authorize('admin', 'profissional'),
+  validate(historicoIdParamSchema, 'params'),
   finalizarHistoricoAtendimento
 );
 
@@ -76,6 +88,7 @@ router.delete(
   '/:id',
   authenticate,
   authorize('admin'),
+  validate(historicoIdParamSchema, 'params'),
   deletarHistoricoAtendimento
 );
 
@@ -87,6 +100,7 @@ router.delete(
 router.get(
   '/cliente/:clienteId',
   authenticate,
+  validate(clienteIdParamSchema, 'params'),
   buscarHistoricoCliente
 );
 
@@ -94,6 +108,7 @@ router.get(
 router.get(
   '/cliente/:clienteId/tecnicas',
   authenticate,
+  validate(clienteIdParamSchema, 'params'),
   buscarTecnicasMaisUsadas
 );
 

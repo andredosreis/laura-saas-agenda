@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate } from '../../middlewares/auth.js';
+import { validate } from '../../middlewares/validate.js';
 import {
   criarTransacao,
   listarTransacoes,
@@ -13,26 +14,38 @@ import {
   comissoesPendentes,
   pagarComissao
 } from './transacaoController.js';
-import validateObjectId from '../../middlewares/validateObjectId.js';
+import {
+  criarTransacaoSchema,
+  atualizarTransacaoSchema,
+  cancelarTransacaoSchema,
+  registrarPagamentoTransacaoSchema,
+  pagarComissaoSchema,
+  idParamSchema,
+} from './financeiroSchemas.js';
 
 const router = express.Router();
 
-// Proteger todas as rotas
 router.use(authenticate);
 
-// Rotas CRUD
-router.post('/', criarTransacao);
+router.post('/', validate(criarTransacaoSchema), criarTransacao);
 router.get('/', listarTransacoes);
 router.get('/pendentes', listarTransacoesPendentes);
 router.get('/relatorio/periodo', relatorioPorPeriodo);
 router.get('/comissoes/pendentes', comissoesPendentes);
-router.get('/:id', validateObjectId, buscarTransacao);
-router.put('/:id', validateObjectId, atualizarTransacao);
-router.delete('/:id', validateObjectId, deletarTransacao);
-router.put('/:id/cancelar', validateObjectId, cancelarTransacao);
+router.get('/:id', validate(idParamSchema, 'params'), buscarTransacao);
+router.put('/:id', validate(idParamSchema, 'params'), validate(atualizarTransacaoSchema), atualizarTransacao);
+router.delete('/:id', validate(idParamSchema, 'params'), deletarTransacao);
+router.put('/:id/cancelar', validate(idParamSchema, 'params'), validate(cancelarTransacaoSchema), cancelarTransacao);
 
-// Rotas de pagamento e comissão
-router.post('/:id/pagamento', validateObjectId, registrarPagamento);
-router.put('/:id/comissao/pagar', validateObjectId, pagarComissao);
+router.post('/:id/pagamento',
+  validate(idParamSchema, 'params'),
+  validate(registrarPagamentoTransacaoSchema),
+  registrarPagamento
+);
+router.put('/:id/comissao/pagar',
+  validate(idParamSchema, 'params'),
+  validate(pagarComissaoSchema),
+  pagarComissao
+);
 
 export default router;

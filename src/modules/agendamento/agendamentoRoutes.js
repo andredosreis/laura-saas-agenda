@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../../middlewares/auth.js';
+import { validate } from '../../middlewares/validate.js';
 import {
   createAgendamento,
   getAllAgendamentos,
@@ -15,11 +16,20 @@ import {
   getHistorico,
   getStatsMes,
 } from './agendamentoController.js';
-import validateObjectId from '../../middlewares/validateObjectId.js';
+import {
+  createAgendamentoSchema,
+  updateAgendamentoSchema,
+  updateStatusSchema,
+  confirmarAgendamentoSchema,
+  comparecimentoSchema,
+  fecharPacoteSchema,
+  registrarPagamentoSchema,
+  enviarLembreteSchema,
+  agendamentoIdParamSchema,
+} from './agendamentoSchemas.js';
 
 const router = express.Router();
 
-// 🆕 Proteger todas as rotas
 router.use(authenticate);
 
 // Rotas de histórico e estatísticas (antes das rotas com :id)
@@ -30,21 +40,54 @@ router.get('/stats/mes', getStatsMes);
 // RBAC: terapeuta só lê (via filtro resource-level em getAll/getOne);
 //       recepcionista cria/edita mas não elimina; gerente/admin têm acesso total.
 router.get('/', getAllAgendamentos);
-router.post('/', authorize('admin', 'gerente', 'recepcionista'), createAgendamento);
-router.get('/:id', validateObjectId, getAgendamento);
-router.put('/:id', validateObjectId, authorize('admin', 'gerente', 'recepcionista'), updateAgendamento);
-router.patch('/:id/status', validateObjectId, updateStatusAgendamento);
-router.delete('/:id', validateObjectId, authorize('admin', 'gerente'), deleteAgendamento);
+router.post('/', authorize('admin', 'gerente', 'recepcionista'), validate(createAgendamentoSchema), createAgendamento);
+router.get('/:id', validate(agendamentoIdParamSchema, 'params'), getAgendamento);
+router.put('/:id',
+  validate(agendamentoIdParamSchema, 'params'),
+  authorize('admin', 'gerente', 'recepcionista'),
+  validate(updateAgendamentoSchema),
+  updateAgendamento
+);
+router.patch('/:id/status',
+  validate(agendamentoIdParamSchema, 'params'),
+  validate(updateStatusSchema),
+  updateStatusAgendamento
+);
+router.delete('/:id',
+  validate(agendamentoIdParamSchema, 'params'),
+  authorize('admin', 'gerente'),
+  deleteAgendamento
+);
 
 // Rotas de confirmação e lembretes
-router.patch('/:id/confirmar', validateObjectId, confirmarAgendamento);
-router.post('/:id/enviar-lembrete', validateObjectId, enviarLembreteManual);
+router.patch('/:id/confirmar',
+  validate(agendamentoIdParamSchema, 'params'),
+  validate(confirmarAgendamentoSchema),
+  confirmarAgendamento
+);
+router.post('/:id/enviar-lembrete',
+  validate(agendamentoIdParamSchema, 'params'),
+  validate(enviarLembreteSchema),
+  enviarLembreteManual
+);
 
 // Funil de avaliação
-router.patch('/:id/comparecimento', validateObjectId, marcarComparecimento);
-router.post('/:id/fechar-pacote', validateObjectId, fecharPacote);
+router.patch('/:id/comparecimento',
+  validate(agendamentoIdParamSchema, 'params'),
+  validate(comparecimentoSchema),
+  marcarComparecimento
+);
+router.post('/:id/fechar-pacote',
+  validate(agendamentoIdParamSchema, 'params'),
+  validate(fecharPacoteSchema),
+  fecharPacote
+);
 
-// Rota para registrar pagamento de serviço avulso
-router.post('/:id/pagamento', validateObjectId, registrarPagamentoServico);
+// Pagamento de serviço avulso
+router.post('/:id/pagamento',
+  validate(agendamentoIdParamSchema, 'params'),
+  validate(registrarPagamentoSchema),
+  registrarPagamentoServico
+);
 
 export default router;
