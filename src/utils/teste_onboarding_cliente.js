@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Cliente = require('../models/Cliente');
 const Conversa = require('../models/Conversa');
 const Pacote = require('../models/Pacote');
-const { processarClienteNovo } = require('../controllers/agenteController');
+const { processarClienteNovo } = require('../modules/ia/agenteController');
 
 // Mock da função de envio de WhatsApp (para não enviar de verdade)
 global.sendWhatsAppMessage = async (telefone, mensagem) => {

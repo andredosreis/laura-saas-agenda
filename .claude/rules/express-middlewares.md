@@ -14,6 +14,25 @@ router.use(authenticate);
 
 Após `authenticate`, `req.user.tenantId` está sempre disponível — usar em todas as queries.
 
+## authorize (RBAC — único mecanismo de autorização)
+
+```javascript
+import { authorize } from '../middlewares/auth.js';
+
+// rota só para admin
+router.delete('/:id', authenticate, authorize('admin'), ctrl.remover);
+
+// rota para múltiplos roles
+router.get('/', authenticate, authorize('admin', 'gerente', 'recepcionista'), ctrl.listar);
+```
+
+Roles suportados: `superadmin`, `admin`, `gerente`, `recepcionista`, `terapeuta`.
+`superadmin` ignora `authorize` e tem sempre acesso.
+
+O campo `User.permissoes` existe apenas para o frontend mostrar/esconder botões — nunca é verificado no backend. A fonte de verdade de autorização é sempre `req.user.role` + `authorize()`.
+
+Não existe `requirePermission`/`hasPermission` — foi removido em 2026-04-24 como código morto. Se precisares de granularidade fina por utilizador, abre ADR antes de adicionar.
+
 ## requirePlan (rotas que consomem limite do plano)
 
 ```javascript

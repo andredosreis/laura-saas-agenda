@@ -60,16 +60,59 @@ Conforme [ADR-012](generated/ADR-012-docker-containerization.md) e [ADR-013](gen
 
 ---
 
-## ADRs com Riscos Documentados Não Resolvidos
+## ADRs com Riscos Documentados
 
-| ADR | Risco | Mitigação Pendente |
-|-----|-------|--------------------|
-| ADR-004 (JWT) | localStorage vulnerável a XSS | CSP headers (resolvido com Helmet — Fase 1) |
-| ADR-005 (RBAC) | Dualidade `authorize()` vs `requirePermission()` confusa | Unificar ou documentar claramente — sem sprint definido |
-| ADR-005 (RBAC) | Sem resource-level permissions (terapeuta vê todos os agendamentos) | Feature futura — ADR nova necessária |
-| ADR-006 (Z-API) | Risco de ban WhatsApp, processamento síncrono | Migração para Evolution API (ADR-012 Fase 2) |
-| ADR-009 (Deploy) | Cold start Render free → CRON 19h pode não disparar | UptimeRobot ping ou Render paid — sem sprint definido |
-| ADR-010 (Express) | Sem versionamento `/api/v1/` | Antes de onboarding novos tenants — sem sprint definido |
+Estado histórico (linha a linha, mantido como registo). Ver Fase 6 abaixo para resolução.
+
+| ADR | Risco | Estado |
+|-----|-------|--------|
+| ADR-004 (JWT) | localStorage vulnerável a XSS | ✅ Mitigado com Helmet (Fase 1) |
+| ADR-005 (RBAC) | Dualidade `authorize()` vs `requirePermission()` confusa | ✅ Resolvido (Fase 6) |
+| ADR-005 (RBAC) | Sem resource-level permissions (terapeuta vê todos os agendamentos) | ✅ Resolvido (Fase 6) |
+| ADR-006 (Z-API) | Risco de ban WhatsApp, processamento síncrono | ✅ Migrado para Evolution API |
+| ADR-009 (Deploy) | Cold start Render free → CRON 19h pode não disparar | ✅ UptimeRobot configurado externamente |
+| ADR-010 (Express) | Sem versionamento `/api/v1/` | ✅ Resolvido (Fase 6) |
+
+---
+
+## Fase 6 — Riscos ADR (2026-04-24)
+
+Esta fase fecha os riscos documentados nas ADRs que estavam pendentes de implementação.
+
+- [x] **Risco 1 — Unificação do RBAC** (ADR-005)
+  - Removido `requirePermission` de `src/middlewares/auth.js` (código morto, não usado em nenhuma rota)
+  - Removido `hasPermission` de `src/models/User.js`
+  - `authorize(roles)` passa a ser o único mecanismo de autorização
+  - `User.permissoes` mantido apenas como hint visual para o frontend (show/hide de botões); nunca é verificado no backend
+  - Documentado em `.claude/rules/express-middlewares.md`
+
+- [x] **Risco 2 — Resource-level permissions para terapeuta** (ADR-005)
+  - Camada A (role-level): `authorize()` aplicado em `POST/PUT/DELETE /api/agendamentos*` com matriz:
+    - Criar/Editar → admin, gerente, recepcionista
+    - Eliminar → admin, gerente
+    - Ler/Status → todos os roles (filtro resource-level faz o resto)
+  - Camada B (resource-level): novo helper `src/utils/agendamentoScope.js` adiciona `profissional: userId` às queries quando `role === 'terapeuta'`
+  - Aplicado em `getAllAgendamentos`, `getAgendamento`, `updateStatusAgendamento`
+  - Cobertura: `tests/agendamento-rbac.test.js` com 7 testes (3 Camada A + 4 Camada B)
+
+- [x] **Risco 3 — Versionamento `/api/v1/`** (ADR-010)
+  - Dual-mount em `src/app.js`: todas as rotas de recurso servidas em `/api/*` (legacy) e `/api/v1/*` (canónico)
+  - Webhooks ficam fora do versionamento (controlados por cliente externo)
+  - Frontend migra via `VITE_API_URL` quando pronto (zero alterações em código)
+  - Cobertura: `tests/api-versioning.test.js` com 3 testes
+
+- [x] **Risco 4 — Cold start Render free** (ADR-009)
+  - Resolvido externamente via UptimeRobot a pingar `/api/health` (confirmado pelo utilizador 2026-04-24)
+  - `render.yaml` mantém `healthCheckPath: /api/health` e `plan: free`
+
+### Testes criados na Fase 6
+
+| Ficheiro | Testes | Estado |
+|----------|--------|--------|
+| `tests/agendamento-rbac.test.js` | 7 | ✅ |
+| `tests/api-versioning.test.js` | 3 | ✅ |
+
+**Delta da suite:** de 91 → 101 testes a passar (+10 novos, zero regressões nos 22 testes pré-existentes que falhavam antes da Fase 6).
 
 ---
 

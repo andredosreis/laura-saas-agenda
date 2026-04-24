@@ -5,7 +5,7 @@ import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
 import Conversa from '../src/models/Conversa.js';
 import Tenant from '../src/models/Tenant.js';
 
-jest.unstable_mockModule('../src/utils/zapi_client.js', () => ({
+jest.unstable_mockModule('../src/modules/ia/zapi_client.js', () => ({
   sendWhatsAppMessage: jest.fn().mockResolvedValue({ success: true, result: 'mocked' }),
   isWhatsAppConnected: jest.fn().mockResolvedValue(true)
 }));

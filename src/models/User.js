@@ -270,19 +270,6 @@ UserSchema.methods.resetLoginAttempts = function () {
 };
 
 /**
- * Verifica se o usuário tem uma permissão específica
- */
-UserSchema.methods.hasPermission = function (permission) {
-    // Superadmin e admin têm todas as permissões
-    if (this.role === 'superadmin' || this.role === 'admin') {
-        return true;
-    }
-
-    // Verificar permissão específica
-    return this.permissoes[permission] === true;
-};
-
-/**
  * Retorna dados seguros do usuário (sem campos sensíveis)
  */
 UserSchema.methods.toSafeObject = function () {

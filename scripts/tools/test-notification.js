@@ -2,7 +2,7 @@ import dotenv from 'dotenv-flow';
 dotenv.config(); // ← PRIMEIRO, antes de qualquer outro import!
 
 import connectDB from './src/config/db.js';
-import { sendReminderNotifications } from './src/controllers/agenteController.js';
+import { sendReminderNotifications } from './src/modules/ia/agenteController.js';
 
 (async () => {
   try {

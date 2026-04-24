@@ -92,39 +92,6 @@ export const authorize = (...allowedRoles) => {
 };
 
 // =============================================
-// MIDDLEWARE: REQUIRE PERMISSION
-// Verifica se o usuário tem uma permissão específica
-// =============================================
-export const requirePermission = (permission) => {
-    return async (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({
-                success: false,
-                error: 'Não autenticado'
-            });
-        }
-
-        // Admin e superadmin têm todas as permissões
-        if (req.user.role === 'superadmin' || req.user.role === 'admin') {
-            return next();
-        }
-
-        // Buscar usuário com permissões
-        const user = await User.findById(req.user.userId);
-
-        if (!user || !user.hasPermission(permission)) {
-            return res.status(403).json({
-                success: false,
-                error: `Sem permissão: ${permission}`,
-                requiredPermission: permission
-            });
-        }
-
-        next();
-    };
-};
-
-// =============================================
 // MIDDLEWARE: REQUIRE PLAN
 // Verifica se o tenant tem um dos planos permitidos
 // =============================================
@@ -320,7 +287,6 @@ export const optionalAuth = async (req, res, next) => {
 export default {
     authenticate,
     authorize,
-    requirePermission,
     requirePlan,
     checkLimit,
     injectTenant,

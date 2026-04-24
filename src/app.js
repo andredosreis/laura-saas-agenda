@@ -13,24 +13,24 @@ import requestLogger from './middlewares/requestLogger.js';
 import errorHandler from './middlewares/errorHandler.js';
 
 // Rotas
-import clienteRoutes from './routes/clienteRoutes.js';
-import pacoteRoutes from './routes/pacoteRoutes.js';
-import agendamentoRoutes from './routes/agendamentoRoutes.js';
+import clienteRoutes from './modules/clientes/clienteRoutes.js';
+import pacoteRoutes from './modules/financeiro/pacoteRoutes.js';
+import agendamentoRoutes from './modules/agendamento/agendamentoRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
-import whatsappRoutes from './routes/whatsappRoutes.js';
-import agenteRoutes from './routes/agenteRoutes.js';
+import whatsappRoutes from './modules/ia/whatsappRoutes.js';
+import agenteRoutes from './modules/ia/agenteRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
-import notificationRoutes from './routes/notificationRoutes.js';
-import webhookRoutes from './routes/webhookRoutes.js';
-import authRoutes from './routes/authRoutes.js'; // 🆕 Autenticação
-import financeiroRoutes from './routes/financeiroRoutes.js'; // Added from snippet
+import notificationRoutes from './modules/notificacoes/notificationRoutes.js';
+import webhookRoutes from './modules/ia/webhookRoutes.js';
+import authRoutes from './modules/auth/authRoutes.js'; // 🆕 Autenticação — migrado para src/modules/auth/ (ADR-011)
+import financeiroRoutes from './modules/financeiro/financeiroRoutes.js';
 import migrationRoutes from './routes/migrationRoutes.js'; // 🆕 Rota de Migração
-import transacaoRoutes from './routes/transacaoRoutes.js'; // 💰 FASE 3: Transações
-import compraPacoteRoutes from './routes/compraPacoteRoutes.js'; // 💰 FASE 3: Compra de Pacotes
-import pagamentoRoutes from './routes/pagamentoRoutes.js'; // 💰 FASE 3: Pagamentos
-import caixaRoutes from './routes/caixaRoutes.js'; // 💰 FASE 3: Controle de Caixa
-import historicoAtendimentoRoutes from './routes/historicoAtendimentoRoutes.js'; // 📋 FASE 4: Histórico de Atendimentos
+import transacaoRoutes from './modules/financeiro/transacaoRoutes.js';
+import compraPacoteRoutes from './modules/financeiro/compraPacoteRoutes.js';
+import pagamentoRoutes from './modules/financeiro/pagamentoRoutes.js';
+import caixaRoutes from './modules/financeiro/caixaRoutes.js';
+import historicoAtendimentoRoutes from './modules/historico/historicoAtendimentoRoutes.js';
 
 const app = express();
 
@@ -75,41 +75,48 @@ if (process.env.NODE_ENV === 'development') {
 }
 // --- Fim da Configuração do CORS ---
 
-// Endpoints da API
-app.use('/api/auth', authRoutes); // 🆕 Autenticação (público)
-app.use('/api/clientes', clienteRoutes);
-app.use('/api/pacotes', pacoteRoutes);
-app.use('/api/agendamentos', agendamentoRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
-app.use('/api/agente', agenteRoutes);
-app.use('/api/schedules', scheduleRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/financeiro', financeiroRoutes);
-app.use('/api/migration', migrationRoutes);
+// Endpoints da API — dual-mount: /api/* (legacy) + /api/v1/* (versionado)
+// O prefixo /api/v1/ é a nova API canónica. /api/* permanece como alias legacy
+// para não quebrar clientes existentes. Frontend migra via VITE_API_URL quando pronto.
+const apiResources = [
+  ['/auth', authRoutes],
+  ['/clientes', clienteRoutes],
+  ['/pacotes', pacoteRoutes],
+  ['/agendamentos', agendamentoRoutes],
+  ['/dashboard', dashboardRoutes],
+  ['/analytics', analyticsRoutes],
+  ['/whatsapp', whatsappRoutes],
+  ['/agente', agenteRoutes],
+  ['/schedules', scheduleRoutes],
+  ['/notifications', notificationRoutes],
+  ['/financeiro', financeiroRoutes],
+  ['/migration', migrationRoutes],
+  ['/transacoes', transacaoRoutes],
+  ['/compras-pacotes', compraPacoteRoutes],
+  ['/pagamentos', pagamentoRoutes],
+  ['/caixa', caixaRoutes],
+  ['/historico-atendimentos', historicoAtendimentoRoutes],
+];
 
-// 💰 FASE 3: Rotas do Sistema Financeiro
-app.use('/api/transacoes', transacaoRoutes);
-app.use('/api/compras-pacotes', compraPacoteRoutes);
-app.use('/api/pagamentos', pagamentoRoutes);
-app.use('/api/caixa', caixaRoutes);
-
-// 📋 FASE 4: Histórico de Atendimentos
-app.use('/api/historico-atendimentos', historicoAtendimentoRoutes);
+for (const [path, router] of apiResources) {
+  app.use(`/api${path}`, router);
+  app.use(`/api/v1${path}`, router);
+}
 
 // Webhook Evolution API — limite maior para payloads com dados binários de grupos
 app.use('/webhook', express.json({ limit: '1mb' }), webhookRoutes);
 
 // Health check endpoint (para Vercel e monitoramento)
-app.get('/api/health', (req, res) => {
+const healthHandler = (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
-});
+};
+app.get('/api/health', healthHandler);
+app.get('/api/v1/health', healthHandler);
 
 // Rota de teste
 app.get('/', (req, res) => {
