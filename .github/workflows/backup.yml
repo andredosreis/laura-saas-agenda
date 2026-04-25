@@ -1,0 +1,92 @@
+name: MongoDB Backup
+
+# Backup diário do MongoDB Atlas para Cloudflare R2.
+#
+# ── Setup único (fazer uma vez) ────────────────────────────────────────
+# 1. Criar conta Cloudflare e activar R2 (cartão obrigatório, mas 10GB/mês grátis).
+# 2. Criar bucket R2: ex. `marcai-backups` (privado).
+# 3. Em R2 → Manage R2 API Tokens → Create API Token:
+#      - Permissões: Object Read & Write
+#      - Scope: apenas o bucket `marcai-backups`
+#    Copiar `Access Key ID` e `Secret Access Key`.
+# 4. Em R2 → Settings → S3 API, copiar o endpoint (formato `https://<accountId>.r2.cloudflarestorage.com`).
+# 5. Em R2 → Bucket → Settings → Object lifecycle rules (rotação automática):
+#      - Prefix `daily/`   → delete after 7 days
+#      - Prefix `weekly/`  → delete after 28 days
+#      - Prefix `monthly/` → delete after 90 days
+# 6. No GitHub → Settings → Secrets and variables → Actions → New repository secret:
+#      - MONGO_URI           (string de conexão Atlas completa com credenciais)
+#      - R2_ACCESS_KEY_ID
+#      - R2_SECRET_ACCESS_KEY
+#      - R2_ENDPOINT         (ex. https://<accountId>.r2.cloudflarestorage.com)
+#      - R2_BUCKET           (ex. marcai-backups)
+#
+# Restore de emergência: correr `./scripts/restore-backup.sh <caminho-do-archive>` localmente.
+
+on:
+  schedule:
+    # 02:00 UTC diariamente (≈ 03:00 Lisboa no inverno, 03:00 no verão)
+    - cron: '0 2 * * *'
+  workflow_dispatch: {} # permite trigger manual via UI do GitHub
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Instalar MongoDB Database Tools
+        run: |
+          wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
+          sudo apt-get install -y ./mongodb-database-tools-ubuntu2204-x86_64-100.10.0.deb
+          mongodump --version
+
+      - name: Instalar AWS CLI (usado com endpoint R2)
+        run: |
+          if ! command -v aws &> /dev/null; then
+            curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install --update
+          fi
+          aws --version
+
+      - name: Dump MongoDB (comprimido)
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d_%H%M")
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+          mongodump --uri="$MONGO_URI" --archive="backup_${TIMESTAMP}.archive.gz" --gzip
+          ls -lh "backup_${TIMESTAMP}.archive.gz"
+
+      - name: Upload para R2 (daily + weekly/monthly quando aplicável)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          ARCHIVE="backup_${TIMESTAMP}.archive.gz"
+          DOW=$(date -u +%u)           # 1=Mon .. 7=Sun
+          DOM=$(date -u +%d)           # 01..31
+
+          # Daily (sempre)
+          aws s3 cp "$ARCHIVE" "s3://$R2_BUCKET/daily/$ARCHIVE" \
+            --endpoint-url "$R2_ENDPOINT" --no-progress
+
+          # Weekly aos domingos
+          if [ "$DOW" = "7" ]; then
+            WEEK=$(date -u +%Y-W%V)
+            aws s3 cp "$ARCHIVE" "s3://$R2_BUCKET/weekly/${WEEK}.archive.gz" \
+              --endpoint-url "$R2_ENDPOINT" --no-progress
+          fi
+
+          # Monthly no dia 1
+          if [ "$DOM" = "01" ]; then
+            MONTH=$(date -u +%Y-%m)
+            aws s3 cp "$ARCHIVE" "s3://$R2_BUCKET/monthly/${MONTH}.archive.gz" \
+              --endpoint-url "$R2_ENDPOINT" --no-progress
+          fi
+
+          echo "✅ Backup enviado para R2"

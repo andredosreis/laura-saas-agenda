@@ -27,6 +27,7 @@
   "dependencies": {
     "@langchain/core": "^1.1.40",
     "@langchain/google-genai": "^2.1.27",
+    "@sentry/node": "^10.50.0",
     "axios": "^1.7.2",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.74.1",

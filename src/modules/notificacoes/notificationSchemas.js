@@ -19,6 +19,7 @@ export const subscribeSchema = z
   .object({
     subscription: pushSubscription,
     userId: z.string().min(1).max(100).optional().nullable(),
+    userAgent: z.string().max(500).optional(),
   })
   .strict();
 

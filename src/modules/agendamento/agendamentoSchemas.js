@@ -24,14 +24,17 @@ const leadSchema = z
 
 const tipoEnum = z.enum(['Sessao', 'Retorno', 'Avaliacao']);
 
+// Alinhado com enum em src/models/Agendamento.js
 const statusEnum = z.enum([
   'Agendado',
   'Confirmado',
-  'Realizado',
-  'Cancelado',
-  'Não Compareceu',
   'Compareceu',
+  'Realizado',
+  'Fechado',
   'Avaliacao',
+  'Cancelado Pelo Cliente',
+  'Cancelado Pelo Salão',
+  'Não Compareceu',
 ]);
 
 export const createAgendamentoSchema = z
@@ -43,7 +46,7 @@ export const createAgendamentoSchema = z
     pacote: objectId.optional().nullable(),
     compraPacote: objectId.optional().nullable(),
     servicoAvulsoNome: z.string().trim().max(200).optional(),
-    servicoAvulsoValor: z.number().nonnegative().optional(),
+    servicoAvulsoValor: z.number().nonnegative().optional().nullable(),
     profissional: objectId.optional().nullable(),
     observacoes: z.string().trim().max(1000).optional(),
   })
@@ -56,11 +59,15 @@ export const updateAgendamentoSchema = z
     observacoes: z.string().trim().max(1000).optional(),
     profissional: objectId.optional().nullable(),
     servicoAvulsoNome: z.string().trim().max(200).optional(),
-    servicoAvulsoValor: z.number().nonnegative().optional(),
+    servicoAvulsoValor: z.number().nonnegative().optional().nullable(),
     cliente: objectId.optional().nullable(),
     pacote: objectId.optional().nullable(),
     compraPacote: objectId.optional().nullable(),
     lead: leadSchema.optional(),
+    // Campos de pagamento (update após registar transação/pagamento)
+    statusPagamento: z.enum(['Pendente', 'Pago', 'Cancelado']).optional(),
+    transacao: objectId.optional().nullable(),
+    valorCobrado: z.number().nonnegative().optional(),
   })
   .strict();
 

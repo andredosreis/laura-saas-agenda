@@ -158,6 +158,7 @@ export const fecharCaixaSchema = z
 export const criarPacoteSchema = z
   .object({
     nome: z.string().trim().min(1).max(200),
+    categoria: z.string().trim().min(1, 'Categoria é obrigatória').max(50),
     descricao: z.string().trim().max(1000).optional(),
     valor: dinheiroPositivo,
     sessoes: z.number().int().min(1).max(100),

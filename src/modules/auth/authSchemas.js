@@ -118,7 +118,17 @@ export const updateTenantSchema = z
       .object({
         email: email.optional(),
         telefone: z.string().trim().max(20).optional(),
-        endereco: z.string().trim().max(300).optional(),
+        website: z.string().trim().max(200).optional().or(z.literal('')),
+        endereco: z
+          .object({
+            rua: z.string().trim().max(200).optional(),
+            numero: z.string().trim().max(20).optional(),
+            cidade: z.string().trim().max(100).optional(),
+            codigoPostal: z.string().trim().max(20).optional(),
+            pais: z.string().trim().max(100).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

@@ -138,7 +138,6 @@ function CriarAgendamento() {
         compraPacote: data.pacote,
         dataHora: data.dataHora,
         observacoes: data.observacoes || '',
-        status: 'Agendado',
       });
       toast.success('Agendamento criado com sucesso!');
       navigate('/agendamentos');
@@ -161,7 +160,6 @@ function CriarAgendamento() {
         },
         dataHora: data.dataHora,
         observacoes: data.observacoes || '',
-        status: 'Agendado',
       });
       toast.success('Avaliação agendada com sucesso!');
       navigate('/agendamentos');

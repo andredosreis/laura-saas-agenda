@@ -187,9 +187,9 @@ export async function unsubscribeFromPush(): Promise<boolean> {
   try {
     console.log('[NotifService] 🔔 Desinscrever de push...');
 
-    const subscription = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
+    const stored = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
 
-    if (!subscription) {
+    if (!stored) {
       console.warn('[NotifService] ⚠️ Sem subscription ativa');
       return false;
     }
@@ -200,10 +200,31 @@ export async function unsubscribeFromPush(): Promise<boolean> {
       return false;
     }
 
+    // Extrair endpoint da subscription para notificar o backend
+    let endpoint: string | undefined;
+    try {
+      const parsed = JSON.parse(stored);
+      endpoint = parsed.endpoint;
+    } catch {
+      endpoint = undefined;
+    }
+
     const pushSubscription = await swRegistration.pushManager.getSubscription();
     if (pushSubscription) {
+      endpoint = endpoint || pushSubscription.endpoint;
       await pushSubscription.unsubscribe();
-      console.log('[NotifService] ✅ Desinscrição completada');
+      console.log('[NotifService] ✅ Desinscrição do browser completada');
+    }
+
+    // Sincronizar com backend para remover o registo e não deixar órfão
+    if (endpoint) {
+      try {
+        await api.post('/notifications/unsubscribe', { endpoint });
+        console.log('[NotifService] ✅ Backend actualizado');
+      } catch (err) {
+        // Não bloqueia o logout local se o backend falhar
+        console.warn('[NotifService] ⚠️ Falha a notificar backend — subscription removida localmente');
+      }
     }
 
     localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
