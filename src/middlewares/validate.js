@@ -10,7 +10,10 @@
  * aplicadas). Em falha, responde 400 seguindo o contrato `{ success, error }`.
  */
 export const validate = (schema, location = 'body') => (req, res, next) => {
-  const result = schema.safeParse(req[location]);
+  // Express 5 + body-parser 2.x: req.body é undefined quando POST/PATCH chega sem corpo.
+  // Schemas com todos os campos opcionais (ex: enviarLembreteSchema) devem aceitar isto.
+  const data = req[location] ?? (location === 'body' ? {} : req[location]);
+  const result = schema.safeParse(data);
   if (!result.success) {
     const first = result.error.issues[0];
     const path = first.path.length ? `${first.path.join('.')}: ` : '';
