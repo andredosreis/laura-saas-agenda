@@ -31,7 +31,7 @@ function VerificarEmail() {
     }, [token]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+        <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>

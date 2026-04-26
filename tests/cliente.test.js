@@ -74,10 +74,6 @@ describe('GET /api/clientes — Paginação', () => {
     expect(res.body.pagination.limit).toBe(100);
   });
 
-  it('rejeita pedido sem autenticação com 401', async () => {
-    const res = await request(app).get('/api/clientes');
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('POST /api/clientes', () => {

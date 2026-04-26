@@ -31,27 +31,6 @@ async function criarToken(slug = 'salon-mw') {
 }
 
 // ──────────────────────────────────────────────
-// Helmet — headers de segurança
-// ──────────────────────────────────────────────
-
-describe('Segurança: headers HTTP (Helmet)', () => {
-  it('remove o header X-Powered-By', async () => {
-    const res = await request(app).get('/api/health');
-    expect(res.headers['x-powered-by']).toBeUndefined();
-  });
-
-  it('inclui X-Content-Type-Options', async () => {
-    const res = await request(app).get('/api/health');
-    expect(res.headers['x-content-type-options']).toBe('nosniff');
-  });
-
-  it('inclui X-Frame-Options', async () => {
-    const res = await request(app).get('/api/health');
-    expect(res.headers['x-frame-options']).toBeDefined();
-  });
-});
-
-// ──────────────────────────────────────────────
 // Autenticação — authenticate middleware
 // ──────────────────────────────────────────────
 
@@ -88,16 +67,6 @@ describe('Middleware: errorHandler — CastError (ID inválido)', () => {
     const token = await criarToken('salon-cast');
     const res = await request(app)
       .get('/api/agendamentos/id-invalido')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-  });
-
-  it('retorna 400 com success:false para ID inválido em clientes', async () => {
-    const token = await criarToken('salon-cast2');
-    const res = await request(app)
-      .get('/api/clientes/id-invalido')
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(400);

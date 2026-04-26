@@ -73,7 +73,7 @@ function ResetPassword() {
     // Estado de carregamento
     if (isVerifying) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
+            <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto mb-4"></div>
                     <p className="text-gray-400">Verificando link...</p>
@@ -83,7 +83,7 @@ function ResetPassword() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+        <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
@@ -156,7 +156,7 @@ function ResetPassword() {
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 {/* Nova Senha */}
                                 <div>
-                                    <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                                    <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
                                         Nova senha
                                     </label>
                                     <div className="relative">
@@ -170,13 +170,13 @@ function ResetPassword() {
                                                 setPassword(e.target.value);
                                                 setError('');
                                             }}
-                                            className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                            className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-hidden focus:ring-4 focus:ring-indigo-400/60 focus:border-indigo-400 transition-all"
                                             placeholder="Mínimo 6 caracteres"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors p-2.5 min-w-11 min-h-11 flex items-center justify-center rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                                             aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                         >
                                             {showPassword ? (
@@ -190,7 +190,7 @@ function ResetPassword() {
 
                                 {/* Confirmar Senha */}
                                 <div>
-                                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-white mb-2">
                                         Confirmar nova senha
                                     </label>
                                     <div className="relative">
@@ -204,13 +204,13 @@ function ResetPassword() {
                                                 setConfirmPassword(e.target.value);
                                                 setError('');
                                             }}
-                                            className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                            className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-hidden focus:ring-4 focus:ring-indigo-400/60 focus:border-indigo-400 transition-all"
                                             placeholder="Repita a senha"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors p-2.5 min-w-11 min-h-11 flex items-center justify-center rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                                             aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                         >
                                             {showConfirmPassword ? (

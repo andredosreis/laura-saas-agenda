@@ -30,15 +30,17 @@ const ClienteCard = ({ cliente, pacotes = [], onEdit, onDelete }) => {
       <div className="mt-4 flex gap-2">
         <button
           onClick={() => onEdit(cliente._id)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-sm text-sm"
+          aria-label={`Editar cliente ${cliente.nome || ''}`}
+          className="min-h-11 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 transition-colors"
         >
           Editar
         </button>
         <button
           onClick={() => onDelete(cliente._id)}
-          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-sm text-sm"
+          aria-label={`Eliminar cliente ${cliente.nome || ''}`}
+          className="min-h-11 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 transition-colors"
         >
-          Deletar
+          Eliminar
         </button>
       </div>
     </div>

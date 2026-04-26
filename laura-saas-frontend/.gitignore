@@ -24,3 +24,9 @@ dev-dist
 *.sln
 *.sw?
 .vercel
+
+# Testing
+coverage
+playwright-report
+test-results
+.playwright-cli

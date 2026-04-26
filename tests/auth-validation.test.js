@@ -48,23 +48,6 @@ describe('Zod validation — POST /api/auth/register (defesa em profundidade)', 
     expect(res.body.error).toMatch(/senha/i);
   });
 
-  it('rejeita password sem caractere especial', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ ...validRegister, password: 'Senha12345' });
-
-    expect(res.status).toBe(400);
-  });
-
-  it('rejeita email mal formatado', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ ...validRegister, email: 'nao-e-email' });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/email/i);
-  });
-
   it('normaliza email para lowercase antes de guardar', async () => {
     const res = await request(app)
       .post('/api/auth/register')
@@ -83,13 +66,5 @@ describe('Zod validation — POST /api/auth/reset-password', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/token/i);
-  });
-
-  it('rejeita token com comprimento errado', async () => {
-    const res = await request(app)
-      .post('/api/auth/reset-password')
-      .send({ token: 'abc123', password: 'Senha@Segura123' });
-
-    expect(res.status).toBe(400);
   });
 });

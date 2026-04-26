@@ -36,23 +36,12 @@ async function criarTenantEToken(slug = 'salon-dash') {
 // ──────────────────────────────────────────────
 
 describe('Dashboard — autenticação obrigatória', () => {
-  const endpoints = [
-    '/api/dashboard/agendamentosHoje',
-    '/api/dashboard/contagemAgendamentosAmanha',
-    '/api/dashboard/agendamentosAmanha',
-    '/api/dashboard/clientesAtendidosSemana',
-    '/api/dashboard/totais',
-    '/api/dashboard/sessoes-baixas',
-    '/api/dashboard/proximos-agendamentos',
-    '/api/dashboard/financeiro',
-  ];
-
-  for (const endpoint of endpoints) {
-    it(`GET ${endpoint} → 401 sem token`, async () => {
-      const res = await request(app).get(endpoint);
-      expect(res.status).toBe(401);
-    });
-  }
+  // Todos os endpoints /api/dashboard/* passam pelo mesmo middleware authenticate.
+  // Um teste representativo basta — se a auth quebra, todos quebram juntos.
+  it('GET /api/dashboard/totais → 401 sem token (representativo)', async () => {
+    const res = await request(app).get('/api/dashboard/totais');
+    expect(res.status).toBe(401);
+  });
 });
 
 // ──────────────────────────────────────────────

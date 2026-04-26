@@ -88,11 +88,11 @@ function Register() {
 
         switch (state) {
             case 'error':
-                return `${baseClasses} border-red-500/50 focus:ring-2 focus:ring-red-500 focus:border-transparent`;
+                return `${baseClasses} border-red-500/50 focus:ring-4 focus:ring-red-400/60 focus:border-red-400`;
             case 'success':
-                return `${baseClasses} border-green-500/50 focus:ring-2 focus:ring-green-500 focus:border-transparent`;
+                return `${baseClasses} border-green-500/50 focus:ring-4 focus:ring-green-400/60 focus:border-green-400`;
             default:
-                return `${baseClasses} border-white/10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent`;
+                return `${baseClasses} border-white/10 focus:ring-4 focus:ring-indigo-400/60 focus:border-indigo-400`;
         }
     };
 
@@ -125,14 +125,14 @@ function Register() {
 
     if (authLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
+            <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4 py-12">
+        <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4 py-12">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
@@ -170,7 +170,7 @@ function Register() {
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                         {/* Nome da Empresa */}
                         <div>
-                            <label htmlFor="nomeEmpresa" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="nomeEmpresa" className="block text-sm font-medium text-white mb-2">
                                 Nome do seu negócio
                             </label>
                             <div className="relative">
@@ -188,7 +188,7 @@ function Register() {
 
                         {/* Nome */}
                         <div>
-                            <label htmlFor="nome" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="nome" className="block text-sm font-medium text-white mb-2">
                                 Seu nome
                             </label>
                             <div className="relative">
@@ -206,7 +206,7 @@ function Register() {
 
                         {/* Email */}
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="email" className="block text-sm font-medium text-white mb-2">
                                 Email
                             </label>
                             <div className="relative">
@@ -225,7 +225,7 @@ function Register() {
 
                         {/* Telefone */}
                         <div>
-                            <label htmlFor="telefone" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="telefone" className="block text-sm font-medium text-white mb-2">
                                 Telefone
                             </label>
                             <div className="relative">
@@ -244,7 +244,7 @@ function Register() {
 
                         {/* Password */}
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
                                 Senha
                             </label>
                             <div className="relative">
@@ -269,7 +269,7 @@ function Register() {
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="text-gray-400 hover:text-white transition-colors p-1"
+                                        className="text-gray-300 hover:text-white transition-colors p-2.5 min-w-11 min-h-11 flex items-center justify-center rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                     >
                                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -304,7 +304,7 @@ function Register() {
 
                         {/* Confirm Password */}
                         <div>
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-white mb-2">
                                 Confirmar senha
                             </label>
                             <div className="relative">
@@ -329,7 +329,7 @@ function Register() {
                                     <button
                                         type="button"
                                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                        className="text-gray-400 hover:text-white transition-colors p-1"
+                                        className="text-gray-300 hover:text-white transition-colors p-2.5 min-w-11 min-h-11 flex items-center justify-center rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                                         aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                     >
                                         {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

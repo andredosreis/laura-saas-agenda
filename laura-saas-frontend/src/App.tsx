@@ -42,10 +42,16 @@ const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <ProtectedRoute>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:bg-white focus:text-slate-900 focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+      >
+        Saltar para o conteúdo principal
+      </a>
       <Sidebar />
-      <div className="lg:pl-72">
+      <main id="main-content" className="lg:pl-72">
         {children}
-      </div>
+      </main>
     </ProtectedRoute>
   );
 };

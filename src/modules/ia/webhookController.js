@@ -2,6 +2,7 @@ import Tenant from '../../models/Tenant.js';
 import { getTenantDB } from '../../config/tenantDB.js';
 import { getModels } from '../../models/registry.js';
 import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
+import { markMessageSeen } from '../../utils/webhookDedupe.js';
 import { DateTime } from 'luxon';
 
 /**
@@ -91,6 +92,16 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       return res.status(200).json({ message: 'Mensagem antiga ignorada' });
     }
 
+    // 🔍 VALIDAÇÃO 4.5: Anti-replay (idempotência via messageId)
+    // Evolution API pode reenviar mensagens em retry/reconexão.
+    // Atomic check via ProcessedMessage unique index — duplicates são silently skip.
+    const messageId = msgData?.key?.id;
+    const isNew = await markMessageSeen(messageId);
+    if (!isNew) {
+      console.log(`[Webhook] ⏭️ Mensagem duplicada (replay) ignorada: ${messageId}`);
+      return res.status(200).json({ message: 'Mensagem duplicada ignorada' });
+    }
+
     // Extrai dados do payload Evolution API
     const remoteJid = msgData?.key?.remoteJid || '';
 
@@ -133,151 +144,157 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       return res.status(200).json({ message: 'Mensagem ignorada' });
     }
 
-    // ✅ É uma resposta de confirmação (SIM/NÃO) → Continua processando
+    // ✅ É uma resposta de confirmação (SIM/NÃO) → ACK rápido + processa async
     console.log(`[Webhook] ✅ Detectado resposta de confirmação: "${mensagem}"`);
 
-    // Busca cliente pelo telefone (tenant-aware)
-    const telefoneVariants = [
-      telefoneNormalizado,
-      `351${telefoneNormalizado}`,
-      telefoneNormalizado.replace(/^351/, '')
-    ];
+    // ACK FAST: Evolution recebe 200 em ~50ms, evita timeout/retry.
+    // O processamento real (resolveCliente, sendWhatsAppMessage, etc.) corre em background.
+    res.status(200).json({ success: true, message: 'Mensagem aceite, processando' });
 
-    // Janela de tempo: próximas 48h ou últimas 2h (para respostas tardias)
-    const agora = DateTime.now().setZone('Europe/Lisbon');
-    const duasHorasAtras = agora.minus({ hours: 2 });
-    const doisDias = agora.plus({ days: 2 });
-    const janelaQuery = { $gte: duasHorasAtras.toJSDate(), $lte: doisDias.toJSDate() };
-
-    let agendamento = null;
-    let nomeRemetente = null;
-    let tenantModels = null;
-
-    // Busca cliente em todos os tenants
-    const clienteResult = await resolveClienteTenant(telefoneVariants);
-
-    if (clienteResult) {
-      const { models, cliente } = clienteResult;
-      tenantModels = models;
-      console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
-      agendamento = await models.Agendamento.findOne({
-        cliente: cliente._id,
-        'confirmacao.tipo': 'pendente',
-        dataHora: janelaQuery,
-      }).sort({ dataHora: 1 });
-      nomeRemetente = cliente.nome;
-    }
-
-    // Se não encontrou agendamento via cliente, tenta via lead (tipo Avaliacao)
-    if (!agendamento) {
-      const leadResult = await resolveLeadTenant(telefoneVariants, janelaQuery);
-
-      if (leadResult) {
-        tenantModels = leadResult.models;
-        agendamento = leadResult.agendamento;
-        nomeRemetente = agendamento.lead.nome;
-        console.log(`[Webhook] ✅ Lead encontrado: ${nomeRemetente}`);
-      }
-    }
-
-    if (!agendamento) {
-      console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${telefoneNormalizado} - delegando para IA`);
-      return await delegarParaIA(req, res, telefoneNormalizado);
-    }
-
-    // Processa resposta
-    let resposta = '';
-    let novoStatus = '';
-
-    // Respostas positivas
-    if (ehSim) {
-      agendamento.confirmacao.tipo = 'confirmado';
-      agendamento.confirmacao.respondidoEm = new Date();
-      agendamento.confirmacao.respondidoPor = 'cliente';
-      agendamento.status = 'Confirmado';
-      novoStatus = 'confirmado';
-
-      const dataFormatada = DateTime.fromJSDate(agendamento.dataHora)
-        .setZone('Europe/Lisbon')
-        .toFormat("dd/MM/yyyy 'às' HH:mm");
-
-      resposta = `✅ Obrigada pela confirmação, ${nomeRemetente}! A sua sessão está marcada para ${dataFormatada}. Até breve! 💆‍♀️✨`;
-    }
-    // Respostas negativas
-    else if (ehNao) {
-      agendamento.confirmacao.tipo = 'rejeitado';
-      agendamento.confirmacao.respondidoEm = new Date();
-      agendamento.confirmacao.respondidoPor = 'cliente';
-      agendamento.status = 'Cancelado Pelo Cliente';
-      novoStatus = 'rejeitado';
-
-      resposta = `Entendido, ${nomeRemetente}. 📅\n\nPara reagendarmos, indique por favor o dia e hora que prefere e iremos analisar a nossa agenda para lhe propor a melhor opção.\n\nObrigada! 💆‍♀️✨`;
-    }
-    // Resposta não reconhecida
-    else {
-      console.warn(`[Webhook] ⚠️ Resposta não reconhecida: "${mensagem}"`);
-
-      const dataFormatada = DateTime.fromJSDate(agendamento.dataHora)
-        .setZone('Europe/Lisbon')
-        .toFormat("dd/MM/yyyy 'às' HH:mm");
-
-      resposta = `Olá ${nomeRemetente}! 👋\n\nNão consegui entender sua resposta. Você tem um agendamento marcado para ${dataFormatada}.\n\nPor favor, responda:\n✅ *SIM* - para confirmar\n❌ *NÃO* - para cancelar`;
-
-      await sendWhatsAppMessage(telefoneNormalizado, resposta);
-      return res.status(200).json({ message: 'Resposta não reconhecida', aguardandoResposta: true });
-    }
-
-    // Salva agendamento
-    await agendamento.save();
-    console.log(`[Webhook] ✅ Agendamento ${novoStatus}: ${agendamento._id}`);
-
-    // Envia resposta ao cliente/lead
-    await sendWhatsAppMessage(telefoneNormalizado, resposta);
-
-    // Notifica admin sobre a resposta do cliente
-    const tenant = await Tenant.findById(agendamento.tenantId).lean();
-    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
-    if (numeroAdmin) {
-      const dataFormatadaAdmin = DateTime.fromJSDate(agendamento.dataHora)
-        .setZone('Europe/Lisbon')
-        .toFormat('HH:mm');
-
-      const msgAdmin = novoStatus === 'confirmado'
-        ? `✅ *Agendamento Confirmado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* confirmou a sessão das *${dataFormatadaAdmin}* de hoje.`
-        : `❌ *Agendamento Cancelado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* cancelou a sessão das *${dataFormatadaAdmin}* de hoje.`;
-
-      await sendWhatsAppMessage(numeroAdmin, msgAdmin);
-    }
-
-    return res.status(200).json({
-      success: true,
-      nome: nomeRemetente,
-      agendamento: agendamento._id,
-      status: novoStatus
-    });
+    // Fire-and-forget. Erros são logged (Sentry captura automaticamente).
+    processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim, ehNao })
+      .catch(err => {
+        console.error('[Webhook] ❌ Erro async ao processar confirmação:', err);
+      });
 
   } catch (error) {
-    console.error('[Webhook] ❌ Erro ao processar confirmação:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
+    console.error('[Webhook] ❌ Erro síncrono ao processar webhook:', error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
   }
 };
 
 /**
- * 🤖 Resposta automática simples (SEM IA)
- * Envia mensagem de saudação e notifica Laura
- * IMPORTANTE: Responde APENAS UMA VEZ, nunca mais interage
+ * Processamento assíncrono da confirmação WhatsApp.
+ * Chamado fire-and-forget após ack 200 ao Evolution.
+ * Sem req/res — toda a comunicação ao cliente é via sendWhatsAppMessage.
  */
-async function delegarParaIA(req, res, telefoneNormalizado) {
+async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim, ehNao }) {
+  // Busca cliente pelo telefone (tenant-aware)
+  const telefoneVariants = [
+    telefoneNormalizado,
+    `351${telefoneNormalizado}`,
+    telefoneNormalizado.replace(/^351/, '')
+  ];
+
+  // Janela de tempo: próximas 48h ou últimas 2h (para respostas tardias)
+  const agora = DateTime.now().setZone('Europe/Lisbon');
+  const duasHorasAtras = agora.minus({ hours: 2 });
+  const doisDias = agora.plus({ days: 2 });
+  const janelaQuery = { $gte: duasHorasAtras.toJSDate(), $lte: doisDias.toJSDate() };
+
+  let agendamento = null;
+  let nomeRemetente = null;
+
+  // Busca cliente em todos os tenants
+  const clienteResult = await resolveClienteTenant(telefoneVariants);
+
+  if (clienteResult) {
+    const { models, cliente } = clienteResult;
+    console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
+    agendamento = await models.Agendamento.findOne({
+      cliente: cliente._id,
+      'confirmacao.tipo': 'pendente',
+      dataHora: janelaQuery,
+    }).sort({ dataHora: 1 });
+    nomeRemetente = cliente.nome;
+  }
+
+  // Se não encontrou agendamento via cliente, tenta via lead (tipo Avaliacao)
+  if (!agendamento) {
+    const leadResult = await resolveLeadTenant(telefoneVariants, janelaQuery);
+
+    if (leadResult) {
+      agendamento = leadResult.agendamento;
+      nomeRemetente = agendamento.lead.nome;
+      console.log(`[Webhook] ✅ Lead encontrado: ${nomeRemetente}`);
+    }
+  }
+
+  if (!agendamento) {
+    console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${telefoneNormalizado} - delegando para IA`);
+    return await delegarParaIAAsync(telefoneNormalizado);
+  }
+
+  // Processa resposta
+  let resposta = '';
+  let novoStatus = '';
+
+  // Respostas positivas
+  if (ehSim) {
+    agendamento.confirmacao.tipo = 'confirmado';
+    agendamento.confirmacao.respondidoEm = new Date();
+    agendamento.confirmacao.respondidoPor = 'cliente';
+    agendamento.status = 'Confirmado';
+    novoStatus = 'confirmado';
+
+    const dataFormatada = DateTime.fromJSDate(agendamento.dataHora)
+      .setZone('Europe/Lisbon')
+      .toFormat("dd/MM/yyyy 'às' HH:mm");
+
+    resposta = `✅ Obrigada pela confirmação, ${nomeRemetente}! A sua sessão está marcada para ${dataFormatada}. Até breve! 💆‍♀️✨`;
+  }
+  // Respostas negativas
+  else if (ehNao) {
+    agendamento.confirmacao.tipo = 'rejeitado';
+    agendamento.confirmacao.respondidoEm = new Date();
+    agendamento.confirmacao.respondidoPor = 'cliente';
+    agendamento.status = 'Cancelado Pelo Cliente';
+    novoStatus = 'rejeitado';
+
+    resposta = `Entendido, ${nomeRemetente}. 📅\n\nPara reagendarmos, indique por favor o dia e hora que prefere e iremos analisar a nossa agenda para lhe propor a melhor opção.\n\nObrigada! 💆‍♀️✨`;
+  }
+  // Resposta não reconhecida
+  else {
+    console.warn(`[Webhook] ⚠️ Resposta não reconhecida: "${mensagem}"`);
+
+    const dataFormatada = DateTime.fromJSDate(agendamento.dataHora)
+      .setZone('Europe/Lisbon')
+      .toFormat("dd/MM/yyyy 'às' HH:mm");
+
+    resposta = `Olá ${nomeRemetente}! 👋\n\nNão consegui entender sua resposta. Você tem um agendamento marcado para ${dataFormatada}.\n\nPor favor, responda:\n✅ *SIM* - para confirmar\n❌ *NÃO* - para cancelar`;
+
+    await sendWhatsAppMessage(telefoneNormalizado, resposta);
+    return;
+  }
+
+  // Salva agendamento
+  await agendamento.save();
+  console.log(`[Webhook] ✅ Agendamento ${novoStatus}: ${agendamento._id}`);
+
+  // Envia resposta ao cliente/lead
+  await sendWhatsAppMessage(telefoneNormalizado, resposta);
+
+  // Notifica admin sobre a resposta do cliente
+  const tenant = await Tenant.findById(agendamento.tenantId).lean();
+  const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+  if (numeroAdmin) {
+    const dataFormatadaAdmin = DateTime.fromJSDate(agendamento.dataHora)
+      .setZone('Europe/Lisbon')
+      .toFormat('HH:mm');
+
+    const msgAdmin = novoStatus === 'confirmado'
+      ? `✅ *Agendamento Confirmado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* confirmou a sessão das *${dataFormatadaAdmin}* de hoje.`
+      : `❌ *Agendamento Cancelado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* cancelou a sessão das *${dataFormatadaAdmin}* de hoje.`;
+
+    await sendWhatsAppMessage(numeroAdmin, msgAdmin);
+  }
+}
+
+/**
+ * 🤖 Resposta automática simples (SEM IA) — versão assíncrona
+ * Envia mensagem de saudação e notifica Laura
+ * IMPORTANTE: Responde APENAS UMA VEZ, nunca mais interage.
+ * Sem req/res — chamada por processarConfirmacaoAsync após ack 200 ao Evolution.
+ */
+async function delegarParaIAAsync(telefoneNormalizado) {
   try {
     console.log('[Webhook] 📝 Processando mensagem não-confirmação (resposta automática simples)');
 
     if (!telefoneNormalizado) {
-      const remoteJid = req.body.data?.key?.remoteJid || '';
-      const telefone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
-      if (!telefone) {
-        return res.status(400).json({ error: 'Telefone não fornecido' });
-      }
-      telefoneNormalizado = telefone.replace(/[^\d]/g, '');
+      console.warn('[Webhook] ⚠️ delegarParaIAAsync chamado sem telefone — abortando');
+      return;
     }
 
     const telefoneVariants = [
@@ -294,11 +311,7 @@ async function delegarParaIA(req, res, telefoneNormalizado) {
     // Neste caso, NÃO respondemos novamente (Laura vai tratar manualmente)
     if (cliente && cliente.etapaConversa) {
       console.log(`[Webhook] ⏭️ Cliente ${cliente.nome} já recebeu mensagem automática - ignorando`);
-      return res.status(200).json({
-        success: true,
-        tipo: 'ignorado',
-        message: 'Cliente já recebeu resposta automática anteriormente'
-      });
+      return;
     }
 
     // Determina saudação baseada no horário (timezone Europe/Lisbon)
@@ -336,21 +349,8 @@ _La Estética Avançada_`;
       console.log(`[Webhook] 📝 Número desconhecido ${telefoneNormalizado} — mensagem automática enviada, sem criação de registo`);
     }
 
-    return res.status(200).json({
-      success: true,
-      tipo: 'resposta_automatica',
-      saudacao,
-      message: 'Mensagem automática enviada - aguardando Laura'
-    });
-
   } catch (error) {
     console.error('[Webhook] ❌ Erro ao processar resposta automática:', error);
-
-    // Fallback silencioso: apenas loga, não envia nada
-    return res.status(200).json({
-      success: false,
-      tipo: 'erro_silencioso',
-      message: 'Erro processado silenciosamente'
-    });
+    // Fallback silencioso: apenas loga (Sentry capta automaticamente)
   }
 }

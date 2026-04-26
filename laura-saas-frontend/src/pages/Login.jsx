@@ -60,17 +60,18 @@ function Login() {
     };
 
     // Classes dinâmicas para inputs
+    // ring-4 + ring-{cor}-400 garante focus visível sobre card glassmorphism (bg-white/10)
     const getInputClasses = (fieldName) => {
         const state = getInputState(fieldName);
-        const baseClasses = 'w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-gray-500 focus:outline-hidden transition-all';
+        const baseClasses = 'w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-gray-400 focus:outline-hidden transition-all';
 
         switch (state) {
             case 'error':
-                return `${baseClasses} border-red-500/50 focus:ring-2 focus:ring-red-500 focus:border-transparent`;
+                return `${baseClasses} border-red-500/50 focus:ring-4 focus:ring-red-400/60 focus:border-red-400`;
             case 'success':
-                return `${baseClasses} border-green-500/50 focus:ring-2 focus:ring-green-500 focus:border-transparent`;
+                return `${baseClasses} border-green-500/50 focus:ring-4 focus:ring-green-400/60 focus:border-green-400`;
             default:
-                return `${baseClasses} border-white/10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent`;
+                return `${baseClasses} border-white/10 focus:ring-4 focus:ring-indigo-400/60 focus:border-indigo-400`;
         }
     };
 
@@ -83,7 +84,7 @@ function Login() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+        <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
@@ -113,7 +114,7 @@ function Login() {
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         {/* Email */}
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="email" className="block text-sm font-medium text-white mb-2">
                                 Email
                             </label>
                             <div className="relative">
@@ -147,7 +148,7 @@ function Login() {
 
                         {/* Password */}
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
                                 Senha
                             </label>
                             <div className="relative">
@@ -173,7 +174,7 @@ function Login() {
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="text-gray-400 hover:text-white transition-colors p-1"
+                                        className="text-gray-300 hover:text-white transition-colors p-2.5 min-w-11 min-h-11 flex items-center justify-center rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                     >
                                         {showPassword ? (

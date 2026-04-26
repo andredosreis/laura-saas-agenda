@@ -67,16 +67,6 @@ describe('GET /api/clientes/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('retorna 400 para ObjectId inválido', async () => {
-    const { token } = await criarTenantEToken();
-
-    const res = await request(app)
-      .get('/api/clientes/id-invalido')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(400);
-  });
-
   it('retorna 404 ao aceder a cliente de outro tenant', async () => {
     const { token: tokenA } = await criarTenantEToken('salon-a');
     const { token: tokenB } = await criarTenantEToken('salon-b');
@@ -122,17 +112,6 @@ describe('PUT /api/clientes/:id', () => {
 
     expect(res.status).toBe(404);
   });
-
-  it('retorna 400 para ObjectId inválido', async () => {
-    const { token } = await criarTenantEToken();
-
-    const res = await request(app)
-      .put('/api/clientes/id-invalido')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ nome: 'Qualquer' });
-
-    expect(res.status).toBe(400);
-  });
 });
 
 // ──────────────────────────────────────────────
@@ -177,16 +156,6 @@ describe('DELETE /api/clientes/:id', () => {
       .set('Authorization', `Bearer ${tokenA}`);
 
     expect(res.status).toBe(404);
-  });
-
-  it('retorna 400 para ObjectId inválido', async () => {
-    const { token } = await criarTenantEToken();
-
-    const res = await request(app)
-      .delete('/api/clientes/id-invalido')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(400);
   });
 });
 

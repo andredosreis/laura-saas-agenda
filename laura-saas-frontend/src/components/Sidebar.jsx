@@ -88,11 +88,13 @@ function Sidebar() {
   ];
 
   // Estilos de Link
+  // text-slate-300 (não slate-400) garante contraste WCAG AA confortável (~5.5:1) sobre slate-900
   const getLinkClasses = ({ isActive }) => `
     flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm
+    focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
     ${isActive
-      ? 'bg-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/10'
-      : 'text-slate-400 hover:text-white hover:bg-white/5'}
+      ? 'bg-indigo-500/20 text-indigo-300 shadow-lg shadow-indigo-500/10'
+      : 'text-slate-300 hover:text-white hover:bg-white/5'}
   `;
 
   const SidebarContent = () => (
@@ -129,13 +131,15 @@ function Sidebar() {
               {group.label && (
                 <button
                   onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-400 transition-colors uppercase tracking-wider"
+                  aria-label={`${group.label}: ${expandedGroups[group.id] ? 'colapsar grupo' : 'expandir grupo'}`}
+                  aria-expanded={expandedGroups[group.id]}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors uppercase tracking-wider focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-md"
                 >
                   <span>{group.label}</span>
                   {expandedGroups[group.id] ? (
-                    <ChevronUp className="w-4 h-4" />
+                    <ChevronUp className="w-4 h-4" aria-hidden="true" />
                   ) : (
-                    <ChevronDown className="w-4 h-4" />
+                    <ChevronDown className="w-4 h-4" aria-hidden="true" />
                   )}
                 </button>
               )}
@@ -196,9 +200,12 @@ function Sidebar() {
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-slate-900/90 backdrop-blur-lg border border-white/10 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shadow-lg"
+        aria-label={isMobileOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
+        aria-expanded={isMobileOpen}
+        aria-controls="mobile-sidebar"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-slate-900/90 backdrop-blur-lg border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors shadow-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
       >
-        {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        {isMobileOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
       </button>
 
       {/* Desktop Sidebar - Always visible on lg+ */}
@@ -222,6 +229,7 @@ function Sidebar() {
 
             {/* Drawer */}
             <motion.aside
+              id="mobile-sidebar"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}

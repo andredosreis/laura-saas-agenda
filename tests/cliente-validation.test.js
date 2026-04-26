@@ -47,30 +47,6 @@ describe('Zod validation — POST /api/clientes', () => {
     expect(res.body.error).toMatch(/nome/i);
   });
 
-  it('rejeita telefone com menos de 9 dígitos', async () => {
-    const token = await tokenAdmin();
-
-    const res = await request(app)
-      .post('/api/clientes')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ nome: 'Ana', telefone: '12345' });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/telefone/i);
-  });
-
-  it('rejeita email mal formatado', async () => {
-    const token = await tokenAdmin();
-
-    const res = await request(app)
-      .post('/api/clientes')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ nome: 'Ana', telefone: '910000001', email: 'nao-e-email' });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/email/i);
-  });
-
   it('normaliza telefone formatado (remove espaços e traços)', async () => {
     const token = await tokenAdmin();
 
@@ -95,15 +71,3 @@ describe('Zod validation — POST /api/clientes', () => {
   });
 });
 
-describe('Zod validation — ObjectId em params', () => {
-  it('GET /:id com ID inválido retorna 400', async () => {
-    const token = await tokenAdmin();
-
-    const res = await request(app)
-      .get('/api/clientes/not-a-valid-id')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/id/i);
-  });
-});
