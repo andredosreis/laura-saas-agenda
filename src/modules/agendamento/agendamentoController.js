@@ -525,15 +525,14 @@ export const enviarLembreteManual = async (req, res) => {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
-    if (!agendamento.cliente) {
-      return res.status(400).json({ message: "Agendamento sem cliente associado." });
-    }
+    // Suporta agendamentos com cliente registado E avaliações com lead embutido
+    const nome = agendamento.cliente?.nome || agendamento.lead?.nome;
+    const telefone = agendamento.cliente?.telefone || agendamento.lead?.telefone;
 
-    const telefone = agendamento.cliente.telefone;
-    if (!telefone) {
+    if (!nome || !telefone) {
       return res.status(400).json({
-        message: "Cliente não possui telefone cadastrado.",
-        hint: "Cadastre o telefone do cliente para enviar lembretes."
+        message: "Agendamento sem contacto válido para envio.",
+        hint: "Adicione cliente ou lead com telefone para enviar lembretes."
       });
     }
 
@@ -543,7 +542,7 @@ export const enviarLembreteManual = async (req, res) => {
 
     const mensagem = `🔔 *Lembrete de Agendamento*
 
-Olá ${agendamento.cliente.nome}!
+Olá ${nome}!
 
 Você tem um agendamento marcado:
 📅 Data: ${dataFormatada}
@@ -560,21 +559,18 @@ _La Estética Avançada_`;
     const resultado = await sendWhatsAppMessage(telefone, mensagem);
 
     if (resultado.success) {
-      console.log(`[Agendamento] ✅ Lembrete WhatsApp enviado para ${agendamento.cliente.nome} (${telefone})`);
+      console.log(`[Agendamento] ✅ Lembrete WhatsApp enviado para ${nome} (${telefone})`);
       return res.status(200).json({
         success: true,
-        message: `Lembrete enviado via WhatsApp para ${agendamento.cliente.nome}`,
-        cliente: {
-          nome: agendamento.cliente.nome,
-          telefone: agendamento.cliente.telefone,
-        },
+        message: `Lembrete enviado via WhatsApp para ${nome}`,
+        cliente: { nome, telefone },
         agendamento: {
           id: agendamento._id,
           dataHora: agendamento.dataHora,
         },
       });
     } else {
-      console.warn(`[Agendamento] ⚠️ Falha ao enviar WhatsApp para ${agendamento.cliente.nome}`);
+      console.warn(`[Agendamento] ⚠️ Falha ao enviar WhatsApp para ${nome}`);
       return res.status(500).json({
         success: false,
         message: "Falha ao enviar mensagem WhatsApp.",
