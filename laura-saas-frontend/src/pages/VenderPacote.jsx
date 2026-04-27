@@ -41,6 +41,7 @@ function VenderPacote() {
     semValidade: false,
     parcelado: false,
     numeroParcelas: 1,
+    valorEntrada: '', // entrada livre quando parcelado (pode ser 0)
     pagarAgora: true,
     valorPago: 0,
     formaPagamento: 'Dinheiro',
@@ -97,53 +98,51 @@ function VenderPacote() {
   const valorTotal = pacoteSelecionado
     ? (parseFloat(form.valorPersonalizado) > 0 ? parseFloat(form.valorPersonalizado) : pacoteSelecionado.valor)
     : 0;
+  // Entrada (parcelado) — livre, pode ser 0; clamp entre [0, valorTotal]
+  const entradaNum = parseFloat(form.valorEntrada) || 0;
+  const entradaValida = Math.min(Math.max(entradaNum, 0), valorTotal);
+  const valorRestante = Math.max(0, valorTotal - entradaValida);
+  // Valor por parcela: parcelado divide o restante; à vista é o total
   const valorParcela = pacoteSelecionado && form.numeroParcelas > 0
-    ? (valorTotal / form.numeroParcelas).toFixed(2)
+    ? (form.parcelado
+        ? (valorRestante / form.numeroParcelas).toFixed(2)
+        : (valorTotal / form.numeroParcelas).toFixed(2))
     : 0;
   const sessoesRestantes = pacoteSelecionado
     ? pacoteSelecionado.sessoes - (parseInt(form.sessoesJaRealizadas) || 0)
     : 0;
 
   // Handlers
+  // Lógica de pagamento:
+  //  • À VISTA: pagarAgora controla se valorPago = valorTotal ou 0
+  //  • PARCELADO: valorEntrada (livre) controla quanto é pago hoje;
+  //    o restante é dividido pelo número de parcelas escolhido
   const handleChange = (campo, valor) => {
     setForm(prev => {
       const newForm = { ...prev, [campo]: valor };
-      const vTotal = parseFloat(campo === 'valorPersonalizado' ? valor : prev.valorPersonalizado) || pacoteSelecionado?.valor || 0;
 
-      // Se mudar parcelamento, atualizar valor pago
+      // Activar parcelado → resetar entrada e garantir nº parcelas >= 1
       if (campo === 'parcelado') {
-        if (valor && pacoteSelecionado) {
-          // Ao activar parcelado, garantir nº parcelas >= 2 (estado inicial é 1)
-          if (!newForm.numeroParcelas || newForm.numeroParcelas < 2) {
+        if (valor) {
+          newForm.valorEntrada = '';
+          if (!newForm.numeroParcelas || newForm.numeroParcelas < 1) {
             newForm.numeroParcelas = 2;
           }
-          newForm.valorPago = vTotal / newForm.numeroParcelas;
-        } else if (pacoteSelecionado && newForm.pagarAgora) {
-          newForm.numeroParcelas = 1;
-          newForm.valorPago = vTotal;
-        }
-      }
-
-      // Se mudar número de parcelas
-      if (campo === 'numeroParcelas' && pacoteSelecionado && newForm.parcelado) {
-        newForm.valorPago = vTotal / valor;
-      }
-
-      // Se mudar valor personalizado e pagando agora
-      if (campo === 'valorPersonalizado' && pacoteSelecionado && newForm.pagarAgora) {
-        const v = parseFloat(valor) || 0;
-        newForm.valorPago = newForm.parcelado ? v / newForm.numeroParcelas : v;
-      }
-
-      // Se desmarcar pagar agora
-      if (campo === 'pagarAgora' && !valor) {
-        newForm.valorPago = 0;
-      } else if (campo === 'pagarAgora' && valor && pacoteSelecionado) {
-        if (newForm.parcelado) {
-          newForm.valorPago = vTotal / newForm.numeroParcelas;
         } else {
-          newForm.valorPago = vTotal;
+          newForm.numeroParcelas = 1;
+          newForm.valorEntrada = '';
         }
+      }
+
+      // À vista: pagarAgora controla valorPago
+      if (campo === 'pagarAgora' && !newForm.parcelado) {
+        const vTotal = parseFloat(prev.valorPersonalizado) || pacoteSelecionado?.valor || 0;
+        newForm.valorPago = valor ? vTotal : 0;
+      }
+
+      // Mudou valor personalizado em modo à vista com pagarAgora
+      if (campo === 'valorPersonalizado' && pacoteSelecionado && !newForm.parcelado && newForm.pagarAgora) {
+        newForm.valorPago = parseFloat(valor) || 0;
       }
 
       return newForm;
@@ -177,18 +176,26 @@ function VenderPacote() {
 
     setSubmitting(true);
     try {
+      // Backend aceita ambos:
+      //  • valorEntrada (parcelado): entrada livre + restante parcelado por numeroParcelas
+      //  • valorPago (à vista): valor pago hoje (0 ou total)
+      const temEntradaParcelado = form.parcelado && entradaValida > 0;
       const dados = {
         clienteId: form.clienteId,
         pacoteId: form.pacoteId,
         diasValidade: form.semValidade ? null : form.diasValidade,
         parcelado: form.parcelado,
         numeroParcelas: form.parcelado ? form.numeroParcelas : 1,
-        valorPago: form.pagarAgora ? form.valorPago : 0,
-        formaPagamento: form.pagarAgora ? form.formaPagamento : null,
+        formaPagamento: (form.parcelado ? temEntradaParcelado : form.pagarAgora) ? form.formaPagamento : null,
         sessoesUsadas: sessoesJaRealizadasNum,
         valorTotal: valorTotal,
-        dataProximaParcela: form.parcelado && form.dataProximaParcela ? form.dataProximaParcela : null
+        dataProximaParcela: form.parcelado && valorRestante > 0.001 && form.dataProximaParcela ? form.dataProximaParcela : null
       };
+      if (form.parcelado) {
+        dados.valorEntrada = entradaValida;
+      } else {
+        dados.valorPago = form.pagarAgora ? form.valorPago : 0;
+      }
 
       await api.post('/compras-pacotes', dados);
       
@@ -386,101 +393,174 @@ function VenderPacote() {
               <span className={textClass}>Parcelado</span>
             </label>
 
+            {/* PARCELADO — entrada livre + restante dividido por N */}
             {form.parcelado && (
-              <>
-                <div className="mb-4">
-                  <label className={`block text-sm ${subTextClass} mb-1`}>Número de parcelas</label>
+              <div className={`p-4 rounded-xl mb-4 ${isDarkMode ? 'bg-indigo-500/5 border border-indigo-500/20' : 'bg-indigo-50/50 border border-indigo-200'} space-y-4`}>
+                {/* Valor de entrada (livre, pode ser 0) */}
+                <div>
+                  <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                    Valor de entrada (€)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={valorTotal}
+                    value={form.valorEntrada}
+                    onChange={(e) => handleChange('valorEntrada', e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    placeholder="0,00"
+                  />
+                  <p className={`text-xs mt-1 ${subTextClass}`}>
+                    Deixa 0 se o cliente não dá entrada hoje.
+                  </p>
+                </div>
+
+                {/* Parcelas do restante */}
+                <div>
+                  <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                    Parcelas do restante (€{valorRestante.toFixed(2)})
+                  </label>
                   <select
                     value={form.numeroParcelas}
                     onChange={(e) => handleChange('numeroParcelas', parseInt(e.target.value))}
                     className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    disabled={valorRestante <= 0.001}
                   >
                     {[1, 2, 3, 4].map(n => (
                       <option key={n} value={n}>
-                        {n}x de €{(valorTotal / n).toFixed(2)}
-                        {n === 1 ? ' (pagamento único)' : ''}
+                        {n}x de €{(valorRestante / n).toFixed(2)}
+                        {n === 1 ? ' (pagar restante de uma vez)' : ''}
                       </option>
                     ))}
                   </select>
+                  {valorRestante <= 0.001 && (
+                    <p className={`text-xs mt-1 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      ✓ A entrada cobre o total — sem parcelas pendentes.
+                    </p>
+                  )}
                 </div>
 
-                <div className="mb-4">
-                  <label className={`block text-sm ${subTextClass} mb-1`}>
-                    Data prevista da próxima parcela
-                  </label>
-                  <input
-                    type="date"
-                    value={form.dataProximaParcela}
-                    onChange={(e) => handleChange('dataProximaParcela', e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
-                  />
-                  <p className={`text-xs ${subTextClass} mt-1`}>
-                    🔔 Lembrete WhatsApp ao cliente 5 dias antes (opcional).
-                  </p>
-                </div>
-              </>
-            )}
-
-            {/* Pagar agora */}
-            <label className="flex items-center gap-3 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.pagarAgora}
-                onChange={(e) => handleChange('pagarAgora', e.target.checked)}
-                className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <span className={textClass}>
-                {form.parcelado ? 'Registrar pagamento da 1ª parcela' : 'Registrar pagamento à vista'}
-              </span>
-            </label>
-
-            {form.pagarAgora && (
-              <>
-                <div className="mb-4">
-                  <label className={`block text-sm ${subTextClass} mb-1`}>Forma de Pagamento</label>
-                  <select
-                    value={form.formaPagamento}
-                    onChange={(e) => handleChange('formaPagamento', e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
-                  >
-                    {FORMAS_PAGAMENTO.map(forma => (
-                      <option key={forma.value} value={forma.value}>{forma.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {form.formaPagamento === 'MBWay' && (
-                  <div className="mb-4">
-                    <label className={`block text-sm ${subTextClass} mb-1`}>Telefone MBWay</label>
-                    <input
-                      type="tel"
-                      value={form.telefoneMBWay}
-                      onChange={(e) => handleChange('telefoneMBWay', e.target.value)}
+                {/* Forma de pagamento da entrada — só se houver entrada */}
+                {entradaValida > 0 && (
+                  <div>
+                    <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                      Forma de pagamento <span className={`text-xs ${subTextClass}`}>(da entrada)</span>
+                    </label>
+                    <select
+                      value={form.formaPagamento}
+                      onChange={(e) => handleChange('formaPagamento', e.target.value)}
                       className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
-                      placeholder="912345678"
-                      pattern="9[0-9]{8}"
-                    />
+                    >
+                      {FORMAS_PAGAMENTO.map(forma => (
+                        <option key={forma.value} value={forma.value}>{forma.label}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
-                <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'} flex items-center justify-between`}>
-                  <span className={`font-medium ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                    {form.parcelado ? 'Valor da 1ª parcela:' : 'Valor a pagar:'}
-                  </span>
-                  <span className={`text-2xl font-bold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                    €{(form.parcelado ? parseFloat(valorParcela) : valorTotal).toFixed(2)}
-                  </span>
+                {/* Data próxima parcela — só se houver restante */}
+                {valorRestante > 0.001 && (
+                  <div>
+                    <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                      Data prevista da próxima parcela
+                    </label>
+                    <input
+                      type="date"
+                      value={form.dataProximaParcela}
+                      onChange={(e) => handleChange('dataProximaParcela', e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    />
+                    <p className={`text-xs ${subTextClass} mt-1`}>
+                      🔔 Lembrete WhatsApp 5 dias antes (opcional).
+                    </p>
+                  </div>
+                )}
+
+                {/* Breakdown visual */}
+                <div className={`pt-3 border-t ${isDarkMode ? 'border-white/10' : 'border-indigo-200'} space-y-1 text-xs`}>
+                  <div className="flex justify-between">
+                    <span className={subTextClass}>Valor total:</span>
+                    <span className={`font-medium ${textClass}`}>€{valorTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className={subTextClass}>Entrada:</span>
+                    <span className="font-medium text-emerald-500">€{entradaValida.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className={subTextClass}>Restante:</span>
+                    <span className={`font-medium ${textClass}`}>€{valorRestante.toFixed(2)}</span>
+                  </div>
+                  {valorRestante > 0.001 && (
+                    <div className="flex justify-between">
+                      <span className={subTextClass}>{form.numeroParcelas}x de:</span>
+                      <span className="font-bold text-indigo-500">€{parseFloat(valorParcela).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
-              </>
+              </div>
             )}
 
-            {!form.pagarAgora && (
-              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-amber-500/10' : 'bg-amber-50'} flex items-center gap-3`}>
-                <AlertCircle className={`w-5 h-5 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                <span className={`text-sm ${isDarkMode ? 'text-amber-400' : 'text-amber-700'}`}>
-                  O pagamento ficará pendente e poderá ser registrado depois
-                </span>
-              </div>
+            {/* À VISTA — pagarAgora controla se regista pagamento hoje */}
+            {!form.parcelado && (
+              <>
+                <label className="flex items-center gap-3 mb-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.pagarAgora}
+                    onChange={(e) => handleChange('pagarAgora', e.target.checked)}
+                    className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className={textClass}>Registrar pagamento à vista</span>
+                </label>
+
+                {form.pagarAgora && (
+                  <>
+                    <div className="mb-4">
+                      <label className={`block text-sm ${subTextClass} mb-1`}>Forma de Pagamento</label>
+                      <select
+                        value={form.formaPagamento}
+                        onChange={(e) => handleChange('formaPagamento', e.target.value)}
+                        className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                      >
+                        {FORMAS_PAGAMENTO.map(forma => (
+                          <option key={forma.value} value={forma.value}>{forma.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {form.formaPagamento === 'MBWay' && (
+                      <div className="mb-4">
+                        <label className={`block text-sm ${subTextClass} mb-1`}>Telefone MBWay</label>
+                        <input
+                          type="tel"
+                          value={form.telefoneMBWay}
+                          onChange={(e) => handleChange('telefoneMBWay', e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                          placeholder="912345678"
+                          pattern="9[0-9]{8}"
+                        />
+                      </div>
+                    )}
+
+                    <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'} flex items-center justify-between`}>
+                      <span className={`font-medium ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>Valor a pagar:</span>
+                      <span className={`text-2xl font-bold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                        €{valorTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {!form.pagarAgora && (
+                  <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-amber-500/10' : 'bg-amber-50'} flex items-center gap-3`}>
+                    <AlertCircle className={`w-5 h-5 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+                    <span className={`text-sm ${isDarkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                      O pagamento ficará pendente e poderá ser registrado depois
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

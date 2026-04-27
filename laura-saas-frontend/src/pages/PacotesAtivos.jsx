@@ -557,7 +557,7 @@ function PacotesAtivos() {
                       <>
                         <button
                           onClick={() => handleAbrirRegistrarPagamento(compra)}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-sm font-medium"
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white border border-red-500 transition-all text-sm font-semibold shadow-lg shadow-red-500/25"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           Registar Pagamento (€{compra.valorPendente?.toFixed(2)} pendente)
