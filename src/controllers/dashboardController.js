@@ -16,7 +16,7 @@ export const getAgendamentosDeHoje = async (req, res) => {
     })
       .populate('cliente', 'nome')
       .populate('pacote', 'nome')
-      .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
+      .select('dataHora status tipo cliente lead pacote servicoAvulsoNome observacoes')
       .sort({ dataHora: 1 });
 
     res.status(200).json(agendamentos || []);
@@ -59,7 +59,7 @@ export const getAgendamentosAmanha = async (req, res) => {
     })
       .populate('cliente', 'nome')
       .populate('pacote', 'nome')
-      .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
+      .select('dataHora status tipo cliente lead pacote servicoAvulsoNome observacoes')
       .sort({ dataHora: 1 });
 
     res.status(200).json(agendamentos || []);
@@ -143,7 +143,7 @@ export const getProximosAgendamentos = async (req, res) => {
     const agendamentos = await Agendamento.find({ tenantId, dataHora: { $gt: agora } })
       .populate('cliente', 'nome')
       .populate('pacote', 'nome')
-      .select('dataHora status cliente pacote servicoAvulsoNome observacoes')
+      .select('dataHora status tipo cliente lead pacote servicoAvulsoNome observacoes')
       .sort({ dataHora: 1 })
       .limit(limit);
 

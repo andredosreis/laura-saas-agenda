@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DateTime } from 'luxon';
 import { toast } from 'react-toastify';
 import {
@@ -25,13 +25,16 @@ import api from '../services/api';
 
 function PacotesAtivos() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isDarkMode } = useTheme();
-  
+
   // Estados
   const [comprasPacotes, setComprasPacotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('Ativo');
   const [alertas, setAlertas] = useState({ expirando: [], poucasSessoes: [] });
+  const [highlightedId, setHighlightedId] = useState(null);
+  const cardRefs = useRef({});
   
   // Modais
   const [showHistorico, setShowHistorico] = useState(false);
@@ -43,17 +46,26 @@ function PacotesAtivos() {
   const [motivoExtensao, setMotivoExtensao] = useState('');
   const [estendendoPrazo, setEstendendoPrazo] = useState(false);
 
-  // Estados do modal Editar
+  // Estados do modal Editar (só correcção de erros — pagamentos têm modal próprio)
   const [showEditar, setShowEditar] = useState(false);
   const [pacoteEditando, setPacoteEditando] = useState(null);
   const [editForm, setEditForm] = useState({
     valorTotal: '',
-    parcelado: false,
-    numeroParcelas: 2,
-    valorEntrada: '',
-    sessoesUsadas: 0
+    sessoesUsadas: 0,
+    observacoes: ''
   });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  // Estados do modal Registar Pagamento
+  const [showRegistrarPagamento, setShowRegistrarPagamento] = useState(false);
+  const [pacotePagamento, setPacotePagamento] = useState(null);
+  const [pagamentoForm, setPagamentoForm] = useState({
+    valor: '',
+    formaPagamento: 'Dinheiro',
+    dataPagamento: DateTime.now().setZone('Europe/Lisbon').toFormat('yyyy-MM-dd'),
+    observacoes: ''
+  });
+  const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
   // Buscar compras de pacotes
   const fetchComprasPacotes = useCallback(async () => {
@@ -82,6 +94,44 @@ function PacotesAtivos() {
     fetchComprasPacotes();
   }, [fetchComprasPacotes]);
 
+  // Scroll + highlight quando a página é aberta com ?id=... (atalho vindo de Transações).
+  // Se a venda existe na lista actual, faz scroll suave + ring temporário 3s.
+  // Se não existe (filtro de status diferente), faz fallback para "todos" e tenta novamente.
+  useEffect(() => {
+    if (loading) return;
+    const idParam = searchParams.get('id');
+    if (!idParam) return;
+
+    const existeNaLista = comprasPacotes.some(c => c._id === idParam);
+
+    if (!existeNaLista) {
+      // Pacote pode estar fora do filtro actual (ex: Concluído, Cancelado) — alarga para todos
+      if (filtroStatus !== '') {
+        setFiltroStatus('');
+      }
+      return;
+    }
+
+    setHighlightedId(idParam);
+    // Aguardar paint para garantir que o ref está montado
+    requestAnimationFrame(() => {
+      const node = cardRefs.current[idParam];
+      if (node) {
+        node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+
+    const timer = setTimeout(() => {
+      setHighlightedId(null);
+      // Limpar query param para não voltar a destacar em re-renders
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('id');
+      setSearchParams(newParams, { replace: true });
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [loading, comprasPacotes, searchParams, setSearchParams, filtroStatus]);
+
   // Handlers
   const handleVerHistorico = (pacote) => {
     setPacoteSelecionado(pacote);
@@ -99,10 +149,8 @@ function PacotesAtivos() {
     setPacoteEditando(pacote);
     setEditForm({
       valorTotal: pacote.valorTotal?.toString() || '',
-      parcelado: !!pacote.parcelado,
-      numeroParcelas: Math.min(4, Math.max(2, pacote.numeroParcelas || 2)),
-      valorEntrada: pacote.valorPago?.toString() || '',
-      sessoesUsadas: pacote.sessoesUsadas || 0
+      sessoesUsadas: pacote.sessoesUsadas || 0,
+      observacoes: pacote.observacoes || ''
     });
     setShowEditar(true);
   };
@@ -118,14 +166,9 @@ function PacotesAtivos() {
 
     const payload = {
       valorTotal: valorTotalNum,
-      parcelado: editForm.parcelado,
-      numeroParcelas: editForm.parcelado ? editForm.numeroParcelas : 1,
       sessoesUsadas: parseInt(editForm.sessoesUsadas) || 0,
+      observacoes: editForm.observacoes || ''
     };
-
-    if (editForm.parcelado) {
-      payload.valorEntrada = parseFloat(editForm.valorEntrada) || 0;
-    }
 
     setSalvandoEdicao(true);
     try {
@@ -139,6 +182,54 @@ function PacotesAtivos() {
       toast.error(error.response?.data?.message || 'Erro ao editar venda');
     } finally {
       setSalvandoEdicao(false);
+    }
+  };
+
+  // Registar pagamento de parcela (não confundir com edição estrutural)
+  const handleAbrirRegistrarPagamento = (pacote) => {
+    const sugestao = pacote.valorParcela > 0 && pacote.valorPendente > 0
+      ? Math.min(pacote.valorParcela, pacote.valorPendente)
+      : pacote.valorPendente || 0;
+    setPacotePagamento(pacote);
+    setPagamentoForm({
+      valor: sugestao > 0 ? sugestao.toFixed(2) : '',
+      formaPagamento: 'Dinheiro',
+      dataPagamento: DateTime.now().setZone('Europe/Lisbon').toFormat('yyyy-MM-dd'),
+      observacoes: ''
+    });
+    setShowRegistrarPagamento(true);
+  };
+
+  const handleSalvarPagamento = async () => {
+    if (!pacotePagamento) return;
+
+    const valorNum = parseFloat(pagamentoForm.valor);
+    if (!valorNum || valorNum <= 0) {
+      toast.error('Valor inválido');
+      return;
+    }
+    if (valorNum > (pacotePagamento.valorPendente || 0) + 0.001) {
+      toast.error(`Valor máximo: €${pacotePagamento.valorPendente?.toFixed(2)}`);
+      return;
+    }
+
+    setSalvandoPagamento(true);
+    try {
+      await api.post(`/compras-pacotes/${pacotePagamento._id}/registrar-pagamento`, {
+        valor: valorNum,
+        formaPagamento: pagamentoForm.formaPagamento,
+        dataPagamento: pagamentoForm.dataPagamento,
+        observacoes: pagamentoForm.observacoes || ''
+      });
+      toast.success('Pagamento registado!');
+      setShowRegistrarPagamento(false);
+      setPacotePagamento(null);
+      fetchComprasPacotes();
+    } catch (error) {
+      console.error('Erro ao registar pagamento:', error);
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao registar pagamento');
+    } finally {
+      setSalvandoPagamento(false);
     }
   };
 
@@ -219,6 +310,7 @@ function PacotesAtivos() {
               onChange={(e) => setFiltroStatus(e.target.value)}
               className={`px-4 py-2 rounded-xl border ${inputClass}`}
             >
+              <option value="">Todos</option>
               <option value="Ativo">Ativos</option>
               <option value="Concluído">Concluídos</option>
               <option value="Expirado">Expirados</option>
@@ -346,10 +438,15 @@ function PacotesAtivos() {
               const isPoucasSessoes = compra.sessoesRestantes <= 2;
               
               return (
-                <div 
-                  key={compra._id} 
-                  className={`${cardClass} rounded-2xl p-5 ${
-                    isExpirando || isPoucasSessoes ? 'ring-2 ring-amber-500/50' : ''
+                <div
+                  key={compra._id}
+                  ref={(el) => { cardRefs.current[compra._id] = el; }}
+                  className={`${cardClass} rounded-2xl p-5 transition-all duration-500 ${
+                    highlightedId === compra._id
+                      ? 'ring-4 ring-indigo-500 shadow-2xl shadow-indigo-500/30 scale-[1.02]'
+                      : isExpirando || isPoucasSessoes
+                      ? 'ring-2 ring-amber-500/50'
+                      : ''
                   }`}
                 >
                   {/* Cliente e Pacote */}
@@ -455,6 +552,22 @@ function PacotesAtivos() {
                         <CalendarPlus className="w-4 h-4" />
                         Agendar Sessão
                       </button>
+                    )}
+                    {compra.status !== 'Cancelado' && compra.valorPendente > 0 && (
+                      <>
+                        <button
+                          onClick={() => handleAbrirRegistrarPagamento(compra)}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white border border-red-500 transition-all text-sm font-semibold shadow-lg shadow-red-500/25"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Registar Pagamento (€{compra.valorPendente?.toFixed(2)} pendente)
+                        </button>
+                        {compra.dataProximaParcela && (
+                          <p className={`text-xs ${subTextClass} text-center`}>
+                            🔔 Próxima parcela: {DateTime.fromISO(compra.dataProximaParcela).setZone('Europe/Lisbon').toFormat('dd/MM/yyyy')}
+                          </p>
+                        )}
+                      </>
                     )}
                     <div className="flex gap-2">
                       <button
@@ -676,8 +789,14 @@ function PacotesAtivos() {
                 <span className={subTextClass}>Já pago:</span>
                 <span className="font-medium text-emerald-500">€{(pacoteEditando.valorPago || 0).toFixed(2)}</span>
               </div>
-              <p className={`text-xs ${subTextClass} mt-1`}>
-                Pagamentos registados mantêm-se. Editar só altera valores e parcelas.
+              <div className="flex justify-between mt-1">
+                <span className={subTextClass}>Pendente:</span>
+                <span className={`font-medium ${pacoteEditando.valorPendente > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  €{(pacoteEditando.valorPendente || 0).toFixed(2)}
+                </span>
+              </div>
+              <p className={`text-xs mt-2 ${isDarkMode ? 'text-amber-300' : 'text-amber-600'}`}>
+                ⓘ Este ecrã serve apenas para corrigir erros de registo (valor total, sessões). Para registar um pagamento de parcela, fecha este modal e usa o botão <strong>Registar Pagamento</strong> na lista.
               </p>
             </div>
 
@@ -712,55 +831,17 @@ function PacotesAtivos() {
                 </p>
               </div>
 
-              {/* Parcelado */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editForm.parcelado}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, parcelado: e.target.checked }))}
-                  className="w-5 h-5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              {/* Observações */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Observações</label>
+                <textarea
+                  rows={3}
+                  value={editForm.observacoes}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, observacoes: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="Notas internas..."
                 />
-                <span className={textClass}>Parcelado</span>
-              </label>
-
-              {editForm.parcelado && (
-                <div className={`space-y-3 p-3 rounded-xl ${isDarkMode ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                  <div>
-                    <label className={`block text-sm ${subTextClass} mb-1`}>Valor de entrada (€)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={parseFloat(editForm.valorTotal) || 0}
-                      value={editForm.valorEntrada}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, valorEntrada: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`block text-sm ${subTextClass} mb-1`}>Número de parcelas</label>
-                    <select
-                      value={editForm.numeroParcelas}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, numeroParcelas: parseInt(e.target.value) }))}
-                      className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
-                    >
-                      {[1, 2, 3, 4].map(n => {
-                        const total = parseFloat(editForm.valorTotal) || 0;
-                        const entrada = parseFloat(editForm.valorEntrada) || 0;
-                        const restante = Math.max(0, total - entrada);
-                        return (
-                          <option key={n} value={n}>
-                            {n}x de €{(restante / n).toFixed(2)}
-                            {n === 1 ? ' (restante de uma vez)' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -782,6 +863,154 @@ function PacotesAtivos() {
                   </>
                 ) : (
                   'Salvar Alterações'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registar Pagamento de Parcela */}
+      {showRegistrarPagamento && pacotePagamento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`${cardClass} rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${textClass}`}>💰 Registar Pagamento</h2>
+              <button
+                onClick={() => { setShowRegistrarPagamento(false); setPacotePagamento(null); }}
+                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+              >
+                <X className={`w-5 h-5 ${subTextClass}`} />
+              </button>
+            </div>
+
+            {/* Resumo */}
+            <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-gray-100'} mb-4 text-sm`}>
+              <p className={`font-medium ${textClass}`}>{pacotePagamento.cliente?.nome}</p>
+              <p className={subTextClass}>{pacotePagamento.pacote?.nome}</p>
+              <div className={`h-px ${isDarkMode ? 'bg-white/10' : 'bg-gray-200'} my-2`} />
+              <div className="flex justify-between">
+                <span className={subTextClass}>Já pago:</span>
+                <span className="font-medium text-emerald-500">€{(pacotePagamento.valorPago || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className={subTextClass}>Pendente:</span>
+                <span className="font-medium text-amber-500">€{(pacotePagamento.valorPendente || 0).toFixed(2)}</span>
+              </div>
+              {pacotePagamento.parcelado && (
+                <div className="flex justify-between mt-1">
+                  <span className={subTextClass}>Parcelas:</span>
+                  <span className={`font-medium ${textClass}`}>
+                    {pacotePagamento.parcelasPagas || 0} de {pacotePagamento.numeroParcelas} pagas
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {/* Valor */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                  Valor recebido (€) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={pacotePagamento.valorPendente}
+                  value={pagamentoForm.valor}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, valor: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="0.00"
+                  autoFocus
+                />
+                {pacotePagamento.valorParcela > 0 && (
+                  <p className={`text-xs ${subTextClass} mt-1`}>
+                    Parcela sugerida: €{pacotePagamento.valorParcela.toFixed(2)}
+                  </p>
+                )}
+              </div>
+
+              {/* Forma de pagamento */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                  Forma de pagamento *
+                </label>
+                <select
+                  value={pagamentoForm.formaPagamento}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, formaPagamento: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                >
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="MBWay">MBWay</option>
+                  <option value="Multibanco">Multibanco</option>
+                  <option value="Cartão">Cartão</option>
+                  <option value="Transferência">Transferência</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+
+              {/* Data */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                  Data do pagamento
+                </label>
+                <input
+                  type="date"
+                  value={pagamentoForm.dataPagamento}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, dataPagamento: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                />
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>
+                  Observações
+                </label>
+                <input
+                  type="text"
+                  value={pagamentoForm.observacoes}
+                  onChange={(e) => setPagamentoForm(prev => ({ ...prev, observacoes: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  placeholder="Ex: 2ª parcela"
+                />
+              </div>
+
+              {/* Atalho: pagar tudo */}
+              {pacotePagamento.valorPendente > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPagamentoForm(prev => ({ ...prev, valor: pacotePagamento.valorPendente.toFixed(2) }))}
+                  className={`w-full text-sm py-2 rounded-xl border ${isDarkMode ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10' : 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-50'} transition-colors`}
+                >
+                  Pagar restante (€{pacotePagamento.valorPendente.toFixed(2)})
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowRegistrarPagamento(false); setPacotePagamento(null); }}
+                className={`flex-1 px-4 py-3 rounded-xl border ${cardClass} ${textClass} hover:opacity-80 transition-all`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSalvarPagamento}
+                disabled={salvandoPagamento || !pagamentoForm.valor}
+                className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-emerald-500 to-emerald-600 text-white font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {salvandoPagamento ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    A registar...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Registar
+                  </>
                 )}
               </button>
             </div>

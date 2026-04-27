@@ -549,9 +549,12 @@ export const pagarComissao = async (req, res) => {
 
 // @desc    Deletar transação permanentemente
 // @route   DELETE /api/transacoes/:id/deletar
+// Endpoint restricto a admin/superadmin (ver authorize na rota).
+// Para transações de Pacote: cascade — apaga Pagamentos + CompraPacote + Transacao.
+// Para outras: bloqueia se tiver Pagamentos (preserva integridade contabilística).
 export const deletarTransacao = async (req, res) => {
   try {
-    const { Transacao, Pagamento } = req.models;
+    const { Transacao, Pagamento, CompraPacote } = req.models;
     const { id } = req.params;
 
     const transacao = await Transacao.findOne({ _id: id, tenantId: req.tenantId });
@@ -564,9 +567,33 @@ export const deletarTransacao = async (req, res) => {
       });
     }
 
-    const pagamentos = await Pagamento.countDocuments({ transacao: id, tenantId: req.tenantId });
+    const pagamentosCount = await Pagamento.countDocuments({ transacao: id, tenantId: req.tenantId });
 
-    if (pagamentos > 0) {
+    // Cascade para vendas de Pacote (admin pode limpar dados legados/órfãos)
+    if (transacao.categoria === 'Pacote' || transacao.compraPacote) {
+      let pagamentosDeletados = 0;
+      let compraPacoteDeletada = false;
+
+      if (pagamentosCount > 0) {
+        const r = await Pagamento.deleteMany({ transacao: id, tenantId: req.tenantId });
+        pagamentosDeletados = r.deletedCount || 0;
+      }
+      if (transacao.compraPacote) {
+        const r = await CompraPacote.deleteOne({ _id: transacao.compraPacote, tenantId: req.tenantId });
+        compraPacoteDeletada = (r.deletedCount || 0) > 0;
+      }
+      await Transacao.deleteOne({ _id: id, tenantId: req.tenantId });
+
+      return res.status(200).json({
+        message: 'Transação e registos relacionados deletados com sucesso',
+        deletedId: id,
+        pagamentosDeletados,
+        compraPacoteDeletada
+      });
+    }
+
+    // Não-Pacote com pagamentos — preserva contabilidade
+    if (pagamentosCount > 0) {
       return res.status(400).json({
         message: 'Não é possível deletar transação com pagamentos registrados. Cancele a transação.'
       });

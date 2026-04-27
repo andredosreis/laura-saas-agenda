@@ -98,15 +98,21 @@ export const deletarPagamentoSchema = z
 
 export const venderPacoteSchema = z
   .object({
-    cliente: objectId,
-    pacote: objectId,
+    clienteId: objectId,
+    pacoteId: objectId,
     valorTotal: dinheiroPositivo.optional(),
     desconto: dinheiro.optional(),
-    formaPagamento: formaPagamento.optional(),
+    formaPagamento: formaPagamento.optional().nullable(),
     observacoes: z.string().trim().max(1000).optional(),
     dataCompra: z.coerce.date().optional(),
-  })
-  .strict();
+    diasValidade: z.number().int().positive().optional().nullable(),
+    sessoesUsadas: z.number().int().min(0).optional(),
+    parcelado: z.boolean().optional(),
+    numeroParcelas: z.number().int().min(1).max(48).optional(),
+    valorEntrada: dinheiro.optional().nullable(),
+    valorPago: dinheiro.optional().nullable(),
+    dataProximaParcela: z.coerce.date().optional().nullable(),
+  });
 
 export const editarVendaPacoteSchema = z
   .object({
@@ -114,8 +120,18 @@ export const editarVendaPacoteSchema = z
     desconto: dinheiro.optional(),
     observacoes: z.string().trim().max(1000).optional(),
     formaPagamento: formaPagamento.optional(),
-  })
-  .strict();
+    sessoesUsadas: z.number().int().min(0).optional(),
+    diasValidade: z.number().int().positive().optional().nullable(),
+  });
+
+export const registrarPagamentoParcelaSchema = z
+  .object({
+    valor: dinheiroPositivo,
+    formaPagamento,
+    dataPagamento: z.coerce.date().optional(),
+    observacoes: z.string().trim().max(1000).optional(),
+    dataProximaParcela: z.coerce.date().optional().nullable(),
+  });
 
 export const estenderPrazoSchema = z
   .object({

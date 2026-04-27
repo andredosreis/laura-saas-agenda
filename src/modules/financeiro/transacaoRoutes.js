@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../../middlewares/auth.js';
+import { authenticate, authorize } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
   criarTransacao,
@@ -34,7 +34,7 @@ router.get('/relatorio/periodo', relatorioPorPeriodo);
 router.get('/comissoes/pendentes', comissoesPendentes);
 router.get('/:id', validate(idParamSchema, 'params'), buscarTransacao);
 router.put('/:id', validate(idParamSchema, 'params'), validate(atualizarTransacaoSchema), atualizarTransacao);
-router.delete('/:id', validate(idParamSchema, 'params'), deletarTransacao);
+router.delete('/:id', authorize('admin', 'superadmin'), validate(idParamSchema, 'params'), deletarTransacao);
 router.put('/:id/cancelar', validate(idParamSchema, 'params'), validate(cancelarTransacaoSchema), cancelarTransacao);
 
 router.post('/:id/pagamento',

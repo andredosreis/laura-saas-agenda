@@ -73,8 +73,10 @@ function CriarAgendamento() {
     async function fetchClientes() {
       setIsLoadingData(true);
       try {
-        const res = await api.get('/clientes');
-        setClientes(res.data?.data || []);
+        const res = await api.get('/clientes?limit=100');
+        const lista = (res.data?.data || []).slice()
+          .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' }));
+        setClientes(lista);
       } catch {
         toast.error('Erro ao carregar clientes');
       } finally {
