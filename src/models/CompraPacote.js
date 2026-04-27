@@ -77,6 +77,19 @@ const compraPacoteSchema = new mongoose.Schema({
     min: 0
   },
 
+  // Data prevista para o próximo pagamento (set pelo utilizador ao registar parcela)
+  // Usada pelo CRON de lembretes WhatsApp (5 dias antes do vencimento).
+  dataProximaParcela: {
+    type: Date,
+    default: null
+  },
+  // Timestamp do último lembrete enviado — evita envios duplicados quando o CRON corre
+  // várias vezes por dia ou quando o utilizador altera dataProximaParcela.
+  lembreteParcelaEnviadoEm: {
+    type: Date,
+    default: null
+  },
+
   // Status e Datas
   status: {
     type: String,
@@ -160,6 +173,8 @@ compraPacoteSchema.index({ tenantId: 1, status: 1 });
 compraPacoteSchema.index({ tenantId: 1, cliente: 1, status: 1 });
 compraPacoteSchema.index({ dataExpiracao: 1 });
 compraPacoteSchema.index({ tenantId: 1, dataExpiracao: 1, status: 1 });
+// Índice para CRON de lembretes — query: { dataProximaParcela: { $gte, $lt }, status: 'Ativo' }
+compraPacoteSchema.index({ dataProximaParcela: 1, status: 1 });
 
 // Middleware: Calcular campos derivados antes de salvar
 compraPacoteSchema.pre('save', function() {

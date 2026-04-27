@@ -12,7 +12,8 @@ import {
   alertasPacotes,
   estatisticasPacotes,
   deletarPacote,
-  editarVenda
+  editarVenda,
+  registrarPagamentoParcela
 } from './compraPacoteController.js';
 import {
   venderPacoteSchema,
@@ -21,6 +22,7 @@ import {
   cancelarPacoteSchema,
   idParamSchema,
   clienteIdParamSchema,
+  registrarPagamentoParcelaSchema,
 } from './financeiroSchemas.js';
 
 const router = express.Router();
@@ -39,6 +41,7 @@ router.get('/cliente/:clienteId', validate(clienteIdParamSchema, 'params'), paco
 router.get('/:id', validate(idParamSchema, 'params'), buscarCompraPacote);
 
 router.put('/:id', validate(idParamSchema, 'params'), validate(editarVendaPacoteSchema), editarVenda);
+router.post('/:id/registrar-pagamento', validate(idParamSchema, 'params'), validate(registrarPagamentoParcelaSchema), registrarPagamentoParcela);
 router.put('/:id/estender-prazo', validate(idParamSchema, 'params'), validate(estenderPrazoSchema), estenderPrazo);
 router.put('/:id/cancelar', validate(idParamSchema, 'params'), validate(cancelarPacoteSchema), cancelarPacote);
 router.delete('/:id', validate(idParamSchema, 'params'), deletarPacote);

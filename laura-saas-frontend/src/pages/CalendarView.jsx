@@ -37,9 +37,11 @@ const STATUS_COLORS = {
 };
 
 // Business hours config
+// Janela visual do calendário: 06:00 → 23:59 para acomodar horários alargados.
+// Para o highlight de "fora de hora" e shading, usa-se uma janela de horário comercial mais estreita.
 const BUSINESS_HOURS = {
-    start: '09:00',
-    end: '19:00',
+    start: '06:00',
+    end: '23:59',
     daysOfWeek: [1, 2, 3, 4, 5, 6] // Monday to Saturday
 };
 
@@ -167,8 +169,9 @@ function CalendarView() {
         const minute = dt.minute;
         const dayOfWeek = dt.weekday; // 1=Monday, 7=Sunday
 
-        const startHour = parseInt(BUSINESS_HOURS.start.split(':')[0]);
-        const endHour = parseInt(BUSINESS_HOURS.end.split(':')[0]);
+        // Parse HH:mm — suporta minutos (ex: 23:59) para janelas alargadas
+        const [startHour, startMin = 0] = BUSINESS_HOURS.start.split(':').map(Number);
+        const [endHour, endMin = 0] = BUSINESS_HOURS.end.split(':').map(Number);
 
         // Check if it's a working day
         if (!BUSINESS_HOURS.daysOfWeek.includes(dayOfWeek)) {
@@ -177,8 +180,8 @@ function CalendarView() {
 
         // Check if within working hours
         const timeInMinutes = hour * 60 + minute;
-        const startInMinutes = startHour * 60;
-        const endInMinutes = endHour * 60;
+        const startInMinutes = startHour * 60 + startMin;
+        const endInMinutes = endHour * 60 + endMin;
 
         return timeInMinutes >= startInMinutes && timeInMinutes < endInMinutes;
     }, []);

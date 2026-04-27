@@ -15,7 +15,8 @@ export const venderPacote = async (req, res) => {
       valorPago,
       formaPagamento,
       sessoesUsadas = 0,
-      valorTotal: valorTotalCustom
+      valorTotal: valorTotalCustom,
+      dataProximaParcela
     } = req.body;
 
     if (!clienteId || !pacoteId) {
@@ -65,6 +66,10 @@ export const venderPacote = async (req, res) => {
       parcelasPagas: (parcelado && temEntrada) ? 0 : (valorPagoFinal > 0 ? 1 : 0),
       valorParcela: valorParcelaCalc,
       diasValidade: diasValidade || null,
+      // dataProximaParcela só faz sentido se há saldo pendente após este registo
+      dataProximaParcela: (parcelado && (valorTotal - valorPagoFinal) > 0.001 && dataProximaParcela)
+        ? new Date(dataProximaParcela)
+        : null,
       dataCompra: new Date()
     });
 
@@ -526,22 +531,154 @@ export const editarVenda = async (req, res) => {
   }
 };
 
-// @desc    Deletar compra de pacote
+// @desc    Registar pagamento de parcela de uma compra de pacote
+// @route   POST /api/compras-pacotes/:id/registrar-pagamento
+// @body    { valor, formaPagamento, dataPagamento?, observacoes? }
+//
+// Único ponto de entrada para registar pagamento de uma venda parcelada.
+// Cria Pagamento + actualiza Transacao + actualiza CompraPacote (valorPago,
+// valorPendente, parcelasPagas, statusPagamento). Falha se valor exceder valorPendente.
+export const registrarPagamentoParcela = async (req, res) => {
+  try {
+    const { CompraPacote, Transacao, Pagamento } = req.models;
+    const { id } = req.params;
+    const { valor, formaPagamento, dataPagamento, observacoes, dataProximaParcela } = req.body;
+
+    const valorNum = parseFloat(valor);
+    if (!valorNum || valorNum <= 0) {
+      return res.status(400).json({ message: 'Valor deve ser maior que zero' });
+    }
+    if (!formaPagamento) {
+      return res.status(400).json({ message: 'Forma de pagamento é obrigatória' });
+    }
+
+    const compraPacote = await CompraPacote.findOne({ _id: id, tenantId: req.tenantId });
+    if (!compraPacote) {
+      return res.status(404).json({ message: 'Compra de pacote não encontrada' });
+    }
+    if (compraPacote.status === 'Cancelado') {
+      return res.status(400).json({ message: 'Não é possível registar pagamento em pacote cancelado' });
+    }
+
+    const valorPendenteAtual = Math.max(0, compraPacote.valorTotal - compraPacote.valorPago);
+    if (valorNum > valorPendenteAtual + 0.001) {
+      return res.status(400).json({
+        message: `Valor (${valorNum.toFixed(2)}) excede pendente (${valorPendenteAtual.toFixed(2)})`
+      });
+    }
+
+    const transacao = await Transacao.findOne({ compraPacote: id, tenantId: req.tenantId });
+    if (!transacao) {
+      return res.status(404).json({ message: 'Transação associada não encontrada' });
+    }
+
+    const dataPag = dataPagamento ? new Date(dataPagamento) : new Date();
+
+    // 1. Criar Pagamento
+    const pagamento = await Pagamento.create({
+      tenantId: req.tenantId,
+      transacao: transacao._id,
+      valor: valorNum,
+      formaPagamento,
+      dataPagamento: dataPag,
+      observacoes: observacoes || `Parcela ${(compraPacote.parcelasPagas || 0) + 1}`
+    });
+
+    // 2. Actualizar CompraPacote — usa método do schema (recalcula parcelasPagas, valorPendente)
+    //    Após esta chamada, compraPacote.valorPago é a fonte de verdade.
+    await compraPacote.registrarPagamento(valorNum);
+
+    // Actualizar data prevista da próxima parcela (e resetar lembrete enviado para a nova data)
+    const totalmentePagoApos = compraPacote.valorPago >= compraPacote.valorTotal - 0.001;
+    if (totalmentePagoApos) {
+      // Pagou tudo — limpar a próxima parcela e o lembrete
+      compraPacote.dataProximaParcela = null;
+      compraPacote.lembreteParcelaEnviadoEm = null;
+    } else if (dataProximaParcela !== undefined) {
+      // Utilizador definiu nova data (pode ser null para limpar)
+      const novaData = dataProximaParcela ? new Date(dataProximaParcela) : null;
+      const mudou = String(compraPacote.dataProximaParcela) !== String(novaData);
+      compraPacote.dataProximaParcela = novaData;
+      if (mudou) compraPacote.lembreteParcelaEnviadoEm = null;
+    }
+    await compraPacote.save();
+
+    // 3. Sincronizar Transacao baseado em CompraPacote.valorPago (Transacao não tem campo valorPago)
+    const totalmentePago = compraPacote.valorPago >= compraPacote.valorTotal - 0.001;
+    transacao.statusPagamento = totalmentePago
+      ? 'Pago'
+      : (compraPacote.valorPago > 0 ? 'Parcial' : 'Pendente');
+    if (transacao.parcelado) {
+      transacao.parcelasPagas = compraPacote.parcelasPagas || 0;
+    }
+    if (totalmentePago && !transacao.dataPagamento) {
+      transacao.dataPagamento = dataPag;
+    }
+    transacao.formaPagamento = formaPagamento;
+    await transacao.save();
+
+    await compraPacote.populate([
+      { path: 'cliente', select: 'nome telefone email' },
+      { path: 'pacote' }
+    ]);
+
+    res.status(201).json({
+      message: 'Pagamento registado com sucesso',
+      pagamento,
+      compraPacote,
+      transacao
+    });
+
+  } catch (error) {
+    console.error('Erro ao registar pagamento:', error);
+    res.status(500).json({ message: 'Erro ao registar pagamento', details: error.message });
+  }
+};
+
+// @desc    Deletar compra de pacote (e tudo o que está ligado)
 // @route   DELETE /api/compras-pacotes/:id
+//
+// Cascade delete: CompraPacote → Transacao(es) → Pagamento(s) ligados.
+// Sem isto, a Transacao ficaria órfã na lista de Transações.
 export const deletarPacote = async (req, res) => {
   try {
-    const { CompraPacote } = req.models;
+    const { CompraPacote, Transacao, Pagamento } = req.models;
     const { id } = req.params;
 
     const compraPacote = await CompraPacote.findOne({ _id: id, tenantId: req.tenantId });
-
     if (!compraPacote) {
       return res.status(404).json({ message: 'Pacote não encontrado' });
     }
 
+    // 1. Encontrar todas as Transações ligadas a esta compra
+    const transacoes = await Transacao.find({ compraPacote: id, tenantId: req.tenantId }).select('_id');
+    const transacaoIds = transacoes.map(t => t._id);
+
+    // 2. Apagar todos os Pagamentos das transações encontradas
+    let pagamentosDeletados = 0;
+    if (transacaoIds.length > 0) {
+      const resPag = await Pagamento.deleteMany({
+        tenantId: req.tenantId,
+        transacao: { $in: transacaoIds }
+      });
+      pagamentosDeletados = resPag.deletedCount || 0;
+    }
+
+    // 3. Apagar as Transações
+    const resTrans = await Transacao.deleteMany({
+      tenantId: req.tenantId,
+      compraPacote: id
+    });
+
+    // 4. Apagar a CompraPacote
     await CompraPacote.deleteOne({ _id: id, tenantId: req.tenantId });
 
-    res.status(200).json({ message: 'Pacote deletado com sucesso', deletedId: id });
+    res.status(200).json({
+      message: 'Pacote e registos relacionados deletados com sucesso',
+      deletedId: id,
+      pagamentosDeletados,
+      transacoesDeletadas: resTrans.deletedCount || 0
+    });
 
   } catch (error) {
     console.error('Erro ao deletar pacote:', error);

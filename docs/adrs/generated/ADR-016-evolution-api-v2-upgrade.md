@@ -260,7 +260,7 @@ Se falhar em qualquer fase pós-deploy:
 - [x] Grep `textMessage` em `src/` — deve voltar sem matches (excepto comentários)
 - [ ] Teste manual de envio: forçar lembrete via rota admin → mensagem chega ao telemóvel teste
 - [ ] Teste manual de recepção: responder "SIM" → logs mostram telefone correcto (sem `@lid`)
-- [ ] `agendamento.confirmacao.tipo === 'confirmado'` no MongoDB
+- [x] `agendamento.confirmacao.tipo === 'confirmado'` no MongoDB — resolvido em [ADR-019](./ADR-019-webhook-confirmacao-markmodified-polling.md) (markModified + palavras SIM/NÃO expandidas)
 - [ ] Admin recebe notificação WhatsApp
 
 ## Fase 5 — Deploy Render + Validação Produção

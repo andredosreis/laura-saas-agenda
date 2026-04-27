@@ -53,7 +53,7 @@ export const listarHistoricosAtendimento = async (req, res) => {
   try {
     const { HistoricoAtendimento } = req.models;
     const {
-      cliente, profissional, status, dataInicio, dataFim,
+      cliente, profissional, agendamento, status, dataInicio, dataFim,
       page = 1, limit = 20, sortBy = 'dataAtendimento', order = 'desc'
     } = req.query;
 
@@ -61,6 +61,7 @@ export const listarHistoricosAtendimento = async (req, res) => {
 
     if (cliente) query.cliente = cliente;
     if (profissional) query.profissional = profissional;
+    if (agendamento) query.agendamento = agendamento;
     if (status) query.status = status;
 
     if (dataInicio || dataFim) {

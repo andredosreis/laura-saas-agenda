@@ -18,7 +18,8 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
     formaPagamento: 'Dinheiro',
     modoPagamento: 'avista', // 'avista' | 'parcelado'
     valorEntrada: '',
-    numeroParcelas: 2
+    numeroParcelas: 1,
+    dataProximaParcela: ''
   });
   const [clienteCriado, setClienteCriado] = useState(null);
   const [registrandoVenda, setRegistrandoVenda] = useState(false);
@@ -29,7 +30,7 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
     if (isOpen && agendamento) {
       setStep(agendamento.compareceu === true ? 2 : 1);
       setClienteCriado(null);
-      setVendaForm({ pacoteId: '', valorPersonalizado: '', formaPagamento: 'Dinheiro', modoPagamento: 'avista', valorEntrada: '', numeroParcelas: 2 });
+      setVendaForm({ pacoteId: '', valorPersonalizado: '', formaPagamento: 'Dinheiro', modoPagamento: 'avista', valorEntrada: '', numeroParcelas: 1, dataProximaParcela: '' });
     }
   }, [isOpen, agendamento?._id]);
 
@@ -94,7 +95,9 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
     setLoadingPacotes(true);
     try {
       const res = await api.get('/pacotes');
-      const pacotesAtivos = (res.data?.data || []).filter(p => p.ativo);
+      const pacotesAtivos = (res.data?.data || [])
+        .filter(p => p.ativo)
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' }));
       setPacotes(pacotesAtivos);
     } catch {
       toast.error('Erro ao carregar serviços');
@@ -143,6 +146,9 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
         payload.parcelado = true;
         payload.numeroParcelas = vendaForm.numeroParcelas;
         payload.valorEntrada = entradaValida;
+        if (valorRestante > 0.001 && vendaForm.dataProximaParcela) {
+          payload.dataProximaParcela = vendaForm.dataProximaParcela;
+        }
       } else {
         payload.parcelado = false;
         payload.numeroParcelas = 1;
@@ -375,7 +381,7 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setVendaForm(prev => ({ ...prev, modoPagamento: 'parcelado' }))}
+                          onClick={() => setVendaForm(prev => ({ ...prev, modoPagamento: 'parcelado', valorEntrada: '', numeroParcelas: 1, dataProximaParcela: '' }))}
                           className={`py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                             vendaForm.modoPagamento === 'parcelado'
                               ? 'border-amber-500 bg-amber-50 text-amber-700'
@@ -412,7 +418,7 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Em quantas parcelas?
+                          Parcelas do restante (€{valorRestante.toFixed(2)})
                         </label>
                         <select
                           value={vendaForm.numeroParcelas}
@@ -427,6 +433,23 @@ function FunilAvaliacaoModal({ isOpen, agendamento, onClose, onSuccess }) {
                           ))}
                         </select>
                       </div>
+
+                      {valorRestante > 0.001 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Data prevista da próxima parcela
+                          </label>
+                          <input
+                            type="date"
+                            value={vendaForm.dataProximaParcela}
+                            onChange={(e) => setVendaForm(prev => ({ ...prev, dataProximaParcela: e.target.value }))}
+                            className="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-gray-900 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            🔔 Lembrete WhatsApp 5 dias antes (opcional).
+                          </p>
+                        </div>
+                      )}
 
                       <div className="pt-2 border-t border-indigo-200 space-y-1 text-xs">
                         <div className="flex justify-between">

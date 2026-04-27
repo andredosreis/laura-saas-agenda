@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DateTime } from 'luxon';
 import { toast } from 'react-toastify';
 import {
@@ -17,9 +18,11 @@ import {
   Eye,
   Edit,
   Trash2,
-  CreditCard
+  CreditCard,
+  Package
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
 // Categorias de receitas e despesas
@@ -41,7 +44,16 @@ const FORMAS_PAGAMENTO = [
 
 function Transacoes() {
   const { isDarkMode } = useTheme();
-  
+  const { isAdmin, user } = useAuth();
+  const navigate = useNavigate();
+
+  // Permissão para eliminar — robusta contra casing e users criados antes do campo existir.
+  // Admin/superadmin têm gerenciarUsuarios=true por defeito. Gerente/recepcionista/terapeuta não.
+  const role = (user?.role || '').toLowerCase();
+  const podeDeletar = isAdmin
+    || ['admin', 'superadmin'].includes(role)
+    || !!user?.permissoes?.gerenciarUsuarios;
+
   // Estados
   const [transacoes, setTransacoes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -597,34 +609,53 @@ function Transacoes() {
                             <button
                               onClick={() => handleVerDetalhes(transacao)}
                               className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition-colors`}
-                              title="Ver detalhes"
+                              title="Ver detalhes / histórico"
                             >
                               <Eye className={`w-4 h-4 ${subTextClass}`} />
                             </button>
-                            {transacao.tipo === 'Receita' &&
-                              (transacao.statusPagamento === 'Pendente' || transacao.statusPagamento === 'Parcial') && (
-                              <button
-                                onClick={() => handleAbrirRegistrarPagamento(transacao)}
-                                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-emerald-500/10' : 'hover:bg-emerald-50'} transition-colors`}
-                                title="Registar pagamento"
-                              >
-                                <CreditCard className="w-4 h-4 text-emerald-500" />
-                              </button>
+                            {transacao.categoria === 'Pacote' ? (
+                              <>
+                                {/* Para Pacote, o atalho "Abrir esta venda" está dentro do modal Ver Detalhes (👁) */}
+                                {podeDeletar && (
+                                  <button
+                                    onClick={() => handleDeletarTransacao(transacao)}
+                                    className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'} transition-colors`}
+                                    title="Deletar transação (admin) — preferir gerir em Vendas"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {transacao.tipo === 'Receita' &&
+                                  (transacao.statusPagamento === 'Pendente' || transacao.statusPagamento === 'Parcial') && (
+                                  <button
+                                    onClick={() => handleAbrirRegistrarPagamento(transacao)}
+                                    className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-emerald-500/10' : 'hover:bg-emerald-50'} transition-colors`}
+                                    title="Registar pagamento"
+                                  >
+                                    <CreditCard className="w-4 h-4 text-emerald-500" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleEditarTransacao(transacao)}
+                                  className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50'} transition-colors`}
+                                  title="Editar transação"
+                                >
+                                  <Edit className="w-4 h-4 text-indigo-500" />
+                                </button>
+                                {podeDeletar && (
+                                  <button
+                                    onClick={() => handleDeletarTransacao(transacao)}
+                                    className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'} transition-colors`}
+                                    title="Deletar transação (admin)"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                  </button>
+                                )}
+                              </>
                             )}
-                            <button
-                              onClick={() => handleEditarTransacao(transacao)}
-                              className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-indigo-500/10' : 'hover:bg-indigo-50'} transition-colors`}
-                              title="Editar transação"
-                            >
-                              <Edit className="w-4 h-4 text-indigo-500" />
-                            </button>
-                            <button
-                              onClick={() => handleDeletarTransacao(transacao)}
-                              className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'} transition-colors`}
-                              title="Deletar transação"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-500" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -773,7 +804,7 @@ function Transacoes() {
       {/* Modal Detalhes */}
       {showDetalhes && transacaoSelecionada && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className={`${cardClass} rounded-2xl w-full max-w-lg p-6`}>
+          <div className={`${cardClass} rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto`}>
             <div className="flex items-center justify-between mb-6">
               <h2 className={`text-xl font-bold ${textClass}`}>📋 Detalhes da Transação</h2>
               <button
@@ -849,20 +880,120 @@ function Transacoes() {
                 </span>
               </div>
 
+              {/* Bloco específico de venda de pacote */}
+              {transacaoSelecionada.transacao?.categoria === 'Pacote' && transacaoSelecionada.transacao?.compraPacote && (() => {
+                const cp = transacaoSelecionada.transacao.compraPacote;
+                const sessoesPct = cp.sessoesContratadas > 0 ? (cp.sessoesUsadas / cp.sessoesContratadas) * 100 : 0;
+                const parcelasPct = cp.numeroParcelas > 0 ? (cp.parcelasPagas / cp.numeroParcelas) * 100 : 0;
+                return (
+                  <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-200'} space-y-3`}>
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-indigo-500" />
+                      <span className={`font-medium ${textClass}`}>Detalhes do Pacote</span>
+                    </div>
+
+                    {/* Sessões */}
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className={subTextClass}>Sessões</span>
+                        <span className={`font-medium ${textClass}`}>
+                          {cp.sessoesUsadas || 0} de {cp.sessoesContratadas} usadas
+                        </span>
+                      </div>
+                      <div className={`h-2 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'} overflow-hidden`}>
+                        <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, sessoesPct)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Parcelas */}
+                    {cp.parcelado && (
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className={subTextClass}>Parcelas</span>
+                          <span className={`font-medium ${textClass}`}>
+                            {cp.parcelasPagas || 0} de {cp.numeroParcelas} pagas (€{cp.valorParcela?.toFixed(2)} cada)
+                          </span>
+                        </div>
+                        <div className={`h-2 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'} overflow-hidden`}>
+                          <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, parcelasPct)}%` }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Valores */}
+                    <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t border-indigo-500/20">
+                      <div>
+                        <span className={`block text-xs ${subTextClass}`}>Pago</span>
+                        <span className="font-bold text-emerald-500">€{cp.valorPago?.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className={`block text-xs ${subTextClass}`}>Pendente</span>
+                        <span className={`font-bold ${cp.valorPendente > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                          €{cp.valorPendente?.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Próxima parcela + lembrete */}
+                    {cp.dataProximaParcela && cp.valorPendente > 0 && (
+                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-800/50' : 'bg-white'} text-sm`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span>🔔</span>
+                          <span className={`font-medium ${textClass}`}>Próxima parcela</span>
+                        </div>
+                        <div className={`${subTextClass} text-xs`}>
+                          Prevista para <span className={`font-medium ${textClass}`}>
+                            {DateTime.fromISO(cp.dataProximaParcela).setZone('Europe/Lisbon').toFormat('dd/MM/yyyy')}
+                          </span>
+                        </div>
+                        {cp.lembreteParcelaEnviadoEm ? (
+                          <div className="text-xs text-emerald-500 mt-1">
+                            ✓ Lembrete WhatsApp enviado em {DateTime.fromISO(cp.lembreteParcelaEnviadoEm).setZone('Europe/Lisbon').toFormat('dd/MM/yyyy HH:mm')}
+                          </div>
+                        ) : (
+                          <div className={`text-xs ${subTextClass} mt-1`}>
+                            Lembrete WhatsApp será enviado 5 dias antes
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Validade */}
+                    {cp.dataExpiracao && (
+                      <div className="text-xs flex justify-between">
+                        <span className={subTextClass}>Validade</span>
+                        <span className={textClass}>
+                          {DateTime.fromISO(cp.dataExpiracao).setZone('Europe/Lisbon').toFormat('dd/MM/yyyy')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Pagamentos */}
               {transacaoSelecionada.pagamentos?.length > 0 && (
                 <div>
-                  <span className={`block text-sm ${subTextClass} mb-2`}>Pagamentos</span>
+                  <span className={`block text-sm ${subTextClass} mb-2`}>
+                    Histórico de pagamentos ({transacaoSelecionada.pagamentos.length})
+                  </span>
                   <div className="space-y-2">
                     {transacaoSelecionada.pagamentos.map((pag, idx) => (
                       <div key={idx} className={`p-3 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-gray-100'}`}>
                         <div className="flex justify-between">
-                          <span className={subTextClass}>{pag.formaPagamento}</span>
-                          <span className={`font-medium ${textClass}`}>€{pag.valor?.toFixed(2)}</span>
+                          <span className={`font-medium ${textClass}`}>
+                            {transacaoSelecionada.pagamentos.length - idx}ª — {pag.formaPagamento}
+                          </span>
+                          <span className={`font-medium text-emerald-500`}>€{pag.valor?.toFixed(2)}</span>
                         </div>
-                        <span className={`text-xs ${subTextClass}`}>
-                          {DateTime.fromISO(pag.dataPagamento).toFormat('dd/MM/yyyy HH:mm')}
-                        </span>
+                        <div className="flex justify-between mt-1">
+                          <span className={`text-xs ${subTextClass}`}>
+                            {DateTime.fromISO(pag.dataPagamento).toFormat('dd/MM/yyyy HH:mm')}
+                          </span>
+                          {pag.observacoes && (
+                            <span className={`text-xs ${subTextClass} italic`}>{pag.observacoes}</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -870,12 +1001,37 @@ function Transacoes() {
               )}
             </div>
 
-            <button
-              onClick={() => { setShowDetalhes(false); setTransacaoSelecionada(null); }}
-              className={`w-full mt-6 px-4 py-3 rounded-xl ${cardClass} ${textClass} hover:opacity-80 transition-all`}
-            >
-              Fechar
-            </button>
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => { setShowDetalhes(false); setTransacaoSelecionada(null); }}
+                className={`flex-1 px-4 py-3 rounded-xl ${cardClass} ${textClass} hover:opacity-80 transition-all`}
+              >
+                Fechar
+              </button>
+              {transacaoSelecionada.transacao?.categoria === 'Pacote' && transacaoSelecionada.transacao?.compraPacote?._id && (
+                <button
+                  onClick={() => navigate(`/pacotes-ativos?id=${transacaoSelecionada.transacao.compraPacote._id}`)}
+                  className="flex-1 px-4 py-3 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                >
+                  <Package className="w-4 h-4" />
+                  Abrir esta venda
+                </button>
+              )}
+              {podeDeletar && (
+                <button
+                  onClick={() => {
+                    handleDeletarTransacao(transacaoSelecionada.transacao);
+                    setShowDetalhes(false);
+                    setTransacaoSelecionada(null);
+                  }}
+                  className="px-4 py-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+                  title="Eliminar (admin)"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

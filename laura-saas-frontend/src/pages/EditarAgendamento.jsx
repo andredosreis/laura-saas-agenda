@@ -40,8 +40,8 @@ function EditarAgendamento() {
         setAgendamentoOriginal(agendamentoData);
 
         const [clientesResponse, pacotesResponse] = await Promise.all([
-          api.get('/clientes'),
-          api.get('/pacotes')
+          api.get('/clientes?limit=100'),
+          api.get('/pacotes?limit=100')
         ]);
 
         // Determinar o tipo de serviço
@@ -63,8 +63,9 @@ function EditarAgendamento() {
           leadEmail: agendamentoData.lead?.email || ''
         });
 
-        setClientes(clientesResponse.data?.data || []);
-        setPacotes(pacotesResponse.data?.data || []);
+        const sortByName = (a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' });
+        setClientes((clientesResponse.data?.data || []).slice().sort(sortByName));
+        setPacotes((pacotesResponse.data?.data || []).slice().sort(sortByName));
 
         // Carregar dados do cliente selecionado
         if (agendamentoData.cliente) {

@@ -22,6 +22,7 @@ import {
   Settings
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
+import ThemeToggle from './ThemeToggle';
 
 function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -179,8 +180,12 @@ function Sidebar() {
         </div>
       </nav>
 
-      {/* Footer - Logout */}
-      <div className="px-4 py-4 border-t border-white/5">
+      {/* Footer - Theme Toggle + Logout */}
+      <div className="px-4 py-4 border-t border-white/5 space-y-2">
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5">
+          <span className="text-xs text-slate-400 font-medium">Aparência</span>
+          <ThemeToggle />
+        </div>
         <button
           onClick={() => {
             closeMobileMenu();

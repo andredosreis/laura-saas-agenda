@@ -422,7 +422,7 @@ function Dashboard() {
               {agendamentosHoje.length > 0 ? (
                 <div className="space-y-4">
                   {agendamentosHoje.map((ag, i) => (
-                    <div key={ag._id} className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all duration-300">
+                    <div key={ag._id} className={`group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border transition-all duration-300 ${isDark ? 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/20' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 hover:border-slate-300'}`}>
                       {/* Time Block */}
                       <div className="flex flex-col items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-900 border border-white/10 group-hover:border-indigo-500/50 transition-colors shrink-0">
                         <span className="text-base sm:text-lg font-bold text-white">{formatarDataHora(ag.dataHora)}</span>
@@ -430,7 +430,7 @@ function Dashboard() {
 
                       {/* Info Block */}
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-base sm:text-lg text-white mb-1 truncate">{ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}</h4>
+                        <h4 className={`font-semibold text-base sm:text-lg mb-1 truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}</h4>
                         <p className="text-slate-400 text-xs sm:text-sm flex items-center gap-2 truncate">
                           <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
                           <span className="truncate">{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço Geral')}</span>

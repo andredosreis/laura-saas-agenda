@@ -46,7 +46,8 @@ function VenderPacote() {
     formaPagamento: 'Dinheiro',
     telefoneMBWay: '',
     sessoesJaRealizadas: 0,
-    valorPersonalizado: ''
+    valorPersonalizado: '',
+    dataProximaParcela: ''
   });
   
   // Pacote selecionado
@@ -58,11 +59,12 @@ function VenderPacote() {
       setLoading(true);
       try {
         const [clientesRes, pacotesRes] = await Promise.all([
-          api.get('/clientes'),
-          api.get('/pacotes')
+          api.get('/clientes?limit=100'),
+          api.get('/pacotes?limit=100')
         ]);
-        setClientes(clientesRes.data?.data || []);
-        setPacotes((pacotesRes.data?.data || []).filter(p => p.ativo));
+        const sortByName = (a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' });
+        setClientes((clientesRes.data?.data || []).slice().sort(sortByName));
+        setPacotes((pacotesRes.data?.data || []).filter(p => p.ativo).sort(sortByName));
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados');
@@ -184,7 +186,8 @@ function VenderPacote() {
         valorPago: form.pagarAgora ? form.valorPago : 0,
         formaPagamento: form.pagarAgora ? form.formaPagamento : null,
         sessoesUsadas: sessoesJaRealizadasNum,
-        valorTotal: valorTotal
+        valorTotal: valorTotal,
+        dataProximaParcela: form.parcelado && form.dataProximaParcela ? form.dataProximaParcela : null
       };
 
       await api.post('/compras-pacotes', dados);
@@ -384,21 +387,38 @@ function VenderPacote() {
             </label>
 
             {form.parcelado && (
-              <div className="mb-4">
-                <label className={`block text-sm ${subTextClass} mb-1`}>Número de parcelas</label>
-                <select
-                  value={form.numeroParcelas}
-                  onChange={(e) => handleChange('numeroParcelas', parseInt(e.target.value))}
-                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
-                >
-                  {[1, 2, 3, 4].map(n => (
-                    <option key={n} value={n}>
-                      {n}x de €{(valorTotal / n).toFixed(2)}
-                      {n === 1 ? ' (pagamento único)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <>
+                <div className="mb-4">
+                  <label className={`block text-sm ${subTextClass} mb-1`}>Número de parcelas</label>
+                  <select
+                    value={form.numeroParcelas}
+                    onChange={(e) => handleChange('numeroParcelas', parseInt(e.target.value))}
+                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  >
+                    {[1, 2, 3, 4].map(n => (
+                      <option key={n} value={n}>
+                        {n}x de €{(valorTotal / n).toFixed(2)}
+                        {n === 1 ? ' (pagamento único)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mb-4">
+                  <label className={`block text-sm ${subTextClass} mb-1`}>
+                    Data prevista da próxima parcela
+                  </label>
+                  <input
+                    type="date"
+                    value={form.dataProximaParcela}
+                    onChange={(e) => handleChange('dataProximaParcela', e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  />
+                  <p className={`text-xs ${subTextClass} mt-1`}>
+                    🔔 Lembrete WhatsApp ao cliente 5 dias antes (opcional).
+                  </p>
+                </div>
+              </>
             )}
 
             {/* Pagar agora */}
