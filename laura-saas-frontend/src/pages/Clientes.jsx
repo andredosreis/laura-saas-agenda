@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { toast } from 'react-toastify';
 import { useNavigate } from "react-router-dom";
 import {
-  Users, Plus, Search, Phone, Package, Calendar, Edit, Trash2, Loader2
+  Users, Plus, Search, Phone, Package, Calendar, Edit, Trash2, Loader2, RefreshCw
 } from 'lucide-react';
 import api from "../services/api";
 import { useTheme } from '../contexts/ThemeContext';
@@ -83,11 +83,20 @@ function Clientes() {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja eliminar este cliente?")) return;
-    setIsLoading(true);
-    await api.delete(`/clientes/${id}`);
-    setClientes(clientesAtuais => clientesAtuais.filter(cliente => cliente._id !== id));
-    toast.success("Cliente eliminado com sucesso!");
-    setIsLoading(false);
+    try {
+      setIsLoading(true);
+      await api.delete(`/clientes/${id}`);
+      // Só remove do estado se o backend confirmou — evita inconsistência se o DELETE falhar
+      setClientes(clientesAtuais => clientesAtuais.filter(cliente => cliente._id !== id));
+      toast.success("Cliente eliminado com sucesso!");
+    } catch (error) {
+      console.error('Erro ao eliminar cliente:', error);
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao eliminar cliente');
+      // Refetch para sincronizar estado com o servidor após erro
+      fetchClientes();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEdit = (id) => navigate(`/clientes/editar/${id}`);
@@ -117,13 +126,29 @@ function Clientes() {
                 {busca && ` para "${busca}"`}
               </p>
             </div>
-            <button
-              onClick={() => navigate('/criar-cliente')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:opacity-90 transition-all text-white font-medium shadow-lg shadow-indigo-500/25"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Cliente
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchClientes}
+                disabled={isLoading}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all disabled:opacity-50 ${
+                  isDarkMode
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                }`}
+                title="Atualizar lista"
+                aria-label="Atualizar lista de clientes"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </button>
+              <button
+                onClick={() => navigate('/criar-cliente')}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:opacity-90 transition-all text-white font-medium shadow-lg shadow-indigo-500/25"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Cliente
+              </button>
+            </div>
           </div>
 
           {/* Aviso: existem mais clientes no servidor do que estão a ser exibidos */}
