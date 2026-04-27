@@ -134,9 +134,37 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     console.log(`[Webhook] 📱 Telefone: ${telefoneNormalizado}, Mensagem: "${mensagemNormalizada}"`);
 
     // 🔍 ROTEAMENTO INTELIGENTE: Detecta se é confirmação (SIM/NÃO) ou conversa normal
-    // Aceita resposta exacta OU mensagem que comece com palavra-chave (ex: "Sim, claro", "Não vou conseguir")
-    const ehSim = /^(sim|confirmo|confirmar|ok|certo|confirma|yes)\b|^s$/.test(mensagemNormalizada);
-    const ehNao = /^(nao|cancelar|cancel|desmarcar|nope)\b|^n$/.test(mensagemNormalizada);
+    // Nota: mensagemNormalizada já está em lowercase sem acentos (ex: "Não" → "nao")
+    const PALAVRAS_SIM = [
+      'sim', 's',
+      'confirmo', 'confirmar', 'confirma', 'confirmado',
+      'ok', 'okay',
+      'certo', 'correto', 'exato', 'exatamente',
+      'claro', 'com certeza', 'certeza',
+      'perfeito', 'combinado',
+      'pode', 'pode ser',
+      'beleza', 'boa',
+      'ta bom', 'ta bem', 'tudo bem', 'tudo certo',
+      'yes', '1',
+    ];
+    const PALAVRAS_NAO = [
+      'nao', 'n',
+      'cancelar', 'cancela', 'cancel', 'cancelado',
+      'desmarcar', 'desmarco', 'desmarque',
+      'nao posso', 'nao consigo', 'nao vou',
+      'nao quero',
+      'desistir', 'desisto',
+      'remover',
+      'nope', 'no',
+      '2',
+    ];
+
+    const ehSim = PALAVRAS_SIM.some(p =>
+      mensagemNormalizada === p || mensagemNormalizada.startsWith(p + ' ')
+    );
+    const ehNao = PALAVRAS_NAO.some(p =>
+      mensagemNormalizada === p || mensagemNormalizada.startsWith(p + ' ')
+    );
     const ehRespostaConfirmacao = ehSim || ehNao;
 
     if (!ehRespostaConfirmacao) {
@@ -227,6 +255,7 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
     agendamento.confirmacao.respondidoEm = new Date();
     agendamento.confirmacao.respondidoPor = 'cliente';
     agendamento.status = 'Confirmado';
+    agendamento.markModified('confirmacao');
     novoStatus = 'confirmado';
 
     const dataFormatada = DateTime.fromJSDate(agendamento.dataHora)
@@ -241,6 +270,7 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
     agendamento.confirmacao.respondidoEm = new Date();
     agendamento.confirmacao.respondidoPor = 'cliente';
     agendamento.status = 'Cancelado Pelo Cliente';
+    agendamento.markModified('confirmacao');
     novoStatus = 'rejeitado';
 
     resposta = `Entendido, ${nomeRemetente}. 📅\n\nPara reagendarmos, indique por favor o dia e hora que prefere e iremos analisar a nossa agenda para lhe propor a melhor opção.\n\nObrigada! 💆‍♀️✨`;

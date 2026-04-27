@@ -26,21 +26,25 @@ function Agendamentos() {
   });
   const [subscribingToPush, setSubscribingToPush] = useState(false);
 
-  const carregarAgendamentos = async () => {
-    setIsLoading(true);
+  const carregarAgendamentos = async (silencioso = false) => {
+    if (!silencioso) setIsLoading(true);
     try {
       const response = await api.get('/agendamentos');
       setAgendamentos(response.data?.data || []);
     } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
-      toast.error('Erro ao carregar agendamentos. Tente novamente mais tarde.');
+      if (!silencioso) {
+        console.error('Erro ao carregar agendamentos:', error);
+        toast.error('Erro ao carregar agendamentos. Tente novamente mais tarde.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!silencioso) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     carregarAgendamentos();
+
+    const intervaloPolling = setInterval(() => carregarAgendamentos(true), 30000);
 
     const checkPushStatus = async () => {
       try {
@@ -70,6 +74,8 @@ function Agendamentos() {
     };
 
     checkPushStatus();
+
+    return () => clearInterval(intervaloPolling);
   }, []);
 
   const handleManualSubscribe = async () => {
