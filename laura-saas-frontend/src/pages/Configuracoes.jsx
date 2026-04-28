@@ -3,7 +3,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 import { toast } from 'react-toastify';
-import { Settings, Building2, Phone, Mail, Globe, Clock, Save, Loader2, MessageCircle } from 'lucide-react';
+import {
+  Settings, Building2, Phone, Mail, Globe, Clock, Save, Loader2, MessageCircle,
+  Users, UserPlus, Edit, Power, PowerOff, ShieldCheck, Trash2
+} from 'lucide-react';
+import ColaboradorModal from '../components/ColaboradorModal';
 
 const TIMEZONES = [
   'Europe/Lisbon',
@@ -17,9 +21,88 @@ const TIMEZONES = [
 ];
 
 function Configuracoes() {
-  const { tenant, refreshAuth } = useAuth();
+  const { tenant, refreshAuth, user, isAdmin } = useAuth();
   const { isDark } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Gestão de colaboradores
+  const [colaboradores, setColaboradores] = useState([]);
+  const [colaboradoresMeta, setColaboradoresMeta] = useState({ total: 0, maxUsuarios: null });
+  const [colaboradoresLoading, setColaboradoresLoading] = useState(false);
+  const [showModalColab, setShowModalColab] = useState(false);
+  const [colabEditando, setColabEditando] = useState(null);
+
+  const fetchColaboradores = async () => {
+    if (!isAdmin) return;
+    setColaboradoresLoading(true);
+    try {
+      const res = await api.get('/users?incluirInativos=true');
+      setColaboradores(res.data?.data || []);
+      setColaboradoresMeta(res.data?.meta || { total: 0, maxUsuarios: null });
+    } catch (err) {
+      console.error('Erro ao listar colaboradores:', err);
+      toast.error('Erro ao carregar colaboradores');
+    } finally {
+      setColaboradoresLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchColaboradores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  const handleAbrirCriar = () => { setColabEditando(null); setShowModalColab(true); };
+  const handleEditar = (colab) => { setColabEditando(colab); setShowModalColab(true); };
+  const handleEliminar = async (colab) => {
+    if (colab._id === user?._id) {
+      toast.error('Não podes eliminar-te a ti próprio');
+      return;
+    }
+    if (!window.confirm(
+      `ELIMINAR ${colab.nome} permanentemente?\n\n` +
+      `Esta acção é irreversível. O registo desaparece da base de dados.\n` +
+      `Histórico de atendimentos/agendamentos antigos podem ficar com referências órfãs.`
+    )) return;
+    try {
+      await api.delete(`/users/${colab._id}`);
+      toast.success('Colaborador eliminado');
+      fetchColaboradores();
+    } catch (err) {
+      console.error('Erro ao eliminar:', err);
+      toast.error(err.response?.data?.error || 'Erro ao eliminar');
+    }
+  };
+  const handleToggleAtivo = async (colab) => {
+    const acao = colab.ativo ? 'desativar' : 'ativar';
+    if (colab.ativo && colab._id === user?._id) {
+      toast.error('Não podes desactivar-te a ti próprio');
+      return;
+    }
+    if (colab.ativo && !window.confirm(`Desactivar ${colab.nome}? A pessoa não poderá entrar até ser reactivada.`)) return;
+    try {
+      await api.patch(`/users/${colab._id}/${acao}`);
+      toast.success(colab.ativo ? 'Colaborador desactivado' : 'Colaborador reactivado');
+      fetchColaboradores();
+    } catch (err) {
+      console.error(`Erro ao ${acao}:`, err);
+      toast.error(err.response?.data?.error || `Erro ao ${acao}`);
+    }
+  };
+
+  const roleBadge = (role) => {
+    const map = {
+      superadmin:    { label: 'Superadmin',    cls: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
+      admin:         { label: 'Admin',         cls: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' },
+      gerente:       { label: 'Gerente',       cls: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
+      recepcionista: { label: 'Recepcionista', cls: 'bg-teal-500/10 text-teal-500 border-teal-500/20' },
+      terapeuta:     { label: 'Terapeuta',     cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
+    };
+    const item = map[role] || { label: role, cls: 'bg-gray-500/10 text-gray-500 border-gray-500/20' };
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${item.cls}`}>{item.label}</span>
+    );
+  };
 
   const [form, setForm] = useState({
     nome: '',
@@ -416,7 +499,170 @@ function Configuracoes() {
             </button>
           </div>
         </form>
+
+        {/* Secção: Colaboradores — só visível para admin/superadmin */}
+        {isAdmin && (
+          <section className={`${card} mt-8`}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-400" />
+                  Colaboradores
+                </h2>
+                <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Convida pessoas para a tua equipa. Cada colaborador define a sua password ao receber o convite.
+                  {colaboradoresMeta.maxUsuarios != null && colaboradoresMeta.maxUsuarios > 0 ? (
+                    <span className="ml-1">
+                      <strong>{colaboradoresMeta.total}</strong>
+                      {' de '}
+                      <strong>{colaboradoresMeta.maxUsuarios}</strong> activos.
+                    </span>
+                  ) : (
+                    <span className="ml-1">
+                      <strong>{colaboradoresMeta.total}</strong> activo{colaboradoresMeta.total === 1 ? '' : 's'} (sem limite).
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAbrirCriar}
+                disabled={colaboradoresMeta.maxUsuarios != null && colaboradoresMeta.maxUsuarios > 0 && colaboradoresMeta.total >= colaboradoresMeta.maxUsuarios}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:opacity-90 text-white text-sm font-medium shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                title={
+                  colaboradoresMeta.maxUsuarios != null && colaboradoresMeta.maxUsuarios > 0 && colaboradoresMeta.total >= colaboradoresMeta.maxUsuarios
+                    ? 'Limite do plano atingido'
+                    : 'Convidar novo colaborador'
+                }
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">Novo Colaborador</span>
+              </button>
+            </div>
+
+            {/* Aviso se atingiu o limite (só quando há um limite REAL > 0) */}
+            {colaboradoresMeta.maxUsuarios != null && colaboradoresMeta.maxUsuarios > 0 && colaboradoresMeta.total >= colaboradoresMeta.maxUsuarios && (
+              <div className={`mb-4 p-3 rounded-xl text-sm flex items-center gap-2 ${
+                isDark ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-700'
+              }`}>
+                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <span>Atingiste o limite do teu plano. Desactiva um colaborador para criar outro, ou faz upgrade do plano.</span>
+              </div>
+            )}
+
+            {/* Lista */}
+            {colaboradoresLoading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
+                <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>A carregar colaboradores...</p>
+              </div>
+            ) : colaboradores.length === 0 ? (
+              <div className="py-8 text-center">
+                <Users className={`w-10 h-10 mx-auto mb-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Ainda sem colaboradores convidados.</p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  Convida o primeiro para começar a partilhar o trabalho.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {colaboradores.map(c => {
+                  const isSelf = c._id === user?._id;
+                  const inicial = (c.nome || '?').charAt(0).toUpperCase();
+                  return (
+                    <div
+                      key={c._id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border ${
+                        isDark ? 'border-white/5 bg-slate-900/40' : 'border-slate-200 bg-slate-50'
+                      } ${!c.ativo ? 'opacity-60' : ''}`}
+                    >
+                      <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center font-bold ${
+                        isDark
+                          ? 'bg-linear-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300'
+                          : 'bg-linear-to-br from-indigo-50 to-purple-50 border border-indigo-200 text-indigo-600'
+                      }`}>
+                        {inicial}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{c.nome}</span>
+                          {roleBadge(c.role)}
+                          {isSelf && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 font-medium">
+                              tu
+                            </span>
+                          )}
+                          {!c.ativo && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 font-medium">
+                              Inactivo
+                            </span>
+                          )}
+                          {c.ativo && !c.emailVerificado && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium">
+                              Convite pendente
+                            </span>
+                          )}
+                        </div>
+                        <div className={`text-xs mt-0.5 truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{c.email}</div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleEditar(c)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isDark ? 'hover:bg-white/10' : 'hover:bg-slate-200'
+                          }`}
+                          title="Editar colaborador"
+                          aria-label={`Editar ${c.nome}`}
+                        >
+                          <Edit className="w-4 h-4 text-indigo-500" />
+                        </button>
+                        {!isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAtivo(c)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDark ? 'hover:bg-white/10' : 'hover:bg-slate-200'
+                            }`}
+                            title={c.ativo ? 'Desactivar' : 'Reactivar'}
+                            aria-label={c.ativo ? `Desactivar ${c.nome}` : `Reactivar ${c.nome}`}
+                          >
+                            {c.ativo
+                              ? <PowerOff className="w-4 h-4 text-red-500" />
+                              : <Power className="w-4 h-4 text-emerald-500" />}
+                          </button>
+                        )}
+                        {/* Eliminar permanente — só para inactivos (workflow de segurança) */}
+                        {!isSelf && !c.ativo && (
+                          <button
+                            type="button"
+                            onClick={() => handleEliminar(c)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'
+                            }`}
+                            title="Eliminar permanentemente"
+                            aria-label={`Eliminar ${c.nome} permanentemente`}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
       </div>
+
+      {/* Modal de criar / editar colaborador */}
+      <ColaboradorModal
+        isOpen={showModalColab}
+        onClose={() => setShowModalColab(false)}
+        onSuccess={() => fetchColaboradores()}
+        colaborador={colabEditando}
+      />
     </div>
   );
 }
