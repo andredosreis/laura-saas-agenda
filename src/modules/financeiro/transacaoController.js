@@ -116,13 +116,23 @@ export const listarTransacoes = async (req, res) => {
       { $group: { _id: '$tipo', total: { $sum: '$valorFinal' }, quantidade: { $sum: 1 } } }
     ]);
 
-    // Calcular "recebido" real: soma dos Pagamentos para receitas + fallback histórico
-    const { Pagamento } = req.models;
+    // Calcular "recebido" real combinando 3 fontes (em ordem de preferência):
+    // 1. CompraPacote.valorPago — fonte de verdade para vendas de pacote (atualizado por
+    //    venderPacote, registrarPagamentoParcela, etc). Isto resolve divergências históricas
+    //    em que o pagamento foi incrementado em CompraPacote mas o Pagamento não foi criado.
+    // 2. Pagamento.valor — para receitas que NÃO são de pacote (serviço avulso, outros).
+    // 3. Transacao.valorFinal (fallback) — quando statusPagamento='Pago' mas sem registos detalhados.
+    const { Pagamento, CompraPacote } = req.models;
     const receitasNoRange = await Transacao.find({ ...query, tipo: 'Receita' })
-      .select('_id valorFinal statusPagamento')
+      .select('_id valorFinal statusPagamento compraPacote')
       .lean();
 
     const receitaIds = receitasNoRange.map(r => r._id);
+    const compraPacoteIds = receitasNoRange
+      .filter(r => r.compraPacote)
+      .map(r => r.compraPacote);
+
+    // Soma agregada de Pagamentos por Transacao
     const pagamentosAgg = receitaIds.length > 0
       ? await Pagamento.aggregate([
           {
@@ -134,23 +144,68 @@ export const listarTransacoes = async (req, res) => {
           { $group: { _id: '$transacao', total: { $sum: '$valor' } } }
         ])
       : [];
-
     const pagamentosPorTransacao = new Map(
       pagamentosAgg.map(p => [String(p._id), p.total])
     );
 
+    // Map CompraPacote._id → valorPago (fonte de verdade para receitas de pacote)
+    const compraPacoteValorPago = new Map();
+    if (compraPacoteIds.length > 0) {
+      const cps = await CompraPacote.find({
+        _id: { $in: compraPacoteIds },
+        tenantId: req.tenantId
+      }).select('_id valorPago').lean();
+      for (const cp of cps) {
+        compraPacoteValorPago.set(String(cp._id), cp.valorPago || 0);
+      }
+    }
+
     let recebido = 0;
     for (const r of receitasNoRange) {
+      // 1. Se tem CompraPacote, usar valorPago como fonte de verdade
+      if (r.compraPacote) {
+        const valorPago = compraPacoteValorPago.get(String(r.compraPacote)) || 0;
+        recebido += valorPago;
+        continue;
+      }
+      // 2. Senão, soma dos Pagamentos da Transacao
       const pago = pagamentosPorTransacao.get(String(r._id)) || 0;
       if (pago > 0) {
         recebido += pago;
       } else if (r.statusPagamento === 'Pago') {
-        // Fallback histórico: transação marcada Pago mas sem Pagamentos registados
+        // 3. Fallback histórico
         recebido += r.valorFinal || 0;
       }
     }
 
-    const vendido = resumo.find(r => r._id === 'Receita')?.total || 0;
+    // "Vendido" base (Transacao.valorFinal de Receitas)
+    let vendido = resumo.find(r => r._id === 'Receita')?.total || 0;
+
+    // Orphan CompraPacote — vendas que existem em CompraPacote mas perderam a Transacao
+    // (ex: cascade delete antigo, edição manual). Sem isto, Transações sub-conta e diverge
+    // de /pacotes-ativos. Sem filtro de data — conta tudo do tenant.
+    const transacoesComPacote = await Transacao.find({
+      tenantId: req.tenantId,
+      compraPacote: { $exists: true, $ne: null }
+    }).distinct('compraPacote');
+
+    const orphanPacotes = await CompraPacote.find({
+      tenantId: req.tenantId,
+      _id: { $nin: transacoesComPacote }
+    }).select('valorTotal valorPago').lean();
+
+    if (orphanPacotes.length > 0) {
+      const vendidoOrphan = orphanPacotes.reduce((s, cp) => s + (cp.valorTotal || 0), 0);
+      const recebidoOrphan = orphanPacotes.reduce((s, cp) => s + (cp.valorPago || 0), 0);
+      vendido += vendidoOrphan;
+      recebido += recebidoOrphan;
+      console.log('[listarTransacoes] ⚠️ CompraPacote orphans encontrados:', {
+        count: orphanPacotes.length,
+        vendidoAdicionado: vendidoOrphan,
+        recebidoAdicionado: recebidoOrphan
+      });
+    }
+
     const pendente = Math.max(0, vendido - recebido);
 
     const totais = {
