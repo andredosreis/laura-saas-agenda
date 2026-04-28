@@ -48,45 +48,60 @@ function Sidebar() {
 
   const closeMobileMenu = () => setIsMobileOpen(false);
 
-  // Menu structure with groups
-  const menuGroups = [
+  // Helper: verifica se o user tem uma permissão específica.
+  // superadmin/admin têm acesso a tudo (bypass).
+  const hasPermissao = (key) => {
+    if (!user) return false;
+    if (user.role === 'superadmin' || user.role === 'admin') return true;
+    return Boolean(user?.permissoes?.[key]);
+  };
+
+  // Menu structure com gating por permissão (key do User.permissoes ou 'admin' para admin-only)
+  const menuGroupsAll = [
     {
       id: 'dashboard',
-      label: null, // Dashboard é standalone, sem grupo
+      label: null,
       items: [
-        { to: "/dashboard", text: "Dashboard", icon: LayoutDashboard }
+        { to: "/dashboard", text: "Dashboard", icon: LayoutDashboard, perm: null } // todos vêem
       ]
     },
     {
       id: 'agendamento',
       label: 'AGENDAMENTO',
       items: [
-        { to: "/agendamentos", text: "Agendamentos", icon: ListChecks },
-        { to: "/calendario", text: "Calendário", icon: Calendar },
-        { to: "/atendimentos", text: "Atendimentos", icon: CalendarClock }
+        { to: "/agendamentos", text: "Agendamentos", icon: ListChecks, perm: 'verAgendamentos' },
+        { to: "/calendario", text: "Calendário", icon: Calendar, perm: 'verAgendamentos' },
+        { to: "/atendimentos", text: "Atendimentos", icon: CalendarClock, perm: 'verAgendamentos' }
       ]
     },
     {
       id: 'financas',
       label: 'FINANÇAS',
       items: [
-        { to: "/transacoes", text: "Transações", icon: Receipt },
-        // { to: "/caixa", text: "Caixa", icon: DollarSign }, // Temporariamente desactivado
-        { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag },
-        { to: "/financeiro", text: "Relatórios", icon: TrendingUp }
+        { to: "/transacoes", text: "Transações", icon: Receipt, perm: 'verFinanceiro' },
+        { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag, perm: 'verFinanceiro' },
+        { to: "/financeiro", text: "Relatórios", icon: TrendingUp, perm: 'verFinanceiro' }
       ]
     },
     {
       id: 'administrativo',
       label: 'ADMINISTRATIVO',
       items: [
-        { to: "/clientes", text: "Clientes", icon: Users },
-        { to: "/pacotes", text: "Serviços", icon: Package },
-        // { to: "/disponibilidade", text: "Disponibilidade", icon: Clock }, // desactivado — ver agendamentoController
-        { to: "/configuracoes", text: "Configurações", icon: Settings }
+        { to: "/clientes", text: "Clientes", icon: Users, perm: 'verClientes' },
+        { to: "/pacotes", text: "Serviços", icon: Package, perm: 'verPacotes' },
+        // Configurações: só admin/superadmin (gerem colaboradores) — gated por editarConfiguracoes
+        { to: "/configuracoes", text: "Configurações", icon: Settings, perm: 'editarConfiguracoes' }
       ]
     }
   ];
+
+  // Filtra items por permissão e remove grupos que ficam vazios
+  const menuGroups = menuGroupsAll
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => item.perm == null || hasPermissao(item.perm))
+    }))
+    .filter(group => group.items.length > 0);
 
   // Estilos de Link
   // text-slate-300 (não slate-400) garante contraste WCAG AA confortável (~5.5:1) sobre slate-900

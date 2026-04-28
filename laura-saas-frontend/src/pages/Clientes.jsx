@@ -28,13 +28,17 @@ function Clientes() {
     : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400';
 
   // Lista filtrada e ordenada alfabeticamente (locale-aware, case-insensitive)
+  // Remove acentos (NFD + remove diacritics) para busca insensível a acentos.
+  // Ex: "lúcia" → "lucia", "céu" → "ceu". Permite encontrar "Lúcia" digitando "luci".
+  const semAcentos = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
   const clientesFiltrados = useMemo(() => {
-    const termo = busca.toLowerCase().trim();
+    const termo = semAcentos(busca.trim());
     return [...clientes]
       .filter(c =>
         !termo ||
-        c.nome?.toLowerCase().includes(termo) ||
-        c.telefone?.includes(termo)
+        semAcentos(c.nome).includes(termo) ||
+        (c.telefone || '').includes(termo)
       )
       .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' }));
   }, [clientes, busca]);

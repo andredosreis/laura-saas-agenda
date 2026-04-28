@@ -31,6 +31,7 @@ import compraPacoteRoutes from './modules/financeiro/compraPacoteRoutes.js';
 import pagamentoRoutes from './modules/financeiro/pagamentoRoutes.js';
 import caixaRoutes from './modules/financeiro/caixaRoutes.js';
 import historicoAtendimentoRoutes from './modules/historico/historicoAtendimentoRoutes.js';
+import usersRoutes from './modules/users/usersRoutes.js';
 
 const app = express();
 
@@ -96,6 +97,7 @@ const apiResources = [
   ['/pagamentos', pagamentoRoutes],
   ['/caixa', caixaRoutes],
   ['/historico-atendimentos', historicoAtendimentoRoutes],
+  ['/users', usersRoutes],
 ];
 
 for (const [path, router] of apiResources) {
