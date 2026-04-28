@@ -98,7 +98,7 @@ function EditarAgendamento() {
   const loadClienteData = async (clienteId) => {
     try {
       const response = await api.get(`/clientes/${clienteId}`);
-      setClienteSelecionado(response.data);
+      setClienteSelecionado(response.data?.data || response.data);
     } catch (error) {
       console.error('Erro ao carregar dados do cliente:', error);
     }

@@ -100,7 +100,7 @@ function CriarAgendamento() {
         api.get(`/clientes/${clienteId}`),
         api.get(`/compras-pacotes/cliente/${clienteId}`),
       ]);
-      setClienteSelecionado(clienteRes.data);
+      setClienteSelecionado(clienteRes.data?.data || clienteRes.data);
       sessaoForm.setValue('cliente', clienteId, { shouldValidate: true });
 
       const pacotesAtivos = (pacotesRes.data || []).filter(

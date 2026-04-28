@@ -53,7 +53,8 @@ function EditarCliente() {
           api.get(`/compras-pacotes/cliente/${id}`)
         ]);
 
-        const clienteData = clienteRes.data;
+        // Backend retorna { success, data: cliente } — o cliente está em data.data
+        const clienteData = clienteRes.data?.data || clienteRes.data;
         setPacotes(pacotesRes.data?.data || []);
         
         // Separar pacotes ativos dos encerrados
