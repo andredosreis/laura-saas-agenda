@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { DateTime } from 'luxon';
 import {
   Calendar, Clock, User, CheckCircle2, XCircle, MessageSquare, Edit, Trash2,
-  Loader2, Plus, Bell, BellOff, ChevronRight, AlertCircle, Sparkles
+  Loader2, Plus, Bell, BellOff, ChevronRight, AlertCircle, Sparkles, UserCheck, UserX
 } from 'lucide-react';
 import api from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -48,6 +48,7 @@ function Agendamentos() {
   const [agendamentoParaFinalizar, setAgendamentoParaFinalizar] = useState(null);
   const [modalFunilAberto, setModalFunilAberto] = useState(false);
   const [agendamentoFunil, setAgendamentoFunil] = useState(null);
+  const [marcandoPresenca, setMarcandoPresenca] = useState(null);
   
   const [pushStatus, setPushStatus] = useState({
     supported: false,
@@ -170,6 +171,19 @@ function Agendamentos() {
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast.error(error.response?.data?.message || 'Erro ao atualizar status do agendamento.');
+    }
+  };
+
+  const marcarPresencaCliente = async (id, compareceu) => {
+    try {
+      setMarcandoPresenca(id);
+      await api.put(`/agendamentos/${id}/status`, { status: compareceu ? 'Compareceu' : 'Não Compareceu' });
+      toast.success(compareceu ? 'Presença marcada!' : 'Ausência registada.');
+      carregarAgendamentos();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Erro ao atualizar status.');
+    } finally {
+      setMarcandoPresenca(null);
     }
   };
 
@@ -497,16 +511,37 @@ function Agendamentos() {
                   )}
 
                   {(ag.status === 'Agendado' || ag.status === 'Confirmado') && (
-                    <button
-                      onClick={() => { setAgendamentoFunil(ag); setModalFunilAberto(true); }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:opacity-90 transition-all text-white text-sm font-medium shadow-lg shadow-indigo-500/25"
-                    >
-                      <User className="w-4 h-4" />
-                      Marcar Presença
-                    </button>
+                    isLead ? (
+                      <button
+                        onClick={() => { setAgendamentoFunil(ag); setModalFunilAberto(true); }}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 hover:opacity-90 transition-all text-white text-sm font-medium shadow-lg shadow-indigo-500/25"
+                      >
+                        <User className="w-4 h-4" />
+                        Marcar Presença
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => marcarPresencaCliente(ag._id, true)}
+                          disabled={marcandoPresenca === ag._id}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-sm font-medium disabled:opacity-50"
+                        >
+                          {marcandoPresenca === ag._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                          Compareceu
+                        </button>
+                        <button
+                          onClick={() => marcarPresencaCliente(ag._id, false)}
+                          disabled={marcandoPresenca === ag._id}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 transition-all text-sm font-medium disabled:opacity-50"
+                        >
+                          <UserX className="w-4 h-4" />
+                          Faltou
+                        </button>
+                      </div>
+                    )
                   )}
 
-                  {ag.status === 'Compareceu' && (
+                  {ag.status === 'Compareceu' && isLead && (
                     <button
                       onClick={() => { setAgendamentoFunil(ag); setModalFunilAberto(true); }}
                       className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-linear-to-r from-emerald-500 to-emerald-600 hover:opacity-90 transition-all text-white text-sm font-medium shadow-lg shadow-emerald-500/25"
