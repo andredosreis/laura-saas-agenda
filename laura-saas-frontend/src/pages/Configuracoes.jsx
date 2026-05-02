@@ -5,7 +5,7 @@ import api from '../services/api';
 import { toast } from 'react-toastify';
 import {
   Settings, Building2, Phone, Mail, Globe, Clock, Save, Loader2, MessageCircle,
-  Users, UserPlus, Edit, Power, PowerOff, ShieldCheck, Trash2
+  Users, UserPlus, Edit, Power, PowerOff, ShieldCheck, Trash2, Send
 } from 'lucide-react';
 import ColaboradorModal from '../components/ColaboradorModal';
 
@@ -87,6 +87,21 @@ function Configuracoes() {
     } catch (err) {
       console.error(`Erro ao ${acao}:`, err);
       toast.error(err.response?.data?.error || `Erro ao ${acao}`);
+    }
+  };
+  const handleReenviarConvite = async (colab) => {
+    if (!window.confirm(`Reenviar convite para ${colab.nome} (${colab.email})? Será gerado um novo link de definição de password.`)) return;
+    try {
+      const res = await api.post(`/users/${colab._id}/reenviar-convite`);
+      const emailEnviado = res.data?.meta?.emailEnviado;
+      if (emailEnviado) {
+        toast.success('Convite reenviado por email');
+      } else {
+        toast.warn('Token actualizado mas o email falhou. Verifica SMTP.');
+      }
+    } catch (err) {
+      console.error('Erro ao reenviar convite:', err);
+      toast.error(err.response?.data?.error || 'Erro ao reenviar convite');
     }
   };
 
@@ -617,6 +632,19 @@ function Configuracoes() {
                         >
                           <Edit className="w-4 h-4 text-indigo-500" />
                         </button>
+                        {c.ativo && !c.emailVerificado && (
+                          <button
+                            type="button"
+                            onClick={() => handleReenviarConvite(c)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDark ? 'hover:bg-amber-500/20' : 'hover:bg-amber-50'
+                            }`}
+                            title="Reenviar convite por email"
+                            aria-label={`Reenviar convite para ${c.nome}`}
+                          >
+                            <Send className="w-4 h-4 text-amber-500" />
+                          </button>
+                        )}
                         {!isSelf && (
                           <button
                             type="button"

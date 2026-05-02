@@ -285,6 +285,64 @@ export const eliminarColaborador = async (req, res) => {
 };
 
 // =============================================
+// REENVIAR convite por email
+// POST /api/users/:id/reenviar-convite
+// Gera novo token, renova expiry e reenvia o email de definição de password.
+// Só faz sentido para colaboradores activos e ainda sem email verificado.
+// =============================================
+export const reenviarConvite = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findOne({ _id: id, tenantId: req.tenantId });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Colaborador não encontrado' });
+    }
+
+    if (!user.ativo) {
+      return res.status(400).json({
+        success: false,
+        error: 'Colaborador está inactivo. Reactiva-o antes de reenviar o convite.',
+      });
+    }
+
+    if (user.emailVerificado) {
+      return res.status(400).json({
+        success: false,
+        error: 'Este colaborador já confirmou a conta. Não há convite pendente.',
+      });
+    }
+
+    const { token, hash } = gerarTokenConvite();
+    user.resetPasswordToken = hash;
+    user.resetPasswordExpires = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    await user.save();
+
+    let emailEnviado = true;
+    try {
+      await sendPasswordResetEmail(user.email, token, user.nome);
+    } catch (emailErr) {
+      console.error('Erro ao reenviar email de convite:', emailErr);
+      emailEnviado = false;
+    }
+
+    res.json({
+      success: true,
+      data: user.toSafeObject(),
+      meta: {
+        emailEnviado,
+        mensagem: emailEnviado
+          ? 'Convite reenviado por email.'
+          : 'Token actualizado mas o email falhou. Verifica configuração SMTP.',
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao reenviar convite:', error);
+    res.status(500).json({ success: false, error: 'Erro interno ao reenviar convite' });
+  }
+};
+
+// =============================================
 // REACTIVAR colaborador
 // PATCH /api/users/:id/ativar
 // =============================================

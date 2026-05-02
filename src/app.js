@@ -42,7 +42,14 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // Middlewares globais (ANTES do CORS para webhooks funcionarem)
-app.use(express.json({ limit: '10kb' })); // limitar payload para prevenir DoS
+// Saltamos /webhook aqui para que o parser específico (1mb) na linha de baixo trate
+// payloads maiores da Evolution API. Sem este skip, o limite de 10kb era aplicado
+// primeiro e atirava 413 antes do webhook handler.
+const jsonParserApi = express.json({ limit: '10kb' }); // limitar payload para prevenir DoS
+app.use((req, res, next) => {
+  if (req.path.startsWith('/webhook')) return next();
+  return jsonParserApi(req, res, next);
+});
 app.use(morgan('dev')); // para logs de requisição
 app.use(requestLogger);
 

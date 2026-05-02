@@ -8,6 +8,7 @@ import {
   desativarColaborador,
   ativarColaborador,
   eliminarColaborador,
+  reenviarConvite,
 } from './usersController.js';
 import {
   criarColaboradorSchema,
@@ -34,6 +35,11 @@ router.patch(
   '/:id/ativar',
   validate(idParamSchema, 'params'),
   ativarColaborador
+);
+router.post(
+  '/:id/reenviar-convite',
+  validate(idParamSchema, 'params'),
+  reenviarConvite
 );
 router.patch(
   '/:id/desativar',
