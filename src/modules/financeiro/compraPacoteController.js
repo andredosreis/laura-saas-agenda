@@ -16,12 +16,44 @@ export const venderPacote = async (req, res) => {
       formaPagamento,
       sessoesUsadas = 0,
       valorTotal: valorTotalCustom,
-      dataProximaParcela
+      dataProximaParcela,
+      dataCompra,
+      motivoRetroactivo
     } = req.body;
 
     if (!clienteId || !pacoteId) {
       return res.status(400).json({ message: 'Cliente e pacote são obrigatórios' });
     }
+
+    // Validação de dataCompra (retroactividade) em Europe/Lisbon — clientes podem estar
+    // noutro fuso e o nosso negócio é local; usar UTC daria erros de off-by-one-day.
+    const hojeLisboa = DateTime.now().setZone('Europe/Lisbon').startOf('day');
+    const dataEfetiva = dataCompra ? new Date(dataCompra) : new Date();
+    let isRetroactivo = false;
+
+    if (dataCompra) {
+      const dataCompraLisboa = DateTime.fromJSDate(dataEfetiva).setZone('Europe/Lisbon').startOf('day');
+
+      if (dataCompraLisboa > hojeLisboa) {
+        return res.status(400).json({ message: 'dataCompra não pode estar no futuro' });
+      }
+
+      // Retroactivo = data anterior a "ontem" (estrito <). Hoje e ontem não exigem motivo.
+      const ontemLisboa = hojeLisboa.minus({ days: 1 });
+      isRetroactivo = dataCompraLisboa < ontemLisboa;
+
+      if (isRetroactivo && (!motivoRetroactivo || !motivoRetroactivo.trim())) {
+        return res.status(400).json({
+          message: 'motivoRetroactivo é obrigatório para vendas com mais de 1 dia de atraso'
+        });
+      }
+    }
+
+    const origemRetroactivaPayload = isRetroactivo ? {
+      motivo: motivoRetroactivo.trim(),
+      registadoEm: new Date(),
+      registadoPor: req.user.userId
+    } : undefined;
 
     const [cliente, pacote] = await Promise.all([
       Cliente.findOne({ _id: clienteId, tenantId: req.tenantId }),
@@ -70,7 +102,8 @@ export const venderPacote = async (req, res) => {
       dataProximaParcela: (parcelado && (valorTotal - valorPagoFinal) > 0.001 && dataProximaParcela)
         ? new Date(dataProximaParcela)
         : null,
-      dataCompra: new Date()
+      dataCompra: dataEfetiva,
+      origemRetroactiva: origemRetroactivaPayload
     });
 
     const transacao = await Transacao.create({
@@ -88,7 +121,8 @@ export const venderPacote = async (req, res) => {
       parcelaAtual: (parcelado && temEntrada) ? 1 : (valorPagoFinal > 0 ? 2 : 1),
       statusPagamento: !valorPagoFinal ? 'Pendente' : (valorPagoFinal >= valorTotal ? 'Pago' : 'Parcial'),
       formaPagamento: formaPagamento || null,
-      dataPagamento: valorPagoFinal >= valorTotal ? new Date() : null
+      dataPagamento: valorPagoFinal >= valorTotal ? dataEfetiva : null,
+      origemRetroactiva: origemRetroactivaPayload
     });
 
     // Criar registo de Pagamento para a entrada/valor inicial — assegura que os relatórios
@@ -100,8 +134,9 @@ export const venderPacote = async (req, res) => {
           transacao: transacao._id,
           valor: valorPagoFinal,
           formaPagamento,
-          dataPagamento: new Date(),
-          observacoes: (parcelado && temEntrada) ? 'Entrada' : 'Pagamento inicial'
+          dataPagamento: dataEfetiva,
+          observacoes: (parcelado && temEntrada) ? 'Entrada' : 'Pagamento inicial',
+          origemRetroactiva: origemRetroactivaPayload
         });
       } catch (pagErr) {
         // Forma de pagamento pode exigir dados adicionais (MBWay, Multibanco, Cartão).

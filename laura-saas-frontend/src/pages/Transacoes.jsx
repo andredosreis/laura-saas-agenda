@@ -19,7 +19,8 @@ import {
   Edit,
   Trash2,
   CreditCard,
-  Package
+  Package,
+  History
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -356,6 +357,18 @@ function Transacoes() {
     ? 'bg-slate-700/50 border-white/10 text-white placeholder-slate-400'
     : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400';
 
+  // Período legível para o banner: usa Luxon para formatar em pt-PT.
+  // Mostra explicitamente que todos os totais são DESTE período (não all-time).
+  const periodoLegivel = (() => {
+    const fmt = 'dd/MM/yyyy';
+    const ini = filtros.dataInicio ? DateTime.fromISO(filtros.dataInicio).toFormat(fmt) : null;
+    const fim = filtros.dataFim ? DateTime.fromISO(filtros.dataFim).toFormat(fmt) : null;
+    if (ini && fim) return `${ini} a ${fim}`;
+    if (ini) return `desde ${ini}`;
+    if (fim) return `até ${fim}`;
+    return 'todos os tempos';
+  })();
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} pt-24 pb-8 px-4`}>
       <div className="max-w-7xl mx-auto">
@@ -363,7 +376,7 @@ function Transacoes() {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
             <h1 className={`text-2xl font-bold ${textClass}`}>💰 Transações</h1>
-            <p className={subTextClass}>Gerencie receitas e despesas</p>
+            <p className={subTextClass}>Faturação e movimentos no período seleccionado</p>
           </div>
           <div className="flex gap-3 mt-4 md:mt-0">
             <button
@@ -390,16 +403,40 @@ function Transacoes() {
           </div>
         </div>
 
-        {/* KPIs */}
+        {/* Banner de período — torna explícito que todos os totais abaixo são deste range.
+            Resolve confusão histórica entre "Faturado neste período" (Transacoes) vs
+            "Carteira em aberto" (PacotesAtivos). */}
+        <div className={`${cardClass} rounded-2xl px-4 py-3 mb-4 flex items-center gap-3`}>
+          <Calendar className={`w-4 h-4 ${subTextClass} shrink-0`} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm ${textClass}`}>
+              <strong>Período:</strong> {periodoLegivel}
+            </p>
+            <p className={`text-xs ${subTextClass}`}>
+              Os totais abaixo são <strong>apenas deste período</strong>. Para ver pacotes em aberto a qualquer altura, vê <em>Vendas / Carteira</em>.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowFilters(true)}
+            className={`text-xs px-3 py-1 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'} ${subTextClass} font-medium transition-colors shrink-0`}
+          >
+            Alterar período
+          </button>
+        </div>
+
+        {/* KPIs — todos relativos ao período seleccionado */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className={`${cardClass} rounded-2xl p-5`}>
+          <div
+            className={`${cardClass} rounded-2xl p-5`}
+            title={`Total de receitas emitidas neste período (${periodoLegivel}). Inclui pagas e pendentes.`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm ${subTextClass}`}>Faturado</p>
                 <p className={`text-xl font-bold ${textClass}`}>
                   €{totais.vendido?.toFixed(2) || '0.00'}
                 </p>
-                <p className={`text-[11px] ${subTextClass} mt-1`}>total vendido</p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>vendas emitidas no período</p>
               </div>
               <div className="p-3 rounded-xl bg-slate-500/10">
                 <TrendingUp className="w-5 h-5 text-slate-500" />
@@ -407,14 +444,17 @@ function Transacoes() {
             </div>
           </div>
 
-          <div className={`${cardClass} rounded-2xl p-5`}>
+          <div
+            className={`${cardClass} rounded-2xl p-5`}
+            title={`Dinheiro efectivamente entrado neste período (${periodoLegivel}), inclui pagamentos de pacotes vendidos noutro mês.`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm ${subTextClass}`}>Recebido</p>
                 <p className={`text-xl font-bold text-emerald-500`}>
                   €{totais.recebido?.toFixed(2) || '0.00'}
                 </p>
-                <p className={`text-[11px] ${subTextClass} mt-1`}>dinheiro em caixa</p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>cash flow do período</p>
               </div>
               <div className="p-3 rounded-xl bg-emerald-500/10">
                 <DollarSign className="w-5 h-5 text-emerald-500" />
@@ -422,14 +462,17 @@ function Transacoes() {
             </div>
           </div>
 
-          <div className={`${cardClass} rounded-2xl p-5`}>
+          <div
+            className={`${cardClass} rounded-2xl p-5`}
+            title={`Faturado − Recebido neste período. Para ver tudo em aberto (todos os pacotes a qualquer altura), vai a Vendas / Carteira.`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm ${subTextClass}`}>A Receber</p>
                 <p className={`text-xl font-bold text-amber-500`}>
                   €{totais.pendente?.toFixed(2) || '0.00'}
                 </p>
-                <p className={`text-[11px] ${subTextClass} mt-1`}>parcelas em falta</p>
+                <p className={`text-[11px] ${subTextClass} mt-1`}>do que faturei no período</p>
               </div>
               <div className="p-3 rounded-xl bg-amber-500/10">
                 <CreditCard className="w-5 h-5 text-amber-500" />
@@ -437,7 +480,10 @@ function Transacoes() {
             </div>
           </div>
 
-          <div className={`${cardClass} rounded-2xl p-5`}>
+          <div
+            className={`${cardClass} rounded-2xl p-5`}
+            title={`Despesas pagas neste período (${periodoLegivel}).`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm ${subTextClass}`}>Despesas</p>
@@ -452,7 +498,10 @@ function Transacoes() {
             </div>
           </div>
 
-          <div className={`${cardClass} rounded-2xl p-5`}>
+          <div
+            className={`${cardClass} rounded-2xl p-5`}
+            title={`Recebido − Despesas neste período. Reflecte o que entrou em caixa de facto.`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm ${subTextClass}`}>Saldo Real</p>
@@ -587,7 +636,20 @@ function Transacoes() {
                           </span>
                         </td>
                         <td className={`px-4 py-3 text-sm ${textClass}`}>{transacao.categoria}</td>
-                        <td className={`px-4 py-3 text-sm ${textClass} max-w-xs truncate`}>{transacao.descricao}</td>
+                        <td className={`px-4 py-3 text-sm ${textClass} max-w-xs`}>
+                          <div className="flex items-center gap-2">
+                            <span className="truncate">{transacao.descricao}</span>
+                            {transacao.origemRetroactiva?.motivo && (
+                              <span
+                                title={`Lançamento retroactivo: ${transacao.origemRetroactiva.motivo}`}
+                                className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}
+                              >
+                                <History className="w-3 h-3" />
+                                Retroactivo
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className={`px-4 py-3 text-sm ${subTextClass}`}>{transacao.cliente?.nome || '-'}</td>
                         <td className={`px-4 py-3 text-sm text-right font-medium ${
                           transacao.tipo === 'Receita' ? 'text-emerald-500' : 'text-red-500'

@@ -19,7 +19,8 @@ import {
   ChevronUp,
   CalendarClock,
   ListChecks,
-  Settings
+  Settings,
+  CalendarCheck
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
 import ThemeToggle from './ThemeToggle';
@@ -80,7 +81,8 @@ function Sidebar() {
       items: [
         { to: "/transacoes", text: "Transações", icon: Receipt, perm: 'verFinanceiro' },
         { to: "/pacotes-ativos", text: "Vendas", icon: ShoppingBag, perm: 'verFinanceiro' },
-        { to: "/financeiro", text: "Relatórios", icon: TrendingUp, perm: 'verFinanceiro' }
+        { to: "/financeiro", text: "Relatórios", icon: TrendingUp, perm: 'verFinanceiro' },
+        { to: "/fechamentos-mensais", text: "Fechamentos", icon: CalendarCheck, perm: 'verFinanceiro' }
       ]
     },
     {

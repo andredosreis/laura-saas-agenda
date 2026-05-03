@@ -9,7 +9,9 @@ import {
   Loader2,
   ArrowLeft,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  History
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
@@ -33,6 +35,9 @@ function VenderPacote() {
   const [clientes, setClientes] = useState([]);
   const [pacotes, setPacotes] = useState([]);
   
+  // Data de hoje em YYYY-MM-DD (timezone local — o backend re-valida em Europe/Lisbon)
+  const hojeStr = new Date().toISOString().split('T')[0];
+
   // Formulário
   const [form, setForm] = useState({
     clienteId: '',
@@ -48,9 +53,15 @@ function VenderPacote() {
     telefoneMBWay: '',
     sessoesJaRealizadas: 0,
     valorPersonalizado: '',
-    dataProximaParcela: ''
+    dataProximaParcela: '',
+    dataVenda: hojeStr,
+    motivoRetroactivo: ''
   });
-  
+
+  // Bloco "Detalhes da venda" colapsado por defeito — só expande quando o utilizador
+  // precisa de registar uma venda que aconteceu noutro dia.
+  const [showDetalhesVenda, setShowDetalhesVenda] = useState(false);
+
   // Pacote selecionado
   const [pacoteSelecionado, setPacoteSelecionado] = useState(null);
 
@@ -111,6 +122,18 @@ function VenderPacote() {
   const sessoesRestantes = pacoteSelecionado
     ? pacoteSelecionado.sessoes - (parseInt(form.sessoesJaRealizadas) || 0)
     : 0;
+
+  // Retroactividade: data anterior a "ontem" (mesma regra do backend, mas em local time
+  // do utilizador — o backend revalida em Europe/Lisbon antes de persistir).
+  const isRetroactivo = (() => {
+    if (!form.dataVenda) return false;
+    const venda = new Date(form.dataVenda + 'T00:00:00');
+    const ontem = new Date();
+    ontem.setHours(0, 0, 0, 0);
+    ontem.setDate(ontem.getDate() - 1);
+    return venda < ontem;
+  })();
+  const dataAlterada = form.dataVenda !== hojeStr;
 
   // Handlers
   // Lógica de pagamento:
@@ -174,6 +197,17 @@ function VenderPacote() {
       return;
     }
 
+    if (form.dataVenda && form.dataVenda > hojeStr) {
+      toast.error('Data da venda não pode estar no futuro');
+      return;
+    }
+
+    if (isRetroactivo && !form.motivoRetroactivo.trim()) {
+      toast.error('Indica o motivo da venda retroactiva (vai ficar registado para auditoria)');
+      setShowDetalhesVenda(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Backend aceita ambos:
@@ -195,6 +229,14 @@ function VenderPacote() {
         dados.valorEntrada = entradaValida;
       } else {
         dados.valorPago = form.pagarAgora ? form.valorPago : 0;
+      }
+      // Só envia data quando o utilizador alterou — assim o backend usa timestamp preciso
+      // (microssegundos) por defeito, e só recebe ISO date quando há intenção explícita.
+      if (dataAlterada) {
+        dados.dataCompra = form.dataVenda;
+      }
+      if (isRetroactivo) {
+        dados.motivoRetroactivo = form.motivoRetroactivo.trim();
       }
 
       await api.post('/compras-pacotes', dados);
@@ -337,6 +379,71 @@ function VenderPacote() {
                   </p>
                 </div>
               </>
+            )}
+          </div>
+
+          {/* Detalhes da venda — colapsado por defeito.
+              Permite registar venda retroactiva (cliente cadastrado tarde, lançamento atrasado, etc).
+              Backend exige motivo se a data for anterior a ontem. */}
+          <div className={`${cardClass} rounded-2xl p-5`}>
+            <button
+              type="button"
+              onClick={() => setShowDetalhesVenda(!showDetalhesVenda)}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <div className="flex items-center gap-2">
+                <History className={`w-5 h-5 ${subTextClass}`} />
+                <h2 className={`font-medium ${textClass}`}>Detalhes da venda</h2>
+                {dataAlterada && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    isRetroactivo
+                      ? (isDarkMode ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700')
+                      : (isDarkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700')
+                  }`}>
+                    {isRetroactivo ? 'Retroactiva' : 'Data ajustada'}
+                  </span>
+                )}
+              </div>
+              <ChevronDown
+                className={`w-5 h-5 ${subTextClass} transition-transform ${showDetalhesVenda ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {showDetalhesVenda && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className={`block text-sm ${subTextClass} mb-1`}>Data da venda</label>
+                  <input
+                    type="date"
+                    value={form.dataVenda}
+                    onChange={(e) => handleChange('dataVenda', e.target.value)}
+                    max={hojeStr}
+                    className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                  />
+                  <p className={`text-xs ${subTextClass} mt-1`}>
+                    Por defeito hoje. Altera se a venda aconteceu noutro dia.
+                  </p>
+                </div>
+
+                {isRetroactivo && (
+                  <div>
+                    <label className={`block text-sm ${subTextClass} mb-1`}>
+                      Motivo da retroactividade <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={form.motivoRetroactivo}
+                      onChange={(e) => handleChange('motivoRetroactivo', e.target.value)}
+                      rows={2}
+                      maxLength={500}
+                      placeholder="Ex: Cliente cadastrado em atraso; venda física registada após o facto."
+                      className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                    />
+                    <p className={`text-xs mt-1 ${isDarkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                      Obrigatório quando a venda foi há mais de 1 dia. Fica registado para auditoria.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

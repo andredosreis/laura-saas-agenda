@@ -24,7 +24,6 @@ import scheduleRoutes from './routes/scheduleRoutes.js';
 import notificationRoutes from './modules/notificacoes/notificationRoutes.js';
 import webhookRoutes from './modules/ia/webhookRoutes.js';
 import authRoutes from './modules/auth/authRoutes.js'; // 🆕 Autenticação — migrado para src/modules/auth/ (ADR-011)
-import financeiroRoutes from './modules/financeiro/financeiroRoutes.js';
 import migrationRoutes from './routes/migrationRoutes.js'; // 🆕 Rota de Migração
 import transacaoRoutes from './modules/financeiro/transacaoRoutes.js';
 import compraPacoteRoutes from './modules/financeiro/compraPacoteRoutes.js';
@@ -32,6 +31,7 @@ import pagamentoRoutes from './modules/financeiro/pagamentoRoutes.js';
 import caixaRoutes from './modules/financeiro/caixaRoutes.js';
 import historicoAtendimentoRoutes from './modules/historico/historicoAtendimentoRoutes.js';
 import usersRoutes from './modules/users/usersRoutes.js';
+import fechamentoMensalRoutes from './modules/financeiro/fechamentoMensalRoutes.js';
 
 const app = express();
 
@@ -97,7 +97,6 @@ const apiResources = [
   ['/agente', agenteRoutes],
   ['/schedules', scheduleRoutes],
   ['/notifications', notificationRoutes],
-  ['/financeiro', financeiroRoutes],
   ['/migration', migrationRoutes],
   ['/transacoes', transacaoRoutes],
   ['/compras-pacotes', compraPacoteRoutes],
@@ -105,6 +104,7 @@ const apiResources = [
   ['/caixa', caixaRoutes],
   ['/historico-atendimentos', historicoAtendimentoRoutes],
   ['/users', usersRoutes],
+  ['/fechamentos-mensais', fechamentoMensalRoutes],
 ];
 
 for (const [path, router] of apiResources) {

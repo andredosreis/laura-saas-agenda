@@ -20,6 +20,7 @@ import { PagamentoSchema }            from './Pagamento.js';
 import { HistoricoAtendimentoSchema } from './HistoricoAtendimento.js';
 import { ConversaSchema }             from './Conversa.js';
 import { ScheduleSchema }             from './Schedule.js';
+import { FechamentoMensalSchema }     from './FechamentoMensal.js';
 
 /**
  * @param {import('mongoose').Connection} db  — conexão específica do tenant
@@ -38,5 +39,6 @@ export function getModels(db) {
     HistoricoAtendimento: db.model('HistoricoAtendimento', HistoricoAtendimentoSchema),
     Conversa:             db.model('Conversa',             ConversaSchema),
     Schedule:             db.model('Schedule',             ScheduleSchema),
+    FechamentoMensal:     db.model('FechamentoMensal',     FechamentoMensalSchema),
   };
 }

@@ -96,6 +96,31 @@ export const deletarPagamentoSchema = z
 
 // ─── Compra de Pacote ───────────────────────────────────────────────
 
+// ─── Fechamento Mensal ──────────────────────────────────────────────
+
+export const criarFechamentoSchema = z
+  .object({
+    ano: z.coerce.number().int().min(2020).max(2099),
+    mes: z.coerce.number().int().min(1).max(12),
+    observacoes: z.string().trim().max(1000).optional(),
+  })
+  .strict();
+
+export const paramsAnoMesSchema = z
+  .object({
+    ano: z.coerce.number().int().min(2020).max(2099),
+    mes: z.coerce.number().int().min(1).max(12),
+  })
+  .strict();
+
+export const listarFechamentosSchema = z
+  .object({
+    ano: z.coerce.number().int().min(2020).max(2099).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .partial();
+
 export const venderPacoteSchema = z
   .object({
     clienteId: objectId,
@@ -105,6 +130,7 @@ export const venderPacoteSchema = z
     formaPagamento: formaPagamento.optional().nullable(),
     observacoes: z.string().trim().max(1000).optional(),
     dataCompra: z.coerce.date().optional(),
+    motivoRetroactivo: z.string().trim().max(500).optional(),
     diasValidade: z.number().int().positive().optional().nullable(),
     sessoesUsadas: z.number().int().min(0).optional(),
     parcelado: z.boolean().optional(),

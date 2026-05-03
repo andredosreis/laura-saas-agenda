@@ -131,6 +131,13 @@ const pagamentoSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: ''
+  },
+
+  // Audit de retroactividade — preenchido apenas em pagamentos com dataPagamento passada
+  origemRetroactiva: {
+    motivo: { type: String, maxlength: 500 },
+    registadoEm: Date,
+    registadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }
 }, {
   timestamps: true

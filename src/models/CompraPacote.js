@@ -163,7 +163,14 @@ const compraPacoteSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
-  }]
+  }],
+
+  // Audit de retroactividade — preenchido apenas em vendas com dataCompra passada
+  origemRetroactiva: {
+    motivo: { type: String, maxlength: 500 },
+    registadoEm: Date,
+    registadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }
 }, {
   timestamps: true
 });

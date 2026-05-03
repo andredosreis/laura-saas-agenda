@@ -154,6 +154,14 @@ const transacaoSchema = new mongoose.Schema({
       type: Date,
       default: null
     }
+  },
+
+  // Audit de retroactividade — preenchido apenas em lançamentos com data passada
+  // (ex: cliente cadastrado tarde, venda registada após o facto)
+  origemRetroactiva: {
+    motivo: { type: String, maxlength: 500 },
+    registadoEm: Date,
+    registadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }
 }, {
   timestamps: true
@@ -164,6 +172,8 @@ transacaoSchema.index({ tenantId: 1, tipo: 1, createdAt: -1 });
 transacaoSchema.index({ tenantId: 1, statusPagamento: 1 });
 transacaoSchema.index({ tenantId: 1, cliente: 1 });
 transacaoSchema.index({ tenantId: 1, createdAt: -1 });
+// Índice para queries de período (snapshot mensal, relatórios por dataPagamento)
+transacaoSchema.index({ tenantId: 1, dataPagamento: -1 });
 
 // Middleware: Calcular valorFinal automaticamente
 transacaoSchema.pre('save', function() {

@@ -37,6 +37,7 @@ const Financeiro = lazy(() => import('./pages/Financeiro'));
 const Transacoes = lazy(() => import('./pages/Transacoes'));
 const PacotesAtivos = lazy(() => import('./pages/PacotesAtivos'));
 const VenderPacote = lazy(() => import('./pages/VenderPacote'));
+const FechamentosMensais = lazy(() => import('./pages/FechamentosMensais'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
@@ -132,6 +133,9 @@ const App = () => {
             } />
             <Route path="/vender-pacote" element={
               <ProtectedLayout><VenderPacote /></ProtectedLayout>
+            } />
+            <Route path="/fechamentos-mensais" element={
+              <ProtectedLayout><FechamentosMensais /></ProtectedLayout>
             } />
             {/* Caixa temporariamente desactivada */}
             {/* <Route path="/caixa" element={

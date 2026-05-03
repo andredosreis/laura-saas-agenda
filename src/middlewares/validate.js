@@ -22,6 +22,17 @@ export const validate = (schema, location = 'body') => (req, res, next) => {
       error: `${path}${first.message}`,
     });
   }
-  req[location] = result.data;
+  // Express 5: req.query é getter-only, não pode ser atribuído. Mutamos em vez.
+  // Para body/params a atribuição directa funciona.
+  try {
+    req[location] = result.data;
+  } catch (err) {
+    if (req[location] && typeof req[location] === 'object') {
+      Object.keys(req[location]).forEach((k) => { delete req[location][k]; });
+      Object.assign(req[location], result.data);
+    } else {
+      throw err;
+    }
+  }
   next();
 };

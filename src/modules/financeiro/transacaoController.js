@@ -183,16 +183,26 @@ export const listarTransacoes = async (req, res) => {
 
     // Orphan CompraPacote — vendas que existem em CompraPacote mas perderam a Transacao
     // (ex: cascade delete antigo, edição manual). Sem isto, Transações sub-conta e diverge
-    // de /pacotes-ativos. Sem filtro de data — conta tudo do tenant.
+    // de /pacotes-ativos.
+    //
+    // IMPORTANTE: respeitar o mesmo range de data que filtra `query.createdAt`. Sem este
+    // filtro, orphans de Janeiro entravam nos totais de Abril e o utilizador via "Vendido"
+    // inflado em períodos passados.
     const transacoesComPacote = await Transacao.find({
       tenantId: req.tenantId,
       compraPacote: { $exists: true, $ne: null }
     }).distinct('compraPacote');
 
-    const orphanPacotes = await CompraPacote.find({
+    const orphanQuery = {
       tenantId: req.tenantId,
       _id: { $nin: transacoesComPacote }
-    }).select('valorTotal valorPago').lean();
+    };
+    if (query.createdAt) {
+      // Aplicar mesmo range a `dataCompra` dos orphans (campo análogo a createdAt para CompraPacote)
+      orphanQuery.dataCompra = query.createdAt;
+    }
+
+    const orphanPacotes = await CompraPacote.find(orphanQuery).select('valorTotal valorPago').lean();
 
     if (orphanPacotes.length > 0) {
       const vendidoOrphan = orphanPacotes.reduce((s, cp) => s + (cp.valorTotal || 0), 0);

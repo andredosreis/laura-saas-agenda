@@ -302,7 +302,12 @@ function PacotesAtivos() {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
             <h1 className={`text-2xl font-bold ${textClass}`}>📦 Serviços Ativos</h1>
-            <p className={subTextClass}>Gerencie os serviços vendidos aos clientes</p>
+            <p className={subTextClass}>
+              Carteira de pacotes em aberto — todos os tempos.{' '}
+              <span className="text-xs italic">
+                Para faturação por mês usa <strong>Transações</strong>.
+              </span>
+            </p>
           </div>
           <div className="flex gap-3 mt-4 md:mt-0">
             <select
@@ -343,23 +348,35 @@ function PacotesAtivos() {
               </div>
               <p className="text-2xl font-bold text-emerald-500">{stats.sessoesTotais}</p>
             </div>
-            <div className={`${cardClass} rounded-2xl p-4`}>
+            <div
+              className={`${cardClass} rounded-2xl p-4`}
+              title="Soma do valor total de todos os pacotes Activos — independente da data de venda. Para faturação do mês usa Transações."
+            >
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs ${subTextClass}`}>💰 Vendido</span>
+                <span className={`text-xs ${subTextClass}`}>💼 Carteira</span>
               </div>
               <p className={`text-2xl font-bold ${textClass}`}>€{stats.valorTotal.toFixed(2)}</p>
+              <p className={`text-[10px] ${subTextClass} mt-1`}>valor total dos activos</p>
             </div>
-            <div className={`${cardClass} rounded-2xl p-4`}>
+            <div
+              className={`${cardClass} rounded-2xl p-4`}
+              title="Total já recebido sobre os pacotes Activos — independente do mês em que entrou."
+            >
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs ${subTextClass}`}>✅ Recebido</span>
+                <span className={`text-xs ${subTextClass}`}>✅ Já recebido</span>
               </div>
               <p className="text-2xl font-bold text-emerald-500">€{stats.valorPago.toFixed(2)}</p>
+              <p className={`text-[10px] ${subTextClass} mt-1`}>pagamentos da carteira</p>
             </div>
-            <div className={`${cardClass} rounded-2xl p-4`}>
+            <div
+              className={`${cardClass} rounded-2xl p-4`}
+              title="Total ainda em aberto na carteira — todos os pacotes Activos com saldo pendente, independente do mês de venda."
+            >
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs ${subTextClass}`}>⏳ A Receber</span>
+                <span className={`text-xs ${subTextClass}`}>⏳ Em aberto</span>
               </div>
               <p className="text-2xl font-bold text-amber-500">€{stats.valorPendente.toFixed(2)}</p>
+              <p className={`text-[10px] ${subTextClass} mt-1`}>parcelas por receber</p>
             </div>
           </div>
         )}
