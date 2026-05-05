@@ -35,7 +35,9 @@ const createTransporter = () => {
 let transporter = null;
 
 // Inicializar transporter (chamado no startup)
-// Em produção valida credenciais com transporter.verify() — apanha auth inválido cedo.
+// Valida credenciais com transporter.verify() mas NÃO mata o processo se falhar
+// (ex: Render bloqueia SMTP outbound em planos free/starter — graceful degrade).
+// Para tornar fatal, define EMAIL_REQUIRED=true.
 export const initEmailService = async () => {
     transporter = createTransporter();
     if (!transporter) return;
@@ -49,14 +51,13 @@ export const initEmailService = async () => {
     } catch (err) {
         logger.error(
             { err, host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER },
-            'Falha ao verificar SMTP — credenciais inválidas ou host inacessível'
+            'Falha ao verificar SMTP — host inacessível, credenciais inválidas ou porta bloqueada pelo provedor (ex: Render bloqueia 587)'
         );
-        if (process.env.NODE_ENV === 'production') {
-            // Em produção, falha o startup — não queremos servidor a aceitar pedidos sem email
+        if (process.env.EMAIL_REQUIRED === 'true') {
+            // Opt-in: só falha startup se admin marcar email como crítico
             throw err;
         }
-        // Em dev, mantém transporter para diagnóstico mas avisa
-        logger.warn('SMTP inválido em modo dev — sendEmail vai falhar quando chamado');
+        logger.warn('Servidor continua sem email — envios vão falhar até resolveres SMTP');
     }
 };
 
