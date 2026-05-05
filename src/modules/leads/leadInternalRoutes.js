@@ -175,4 +175,41 @@ router.patch('/:id/qualificacao', async (req, res) => {
   }
 });
 
+// =====================================================================
+// POST /api/internal/mensagens — ia-service persiste mensagem (in ou out)
+// Body: { tenantId, conversaId?, telefone, mensagem, origem, direcao? }
+// =====================================================================
+router.post('/mensagens', requireServiceToken, async (req, res) => {
+  try {
+    const { tenantId, conversaId, telefone, mensagem, origem, direcao } = req.body;
+    if (!tenantId || !telefone || !mensagem || !origem) {
+      return res.status(400).json({ success: false, error: 'tenantId, telefone, mensagem e origem são obrigatórios' });
+    }
+    const db = getTenantDB(String(tenantId));
+    const { Mensagem, Conversa } = getModels(db);
+
+    let conversa = conversaId
+      ? await Conversa.findOne({ _id: conversaId, tenantId })
+      : await Conversa.findOne({ telefone, tenantId });
+
+    if (!conversa) {
+      conversa = await Conversa.create({ tenantId, telefone, estado: 'aguardando_agendamento' });
+    }
+
+    const msg = await Mensagem.create({
+      tenantId,
+      telefone,
+      mensagem,
+      origem,
+      direcao: direcao ?? (origem === 'cliente' ? 'entrada' : 'saida'),
+      conversa: conversa._id,
+    });
+
+    res.status(201).json({ success: true, data: { mensagem: msg, conversa } });
+  } catch (err) {
+    console.error('Erro ao persistir mensagem:', err);
+    res.status(500).json({ success: false, error: 'Erro interno ao persistir mensagem.' });
+  }
+});
+
 export default router;

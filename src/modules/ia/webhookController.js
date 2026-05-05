@@ -4,6 +4,7 @@ import { getModels } from '../../models/registry.js';
 import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
 import { markMessageSeen } from '../../utils/webhookDedupe.js';
 import { DateTime } from 'luxon';
+import * as iaServiceClient from '../../utils/iaServiceClient.js';
 
 /**
  * Resolve tenant a partir do nome da instância Evolution (`req.body.instance`).
@@ -197,17 +198,28 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     );
     const ehRespostaConfirmacao = ehSim || ehNao;
 
+    // Captura instanceName antes do routing (necessário para ia-service path — ADR-021)
+    const instanceName = req.body?.instance ? String(req.body.instance) : null;
+
     if (!ehRespostaConfirmacao) {
-      console.log(`[Webhook] ⏭️ Mensagem ignorada (não é confirmação): "${mensagem}"`);
-      return res.status(200).json({ message: 'Mensagem ignorada' });
+      // ACK imediato — processamento async (ia-service ou fallback)
+      res.status(200).json({ success: true, message: 'Mensagem aceite, a processar' });
+
+      processarMensagemLeadAsync({
+        telefoneNormalizado,
+        mensagem,
+        messageId,
+        timestampMensagem,
+        instanceName,
+      }).catch(err => {
+        console.error('[Webhook] ❌ Erro processarMensagemLeadAsync:', err);
+      });
+
+      return;
     }
 
     // ✅ É uma resposta de confirmação (SIM/NÃO) → ACK rápido + processa async
     console.log(`[Webhook] ✅ Detectado resposta de confirmação: "${mensagem}"`);
-
-    // Captura nome da instância Evolution para routing O(1) por tenant (ADR-021).
-    // Quando ausente (legacy), processarConfirmacaoAsync cai no scan global com warning.
-    const instanceName = req.body?.instance ? String(req.body.instance) : null;
 
     // ACK FAST: Evolution recebe 200 em ~50ms, evita timeout/retry.
     // O processamento real (resolveCliente, sendWhatsAppMessage, etc.) corre em background.
@@ -412,6 +424,64 @@ async function resolveOutboundInstance(tenantId, currentInstance) {
     return t?.whatsapp?.instanceName || null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Processamento assíncrono de mensagens de lead (não-confirmação).
+ * Se ia-service disponível + leadsAtivo → delega para Python.
+ * Fallback: delegarParaIAAsync (saudação genérica local).
+ */
+async function processarMensagemLeadAsync({ telefoneNormalizado, mensagem, messageId, timestampMensagem, instanceName }) {
+  const IA_SERVICE_ENABLED = process.env.IA_SERVICE_ENABLED !== 'false' && Boolean(process.env.IA_SERVICE_URL);
+
+  // Resolve tenant (O(1) via instance, ou null se legacy)
+  const tenantCtx = await resolveTenantByInstance(instanceName);
+  const leadsAtivo = tenantCtx?.tenant?.limites?.leadsAtivo !== false;
+
+  if (!IA_SERVICE_ENABLED || !leadsAtivo) {
+    console.log(`[Webhook] ℹ️ ia-service desabilitado ou leadsAtivo=false — delegarParaIAAsync`);
+    return delegarParaIAAsync(telefoneNormalizado, instanceName);
+  }
+
+  // Verifica se já existe lead para este telefone neste tenant
+  let leadId = null;
+  let clienteId = null;
+  if (tenantCtx) {
+    const telefoneVariants = [
+      telefoneNormalizado,
+      `351${telefoneNormalizado}`,
+      telefoneNormalizado.replace(/^351/, ''),
+    ];
+    const lead = await tenantCtx.models.Lead?.findOne({
+      tenantId: tenantCtx.tenantId,
+      telefone: { $in: telefoneVariants },
+    }).select('_id').lean();
+    if (lead) leadId = lead._id.toString();
+
+    const cliente = await tenantCtx.models.Cliente?.findOne({
+      tenantId: tenantCtx.tenantId,
+      telefone: { $in: telefoneVariants },
+    }).select('_id').lean();
+    if (cliente) clienteId = cliente._id.toString();
+  }
+
+  try {
+    await iaServiceClient.processLead({
+      tenantId: tenantCtx?.tenantId ?? null,
+      instanceName,
+      telefone: telefoneNormalizado,
+      mensagem,
+      messageId,
+      timestamp: new Date(timestampMensagem).toISOString(),
+      clienteId,
+      leadId,
+    });
+    console.log(`[Webhook] ✅ Mensagem delegada ao ia-service — lead ${leadId ?? 'novo'}`);
+  } catch (err) {
+    console.error('[Webhook] ❌ ia_service_unreachable — fallback delegarParaIAAsync:', err.message);
+    // Sentry captura automaticamente via integração global
+    return delegarParaIAAsync(telefoneNormalizado, instanceName);
   }
 }
 

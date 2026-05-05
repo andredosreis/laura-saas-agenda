@@ -23,6 +23,45 @@ services:
       - evolution_data:/evolution/instances
       - evolution_store:/evolution/store
 
+  backend:
+    build: .
+    container_name: marcai-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - IA_SERVICE_URL=http://ia-service:8000
+      - IA_SERVICE_ENABLED=${IA_SERVICE_ENABLED:-true}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-dev-token-only}
+    depends_on:
+      - evolution-api
+
+  ia-service:
+    build: ./ia-service
+    container_name: marcai-ia-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-dev-token-only}
+      - MARCAI_API_URL=http://backend:5000
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB_PREFIX=${MONGODB_DB_PREFIX:-marcai}
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - SENTRY_DSN=${SENTRY_DSN_IA:-}
+    depends_on:
+      - backend
+
 volumes:
   evolution_data:
   evolution_store:
