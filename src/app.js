@@ -32,6 +32,8 @@ import caixaRoutes from './modules/financeiro/caixaRoutes.js';
 import historicoAtendimentoRoutes from './modules/historico/historicoAtendimentoRoutes.js';
 import usersRoutes from './modules/users/usersRoutes.js';
 import fechamentoMensalRoutes from './modules/financeiro/fechamentoMensalRoutes.js';
+import leadRoutes from './modules/leads/leadRoutes.js';
+import leadInternalRoutes from './modules/leads/leadInternalRoutes.js';
 
 const app = express();
 
@@ -105,12 +107,17 @@ const apiResources = [
   ['/historico-atendimentos', historicoAtendimentoRoutes],
   ['/users', usersRoutes],
   ['/fechamentos-mensais', fechamentoMensalRoutes],
+  ['/leads', leadRoutes],
 ];
 
 for (const [path, router] of apiResources) {
   app.use(`/api${path}`, router);
   app.use(`/api/v1${path}`, router);
 }
+
+// Rotas internas — autenticadas por X-Service-Token, usadas pelo `ia-service`
+// Python (Phase 2+). Não expostas em /api/v1 — só /api/internal/*.
+app.use('/api/internal/leads', leadInternalRoutes);
 
 // Webhook Evolution API — limite maior para payloads com dados binários de grupos
 app.use('/webhook', express.json({ limit: '1mb' }), webhookRoutes);

@@ -82,6 +82,13 @@ const UserSchema = new Schema({
         // Financeiro
         verFinanceiro: { type: Boolean, default: false },
 
+        // Leads / CRM (Phase 1+)
+        verLeads: { type: Boolean, default: true },
+        criarLeads: { type: Boolean, default: true },
+        editarLeads: { type: Boolean, default: true },
+        deletarLeads: { type: Boolean, default: false },
+        responderLeads: { type: Boolean, default: true },
+
         // Configurações
         editarConfiguracoes: { type: Boolean, default: false },
 
@@ -331,6 +338,11 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: true,
             deletarPacotes: true,
             verFinanceiro: true,
+            verLeads: true,
+            criarLeads: true,
+            editarLeads: true,
+            deletarLeads: true,
+            responderLeads: true,
             editarConfiguracoes: true,
             gerenciarUsuarios: true
         },
@@ -348,6 +360,11 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: true,
             deletarPacotes: true,
             verFinanceiro: true,
+            verLeads: true,
+            criarLeads: true,
+            editarLeads: true,
+            deletarLeads: true,
+            responderLeads: true,
             editarConfiguracoes: true,
             gerenciarUsuarios: true
         },
@@ -365,6 +382,11 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: true,
             deletarPacotes: false,
             verFinanceiro: true,
+            verLeads: true,
+            criarLeads: true,
+            editarLeads: true,
+            deletarLeads: false,
+            responderLeads: true,
             editarConfiguracoes: false,
             gerenciarUsuarios: false
         },
@@ -382,6 +404,11 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: false,
             deletarPacotes: false,
             verFinanceiro: false,
+            verLeads: true,
+            criarLeads: true,
+            editarLeads: true,
+            deletarLeads: false,
+            responderLeads: true,
             editarConfiguracoes: false,
             gerenciarUsuarios: false
         },
@@ -399,6 +426,11 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: false,
             deletarPacotes: false,
             verFinanceiro: false,
+            verLeads: false,
+            criarLeads: false,
+            editarLeads: false,
+            deletarLeads: false,
+            responderLeads: false,
             editarConfiguracoes: false,
             gerenciarUsuarios: false
         }

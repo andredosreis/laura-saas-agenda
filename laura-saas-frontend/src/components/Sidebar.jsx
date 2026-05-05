@@ -20,7 +20,9 @@ import {
   CalendarClock,
   ListChecks,
   Settings,
-  CalendarCheck
+  CalendarCheck,
+  Inbox,
+  Columns
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
 import ThemeToggle from './ThemeToggle';
@@ -30,7 +32,8 @@ function Sidebar() {
   const [expandedGroups, setExpandedGroups] = useState({
     financas: true,
     agendamento: true,
-    administrativo: true
+    administrativo: true,
+    crm: true
   });
   const { logout, user } = useAuth();
   const navigate = useNavigate();
@@ -64,6 +67,14 @@ function Sidebar() {
       label: null,
       items: [
         { to: "/dashboard", text: "Dashboard", icon: LayoutDashboard, perm: null } // todos vêem
+      ]
+    },
+    {
+      id: 'crm',
+      label: 'CRM / VENDAS',
+      items: [
+        { to: "/leads", text: "Leads", icon: Inbox, perm: 'verLeads' },
+        { to: "/leads/kanban", text: "Pipeline", icon: Columns, perm: 'verLeads' }
       ]
     },
     {
@@ -178,7 +189,7 @@ function Sidebar() {
                         to={link.to}
                         className={getLinkClasses}
                         onClick={closeMobileMenu}
-                        end={link.to === "/dashboard"}
+                        end={link.to === "/dashboard" || link.to === "/leads"}
                       >
                         <link.icon className="w-5 h-5" />
                         <span>{link.text}</span>

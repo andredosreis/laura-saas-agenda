@@ -21,6 +21,7 @@ import { HistoricoAtendimentoSchema } from './HistoricoAtendimento.js';
 import { ConversaSchema }             from './Conversa.js';
 import { ScheduleSchema }             from './Schedule.js';
 import { FechamentoMensalSchema }     from './FechamentoMensal.js';
+import { LeadSchema }                 from './Lead.js';
 
 /**
  * @param {import('mongoose').Connection} db  — conexão específica do tenant
@@ -40,5 +41,6 @@ export function getModels(db) {
     Conversa:             db.model('Conversa',             ConversaSchema),
     Schedule:             db.model('Schedule',             ScheduleSchema),
     FechamentoMensal:     db.model('FechamentoMensal',     FechamentoMensalSchema),
+    Lead:                 db.model('Lead',                 LeadSchema),
   };
 }

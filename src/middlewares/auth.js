@@ -213,6 +213,17 @@ export const checkLimit = (limitType) => {
                     break;
                 }
 
+                case 'maxLeads': {
+                    // Apenas leads em estado activo contam para o limite.
+                    // Leads convertidos ou perdidos saem do limite (incentiva fechar).
+                    const { Lead } = req.models;
+                    count = await Lead.countDocuments({
+                        tenantId: req.tenantId,
+                        status: { $nin: ['perdido', 'convertido'] }
+                    });
+                    break;
+                }
+
                 default:
                     return next();
             }

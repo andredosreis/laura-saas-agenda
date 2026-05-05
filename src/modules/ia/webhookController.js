@@ -6,8 +6,38 @@ import { markMessageSeen } from '../../utils/webhookDedupe.js';
 import { DateTime } from 'luxon';
 
 /**
+ * Resolve tenant a partir do nome da instância Evolution (`req.body.instance`).
+ * Lookup O(1) via índice unique sparse em `whatsapp.instanceName`.
+ * Esta é a via preferida desde a Phase 0 do módulo de Leads (1 Evolution per tenant).
+ *
+ * Exportado para permitir testes unitários e reutilização noutros pontos do
+ * fluxo (Phase 1: criação de leads; Phase 2: gateway para o `ia-service`).
+ *
+ * @param {string} instanceName  valor de `req.body.instance` do payload Evolution
+ * @returns {{ tenant, models, tenantId } | null}
+ */
+export async function resolveTenantByInstance(instanceName) {
+  if (!instanceName || typeof instanceName !== 'string') return null;
+
+  const tenant = await Tenant.findOne({
+    'whatsapp.instanceName': instanceName.trim().toLowerCase(),
+    'plano.status': { $in: ['ativo', 'trial'] },
+  }).lean();
+
+  if (!tenant) return null;
+
+  const db = getTenantDB(tenant._id.toString());
+  const models = getModels(db);
+  return { tenant, models, tenantId: tenant._id.toString() };
+}
+
+/**
  * Resolve tenant-specific models by searching across all tenant databases.
  * Tries to find a client matching the given phone variants in each tenant DB.
+ *
+ * Legacy fallback usado quando a instância partilhada `marcai` envia o webhook
+ * sem `instance` resolvível por tenant. Será removido depois da migração total
+ * para 1 Evolution per tenant (ADR-021).
  *
  * @returns {{ models, tenantId, cliente } | null}
  */
@@ -175,12 +205,16 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     // ✅ É uma resposta de confirmação (SIM/NÃO) → ACK rápido + processa async
     console.log(`[Webhook] ✅ Detectado resposta de confirmação: "${mensagem}"`);
 
+    // Captura nome da instância Evolution para routing O(1) por tenant (ADR-021).
+    // Quando ausente (legacy), processarConfirmacaoAsync cai no scan global com warning.
+    const instanceName = req.body?.instance ? String(req.body.instance) : null;
+
     // ACK FAST: Evolution recebe 200 em ~50ms, evita timeout/retry.
     // O processamento real (resolveCliente, sendWhatsAppMessage, etc.) corre em background.
     res.status(200).json({ success: true, message: 'Mensagem aceite, processando' });
 
     // Fire-and-forget. Erros são logged (Sentry captura automaticamente).
-    processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim, ehNao })
+    processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim, ehNao, instanceName })
       .catch(err => {
         console.error('[Webhook] ❌ Erro async ao processar confirmação:', err);
       });
@@ -197,8 +231,18 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
  * Processamento assíncrono da confirmação WhatsApp.
  * Chamado fire-and-forget após ack 200 ao Evolution.
  * Sem req/res — toda a comunicação ao cliente é via sendWhatsAppMessage.
+ *
+ * @param {object}  ctx
+ * @param {string}  ctx.telefoneNormalizado
+ * @param {string}  ctx.mensagem
+ * @param {boolean} ctx.ehSim
+ * @param {boolean} ctx.ehNao
+ * @param {string|null} [ctx.instanceName]  nome da instância Evolution; quando presente,
+ *                                          permite resolução O(1) do tenant via
+ *                                          índice `whatsapp.instanceName` (ADR-021).
+ *                                          Sem isto, cai no scan global legacy com warning.
  */
-async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim, ehNao }) {
+async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim, ehNao, instanceName = null }) {
   // Busca cliente pelo telefone (tenant-aware)
   const telefoneVariants = [
     telefoneNormalizado,
@@ -214,35 +258,69 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
 
   let agendamento = null;
   let nomeRemetente = null;
+  let instanceForResponse = instanceName; // usada ao enviar resposta
 
-  // Busca cliente em todos os tenants
-  const clienteResult = await resolveClienteTenant(telefoneVariants);
+  // Caminho preferido (ADR-021): resolução directa via instance → 1 query indexada
+  const tenantByInstance = await resolveTenantByInstance(instanceName);
 
-  if (clienteResult) {
-    const { models, cliente } = clienteResult;
-    console.log(`[Webhook] ✅ Cliente encontrado: ${cliente.nome} (${cliente._id})`);
-    agendamento = await models.Agendamento.findOne({
-      cliente: cliente._id,
-      'confirmacao.tipo': 'pendente',
-      dataHora: janelaQuery,
-    }).sort({ dataHora: 1 });
-    nomeRemetente = cliente.nome;
-  }
+  if (tenantByInstance) {
+    const { models, tenant } = tenantByInstance;
+    instanceForResponse = tenant?.whatsapp?.instanceName || instanceForResponse;
 
-  // Se não encontrou agendamento via cliente, tenta via lead (tipo Avaliacao)
-  if (!agendamento) {
-    const leadResult = await resolveLeadTenant(telefoneVariants, janelaQuery);
+    const cliente = await models.Cliente.findOne({ telefone: { $in: telefoneVariants } });
+    if (cliente) {
+      console.log(`[Webhook] ✅ Cliente encontrado via instance "${instanceName}": ${cliente.nome}`);
+      agendamento = await models.Agendamento.findOne({
+        cliente: cliente._id,
+        'confirmacao.tipo': 'pendente',
+        dataHora: janelaQuery,
+      }).sort({ dataHora: 1 });
+      nomeRemetente = cliente.nome;
+    }
 
-    if (leadResult) {
-      agendamento = leadResult.agendamento;
-      nomeRemetente = agendamento.lead.nome;
-      console.log(`[Webhook] ✅ Lead encontrado: ${nomeRemetente}`);
+    if (!agendamento) {
+      agendamento = await models.Agendamento.findOne({
+        tipo: 'Avaliacao',
+        'lead.telefone': { $in: telefoneVariants },
+        'confirmacao.tipo': 'pendente',
+        dataHora: janelaQuery,
+      }).sort({ dataHora: 1 });
+      if (agendamento) {
+        nomeRemetente = agendamento.lead?.nome || nomeRemetente;
+        console.log(`[Webhook] ✅ Lead Avaliação encontrado via instance "${instanceName}": ${nomeRemetente}`);
+      }
+    }
+  } else {
+    // Fallback legacy: instance ausente, desconhecida ou tenant sem `whatsapp.instanceName`
+    // configurado. Avisa e cai no scan global enquanto a migração não está completa.
+    console.warn(`[Webhook] ⚠️ legacy_evolution_routing: instance="${instanceName ?? '(none)'}" sem tenant correspondente — fallback scan`);
+
+    const clienteResult = await resolveClienteTenant(telefoneVariants);
+
+    if (clienteResult) {
+      const { models, cliente } = clienteResult;
+      console.log(`[Webhook] ✅ Cliente encontrado (scan legacy): ${cliente.nome} (${cliente._id})`);
+      agendamento = await models.Agendamento.findOne({
+        cliente: cliente._id,
+        'confirmacao.tipo': 'pendente',
+        dataHora: janelaQuery,
+      }).sort({ dataHora: 1 });
+      nomeRemetente = cliente.nome;
+    }
+
+    if (!agendamento) {
+      const leadResult = await resolveLeadTenant(telefoneVariants, janelaQuery);
+      if (leadResult) {
+        agendamento = leadResult.agendamento;
+        nomeRemetente = agendamento.lead.nome;
+        console.log(`[Webhook] ✅ Lead encontrado (scan legacy): ${nomeRemetente}`);
+      }
     }
   }
 
   if (!agendamento) {
     console.warn(`[Webhook] ⚠️ Nenhum agendamento pendente para ${telefoneNormalizado} - delegando para IA`);
-    return await delegarParaIAAsync(telefoneNormalizado);
+    return await delegarParaIAAsync(telefoneNormalizado, instanceForResponse);
   }
 
   // Processa resposta
@@ -285,7 +363,9 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
 
     resposta = `Olá ${nomeRemetente}! 👋\n\nNão consegui entender sua resposta. Você tem um agendamento marcado para ${dataFormatada}.\n\nPor favor, responda:\n✅ *SIM* - para confirmar\n❌ *NÃO* - para cancelar`;
 
-    await sendWhatsAppMessage(telefoneNormalizado, resposta);
+    // Tenta resolver instance do tenant proprietário do agendamento (caminho legacy → preferido)
+    const outboundInstance = await resolveOutboundInstance(agendamento.tenantId, instanceForResponse);
+    await sendWhatsAppMessage(telefoneNormalizado, resposta, outboundInstance);
     return;
   }
 
@@ -293,8 +373,11 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
   await agendamento.save();
   console.log(`[Webhook] ✅ Agendamento ${novoStatus}: ${agendamento._id}`);
 
+  // Resolve a instância correcta para o envio de saída (prefere a do tenant proprietário)
+  const outboundInstance = await resolveOutboundInstance(agendamento.tenantId, instanceForResponse);
+
   // Envia resposta ao cliente/lead
-  await sendWhatsAppMessage(telefoneNormalizado, resposta);
+  await sendWhatsAppMessage(telefoneNormalizado, resposta, outboundInstance);
 
   // Notifica admin sobre a resposta do cliente
   const tenant = await Tenant.findById(agendamento.tenantId).lean();
@@ -308,7 +391,27 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
       ? `✅ *Agendamento Confirmado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* confirmou a sessão das *${dataFormatadaAdmin}* de hoje.`
       : `❌ *Agendamento Cancelado*\n\nOlá, Administrador!\n\n*${nomeRemetente}* cancelou a sessão das *${dataFormatadaAdmin}* de hoje.`;
 
-    await sendWhatsAppMessage(numeroAdmin, msgAdmin);
+    await sendWhatsAppMessage(numeroAdmin, msgAdmin, outboundInstance);
+  }
+}
+
+/**
+ * Resolve a instância Evolution correcta para envio de mensagem outbound.
+ * Prefere `currentInstance` (já resolvida no fluxo); senão tenta o `instanceName`
+ * configurado no tenant proprietário; senão devolve `null` (cai no env default).
+ *
+ * @param {import('mongoose').ObjectId|string} tenantId
+ * @param {string|null} currentInstance
+ * @returns {Promise<string|null>}
+ */
+async function resolveOutboundInstance(tenantId, currentInstance) {
+  if (currentInstance) return currentInstance;
+  if (!tenantId) return null;
+  try {
+    const t = await Tenant.findById(tenantId).select('whatsapp.instanceName').lean();
+    return t?.whatsapp?.instanceName || null;
+  } catch {
+    return null;
   }
 }
 
@@ -317,8 +420,11 @@ async function processarConfirmacaoAsync({ telefoneNormalizado, mensagem, ehSim,
  * Envia mensagem de saudação e notifica Laura
  * IMPORTANTE: Responde APENAS UMA VEZ, nunca mais interage.
  * Sem req/res — chamada por processarConfirmacaoAsync após ack 200 ao Evolution.
+ *
+ * @param {string} telefoneNormalizado
+ * @param {string|null} [instanceName]  instância Evolution preferida; null cai no env default
  */
-async function delegarParaIAAsync(telefoneNormalizado) {
+async function delegarParaIAAsync(telefoneNormalizado, instanceName = null) {
   try {
     console.log('[Webhook] 📝 Processando mensagem não-confirmação (resposta automática simples)');
 
@@ -333,9 +439,15 @@ async function delegarParaIAAsync(telefoneNormalizado) {
       telefoneNormalizado.replace(/^351/, '')
     ];
 
-    // Busca cliente em todos os tenants (tenant-aware)
-    const clienteResult = await resolveClienteTenant(telefoneVariants);
-    const cliente = clienteResult?.cliente || null;
+    // Caminho preferido: instance → tenant directo. Senão, scan legacy.
+    let cliente = null;
+    const tenantByInstance = await resolveTenantByInstance(instanceName);
+    if (tenantByInstance) {
+      cliente = await tenantByInstance.models.Cliente.findOne({ telefone: { $in: telefoneVariants } });
+    } else {
+      const clienteResult = await resolveClienteTenant(telefoneVariants);
+      cliente = clienteResult?.cliente || null;
+    }
 
     // Se cliente já existe E já tem etapaConversa definida, significa que já respondemos antes
     // Neste caso, NÃO respondemos novamente (Laura vai tratar manualmente)
@@ -366,8 +478,8 @@ Em breve ela entrará em contato para mais informações. 💆‍♀️✨
 
 _La Estética Avançada_`;
 
-    // Envia mensagem
-    await sendWhatsAppMessage(telefoneNormalizado, mensagemAutomatica);
+    // Envia mensagem (usa instance preferida do tenant, se disponível)
+    await sendWhatsAppMessage(telefoneNormalizado, mensagemAutomatica, instanceName);
     console.log(`[Webhook] ✅ Mensagem automática enviada (${saudacao})`);
 
     // Marca que já respondemos (para não responder novamente)

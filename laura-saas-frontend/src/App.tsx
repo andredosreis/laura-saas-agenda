@@ -39,6 +39,9 @@ const PacotesAtivos = lazy(() => import('./pages/PacotesAtivos'));
 const VenderPacote = lazy(() => import('./pages/VenderPacote'));
 const FechamentosMensais = lazy(() => import('./pages/FechamentosMensais'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
+const Leads = lazy(() => import('./pages/Leads'));
+const LeadsKanban = lazy(() => import('./pages/LeadsKanban'));
+const LeadDetalhe = lazy(() => import('./pages/LeadDetalhe'));
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -141,6 +144,17 @@ const App = () => {
             {/* <Route path="/caixa" element={
               <ProtectedLayout><Caixa /></ProtectedLayout>
             } /> */}
+
+            {/* 📥 CRM / Leads */}
+            <Route path="/leads" element={
+              <ProtectedLayout><Leads /></ProtectedLayout>
+            } />
+            <Route path="/leads/kanban" element={
+              <ProtectedLayout><LeadsKanban /></ProtectedLayout>
+            } />
+            <Route path="/leads/:id" element={
+              <ProtectedLayout><LeadDetalhe /></ProtectedLayout>
+            } />
 
             {/* ⚙️ Configurações */}
             <Route path="/configuracoes" element={

@@ -70,6 +70,9 @@ const TenantSchema = new Schema({
         maxUsuarios: { type: Number, default: 1 },
         maxClientes: { type: Number, default: 50 },
         maxAgendamentosMes: { type: Number, default: 100 },
+        // CRM/Leads (Phase 1+). leadsAtivo é feature-flag por tenant.
+        maxLeads: { type: Number, default: 50 },
+        leadsAtivo: { type: Boolean, default: true },
         iaAtiva: { type: Boolean, default: false },
         whatsappAutomacao: { type: Boolean, default: false },
         lembretesWhatsapp: { type: Boolean, default: true },
@@ -95,10 +98,21 @@ const TenantSchema = new Schema({
     },
 
     // =============================================
-    // INTEGRAÇÃO WHATSAPP (Z-API)
+    // INTEGRAÇÃO WHATSAPP (Evolution API + legacy Z-API)
     // =============================================
     whatsapp: {
         provider: { type: String, enum: ['zapi', 'evolution', 'baileys'], default: 'zapi' },
+        // Identificação da instância Evolution dedicada deste tenant.
+        // unique sparse: nem todos os tenants têm Evolution; quem tem, tem nome único.
+        // Validação: minúsculas, números, hífenes (slug-style — limite Evolution Manager).
+        instanceName: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            match: [/^[a-z0-9-]+$/, 'instanceName deve conter apenas minúsculas, números e hífenes']
+        },
+        instanceToken: { type: String },
+        // Legacy Z-API (mantido para retrocompat — ADR-014)
         zapiInstanceId: String,
         zapiToken: String,
         zapiClientToken: String,
@@ -156,6 +170,9 @@ TenantSchema.index({ 'plano.status': 1 });
 TenantSchema.index({ 'plano.tipo': 1 });
 TenantSchema.index({ ativo: 1 });
 TenantSchema.index({ createdAt: -1 });
+// Resolução O(1) de tenant a partir do payload Evolution (`req.body.instance`).
+// sparse para permitir tenants sem instance configurada.
+TenantSchema.index({ 'whatsapp.instanceName': 1 }, { unique: true, sparse: true });
 
 // =============================================
 // VIRTUALS
