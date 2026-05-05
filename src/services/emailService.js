@@ -1,10 +1,23 @@
 import nodemailer from 'nodemailer';
+import logger from '../utils/logger.js';
+
+const REQUIRED_SMTP_VARS = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
 
 // Criar transporter do nodemailer
 const createTransporter = () => {
-    // Em desenvolvimento, pode usar ethereal.email para testes
-    if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST) {
-        console.log('📧 Modo desenvolvimento: emails serão logados no console');
+    const missing = REQUIRED_SMTP_VARS.filter(v => !process.env[v]);
+
+    // Em produção, falhar fast se SMTP não está configurado — esconde bugs silenciosos
+    if (missing.length > 0) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error(
+                `SMTP não configurado em produção. Variáveis em falta: ${missing.join(', ')}`
+            );
+        }
+        logger.warn(
+            { missing },
+            'SMTP não configurado — emails serão logados no console (modo dev)'
+        );
         return null;
     }
 
@@ -22,10 +35,28 @@ const createTransporter = () => {
 let transporter = null;
 
 // Inicializar transporter (chamado no startup)
-export const initEmailService = () => {
+// Em produção valida credenciais com transporter.verify() — apanha auth inválido cedo.
+export const initEmailService = async () => {
     transporter = createTransporter();
-    if (transporter) {
-        console.log('📧 Serviço de email configurado');
+    if (!transporter) return;
+
+    try {
+        await transporter.verify();
+        logger.info(
+            { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER },
+            'Serviço de email configurado e verificado'
+        );
+    } catch (err) {
+        logger.error(
+            { err, host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER },
+            'Falha ao verificar SMTP — credenciais inválidas ou host inacessível'
+        );
+        if (process.env.NODE_ENV === 'production') {
+            // Em produção, falha o startup — não queremos servidor a aceitar pedidos sem email
+            throw err;
+        }
+        // Em dev, mantém transporter para diagnóstico mas avisa
+        logger.warn('SMTP inválido em modo dev — sendEmail vai falhar quando chamado');
     }
 };
 
@@ -41,19 +72,19 @@ export const sendEmail = async ({ to, subject, html, text }) => {
 
     // Em dev sem SMTP, apenas logar
     if (!transporter) {
-        console.log('📧 [DEV] Email que seria enviado:');
-        console.log('   Para:', to);
-        console.log('   Assunto:', subject);
-        console.log('   Corpo:', text || html);
+        logger.info({ to, subject, body: text || html }, '[DEV] Email simulado (sem SMTP)');
         return { success: true, dev: true };
     }
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log('📧 Email enviado:', info.messageId);
+        logger.info({ messageId: info.messageId, to, subject }, 'Email enviado');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('📧 Erro ao enviar email:', error);
+        logger.error(
+            { err: error, to, subject, smtpHost: process.env.SMTP_HOST, smtpUser: process.env.SMTP_USER },
+            'Falha ao enviar email'
+        );
         throw error;
     }
 };

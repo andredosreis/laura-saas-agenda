@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import User from '../../models/User.js';
 import Tenant from '../../models/Tenant.js';
 import { sendInvitationEmail } from '../../services/emailService.js';
+import logger from '../../utils/logger.js';
 
 // =============================================
 // Helpers internos
@@ -126,7 +127,10 @@ export const criarColaborador = async (req, res) => {
     try {
       await sendInvitationEmail(novoUser.email, token, novoUser.nome, tenant.nome);
     } catch (emailErr) {
-      console.error('Erro ao enviar email de convite:', emailErr);
+      logger.error(
+        { err: emailErr, userId: novoUser._id, email: novoUser.email, tenantId: req.tenantId },
+        'Falha ao enviar email de convite a novo colaborador'
+      );
       emailEnviado = false;
     }
 
@@ -323,7 +327,10 @@ export const reenviarConvite = async (req, res) => {
     try {
       await sendInvitationEmail(user.email, token, user.nome, tenant?.nome);
     } catch (emailErr) {
-      console.error('Erro ao reenviar email de convite:', emailErr);
+      logger.error(
+        { err: emailErr, userId: user._id, email: user.email, tenantId: req.tenantId },
+        'Falha ao reenviar email de convite'
+      );
       emailEnviado = false;
     }
 

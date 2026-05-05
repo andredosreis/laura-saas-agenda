@@ -23,8 +23,8 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Conectar ao banco de dados e, após sucesso, iniciar o servidor
-connectDB().then(() => {
-  initEmailService();
+connectDB().then(async () => {
+  await initEmailService();
   startNotificationWorker();
   startLembreteParcelaCron();
 
@@ -48,6 +48,7 @@ connectDB().then(() => {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }).catch(err => {
-  logger.error({ err }, 'Falha ao conectar ao MongoDB. O servidor não foi iniciado.');
-  process.exit(1);
+  logger.fatal({ err }, 'Falha no startup do servidor (MongoDB ou serviços críticos). Processo vai terminar.');
+  Sentry.captureException(err);
+  Sentry.flush(2000).finally(() => process.exit(1));
 });
