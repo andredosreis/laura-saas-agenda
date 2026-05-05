@@ -1,93 +1,72 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import logger from '../utils/logger.js';
 
-const REQUIRED_SMTP_VARS = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
+// Default seguro para teste — substituir por domínio verificado em produção (EMAIL_FROM).
+// `onboarding@resend.dev` só envia para o email do dono da conta Resend.
+const DEFAULT_FROM = 'Marcai <onboarding@resend.dev>';
 
-// Criar transporter do nodemailer
-const createTransporter = () => {
-    const missing = REQUIRED_SMTP_VARS.filter(v => !process.env[v]);
+let resendClient = null;
 
-    // Em produção, falhar fast se SMTP não está configurado — esconde bugs silenciosos
-    if (missing.length > 0) {
-        if (process.env.NODE_ENV === 'production') {
-            throw new Error(
-                `SMTP não configurado em produção. Variáveis em falta: ${missing.join(', ')}`
-            );
-        }
-        logger.warn(
-            { missing },
-            'SMTP não configurado — emails serão logados no console (modo dev)'
-        );
-        return null;
-    }
-
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        }
-    });
-};
-
-let transporter = null;
-
-// Inicializar transporter (chamado no startup)
-// Valida credenciais com transporter.verify() mas NÃO mata o processo se falhar
-// (ex: Render bloqueia SMTP outbound em planos free/starter — graceful degrade).
+// Inicializar Resend (chamado no startup)
+// Não usa porta SMTP — comunica via HTTPS, contornando bloqueios de SMTP outbound
+// que existem em PaaS como Render, Heroku e Vercel.
+// Graceful degrade: se RESEND_API_KEY estiver em falta, servidor arranca mas envios viram no-op.
 // Para tornar fatal, define EMAIL_REQUIRED=true.
 export const initEmailService = async () => {
-    transporter = createTransporter();
-    if (!transporter) return;
+    const apiKey = process.env.RESEND_API_KEY;
 
-    try {
-        await transporter.verify();
-        logger.info(
-            { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER },
-            'Serviço de email configurado e verificado'
-        );
-    } catch (err) {
-        logger.error(
-            { err, host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER },
-            'Falha ao verificar SMTP — host inacessível, credenciais inválidas ou porta bloqueada pelo provedor (ex: Render bloqueia 587)'
+    if (!apiKey) {
+        logger.warn(
+            'RESEND_API_KEY não definida — emails desactivados (envios serão logados em vez de enviados)'
         );
         if (process.env.EMAIL_REQUIRED === 'true') {
-            // Opt-in: só falha startup se admin marcar email como crítico
-            throw err;
+            throw new Error('RESEND_API_KEY obrigatória quando EMAIL_REQUIRED=true');
         }
-        logger.warn('Servidor continua sem email — envios vão falhar até resolveres SMTP');
+        return;
     }
+
+    resendClient = new Resend(apiKey);
+    logger.info(
+        { from: process.env.EMAIL_FROM || DEFAULT_FROM },
+        'Serviço de email configurado (Resend HTTP API)'
+    );
 };
 
-// Enviar email genérico
+// Enviar email genérico — mantém a mesma assinatura {to, subject, html, text}
+// para compatibilidade com authController e usersController.
 export const sendEmail = async ({ to, subject, html, text }) => {
-    const mailOptions = {
-        from: process.env.SMTP_FROM || '"Marcai" <noreply@laurasaas.com>',
-        to,
-        subject,
-        html,
-        text
-    };
+    const from = process.env.EMAIL_FROM || DEFAULT_FROM;
 
-    // Em dev sem SMTP, apenas logar
-    if (!transporter) {
-        logger.info({ to, subject, body: text || html }, '[DEV] Email simulado (sem SMTP)');
+    // Sem cliente configurado → log e retorna sucesso "dev" (mesmo padrão anterior)
+    if (!resendClient) {
+        logger.info(
+            { to, subject, body: text || html },
+            '[DEV] Email simulado (RESEND_API_KEY não configurada)'
+        );
         return { success: true, dev: true };
     }
 
-    try {
-        const info = await transporter.sendMail(mailOptions);
-        logger.info({ messageId: info.messageId, to, subject }, 'Email enviado');
-        return { success: true, messageId: info.messageId };
-    } catch (error) {
+    const { data, error } = await resendClient.emails.send({
+        from,
+        to,
+        subject,
+        html,
+        text,
+    });
+
+    if (error) {
         logger.error(
-            { err: error, to, subject, smtpHost: process.env.SMTP_HOST, smtpUser: process.env.SMTP_USER },
-            'Falha ao enviar email'
+            { err: error, to, subject, from },
+            'Falha ao enviar email via Resend'
         );
-        throw error;
+        // Re-throw para que o caller (controller) possa marcar emailEnviado=false
+        const wrapped = new Error(error.message || 'Resend send error');
+        wrapped.cause = error;
+        throw wrapped;
     }
+
+    logger.info({ messageId: data?.id, to, subject }, 'Email enviado');
+    return { success: true, messageId: data?.id };
 };
 
 // Template de email para recuperação de senha
