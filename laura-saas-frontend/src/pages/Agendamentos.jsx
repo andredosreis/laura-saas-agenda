@@ -83,7 +83,14 @@ function Agendamentos() {
   useEffect(() => {
     carregarAgendamentos();
 
-    const intervaloPolling = setInterval(() => carregarAgendamentos(true), 30000);
+    const intervaloPolling = setInterval(() => {
+      if (document.visibilityState === 'visible') carregarAgendamentos(true);
+    }, 60000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') carregarAgendamentos(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     const checkPushStatus = async () => {
       try {
@@ -114,7 +121,10 @@ function Agendamentos() {
 
     checkPushStatus();
 
-    return () => clearInterval(intervaloPolling);
+    return () => {
+      clearInterval(intervaloPolling);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [carregarAgendamentos]);
 
   const handleManualSubscribe = async () => {

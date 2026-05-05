@@ -88,11 +88,11 @@ function Dashboard() {
     });
   };
 
+  // Fase 1: KPIs e agendamentos — bloqueiam o skeleton, devem ser rápidos
   useEffect(() => {
-    async function fetchDadosDashboard() {
+    async function fetchKPIs() {
       setIsLoading(true);
       try {
-        // Calcular datas da semana (próximos 7 dias)
         const hoje = new Date();
         const proximaSemana = new Date(hoje);
         proximaSemana.setDate(hoje.getDate() + 7);
@@ -127,23 +127,32 @@ function Dashboard() {
         setConcluidosSemana(resSemana.data.contagem ?? 0);
         setSessoesBaixas(Array.isArray(resSessoes.data.clientes) ? resSessoes.data.clientes : []);
         setAgendamentosSemana(Array.isArray(resAgendamentosSemana.data?.data) ? resAgendamentosSemana.data.data : []);
+      } catch (error) {
+        console.error("Erro ao carregar dados do dashboard:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchKPIs();
+  }, []);
 
-        try {
-          const resFinanceiro = await api.get('/dashboard/financeiro');
-          if (resFinanceiro.data) {
-            setFinanceiro({
-              faturamentoMes: resFinanceiro.data.faturamentoMensal || 0,
-              taxaComparecimento: resFinanceiro.data.taxaComparecimento || 0
-            });
-          }
-        } catch (err) {
-          console.error("Erro ao buscar dados financeiros:", err);
-          setFinanceiro({ faturamentoMes: 0, taxaComparecimento: 0 });
+  // Fase 2: financeiro + gráfico — carregam em segundo plano sem bloquear o skeleton
+  useEffect(() => {
+    async function fetchSecundario() {
+      try {
+        const [resFinanceiro, resChart] = await Promise.all([
+          api.get('/dashboard/financeiro').catch(() => null),
+          api.get('/analytics/receita-temporal?periodo=dia&dias=7').catch(() => null),
+        ]);
+
+        if (resFinanceiro?.data) {
+          setFinanceiro({
+            faturamentoMes: resFinanceiro.data.faturamentoMensal || 0,
+            taxaComparecimento: resFinanceiro.data.taxaComparecimento || 0
+          });
         }
 
-        // Gráfico semanal com dados reais
-        try {
-          const resChart = await api.get('/analytics/receita-temporal?periodo=dia&dias=7');
+        if (resChart?.data) {
           const dadosApi = resChart.data?.dados || [];
           const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
           const agora = new Date();
@@ -163,16 +172,12 @@ function Dashboard() {
           setChartData(ultimos7);
           const total = ultimos7.reduce((s, d) => s + d.atendimentos, 0);
           setMediaDiaria(total > 0 ? (total / 7).toFixed(1) : 0);
-        } catch (err) {
-          console.error("Erro ao buscar dados do gráfico:", err);
         }
-      } catch (error) {
-        console.error("Erro ao carregar dados do dashboard:", error);
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.error("Erro ao buscar dados secundários do dashboard:", err);
       }
     }
-    fetchDadosDashboard();
+    fetchSecundario();
   }, []);
 
   const formatarDataHora = (dataIso) => {

@@ -46,33 +46,10 @@ function Clientes() {
   const fetchClientes = async () => {
     try {
       setIsLoading(true);
-      // limit máximo permitido pelo backend (100). Para volumes maiores precisamos de paginação real.
       const response = await api.get("/clientes?limit=100");
       const clientesData = Array.isArray(response.data?.data) ? response.data.data : [];
       setClientes(clientesData);
       setTotalServidor(response.data?.pagination?.total || clientesData.length);
-
-      if (clientesData.length > 0) {
-        const pacotesPromises = clientesData.map(async (cliente) => {
-          try {
-            const pacotesRes = await api.get(`/compras-pacotes/cliente/${cliente._id}`);
-            const pacotesAtivos = (pacotesRes.data || []).filter(
-              (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
-            );
-            return { clienteId: cliente._id, pacotes: pacotesAtivos };
-          } catch (error) {
-            console.error(`Erro ao buscar pacotes do cliente ${cliente._id}:`, error);
-            return { clienteId: cliente._id, pacotes: [] };
-          }
-        });
-
-        const pacotesResults = await Promise.all(pacotesPromises);
-        const pacotesMap = {};
-        pacotesResults.forEach(({ clienteId, pacotes }) => {
-          pacotesMap[clienteId] = pacotes;
-        });
-        setPacotesClientes(pacotesMap);
-      }
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       toast.error('Erro ao carregar lista de clientes.');
@@ -84,6 +61,38 @@ function Clientes() {
   useEffect(() => {
     fetchClientes();
   }, []);
+
+  // Carrega pacotes em segundo plano após os clientes estarem visíveis
+  useEffect(() => {
+    if (clientes.length === 0) return;
+
+    let cancelado = false;
+
+    const fetchPacotes = async () => {
+      const resultados = await Promise.all(
+        clientes.map(async (cliente) => {
+          try {
+            const res = await api.get(`/compras-pacotes/cliente/${cliente._id}`);
+            const ativos = (res.data || []).filter(
+              (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
+            );
+            return { clienteId: cliente._id, pacotes: ativos };
+          } catch {
+            return { clienteId: cliente._id, pacotes: [] };
+          }
+        })
+      );
+
+      if (cancelado) return;
+
+      const mapa = {};
+      resultados.forEach(({ clienteId, pacotes }) => { mapa[clienteId] = pacotes; });
+      setPacotesClientes(mapa);
+    };
+
+    fetchPacotes();
+    return () => { cancelado = true; };
+  }, [clientes]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja eliminar este cliente?")) return;
