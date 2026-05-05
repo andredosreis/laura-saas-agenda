@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import User from '../../models/User.js';
 import Tenant from '../../models/Tenant.js';
-import { sendPasswordResetEmail } from '../../services/emailService.js';
+import { sendInvitationEmail } from '../../services/emailService.js';
 
 // =============================================
 // Helpers internos
@@ -71,7 +71,7 @@ export const criarColaborador = async (req, res) => {
     }
 
     // Limite do plano (apenas users activos contam)
-    const tenant = await Tenant.findById(req.tenantId).select('limites');
+    const tenant = await Tenant.findById(req.tenantId).select('limites nome');
     // Convenção: maxUsuarios <= 0 ou null = ilimitado
     const limiteRaw = tenant?.limites?.maxUsuarios;
     const maxUsuarios = (limiteRaw == null || limiteRaw <= 0) ? Infinity : limiteRaw;
@@ -124,7 +124,7 @@ export const criarColaborador = async (req, res) => {
     // Enviar email de convite. Se falhar, não bloqueia (graceful degrade) mas avisa.
     let emailEnviado = true;
     try {
-      await sendPasswordResetEmail(novoUser.email, token, novoUser.nome);
+      await sendInvitationEmail(novoUser.email, token, novoUser.nome, tenant.nome);
     } catch (emailErr) {
       console.error('Erro ao enviar email de convite:', emailErr);
       emailEnviado = false;
@@ -314,13 +314,14 @@ export const reenviarConvite = async (req, res) => {
     }
 
     const { token, hash } = gerarTokenConvite();
+    const tenant = await Tenant.findById(req.tenantId).select('nome');
     user.resetPasswordToken = hash;
     user.resetPasswordExpires = Date.now() + 7 * 24 * 60 * 60 * 1000;
     await user.save();
 
     let emailEnviado = true;
     try {
-      await sendPasswordResetEmail(user.email, token, user.nome);
+      await sendInvitationEmail(user.email, token, user.nome, tenant?.nome);
     } catch (emailErr) {
       console.error('Erro ao reenviar email de convite:', emailErr);
       emailEnviado = false;

@@ -17,6 +17,7 @@ import Login from './pages/Login';
 const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const AceitarConvite = lazy(() => import('./pages/AceitarConvite'));
 const VerificarEmail = lazy(() => import('./pages/VerificarEmail'));
 
 // Rotas protegidas em lazy — cada uma vira um chunk separado
@@ -78,6 +79,7 @@ const App = () => {
             <Route path="/registrar" element={<Register />} />
             <Route path="/esqueci-senha" element={<ForgotPassword />} />
             <Route path="/reset-senha/:token" element={<ResetPassword />} />
+            <Route path="/aceitar-convite/:token" element={<AceitarConvite />} />
             <Route path="/verificar-email/:token" element={<VerificarEmail />} />
 
             {/* 🔐 Rotas Protegidas (com navbar) */}
