@@ -203,7 +203,24 @@ export const login = async (req, res) => {
         // req.body já validado e email normalizado (lowercase) pelo middleware Zod
         const { email, password } = req.body;
 
-        const user = await User.findOne({ email }).select('+passwordHash');
+        // Pode haver múltiplos users com o mesmo email em tenants diferentes
+        // (índice único é {tenantId, email}). Preferimos os que têm tenant
+        // existente — users órfãos (tenant apagado) são ignorados.
+        const candidatos = await User.find({ email })
+            .select('+passwordHash')
+            .sort({ createdAt: -1 }); // mais recente primeiro
+
+        let user = null;
+        if (candidatos.length === 1) {
+            user = candidatos[0];
+        } else if (candidatos.length > 1) {
+            // Resolver ambiguidade: escolher candidato cujo tenant existe e está activo.
+            const tenantIds = candidatos.map(c => c.tenantId).filter(Boolean);
+            const tenantsValidos = await Tenant.find({ _id: { $in: tenantIds }, ativo: true })
+                .select('_id');
+            const tenantIdsValidos = new Set(tenantsValidos.map(t => String(t._id)));
+            user = candidatos.find(c => tenantIdsValidos.has(String(c.tenantId))) || null;
+        }
 
         if (!user) {
             return res.status(401).json({
@@ -682,9 +699,10 @@ export const resetPassword = async (req, res) => {
         const salt = await bcrypt.genSalt(12);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        // Atualizar senha e limpar tokens
+        // Atualizar senha, marcar email como verificado (fluxo de aceitar-convite
+        // chega aqui quando o colaborador define a primeira password) e limpar tokens.
         await User.findByIdAndUpdate(user._id, {
-            $set: { passwordHash },
+            $set: { passwordHash, emailVerificado: true },
             $unset: {
                 resetPasswordToken: 1,
                 resetPasswordExpires: 1,
