@@ -116,17 +116,33 @@ def _read_faqs(tenant_id: str) -> dict[str, str]:
 
 
 def _search_sections(sections: dict[str, str], query: str) -> str | None:
-    """Find a section whose normalized title contains the normalized query."""
+    """Find a section whose normalized title best matches the query.
+
+    Matching strategy (first hit wins):
+      1. Exact title match after normalization (`drenagem linfática modeladora`).
+      2. All query words appear in title — handles "pacote 10" against
+         "Pacote de 10 Sessões..." and "pre operatorio" against
+         "Pré e Pós-Operatório".
+      3. Substring fallback (handles single-word queries).
+    """
     if not query.strip():
         return None
     needle = _strip_accents(query)
+    needle_words = [w for w in needle.split() if w]
 
-    # 1. Exact match (after normalization)
+    # 1. Exact match
     for title, content in sections.items():
         if _strip_accents(title) == needle:
             return content
 
-    # 2. Substring match
+    # 2. All-words match (most useful for multi-word queries)
+    if len(needle_words) >= 2:
+        for title, content in sections.items():
+            title_norm = _strip_accents(title)
+            if all(w in title_norm for w in needle_words):
+                return content
+
+    # 3. Substring fallback
     for title, content in sections.items():
         if needle in _strip_accents(title):
             return content

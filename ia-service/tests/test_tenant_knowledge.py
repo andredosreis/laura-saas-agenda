@@ -73,6 +73,18 @@ def test_find_servico_unknown_returns_none():
     assert txt is None
 
 
+def test_find_servico_multi_word_query_with_filler():
+    """LLM may search for 'pacote 10' but title has 'Pacote de 10' — must still match."""
+    # Use Laura's tenant which has a "Pacote de 10 Sessões..." section
+    txt = tenant_knowledge.find_servico("695413fb6ce936a9097af750", "pacote 10")
+    assert txt is not None
+    assert "Pacote de 10" in txt
+    # Also "pre operatorio" → "Pré e Pós-Operatório"
+    txt = tenant_knowledge.find_servico("695413fb6ce936a9097af750", "pre operatorio")
+    assert txt is not None
+    assert "Operatório" in txt or "operatório" in txt
+
+
 # ───────────────────────── find_faq ─────────────────────────
 
 
