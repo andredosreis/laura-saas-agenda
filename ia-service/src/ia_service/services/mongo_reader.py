@@ -23,7 +23,8 @@ def _get_client(tenant_id: str) -> MongoClient:
 
 
 def get_tenant_db(tenant_id: str):
-    db_name = f"{settings.mongodb_db_prefix}_tenant_{tenant_id}"
+    # Matches Node convention in src/config/tenantDB.js: `tenant_<id>` (no prefix).
+    db_name = f"tenant_{tenant_id}"
     return _get_client(tenant_id)[db_name]
 
 
