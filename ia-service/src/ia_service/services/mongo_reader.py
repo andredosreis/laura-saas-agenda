@@ -44,7 +44,13 @@ def find_available_slots(
     slot_duration_min: int = 60,
     timezone_name: str = "Europe/Lisbon",
 ) -> list[dict]:
-    """Compute available slots for the next N days from Schedule + Agendamento.
+    """Compute slots the IA can propose to leads.
+
+    **Important architectural note**: this function uses the *agent business
+    rules* in `services/agent_business_rules.py` — NOT the `schedules`
+    collection in Mongo. That collection stays open so Laura can book
+    manually at any hour she likes. The agent rules are intentionally
+    more restrictive (e.g. closed on Sundays).
 
     All times are computed in the clinic's local timezone (Europe/Lisbon by
     default). Appointments stored in UTC in Mongo are converted to local
@@ -53,16 +59,18 @@ def find_available_slots(
 
     Algorithm:
     1. For each day in [today, today + dias_a_frente] (local):
-       a. Look up Schedule for that day-of-week (must be isActive=true).
-       b. Generate candidate slots between startTime/endTime, skipping
-          the break window.
+       a. Look up the agent rule for that weekday (skip if None).
+       b. Generate candidate slots between rule.start/rule.end,
+          skipping break window if defined.
     2. Read existing appointments (UTC), convert to local, treat each as
        occupying [start, start + slot_duration_min).
     3. A candidate slot is busy if it overlaps with any occupied interval.
-    4. Skip past slots and break window.
+    4. Skip past slots.
     """
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
+
+    from . import agent_business_rules
 
     tz = ZoneInfo(timezone_name)
     db = get_tenant_db(tenant_id)
@@ -112,22 +120,15 @@ def find_available_slots(
 
     current = today
     while current <= end_date:
-        # Python: Monday=0, Sunday=6.   Schedule.dayOfWeek: Sunday=0, Saturday=6.
-        # Map: python(0=Mon) → schedule(1=Mon), python(6=Sun) → schedule(0=Sun).
-        py_weekday = current.weekday()
-        sched_dow = (py_weekday + 1) % 7
+        py_weekday = current.weekday()  # 0=Mon..6=Sun
 
-        schedule = db.schedules.find_one(
-            {"dayOfWeek": sched_dow, "isActive": True}
-        )
-        if not schedule:
+        rule = agent_business_rules.get_day_rule(tenant_id, py_weekday)
+        if rule is None:
             current += timedelta(days=1)
             continue
 
-        start_h, start_m = map(int, schedule["startTime"].split(":"))
-        end_h, end_m = map(int, schedule["endTime"].split(":"))
-        break_start_h, break_start_m = map(int, schedule.get("breakStartTime", "12:00").split(":"))
-        break_end_h, break_end_m = map(int, schedule.get("breakEndTime", "13:00").split(":"))
+        start_h, start_m = map(int, rule["start"].split(":"))
+        end_h, end_m = map(int, rule["end"].split(":"))
 
         slot = datetime.combine(current, datetime.min.time()).replace(
             hour=start_h, minute=start_m
@@ -135,20 +136,27 @@ def find_available_slots(
         end_of_day = datetime.combine(current, datetime.min.time()).replace(
             hour=end_h, minute=end_m
         )
-        break_start = datetime.combine(current, datetime.min.time()).replace(
-            hour=break_start_h, minute=break_start_m
-        )
-        break_end = datetime.combine(current, datetime.min.time()).replace(
-            hour=break_end_h, minute=break_end_m
-        )
+
+        # Break window is optional — if not defined, no break.
+        if "break_start" in rule and "break_end" in rule:
+            bs_h, bs_m = map(int, rule["break_start"].split(":"))
+            be_h, be_m = map(int, rule["break_end"].split(":"))
+            break_start = datetime.combine(current, datetime.min.time()).replace(
+                hour=bs_h, minute=bs_m
+            )
+            break_end = datetime.combine(current, datetime.min.time()).replace(
+                hour=be_h, minute=be_m
+            )
+        else:
+            break_start = break_end = None
 
         while slot < end_of_day:
             slot_end = slot + timedelta(minutes=slot_duration_min)
             # Slot extends beyond closing time
             if slot_end > end_of_day:
                 break
-            # Skip slots overlapping break window
-            if slot < break_end and slot_end > break_start:
+            # Skip slots overlapping break window (if defined)
+            if break_start and break_end and slot < break_end and slot_end > break_start:
                 slot += timedelta(minutes=slot_duration_min)
                 continue
             # Skip past slots (today only) — compare in local time
