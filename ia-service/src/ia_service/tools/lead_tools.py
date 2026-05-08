@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from langchain.tools import tool
 
-from ..services import tenant_knowledge
+from ..services import mongo_reader, tenant_knowledge
 
 
 def make_find_servico_tool(tenant_id: str):
@@ -54,3 +54,43 @@ def make_find_servico_tool(tenant_id: str):
         return section
 
     return find_servico
+
+
+def make_get_available_slots_tool(tenant_id: str):
+    """Build a `get_available_slots` tool bound to a specific tenant.
+
+    Returns up to N free 30-min slots in the coming days. The agent
+    should call this when the lead agrees to book an evaluation, then
+    propose 2-3 options to the lead (not the full list — too many
+    overwhelms).
+    """
+
+    @tool
+    def get_available_slots(dias_a_frente: int = 7, max_slots: int = 8) -> str:
+        """Devolve slots livres na agenda da clínica para os próximos dias.
+
+        Usa esta tool **só quando o lead aceitar marcar uma avaliação** —
+        nunca antes. Depois de a chamares, propõe ao lead 2-3 opções
+        variadas (manhã/tarde, dias diferentes), nunca a lista completa.
+
+        Args:
+            dias_a_frente: Quantos dias à frente procurar (default 7,
+                máximo razoável: 14).
+            max_slots: Máximo de slots a devolver (default 8 — chega
+                para escolher 2-3 opções).
+        """
+        slots = mongo_reader.find_available_slots(
+            tenant_id, dias_a_frente=dias_a_frente
+        )
+        if not slots:
+            return (
+                "Não há slots livres nos próximos dias. Pede ao lead para "
+                "indicar a sua preferência (dia/turno) e diz que a "
+                "recepcionista entra em contacto para confirmar."
+            )
+        # Limit and format
+        sample = slots[:max_slots]
+        lines = [f"- {s['weekday']} {s['date']} às {s['time']}" for s in sample]
+        return "Slots livres (escolhe 2-3 para propor ao lead):\n" + "\n".join(lines)
+
+    return get_available_slots

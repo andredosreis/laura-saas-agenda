@@ -23,7 +23,7 @@ from langchain_openai import ChatOpenAI
 
 from ..config import settings
 from ..services.prompt_renderer import render_system_prompt
-from ..tools.lead_tools import make_find_servico_tool
+from ..tools.lead_tools import make_find_servico_tool, make_get_available_slots_tool
 
 
 # Model factory kept separate so tests can monkeypatch it with a fake LLM
@@ -42,7 +42,10 @@ def make_lead_agent(tenant_id: str) -> Any:
     The returned object exposes `.invoke({"messages": [...]})` (sync) and
     `.ainvoke({"messages": [...]})` (async) per LangChain v1 contract.
     """
-    tools = [make_find_servico_tool(tenant_id)]
+    tools = [
+        make_find_servico_tool(tenant_id),
+        make_get_available_slots_tool(tenant_id),
+    ]
     system_prompt = render_system_prompt(tenant_id)
     model = _build_model()
     return create_agent(model, tools=tools, system_prompt=system_prompt)
