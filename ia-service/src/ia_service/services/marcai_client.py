@@ -104,6 +104,31 @@ async def move_lead_stage(
     return resp["data"]
 
 
+async def get_recent_messages(
+    tenant_id: str,
+    lead_id: str,
+    limit: int = 10,
+) -> list[dict]:
+    """Fetch the most recent messages for a lead's conversation, oldest first.
+
+    Used by the orchestrator to give the LangChain agent conversational
+    memory: previous lead messages + previous IA replies are passed as
+    `messages` so the agent sees the full context.
+
+    Returns: list of {mensagem, origem, direcao, data} dicts.
+    """
+    url = f"{settings.marcai_api_url}/api/internal/leads/{lead_id}/messages"
+    params = {"tenantId": tenant_id, "limit": limit}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(url, params=params, headers=_auth_headers())
+            r.raise_for_status()
+            return r.json().get("data", [])
+    except Exception as exc:
+        logger.warning("recent_messages_fetch_failed", error=str(exc))
+        return []
+
+
 async def qualify_lead(
     lead_id: str,
     tenant_id: str,

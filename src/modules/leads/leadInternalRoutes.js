@@ -179,6 +179,47 @@ router.patch('/:id/qualificacao', async (req, res) => {
 // POST /api/internal/mensagens — ia-service persiste mensagem (in ou out)
 // Body: { tenantId, conversaId?, telefone, mensagem, origem, direcao? }
 // =====================================================================
+/**
+ * GET /:id/messages?tenantId=...&limit=10
+ *
+ * Returns the most recent messages for a lead's conversation, oldest first.
+ * Used by the ia-service to give the LangChain agent conversational memory.
+ */
+router.get('/:id/messages', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tenantId } = req.query;
+    const limit = Math.min(50, parseInt(req.query.limit) || 10);
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenantId is required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: 'leadId invalid' });
+    }
+
+    const db = getTenantDB(String(tenantId));
+    const { Lead, Mensagem } = getModels(db);
+
+    const lead = await Lead.findOne({ _id: id, tenantId }).select('conversa').lean();
+    if (!lead || !lead.conversa) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // newest-first then reverse to chronological
+    const recent = await Mensagem.find({ conversa: lead.conversa, tenantId })
+      .sort({ data: -1, createdAt: -1 })
+      .limit(limit)
+      .select('mensagem origem direcao data createdAt')
+      .lean();
+
+    res.json({ success: true, data: recent.reverse() });
+  } catch (err) {
+    console.error('Erro ao listar mensagens do lead:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
 router.post('/mensagens', requireServiceToken, async (req, res) => {
   try {
     const { tenantId, conversaId, telefone, mensagem, origem, direcao } = req.body;

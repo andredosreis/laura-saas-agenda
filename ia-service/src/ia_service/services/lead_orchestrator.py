@@ -37,7 +37,59 @@ def _period_of_day(dt: datetime) -> str:
     return "noite"
 
 
-async def _generate_reply(tenant_id: str, mensagem: str, fallback_greeting: str, log) -> tuple[str, str]:
+async def _build_conversation_history(
+    tenant_id: str, lead_id: str | None, current_message: str, log
+) -> list[dict]:
+    """Build the LangChain `messages` array with conversation history.
+
+    Pulls the last 10 persisted messages from the lead's conversation
+    and appends the current inbound message at the end.
+
+    `direcao=entrada` (lead → clinic) → role=user
+    `direcao=saida`   (clinic → lead) → role=assistant
+    """
+    messages: list[dict] = []
+    if lead_id:
+        try:
+            history = await marcai_client.get_recent_messages(
+                tenant_id=tenant_id, lead_id=lead_id, limit=8
+            )
+            # Session-style filter: only include messages from the last
+            # 30 minutes. Older interactions (e.g. lead from 2 days ago)
+            # would bias the LLM with stale slot proposals or old context.
+            from datetime import datetime, timedelta, timezone
+
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+            for m in history:
+                # `data` is ISO 8601 from the Node side
+                data_str = m.get("data") or m.get("createdAt") or ""
+                try:
+                    msg_dt = datetime.fromisoformat(data_str.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if msg_dt < cutoff:
+                    continue
+                role = "user" if m.get("direcao") == "entrada" else "assistant"
+                content = m.get("mensagem", "").strip()
+                if content:
+                    messages.append({"role": role, "content": content})
+            log.info("history_loaded", turns=len(messages), cutoff_min=30)
+        except Exception as exc:
+            log.warning("history_load_failed", error=str(exc))
+
+    # Append current message — orchestrator persists it AFTER this call,
+    # so it's not yet in the history we just fetched.
+    messages.append({"role": "user", "content": current_message})
+    return messages
+
+
+async def _generate_reply(
+    tenant_id: str,
+    lead_id: str | None,
+    mensagem: str,
+    fallback_greeting: str,
+    log,
+) -> tuple[str, str]:
     """Returns (reply_text, source) where source is 'agent' or 'greeting_fallback'.
 
     Tries the LangChain agent first if OPENAI_API_KEY is set. Falls back to
@@ -51,10 +103,12 @@ async def _generate_reply(tenant_id: str, mensagem: str, fallback_greeting: str,
         # need to instantiate ChatOpenAI on import.
         from ..agents.lead_agent import make_lead_agent
 
-        agent = make_lead_agent(tenant_id)
-        result = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": mensagem}]}
+        messages = await _build_conversation_history(
+            tenant_id, lead_id, mensagem, log
         )
+
+        agent = make_lead_agent(tenant_id)
+        result = await agent.ainvoke({"messages": messages})
         last_msg = result["messages"][-1]
         # last_msg may be AIMessage; .content is a string in simple cases
         content = getattr(last_msg, "content", "") or ""
@@ -115,7 +169,9 @@ async def run(payload) -> dict:
     # 3. Generate reply (agent if API key set, else fixed greeting)
     period = _period_of_day(timestamp)
     fallback_greeting = _GREETINGS[period]
-    reply, reply_source = await _generate_reply(tenant_id, mensagem, fallback_greeting, log)
+    reply, reply_source = await _generate_reply(
+        tenant_id, lead_id, mensagem, fallback_greeting, log
+    )
 
     # 4. Send reply via Evolution API
     try:
