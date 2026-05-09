@@ -56,6 +56,146 @@ def make_find_servico_tool(tenant_id: str):
     return find_servico
 
 
+def make_update_lead_info_tool(tenant_id: str, lead_id: str):
+    """Build an async tool that captures lead intel as the conversation flows."""
+
+    @tool
+    async def update_lead_info(
+        interesse: str | None = None,
+        urgencia: str | None = None,
+        observacoes: str | None = None,
+    ) -> str:
+        """Guarda informação que o lead acabou de revelar — interesse,
+        urgência ou observação livre.
+
+        Usa esta tool sempre que o lead te disser algo importante:
+        - Que serviço/objectivo procura → `interesse` (string curta)
+        - Quão urgente é → `urgencia` ("baixa", "media" ou "alta")
+        - Detalhes que ajudam a Laura na avaliação → `observacoes`
+
+        Não precisas saber tudo de uma vez — actualiza incrementalmente.
+
+        Args:
+            interesse: Resumo curto do interesse do lead (≤200 chars).
+                Ex: "drenagem pré-evento de casamento", "modelagem
+                pós-parto", "tratamento capilar para queda".
+            urgencia: "baixa" (curiosidade), "media" (quer começar este
+                mês), "alta" (preciso para data marcada / pós-cirurgia
+                imediato).
+            observacoes: Notas livres úteis para a Laura na avaliação
+                (ex: "parto há 3 meses, queixa-se de retenção").
+        """
+        from ..services import marcai_client
+
+        try:
+            await marcai_client.update_lead_info(
+                lead_id=lead_id,
+                tenant_id=tenant_id,
+                interesse=interesse,
+                urgencia=urgencia,
+                observacoes=observacoes,
+            )
+            saved: list[str] = []
+            if interesse:
+                saved.append(f"interesse='{interesse[:50]}'")
+            if urgencia:
+                saved.append(f"urgencia='{urgencia}'")
+            if observacoes:
+                saved.append(f"observacoes='{observacoes[:50]}'")
+            return f"OK — guardado: {', '.join(saved) if saved else 'nada'}."
+        except Exception as exc:
+            return f"Erro ao guardar info do lead: {exc}. Continua a conversa."
+
+    return update_lead_info
+
+
+def make_qualify_lead_tool(tenant_id: str, lead_id: str):
+    """Build an async tool that promotes a lead to 'qualificado'."""
+
+    @tool
+    async def qualify_lead(
+        score: int,
+        motivo_interesse: str,
+        objetivos: list[str],
+    ) -> str:
+        """Marca o lead como QUALIFICADO — pronto para a Laura tratar.
+
+        Chama esta tool **só** quando:
+        1. Já recolheste informação suficiente (interesse + objectivos
+           concretos)
+        2. O lead mostra intenção real de avançar (pediu detalhes,
+           aceitou avaliação ou marcou)
+        3. Score que calculas é >= 60
+
+        Critérios de scoring (mental):
+        - +30 se descreveu sintomas/objectivos concretos
+        - +25 se há urgência (data marcada, pós-op, evento próximo)
+        - +20 se aceitou receber info ou avaliação
+        - +30 se já agendou
+        - +15 se pediu detalhes técnicos
+        - −15 se "vou pensar" repetido sem progresso
+        - −25 se "agora não tenho dinheiro"
+
+        Args:
+            score: Pontuação 0-100. Só promove se >=60.
+            motivo_interesse: Frase curta (ex: "recuperação pós-parto").
+            objetivos: Lista 1-3 objectivos concretos.
+        """
+        from ..services import marcai_client
+
+        try:
+            await marcai_client.qualify_lead(
+                lead_id=lead_id,
+                tenant_id=tenant_id,
+                score=score,
+                motivo_interesse=motivo_interesse,
+                objetivos=objetivos,
+            )
+            return f"OK — lead qualificado com score={score}."
+        except Exception as exc:
+            return f"Erro ao qualificar lead: {exc}. Continua a conversa."
+
+    return qualify_lead
+
+
+def make_move_lead_stage_tool(tenant_id: str, lead_id: str):
+    """Build an async tool to move the lead between pipeline stages."""
+
+    @tool
+    async def move_lead_stage(stage: str, motivo: str | None = None) -> str:
+        """Move o lead para outro estágio do pipeline.
+
+        Estágios válidos:
+        - "qualificado" — depois de recolheres info suficiente
+          (alternativa a qualify_lead — usa um ou outro)
+        - "agendado" — DEPOIS do lead aceitar um slot e tu confirmares
+          que vais passar à recepcionista
+        - "perdido" — só quando o lead **explicitamente** desiste,
+          recusa, ou diz claramente que não tem condições.
+
+        NUNCA uses "convertido" — é manual pela equipa.
+
+        Args:
+            stage: "qualificado", "agendado" ou "perdido".
+            motivo: Razão (obrigatório para "perdido"). Ex: "sem orçamento",
+                "não interessada", "outro local mais perto".
+        """
+        from ..services import marcai_client
+
+        try:
+            await marcai_client.move_lead_stage(
+                lead_id=lead_id,
+                tenant_id=tenant_id,
+                stage=stage,
+                motivo=motivo,
+            )
+            return f"OK — lead movido para '{stage}'."
+        except Exception as exc:
+            return f"Erro ao mover stage: {exc}. Continua a conversa."
+
+    return move_lead_stage
+
+
 def make_get_available_slots_tool(tenant_id: str):
     """Build a `get_available_slots` tool bound to a specific tenant.
 

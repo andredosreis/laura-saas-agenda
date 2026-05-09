@@ -143,11 +143,18 @@ router.patch('/:id/stage', async (req, res) => {
 
 // =====================================================================
 // PATCH /api/internal/leads/:id/qualificacao
-// Body: { tenantId, score?, motivoInteresse?, objetivos?, urgencia?, interesse? }
+// Body: { tenantId, score?, motivoInteresse?, objetivos?, urgencia?, interesse?, observacoes? }
+//
+// Used by the ia-service to capture lead intel during conversation:
+// - score is bounded to [0,100]
+// - urgencia must be one of URGENCIA_VALUES (validated by Mongoose)
+// - observacoes is free-form notes the agent collected
+// Stage transitions are NOT done here — agent calls /:id/stage explicitly
+// when criteria are met (e.g., score >= 60 → 'qualificado').
 // =====================================================================
 router.patch('/:id/qualificacao', async (req, res) => {
   try {
-    const { tenantId, score, motivoInteresse, objetivos, urgencia, interesse } = req.body || {};
+    const { tenantId, score, motivoInteresse, objetivos, urgencia, interesse, observacoes } = req.body || {};
     const { models } = await resolveTenantContext(tenantId);
 
     const update = { ultimaInteracao: new Date() };
@@ -156,6 +163,7 @@ router.patch('/:id/qualificacao', async (req, res) => {
     if (Array.isArray(objetivos)) update['qualificacao.objetivos'] = objetivos;
     if (urgencia) update.urgencia = urgencia;
     if (interesse) update.interesse = interesse;
+    if (observacoes) update.observacoes = observacoes;
 
     const lead = await models.Lead.findOneAndUpdate(
       { _id: req.params.id, tenantId },
@@ -165,6 +173,26 @@ router.patch('/:id/qualificacao', async (req, res) => {
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead não encontrado' });
     }
+
+    // Auto-promote to 'qualificado' when score >= 60 and lead is still
+    // in 'em_conversa' (or 'novo'). Defense-in-depth — the agent doesn't
+    // always remember to call /stage explicitly.
+    const isStillEarly = lead.status === 'em_conversa' || lead.status === 'novo';
+    if (isStillEarly && (lead.qualificacao?.score || 0) >= 60) {
+      try {
+        transitionStage({
+          lead,
+          toStage: 'qualificado',
+          actor: { role: 'service' },
+          isInternalCall: true,
+        });
+        await lead.save();
+      } catch (err) {
+        // Non-fatal: transition validation may refuse — log and move on
+        console.warn('[qualificacao auto-promote refused]', err.message);
+      }
+    }
+
     res.status(200).json({ success: true, data: lead });
   } catch (err) {
     if (err instanceof LeadError) {

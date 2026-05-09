@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     ia_service_port: int = 8000
     sentry_dsn: str | None = None
     openai_api_key: str | None = None
+    google_api_key: str | None = None
+    # Provider can be 'gemini' (default — free tier) or 'openai'
+    llm_provider: str = "gemini"
 
 
 settings = Settings()

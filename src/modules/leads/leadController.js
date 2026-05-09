@@ -74,19 +74,27 @@ export const listLeads = async (req, res) => {
 
 export const getLead = async (req, res) => {
   try {
-    const { Lead, Conversa } = req.models;
+    const { Lead, Conversa, Mensagem } = req.models;
     const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead não encontrado' });
     }
 
-    // Devolve também a Conversa associada (para o detalhe na Phase 5).
+    // Devolve também a Conversa + últimas 50 Mensagens (para o detalhe na Phase 5).
     let conversa = null;
+    let messages = [];
     if (lead.conversa) {
       conversa = await Conversa.findOne({ _id: lead.conversa, tenantId: req.tenantId });
+      // Últimas 50, oldest-first para a UI mostrar em ordem cronológica.
+      const recent = await Mensagem.find({ conversa: lead.conversa, tenantId: req.tenantId })
+        .sort({ data: -1, createdAt: -1 })
+        .limit(50)
+        .select('mensagem origem direcao data createdAt')
+        .lean();
+      messages = recent.reverse();
     }
 
-    res.status(200).json({ success: true, data: { lead, conversa } });
+    res.status(200).json({ success: true, data: { lead, conversa, messages } });
   } catch (err) {
     console.error('Erro ao buscar lead:', err);
     res.status(500).json({ success: false, error: 'Erro interno ao buscar lead.' });

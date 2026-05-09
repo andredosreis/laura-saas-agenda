@@ -19,33 +19,60 @@ from __future__ import annotations
 from typing import Any
 
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
 
 from ..config import settings
 from ..services.prompt_renderer import render_system_prompt
-from ..tools.lead_tools import make_find_servico_tool, make_get_available_slots_tool
+from ..tools.lead_tools import (
+    make_find_servico_tool,
+    make_get_available_slots_tool,
+    make_move_lead_stage_tool,
+    make_qualify_lead_tool,
+    make_update_lead_info_tool,
+)
 
 
-# Model factory kept separate so tests can monkeypatch it with a fake LLM
+# Model factory kept separate so tests can monkeypatch it with a fake LLM.
+# Provider is selected via settings.llm_provider ('gemini' default, 'openai' opt-in).
 def _build_model():
-    return ChatOpenAI(
-        model="gpt-4o-mini",
+    if settings.llm_provider == "openai":
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0,
+            api_key=settings.openai_api_key,
+            timeout=20,
+        )
+
+    # Default: Gemini 2.5 Flash — free tier good for the pilot
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
         temperature=0,
-        api_key=settings.openai_api_key,
-        timeout=20,  # seconds — fail fast on slow LLM
+        google_api_key=settings.google_api_key,
+        timeout=20,
     )
 
 
-def make_lead_agent(tenant_id: str) -> Any:
-    """Create a LangChain agent bound to a tenant.
+def make_lead_agent(tenant_id: str, lead_id: str | None = None) -> Any:
+    """Create a LangChain agent bound to a tenant + (optionally) a lead.
 
-    The returned object exposes `.invoke({"messages": [...]})` (sync) and
-    `.ainvoke({"messages": [...]})` (async) per LangChain v1 contract.
+    `lead_id` is required for the qualification tools (update_lead_info,
+    qualify_lead, move_lead_stage). When omitted, only the read-only
+    tools (find_servico, get_available_slots) are exposed — useful for
+    evals or stateless calls.
     """
     tools = [
         make_find_servico_tool(tenant_id),
         make_get_available_slots_tool(tenant_id),
     ]
+    if lead_id:
+        tools.extend([
+            make_update_lead_info_tool(tenant_id, lead_id),
+            make_qualify_lead_tool(tenant_id, lead_id),
+            make_move_lead_stage_tool(tenant_id, lead_id),
+        ])
     system_prompt = render_system_prompt(tenant_id)
     model = _build_model()
     return create_agent(model, tools=tools, system_prompt=system_prompt)

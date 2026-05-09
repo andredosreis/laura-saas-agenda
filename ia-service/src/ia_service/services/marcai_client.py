@@ -55,6 +55,12 @@ async def create_lead(
     email: str | None = None,
     conversa_id: str | None = None,
 ) -> dict:
+    """Returns the lead document with `_alreadyExisted` injected.
+
+    The Node response shape is `{success, data: <lead>, alreadyExisted?}` —
+    we flatten it so callers see the alreadyExisted flag inside the lead
+    dict (key `_alreadyExisted` to avoid collisions with real fields).
+    """
     resp = await _post_with_retry(
         f"{settings.marcai_api_url}/api/internal/leads",
         json={
@@ -65,7 +71,9 @@ async def create_lead(
             "conversaId": conversa_id,
         },
     )
-    return resp["data"]
+    lead = dict(resp["data"])
+    lead["_alreadyExisted"] = bool(resp.get("alreadyExisted", False))
+    return lead
 
 
 async def create_message(
@@ -144,5 +152,33 @@ async def qualify_lead(
             "motivoInteresse": motivo_interesse,
             "objetivos": objetivos,
         },
+    )
+    return resp["data"]
+
+
+async def update_lead_info(
+    lead_id: str,
+    tenant_id: str,
+    interesse: str | None = None,
+    urgencia: str | None = None,
+    observacoes: str | None = None,
+) -> dict:
+    """Update lead intel captured during conversation.
+
+    Used by the agent to record what the lead said as the conversation
+    flows — before having enough data to fully qualify. All fields are
+    optional; only provided ones are sent.
+    """
+    payload: dict = {"tenantId": tenant_id}
+    if interesse is not None:
+        payload["interesse"] = interesse
+    if urgencia is not None:
+        payload["urgencia"] = urgencia
+    if observacoes is not None:
+        payload["observacoes"] = observacoes
+
+    resp = await _patch_with_retry(
+        f"{settings.marcai_api_url}/api/internal/leads/{lead_id}/qualificacao",
+        json=payload,
     )
     return resp["data"]

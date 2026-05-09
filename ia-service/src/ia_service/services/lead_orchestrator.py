@@ -107,19 +107,63 @@ async def _generate_reply(
             tenant_id, lead_id, mensagem, log
         )
 
-        agent = make_lead_agent(tenant_id)
-        result = await agent.ainvoke({"messages": messages})
-        last_msg = result["messages"][-1]
-        # last_msg may be AIMessage; .content is a string in simple cases
-        content = getattr(last_msg, "content", "") or ""
+        agent = make_lead_agent(tenant_id, lead_id=lead_id)
+
+        # Gemini Flash sometimes returns empty content after tool calls
+        # (transient quirk). Retry once before falling back to greeting.
+        content = ""
+        for attempt in (1, 2):
+            result = await agent.ainvoke({"messages": messages})
+            last_msg = result["messages"][-1]
+            raw = getattr(last_msg, "content", "")
+            if isinstance(raw, list):
+                content = "".join(
+                    p.get("text", "") if isinstance(p, dict) else str(p)
+                    for p in raw
+                )
+            else:
+                content = str(raw or "")
+            if content.strip():
+                break
+            log.warning("agent_empty_reply_retrying", attempt=attempt)
+
         if not content.strip():
             log.warning("agent_empty_reply_falling_back")
             return fallback_greeting, "greeting_fallback"
         log.info("agent_reply_generated", chars=len(content))
+
+        # Defense-in-depth: detect booking confirmation in reply and
+        # auto-move stage to 'agendado'. LLMs sometimes craft a perfect
+        # confirmation ("Marcado às 15:00") without remembering to call
+        # move_lead_stage. We catch that here.
+        await _maybe_auto_book(content, tenant_id, lead_id, log)
+
         return content, "agent"
     except Exception as exc:
         log.error("agent_failed_falling_back", error=str(exc))
         return fallback_greeting, "greeting_fallback"
+
+
+import re as _re
+
+_BOOKING_REGEX = _re.compile(
+    r"(?:marcad|agendad|confirmad)[oa]?\b[^.!?]*?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
+    _re.IGNORECASE,
+)
+
+
+async def _maybe_auto_book(content: str, tenant_id: str, lead_id: str | None, log) -> None:
+    """If the agent's reply confirms a booking + cites a time, move stage."""
+    if not lead_id or not _BOOKING_REGEX.search(content):
+        return
+    try:
+        await marcai_client.move_lead_stage(
+            lead_id=lead_id, tenant_id=tenant_id, stage="agendado"
+        )
+        log.info("auto_book_stage_moved", stage="agendado")
+    except Exception as exc:
+        # Non-fatal: stage may already be agendado, or transition refused
+        log.info("auto_book_skipped", error=str(exc))
 
 
 async def run(payload) -> dict:
@@ -138,6 +182,7 @@ async def run(payload) -> dict:
     # 1. Resolve lead (idempotent POST — returns existing if phone already registered)
     lead_id = payload.lead_id
     conversa_id: str | None = None
+    is_brand_new_lead = False
     if not lead_id:
         try:
             lead_data = await marcai_client.create_lead(
@@ -146,7 +191,8 @@ async def run(payload) -> dict:
             )
             lead_id = str(lead_data["_id"])
             conversa_id = str(lead_data.get("conversa") or "")
-            log.info("lead_resolved", lead_id=lead_id, already_existed=lead_data.get("alreadyExisted"))
+            is_brand_new_lead = not lead_data.get("_alreadyExisted", False)
+            log.info("lead_resolved", lead_id=lead_id, already_existed=lead_data.get("_alreadyExisted"))
         except Exception as exc:
             log.error("lead_create_failed", error=str(exc))
             return {"status": "error", "lead_id": None, "action_taken": "lead_create_failed"}
@@ -197,16 +243,17 @@ async def run(payload) -> dict:
     except Exception as exc:
         log.warning("outbound_message_persist_failed", error=str(exc))
 
-    # 6. Move lead to em_conversa (only if it was in novo — Node validates the transition)
-    try:
-        await marcai_client.move_lead_stage(
-            lead_id=lead_id,
-            tenant_id=tenant_id,
-            stage="em_conversa",
-        )
-    except Exception as exc:
-        # Non-critical: lead may already be in a later stage, transition may be refused
-        log.info("stage_transition_skipped", error=str(exc))
+    # 6. Move brand-new lead from 'novo' → 'em_conversa'.
+    # Skipped for existing leads — the agent/auto_book handle later transitions.
+    if is_brand_new_lead:
+        try:
+            await marcai_client.move_lead_stage(
+                lead_id=lead_id,
+                tenant_id=tenant_id,
+                stage="em_conversa",
+            )
+        except Exception as exc:
+            log.info("stage_transition_skipped", error=str(exc))
 
     log.info("lead_processed", lead_id=lead_id, reply_source=reply_source)
     return {
