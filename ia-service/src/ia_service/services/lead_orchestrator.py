@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import structlog
 
 from ..config import settings
-from . import evolution_client, marcai_client
+from . import evolution_client, lead_extractor, marcai_client
 
 logger = structlog.get_logger()
 
@@ -147,7 +147,10 @@ async def _generate_reply(
 import re as _re
 
 _BOOKING_REGEX = _re.compile(
-    r"(?:marcad|agendad|confirmad)[oa]?\b[^.!?]*?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
+    # Roots: marc/agend/confirm cover "marcado", "marcação", "marcar",
+    # "agendado", "agendamento", "agendar", "confirmado", "confirmar",
+    # "confirmação". Followed (in same sentence) by an HH:MM or "Xh" time.
+    r"(?:marc|agend|confirm)\w*\b[^.!?]*?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
     _re.IGNORECASE,
 )
 
@@ -164,6 +167,138 @@ async def _maybe_auto_book(content: str, tenant_id: str, lead_id: str | None, lo
     except Exception as exc:
         # Non-fatal: stage may already be agendado, or transition refused
         log.info("auto_book_skipped", error=str(exc))
+
+
+async def _extract_and_apply_intel(
+    tenant_id: str, lead_id: str, telefone: str, mensagem: str, log
+) -> None:
+    """Run the structured-output extractor on recent history and apply
+    any new intel directly to the DB (no LLM tool calls involved).
+
+    This complements (does not replace) the agent's optional tool calls.
+    Belt-and-suspenders: if the agent ALSO calls update_lead_info, the
+    DB just gets overwritten with the same data — idempotent.
+    """
+    try:
+        # Build messages list from recent history + current message
+        history = await marcai_client.get_recent_messages(
+            tenant_id=tenant_id, lead_id=lead_id, limit=6
+        )
+        # Filter by 30-min window (same logic as agent history) and convert
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+        msgs: list[dict] = []
+        for m in history:
+            data_str = m.get("data") or m.get("createdAt") or ""
+            try:
+                msg_dt = datetime.fromisoformat(data_str.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if msg_dt < cutoff:
+                continue
+            role = "user" if m.get("direcao") == "entrada" else "assistant"
+            content_m = m.get("mensagem", "").strip()
+            if content_m:
+                msgs.append({"role": role, "content": content_m})
+        msgs.append({"role": "user", "content": mensagem})
+
+        intel = await lead_extractor.extract_intel(msgs)
+        if intel is None:
+            log.warning("intel_extraction_skipped")
+            return
+
+        log.info(
+            "intel_extracted",
+            intent=intel.intent,
+            score_delta=intel.score_delta,
+            interesse=bool(intel.interesse),
+        )
+
+        # Apply intel to DB
+        if intel.interesse or intel.urgencia or intel.observacoes:
+            try:
+                await marcai_client.update_lead_info(
+                    lead_id=lead_id,
+                    tenant_id=tenant_id,
+                    interesse=intel.interesse,
+                    urgencia=intel.urgencia,
+                    observacoes=intel.observacoes,
+                )
+            except Exception as exc:
+                log.warning("intel_update_failed", error=str(exc))
+
+        # Apply score_delta cumulatively to qualificacao.score.
+        # When the running total reaches >= 60, the Node endpoint
+        # auto-promotes the lead to 'qualificado'.
+        if intel.score_delta != 0:
+            try:
+                current_score = await _get_current_score(tenant_id, lead_id)
+                new_score = max(0, min(100, current_score + intel.score_delta))
+                await marcai_client.qualify_lead(
+                    lead_id=lead_id,
+                    tenant_id=tenant_id,
+                    score=new_score,
+                    motivo_interesse=intel.interesse or "",
+                    objetivos=[intel.observacoes] if intel.observacoes else [],
+                )
+                log.info("intel_score_updated", from_=current_score, to=new_score)
+            except Exception as exc:
+                log.info("intel_score_update_skipped", error=str(exc))
+
+        # Move 'novo' → 'em_conversa' ONLY if lead is currently in 'novo'.
+        # Reading current status first avoids regressing leads already at
+        # 'qualificado' / 'agendado' (qualificado → em_conversa is allowed
+        # by transition rules but here it would be a regression).
+        current_score = await _get_current_score(tenant_id, lead_id)  # cheap read
+        try:
+            from bson import ObjectId
+            from . import mongo_reader as _mr
+            db = _mr.get_tenant_db(tenant_id)
+            lead_doc = db.leads.find_one(
+                {"_id": ObjectId(lead_id)}, {"status": 1}
+            )
+            if lead_doc and lead_doc.get("status") == "novo":
+                await marcai_client.move_lead_stage(
+                    lead_id=lead_id, tenant_id=tenant_id, stage="em_conversa"
+                )
+        except Exception:
+            pass
+
+        # If lead is desisting → move stage to perdido immediately
+        if intel.intent == "desistir":
+            try:
+                await marcai_client.move_lead_stage(
+                    lead_id=lead_id,
+                    tenant_id=tenant_id,
+                    stage="perdido",
+                    motivo=intel.perdido_motivo or "desistiu na conversa",
+                )
+                log.info("intel_moved_perdido", motivo=intel.perdido_motivo)
+            except Exception as exc:
+                log.info("intel_move_perdido_skipped", error=str(exc))
+    except Exception as exc:
+        # Non-fatal: extractor failures should never block the conversation.
+        log.warning("intel_extraction_error", error=str(exc))
+
+
+async def _get_current_score(tenant_id: str, lead_id: str) -> int:
+    """Read the lead's current qualificacao.score directly from Mongo.
+
+    Lighter than calling Node — saves a round-trip when we just need
+    one number to add a delta to.
+    """
+    from bson import ObjectId
+
+    from . import mongo_reader
+
+    db = mongo_reader.get_tenant_db(tenant_id)
+    lead = db.leads.find_one(
+        {"_id": ObjectId(lead_id)}, {"qualificacao.score": 1}
+    )
+    if not lead:
+        return 0
+    return int((lead.get("qualificacao") or {}).get("score") or 0)
 
 
 async def run(payload) -> dict:
@@ -211,6 +346,13 @@ async def run(payload) -> dict:
             conversa_id = str(msg_data.get("conversa", {}).get("_id") or "")
     except Exception as exc:
         log.warning("inbound_message_persist_failed", error=str(exc))
+
+    # 2.5. Extract structured intel from the conversation BEFORE the
+    # conversational agent runs. This guarantees the lead's interesse/
+    # urgencia/observacoes/score are captured even if the agent later
+    # forgets to call qualification tools.
+    if lead_id:
+        await _extract_and_apply_intel(tenant_id, lead_id, telefone, mensagem, log)
 
     # 3. Generate reply (agent if API key set, else fixed greeting)
     period = _period_of_day(timestamp)
