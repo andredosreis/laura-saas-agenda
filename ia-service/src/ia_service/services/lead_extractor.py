@@ -124,6 +124,25 @@ class LeadIntel(BaseModel):
         ),
     )
 
+    objection_type: Optional[
+        Literal[
+            "preco",        # "não tenho dinheiro", "está caro"
+            "tempo",        # "estou ocupada", "agora não dá"
+            "distancia",    # "moro longe", "não sei se consigo ir"
+            "duvida_servico",  # "será que funciona?", "preciso de pensar mais"
+            "outra_clinica",   # "estou a comparar", "vi outra"
+            "geral",        # hesitação sem motivo claro ("vou pensar")
+        ]
+    ] = Field(
+        None,
+        description=(
+            "Quando o lead hesita, recusa marcar ou se mostra evasivo, "
+            "categoriza o tipo de objecção que está por trás (mesmo "
+            "implícita). Permite à IA aplicar a estratégia certa de "
+            "superação. null se o lead avança com confiança."
+        ),
+    )
+
 
 # ─────────────────────── Extractor prompt ───────────────────────
 
