@@ -37,6 +37,17 @@ class LeadIntel(BaseModel):
     revealed. If unsure, leave None.
     """
 
+    nome: Optional[str] = Field(
+        None,
+        description=(
+            "Primeiro nome (ou nome completo) do lead — só preencher "
+            "se ele se apresentou claramente nas mensagens. "
+            "ex: 'Maria', 'João Silva'. "
+            "Não inferir nem completar de saudações genéricas. null se "
+            "ainda não disse o nome."
+        ),
+    )
+
     interesse: Optional[str] = Field(
         None,
         description=(
@@ -173,7 +184,7 @@ def _get_extractor_llm():
 
         llm = ChatOpenAI(
             model="gpt-4o-mini",
-            temperature=0,
+            temperature=0.3,
             api_key=settings.openai_api_key,
             timeout=15,
         )

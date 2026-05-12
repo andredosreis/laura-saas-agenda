@@ -18,6 +18,7 @@ import { getModels } from '../../models/registry.js';
 import Tenant from '../../models/Tenant.js';
 import { transitionStage, LeadError } from './leadService.js';
 import { LEAD_STAGES, ORIGEM_VALUES } from './pipelineConstants.js';
+import { scheduleNotifications } from '../../utils/scheduleNotifications.js';
 
 const router = express.Router();
 
@@ -154,7 +155,7 @@ router.patch('/:id/stage', async (req, res) => {
 // =====================================================================
 router.patch('/:id/qualificacao', async (req, res) => {
   try {
-    const { tenantId, score, motivoInteresse, objetivos, urgencia, interesse, observacoes } = req.body || {};
+    const { tenantId, score, motivoInteresse, objetivos, urgencia, interesse, observacoes, nome } = req.body || {};
     const { models } = await resolveTenantContext(tenantId);
 
     const update = { ultimaInteracao: new Date() };
@@ -164,6 +165,7 @@ router.patch('/:id/qualificacao', async (req, res) => {
     if (urgencia) update.urgencia = urgencia;
     if (interesse) update.interesse = interesse;
     if (observacoes) update.observacoes = observacoes;
+    if (nome) update.nome = nome;
 
     const lead = await models.Lead.findOneAndUpdate(
       { _id: req.params.id, tenantId },
@@ -244,6 +246,90 @@ router.get('/:id/messages', async (req, res) => {
     res.json({ success: true, data: recent.reverse() });
   } catch (err) {
     console.error('Erro ao listar mensagens do lead:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// POST /api/internal/leads/:id/agendamento
+// Body: { tenantId, dataHoraISO, tipo? }
+//
+// Creates an Avaliacao appointment for the lead — used when the IA
+// agent confirms a slot the lead picked. Atomic check: refuses if the
+// slot is already taken by another non-cancelled appointment.
+// =====================================================================
+router.post('/:id/agendamento', async (req, res) => {
+  try {
+    const { tenantId, dataHoraISO, tipo } = req.body || {};
+    if (!tenantId || !dataHoraISO) {
+      return res.status(400).json({ success: false, error: 'tenantId e dataHoraISO são obrigatórios' });
+    }
+    const dataHora = new Date(dataHoraISO);
+    if (Number.isNaN(dataHora.getTime())) {
+      return res.status(400).json({ success: false, error: 'dataHoraISO inválido' });
+    }
+    if (dataHora < new Date()) {
+      return res.status(400).json({ success: false, error: 'dataHora no passado' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'leadId inválido' });
+    }
+
+    const { models } = await resolveTenantContext(tenantId);
+    const lead = await models.Lead.findOne({ _id: req.params.id, tenantId });
+    if (!lead) {
+      return res.status(404).json({ success: false, error: 'Lead não encontrado' });
+    }
+
+    // Atomic slot check: refuse if any non-cancelled appointment overlaps the
+    // 60-min window centered on dataHora (we treat each appointment as 60min).
+    const SLOT_MIN = 60;
+    const halfMs = (SLOT_MIN * 60 * 1000) - 1; // [start, start+60min)
+    const windowStart = new Date(dataHora.getTime() - halfMs);
+    const windowEnd = new Date(dataHora.getTime() + halfMs);
+    const cancelledStatus = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
+    const conflict = await models.Agendamento.findOne({
+      tenantId,
+      dataHora: { $gte: windowStart, $lte: windowEnd },
+      status: { $nin: cancelledStatus },
+    });
+    if (conflict) {
+      return res.status(409).json({
+        success: false,
+        error: 'Slot já ocupado por outro agendamento',
+        code: 'slot_taken',
+      });
+    }
+
+    const agendamento = await models.Agendamento.create({
+      tenantId,
+      tipo: tipo === 'Sessao' || tipo === 'Retorno' ? tipo : 'Avaliacao',
+      lead: {
+        nome: lead.nome || null,
+        telefone: lead.telefone,
+        email: lead.email || null,
+      },
+      dataHora,
+      status: 'Agendado',
+      criadoPorIA: true,
+      observacoes: 'Marcação criada automaticamente pelo agent IA — confirmar com cliente.',
+    });
+
+    // Dispara mesma automação de lembretes que createAgendamento público:
+    // confirmação imediata + lembrete antecipado (1-2 dias) + 1h antes.
+    // Degrada silenciosamente se Redis não estiver configurado.
+    scheduleNotifications({
+      agendamentoId: agendamento._id,
+      tenantId,
+      dataHora: agendamento.dataHora,
+      clienteNome: lead.nome || 'Cliente',
+      clienteTelefone: lead.telefone,
+      servicoNome: 'Avaliação gratuita',
+    }).catch((err) => console.warn('[ia-appointment] scheduleNotifications falhou:', err.message));
+
+    res.status(201).json({ success: true, data: agendamento });
+  } catch (err) {
+    console.error('Erro internal POST /leads/:id/agendamento:', err);
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });

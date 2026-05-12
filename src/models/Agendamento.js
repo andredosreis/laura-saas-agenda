@@ -121,6 +121,21 @@ const agendamentoSchema = new mongoose.Schema({
     default: null
   },
 
+  // 🤖 IA: marca quando este agendamento foi criado automaticamente
+  // pelo agent (Phase 4). Permite à UI mostrar badge "X marcações novas
+  // pela IA" e a Laura saber que precisa de confirmar.
+  criadoPorIA: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  // Quando a equipa "viu" — clica num botão de acknowledgment.
+  // Antes disso, conta para o badge.
+  iaAckEm: {
+    type: Date,
+    default: null
+  },
+
   // Comissão
   comissao: {
     profissional: {

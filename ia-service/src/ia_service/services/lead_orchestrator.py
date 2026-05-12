@@ -216,11 +216,12 @@ async def _extract_and_apply_intel(
         )
 
         # Apply intel to DB
-        if intel.interesse or intel.urgencia or intel.observacoes:
+        if intel.nome or intel.interesse or intel.urgencia or intel.observacoes:
             try:
                 await marcai_client.update_lead_info(
                     lead_id=lead_id,
                     tenant_id=tenant_id,
+                    nome=intel.nome,
                     interesse=intel.interesse,
                     urgencia=intel.urgencia,
                     observacoes=intel.observacoes,

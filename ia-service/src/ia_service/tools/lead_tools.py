@@ -196,6 +196,54 @@ def make_move_lead_stage_tool(tenant_id: str, lead_id: str):
     return move_lead_stage
 
 
+def make_create_appointment_tool(tenant_id: str, lead_id: str):
+    """Build a tool that books the evaluation appointment."""
+
+    @tool
+    async def create_appointment(data: str, hora: str) -> str:
+        """Marca a avaliação (Agendamento) com a Laura para o lead.
+
+        Chama esta tool **APENAS** quando o lead aceita explicitamente
+        um slot que tu acabaste de propor (ex: "11:00 dá-me jeito").
+        A tool valida em tempo real que o slot ainda está livre — se
+        entretanto outro cliente o ocupou, devolve erro e tens de
+        propor outras opções.
+
+        Args:
+            data: Data no formato YYYY-MM-DD (ex: '2026-05-11').
+            hora: Hora no formato HH:MM (ex: '11:00').
+        """
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        from ..services import marcai_client
+
+        try:
+            local = datetime.fromisoformat(f"{data}T{hora}:00").replace(
+                tzinfo=ZoneInfo("Europe/Lisbon")
+            )
+            iso_utc = local.astimezone(ZoneInfo("UTC")).isoformat()
+            await marcai_client.create_appointment(
+                lead_id=lead_id, tenant_id=tenant_id, data_hora_iso=iso_utc
+            )
+            return (
+                f"OK — avaliação marcada para {data} às {hora} (status pendente "
+                "de confirmação pela recepcionista). Confirma o agendamento ao "
+                "lead com naturalidade."
+            )
+        except Exception as exc:
+            msg = str(exc)
+            if "409" in msg or "slot_taken" in msg:
+                return (
+                    "ERRO: o slot já foi ocupado por outro cliente. Pede "
+                    "desculpa ao lead, chama get_available_slots de novo "
+                    "para o mesmo dia e propõe alternativas."
+                )
+            return f"ERRO ao marcar: {msg}. Diz ao lead que vais passar à recepcionista."
+
+    return create_appointment
+
+
 def make_get_available_slots_tool(tenant_id: str):
     """Build a `get_available_slots` tool bound to a specific tenant.
 

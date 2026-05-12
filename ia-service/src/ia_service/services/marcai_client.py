@@ -156,9 +156,32 @@ async def qualify_lead(
     return resp["data"]
 
 
+async def create_appointment(
+    lead_id: str,
+    tenant_id: str,
+    data_hora_iso: str,
+    tipo: str = "Avaliacao",
+) -> dict:
+    """Create an appointment for the lead. Returns the new appointment dict.
+
+    Raises on conflict (HTTP 409 'slot_taken'). The agent should react to
+    this by re-fetching available slots and proposing alternatives.
+    """
+    resp = await _post_with_retry(
+        f"{settings.marcai_api_url}/api/internal/leads/{lead_id}/agendamento",
+        json={
+            "tenantId": tenant_id,
+            "dataHoraISO": data_hora_iso,
+            "tipo": tipo,
+        },
+    )
+    return resp["data"]
+
+
 async def update_lead_info(
     lead_id: str,
     tenant_id: str,
+    nome: str | None = None,
     interesse: str | None = None,
     urgencia: str | None = None,
     observacoes: str | None = None,
@@ -170,6 +193,8 @@ async def update_lead_info(
     optional; only provided ones are sent.
     """
     payload: dict = {"tenantId": tenant_id}
+    if nome is not None:
+        payload["nome"] = nome
     if interesse is not None:
         payload["interesse"] = interesse
     if urgencia is not None:
