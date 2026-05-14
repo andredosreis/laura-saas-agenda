@@ -229,29 +229,40 @@ async def _extract_and_apply_intel(
             except Exception as exc:
                 log.warning("intel_update_failed", error=str(exc))
 
-        # Apply score_delta cumulatively to qualificacao.score.
-        # When the running total reaches >= 60, the Node endpoint
-        # auto-promotes the lead to 'qualificado'.
+        # GAP-02 fix: Apply score_delta atomically. The Node endpoint uses
+        # an aggregation pipeline update (`$add` + `$min` + `$max`) so the
+        # read-compute-write happens in a single MongoDB command, atomic
+        # at the document level. Two parallel orchestrator runs for the
+        # same lead now produce deterministic accumulation (each delta
+        # lands) instead of the previous last-write-wins race.
+        #
+        # Auto-promotion to 'qualificado' is also computed inside the
+        # same pipeline (no separate round-trip needed).
         if intel.score_delta != 0:
             try:
-                current_score = await _get_current_score(tenant_id, lead_id)
-                new_score = max(0, min(100, current_score + intel.score_delta))
-                await marcai_client.qualify_lead(
+                updated = await marcai_client.apply_score_delta(
                     lead_id=lead_id,
                     tenant_id=tenant_id,
-                    score=new_score,
+                    score_delta=intel.score_delta,
                     motivo_interesse=intel.interesse or "",
                     objetivos=[intel.observacoes] if intel.observacoes else [],
                 )
-                log.info("intel_score_updated", from_=current_score, to=new_score)
+                new_score = (updated.get("qualificacao") or {}).get("score")
+                log.info(
+                    "intel_score_delta_applied",
+                    delta=intel.score_delta,
+                    new_score=new_score,
+                    status=updated.get("status"),
+                )
             except Exception as exc:
                 log.info("intel_score_update_skipped", error=str(exc))
 
         # Move 'novo' → 'em_conversa' ONLY if lead is currently in 'novo'.
         # Reading current status first avoids regressing leads already at
-        # 'qualificado' / 'agendado' (qualificado → em_conversa is allowed
-        # by transition rules but here it would be a regression).
-        current_score = await _get_current_score(tenant_id, lead_id)  # cheap read
+        # 'qualificado' / 'agendado'. Note: if the score-delta call above
+        # already auto-promoted to 'qualificado' inside the same Node
+        # pipeline, this read will see 'qualificado' and skip the
+        # transition — correct behaviour.
         try:
             from bson import ObjectId
             from . import mongo_reader as _mr
@@ -281,25 +292,6 @@ async def _extract_and_apply_intel(
     except Exception as exc:
         # Non-fatal: extractor failures should never block the conversation.
         log.warning("intel_extraction_error", error=str(exc))
-
-
-async def _get_current_score(tenant_id: str, lead_id: str) -> int:
-    """Read the lead's current qualificacao.score directly from Mongo.
-
-    Lighter than calling Node — saves a round-trip when we just need
-    one number to add a delta to.
-    """
-    from bson import ObjectId
-
-    from . import mongo_reader
-
-    db = mongo_reader.get_tenant_db(tenant_id)
-    lead = db.leads.find_one(
-        {"_id": ObjectId(lead_id)}, {"qualificacao.score": 1}
-    )
-    if not lead:
-        return 0
-    return int((lead.get("qualificacao") or {}).get("score") or 0)
 
 
 async def run(payload) -> dict:

@@ -144,6 +144,16 @@ async def qualify_lead(
     motivo_interesse: str,
     objetivos: list[str],
 ) -> dict:
+    """Set the lead's qualification score to an absolute value (`score`).
+
+    Used by the agent's `qualify_lead` tool — the agent commits a deliberate
+    final score after reasoning over the conversation. Set semantics, not
+    accumulative.
+
+    For per-turn cumulative deltas from the extractor (F07), use
+    `apply_score_delta` instead — that path is atomic at the DB layer
+    and is the GAP-02 fix.
+    """
     resp = await _patch_with_retry(
         f"{settings.marcai_api_url}/api/internal/leads/{lead_id}/qualificacao",
         json={
@@ -152,6 +162,45 @@ async def qualify_lead(
             "motivoInteresse": motivo_interesse,
             "objetivos": objetivos,
         },
+    )
+    return resp["data"]
+
+
+async def apply_score_delta(
+    lead_id: str,
+    tenant_id: str,
+    score_delta: int,
+    motivo_interesse: str | None = None,
+    objetivos: list[str] | None = None,
+) -> dict:
+    """Apply a cumulative score delta to the lead atomically.
+
+    Resolves GAP-02 (cross-turn race on score accumulation). The Node
+    endpoint uses an aggregation pipeline update to read+compute+clamp+write
+    in a single MongoDB command — two parallel orchestrator runs for the
+    same lead now produce a deterministic final score equal to the sum of
+    their deltas (clamped to [0, 100]), instead of last-write-wins losing
+    one of them.
+
+    `score_delta` must be an integer in [-30, +30] (mirrors LeadIntel
+    schema in F07). Other fields (motivo_interesse, objetivos) are applied
+    in the same atomic update.
+
+    Auto-promotion to 'qualificado' (when score >= 60 and status is
+    'novo' or 'em_conversa') is performed by the Node endpoint inside
+    the same pipeline — no separate round-trip.
+    """
+    payload: dict = {
+        "tenantId": tenant_id,
+        "scoreDelta": score_delta,
+    }
+    if motivo_interesse:
+        payload["motivoInteresse"] = motivo_interesse
+    if objetivos:
+        payload["objetivos"] = objetivos
+    resp = await _patch_with_retry(
+        f"{settings.marcai_api_url}/api/internal/leads/{lead_id}/qualificacao",
+        json=payload,
     )
     return resp["data"]
 

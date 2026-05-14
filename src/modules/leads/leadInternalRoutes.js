@@ -155,19 +155,121 @@ router.patch('/:id/stage', async (req, res) => {
 // =====================================================================
 router.patch('/:id/qualificacao', async (req, res) => {
   try {
-    const { tenantId, score, motivoInteresse, objetivos, urgencia, interesse, observacoes, nome } = req.body || {};
+    const {
+      tenantId,
+      score,
+      scoreDelta,
+      motivoInteresse,
+      objetivos,
+      urgencia,
+      interesse,
+      observacoes,
+      nome,
+    } = req.body || {};
     const { models } = await resolveTenantContext(tenantId);
 
-    const update = { ultimaInteracao: new Date() };
-    if (Number.isFinite(score)) update['qualificacao.score'] = Math.max(0, Math.min(100, score));
-    if (motivoInteresse) update['qualificacao.motivoInteresse'] = motivoInteresse;
-    if (Array.isArray(objetivos)) update['qualificacao.objetivos'] = objetivos;
-    if (urgencia) update.urgencia = urgencia;
-    if (interesse) update.interesse = interesse;
-    if (observacoes) update.observacoes = observacoes;
-    if (nome) update.nome = nome;
+    // GAP-02: dois modos mutuamente exclusivos
+    //   • `score` absoluto — usado pelo agent `qualify_lead` tool (commitment
+    //     deliberado do agente após reasoning). Set semantics.
+    //   • `scoreDelta` — usado pelo F07 extractor (por turno). **Atómico**
+    //     via aggregation pipeline update: read+compute+clamp+write num
+    //     único comando MongoDB. Elimina a corrida read-then-write que
+    //     perdia deltas entre turns paralelos do mesmo lead.
+    if (Number.isFinite(score) && Number.isFinite(scoreDelta)) {
+      return res.status(400).json({
+        success: false,
+        error: 'score e scoreDelta são mutuamente exclusivos',
+        code: 'score_and_delta_conflict',
+      });
+    }
 
-    const lead = await models.Lead.findOneAndUpdate(
+    // Validação do delta range — espelha LeadIntel.score_delta do extractor
+    if (scoreDelta !== undefined) {
+      if (!Number.isInteger(scoreDelta) || scoreDelta < -30 || scoreDelta > 30) {
+        return res.status(400).json({
+          success: false,
+          error: 'scoreDelta deve ser inteiro entre -30 e +30',
+          code: 'score_delta_invalid',
+        });
+      }
+    }
+
+    // Other-fields update (motivoInteresse, objetivos, urgencia, etc.) é
+    // partilhado por ambos os modos.
+    const otherSet = { ultimaInteracao: new Date() };
+    if (motivoInteresse) otherSet['qualificacao.motivoInteresse'] = motivoInteresse;
+    if (Array.isArray(objetivos)) otherSet['qualificacao.objetivos'] = objetivos;
+    if (urgencia) otherSet.urgencia = urgencia;
+    if (interesse) otherSet.interesse = interesse;
+    if (observacoes) otherSet.observacoes = observacoes;
+    if (nome) otherSet.nome = nome;
+
+    let lead;
+
+    if (Number.isFinite(scoreDelta)) {
+      // ─── Modo delta: aggregation pipeline update atómico ─────────────
+      // Single MongoDB command que (a) acumula delta + clamp, (b) actualiza
+      // outros campos, (c) auto-promove a 'qualificado' se score >= 60 e
+      // status ∈ {novo, em_conversa}. Tudo dentro da atomicidade
+      // single-document do Mongo — concorrência entre turns é segura.
+      const pipeline = [
+        {
+          $set: {
+            ...otherSet,
+            'qualificacao.score': {
+              $max: [
+                0,
+                {
+                  $min: [
+                    100,
+                    {
+                      $add: [
+                        { $ifNull: ['$qualificacao.score', 0] },
+                        scoreDelta,
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        {
+          $set: {
+            status: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $gte: ['$qualificacao.score', 60] },
+                    { $in: ['$status', ['novo', 'em_conversa']] },
+                  ],
+                },
+                then: 'qualificado',
+                else: '$status',
+              },
+            },
+          },
+        },
+      ];
+
+      lead = await models.Lead.findOneAndUpdate(
+        { _id: req.params.id, tenantId },
+        pipeline,
+        { new: true, updatePipeline: true },
+      );
+
+      if (!lead) {
+        return res.status(404).json({ success: false, error: 'Lead não encontrado' });
+      }
+
+      return res.status(200).json({ success: true, data: lead });
+    }
+
+    // ─── Modo score absoluto: set semantics (compatibilidade) ────────────
+    const update = { ...otherSet };
+    if (Number.isFinite(score)) update['qualificacao.score'] = Math.max(0, Math.min(100, score));
+
+    lead = await models.Lead.findOneAndUpdate(
       { _id: req.params.id, tenantId },
       { $set: update },
       { new: true, runValidators: true },
@@ -176,9 +278,8 @@ router.patch('/:id/qualificacao', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Lead não encontrado' });
     }
 
-    // Auto-promote to 'qualificado' when score >= 60 and lead is still
-    // in 'em_conversa' (or 'novo'). Defense-in-depth — the agent doesn't
-    // always remember to call /stage explicitly.
+    // Auto-promote no modo absoluto — defense-in-depth via transitionStage
+    // (mantém validação ALLOWED_TRANSITIONS do leadService).
     const isStillEarly = lead.status === 'em_conversa' || lead.status === 'novo';
     if (isStillEarly && (lead.qualificacao?.score || 0) >= 60) {
       try {
