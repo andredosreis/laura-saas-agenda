@@ -12,24 +12,33 @@ const normalizePortuguesePhone = (phone) => {
   return cleaned;
 };
 
-export const sendWhatsAppMessage = async (to, message) => {
+/**
+ * Envia mensagem WhatsApp via Evolution API.
+ *
+ * @param {string} to                 telefone destino
+ * @param {string} message            corpo da mensagem
+ * @param {string} [instanceName]     instância Evolution a usar; se omisso, cai para EVOLUTION_INSTANCE
+ * @returns {Promise<{success:boolean, result?, error?}>}
+ */
+export const sendWhatsAppMessage = async (to, message, instanceName) => {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     logger.warn({ to }, '[Evolution] EVOLUTION_API_URL ou EVOLUTION_API_KEY não configurado — mensagem não enviada');
     return { success: false, error: 'Evolution API não configurada' };
   }
 
   const phoneNormalized = normalizePortuguesePhone(to);
+  const instance = (instanceName && String(instanceName).trim()) || EVOLUTION_INSTANCE;
 
   try {
     const response = await axios.post(
-      `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
+      `${EVOLUTION_API_URL}/message/sendText/${instance}`,
       { number: phoneNormalized, text: message },
       { headers: { apikey: EVOLUTION_API_KEY, 'Content-Type': 'application/json' } }
     );
-    logger.info({ to: phoneNormalized }, '[Evolution] Mensagem enviada');
+    logger.info({ to: phoneNormalized, instance }, '[Evolution] Mensagem enviada');
     return { success: true, result: response.data };
   } catch (error) {
-    logger.error({ to: phoneNormalized, err: error.response?.data || error.message }, '[Evolution] Erro ao enviar mensagem');
+    logger.error({ to: phoneNormalized, instance, err: error.response?.data || error.message }, '[Evolution] Erro ao enviar mensagem');
     return { success: false, error: error.response?.data || error.message };
   }
 };

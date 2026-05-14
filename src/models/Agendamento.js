@@ -121,6 +121,32 @@ const agendamentoSchema = new mongoose.Schema({
     default: null
   },
 
+  // 🤖 IA: marca quando este agendamento foi criado automaticamente
+  // pelo agent (Phase 4). Permite à UI mostrar badge "X marcações novas
+  // pela IA" e a Laura saber que precisa de confirmar.
+  criadoPorIA: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  // Quando a equipa "viu" — clica num botão de acknowledgment.
+  // Antes disso, conta para o badge.
+  iaAckEm: {
+    type: Date,
+    default: null
+  },
+
+  // GAP-01 fix: campo derivado de `status`. true quando o agendamento ocupa
+  // efectivamente um slot (não está cancelado). Usado pelo índice composto
+  // único parcial abaixo para tornar a detecção de conflito de slot atómica
+  // ao nível da base de dados (em vez de check-then-create com TOCTOU race).
+  // MongoDB partial filters não suportam $nin/$in/$ne, daí o campo derivado
+  // em vez de filtrar directamente por status.
+  ocupaSlot: {
+    type: Boolean,
+    default: true,
+  },
+
   // Comissão
   comissao: {
     profissional: {
@@ -169,11 +195,53 @@ agendamentoSchema.index({ tenantId: 1, compraPacote: 1 });
 agendamentoSchema.index({ tenantId: 1, statusPagamento: 1 });
 agendamentoSchema.index({ tenantId: 1, profissional: 1, status: 1 });
 
+// GAP-01 fix: índice composto único parcial. Dois agendamentos do mesmo
+// tenant não podem coexistir com a mesma `dataHora` exacta enquanto ambos
+// ocuparem slot (ou seja, enquanto não estiverem cancelados). Substitui o
+// padrão check-then-create (TOCTOU race) por uma garantia atómica da DB:
+// `Agendamento.create()` falha com E11000 se houver colisão.
+//
+// A janela de 60min permanece como detecção best-effort no handler
+// (returns 409 cedo quando possível) — o índice cobre a corrida real
+// (dois pedidos simultâneos para a mesma dataHora exacta).
+agendamentoSchema.index(
+  { tenantId: 1, dataHora: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { ocupaSlot: true },
+    name: 'tenant_datahora_ocupaslot_unique',
+  },
+);
+
+// Lista canónica de status que NÃO ocupam slot (libertam a "reserva").
+// Mantida em módulo dedicado para reutilização (handlers + migration script).
+const STATUSES_QUE_NAO_OCUPAM_SLOT = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
+
 agendamentoSchema.pre('save', function () {
   if (this.isNew && this.dataHora < new Date()) {
     throw new Error('Não é possível criar agendamentos com data no passado.');
   }
+  // GAP-01: deriva ocupaSlot de status antes de persistir.
+  this.ocupaSlot = !STATUSES_QUE_NAO_OCUPAM_SLOT.includes(this.status);
 });
+
+// GAP-01: hooks de update para garantir que ocupaSlot acompanha mudanças
+// de status feitas via findOneAndUpdate / updateOne (pre('save') não dispara).
+// Quando o caller actualiza `status`, recalculamos `ocupaSlot` no mesmo update.
+function syncOcupaSlotInUpdate() {
+  const update = this.getUpdate() || {};
+  const $set = update.$set || update;
+  if ($set && Object.prototype.hasOwnProperty.call($set, 'status')) {
+    const novoStatus = $set.status;
+    const novoOcupa = !STATUSES_QUE_NAO_OCUPAM_SLOT.includes(novoStatus);
+    if (update.$set) update.$set.ocupaSlot = novoOcupa;
+    else update.ocupaSlot = novoOcupa;
+  }
+}
+
+agendamentoSchema.pre('findOneAndUpdate', syncOcupaSlotInUpdate);
+agendamentoSchema.pre('updateOne', syncOcupaSlotInUpdate);
+agendamentoSchema.pre('updateMany', syncOcupaSlotInUpdate);
 
 // Exporta schema para uso no registry (database-per-tenant)
 export { agendamentoSchema as AgendamentoSchema };

@@ -15,6 +15,8 @@ import {
   fecharPacote,
   getHistorico,
   getStatsMes,
+  getIaPendentes,
+  ackIaAgendamento,
 } from './agendamentoController.js';
 import {
   createAgendamentoSchema,
@@ -35,6 +37,10 @@ router.use(authenticate);
 // Rotas de histórico e estatísticas (antes das rotas com :id)
 router.get('/historico', getHistorico);
 router.get('/stats/mes', getStatsMes);
+
+// 🤖 IA: agendamentos criados pelo agent ainda não vistos pela equipa
+router.get('/ia-pendentes', getIaPendentes);
+router.post('/:id/ack-ia', validate(agendamentoIdParamSchema, 'params'), ackIaAgendamento);
 
 // Rotas CRUD para Agendamentos
 // RBAC: terapeuta só lê (via filtro resource-level em getAll/getOne);

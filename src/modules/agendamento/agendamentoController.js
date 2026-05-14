@@ -123,6 +123,15 @@ export const createAgendamento = async (req, res) => {
 
     res.status(201).json(novoAgendamento);
   } catch (error) {
+    // GAP-01: corrida simultânea para a mesma (tenantId, dataHora) é detectada
+    // atomicamente pelo índice composto único parcial em Agendamento. Devolvemos
+    // 409 com o mesmo formato semântico que a verificação best-effort acima.
+    if (error && error.code === 11000) {
+      return res.status(409).json({
+        message: "Já existe um agendamento para este horário.",
+        code: "slot_taken",
+      });
+    }
     console.error("Erro ao criar agendamento:", error);
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(err => err.message);
@@ -811,5 +820,56 @@ export const getStatsMes = async (req, res) => {
       message: "Erro ao buscar estatísticas.",
       details: error.message
     });
+  }
+};
+
+
+// =====================================================================
+// 🤖 IA — Pendentes de visualização
+// =====================================================================
+// Lista (e conta) agendamentos criados pelo agent IA que a equipa
+// ainda não viu (iaAckEm null). Usado para um badge na Sidebar.
+
+export const getIaPendentes = async (req, res) => {
+  try {
+    const { Agendamento } = req.models;
+    const filtro = {
+      tenantId: req.tenantId,
+      criadoPorIA: true,
+      iaAckEm: null,
+    };
+    const [count, recentes] = await Promise.all([
+      Agendamento.countDocuments(filtro),
+      Agendamento.find(filtro)
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .select('dataHora tipo lead status createdAt')
+        .lean(),
+    ]);
+    res.status(200).json({ success: true, data: { count, recentes } });
+  } catch (err) {
+    console.error('Erro ao listar IA pendentes:', err);
+    res.status(500).json({ success: false, error: 'Erro interno.' });
+  }
+};
+
+// =====================================================================
+// 🤖 IA — Acknowledge (a equipa viu este agendamento criado pela IA)
+// =====================================================================
+export const ackIaAgendamento = async (req, res) => {
+  try {
+    const { Agendamento } = req.models;
+    const ag = await Agendamento.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId, criadoPorIA: true },
+      { $set: { iaAckEm: new Date() } },
+      { new: true },
+    );
+    if (!ag) {
+      return res.status(404).json({ success: false, error: 'Agendamento IA não encontrado' });
+    }
+    res.status(200).json({ success: true, data: ag });
+  } catch (err) {
+    console.error('Erro ao ack IA agendamento:', err);
+    res.status(500).json({ success: false, error: 'Erro interno.' });
   }
 };
