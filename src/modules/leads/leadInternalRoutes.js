@@ -329,6 +329,17 @@ router.post('/:id/agendamento', async (req, res) => {
 
     res.status(201).json({ success: true, data: agendamento });
   } catch (err) {
+    // GAP-01: o índice composto único parcial em Agendamento captura corridas
+    // simultâneas para a mesma (tenantId, dataHora). Convertemos E11000 em
+    // 409 slot_taken — mesmo código que o handler usa quando detecta o
+    // conflito via best-effort findOne acima.
+    if (err && err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: 'Slot já ocupado por outro agendamento',
+        code: 'slot_taken',
+      });
+    }
     console.error('Erro internal POST /leads/:id/agendamento:', err);
     res.status(500).json({ success: false, error: 'Erro interno' });
   }

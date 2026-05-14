@@ -123,6 +123,15 @@ export const createAgendamento = async (req, res) => {
 
     res.status(201).json(novoAgendamento);
   } catch (error) {
+    // GAP-01: corrida simultânea para a mesma (tenantId, dataHora) é detectada
+    // atomicamente pelo índice composto único parcial em Agendamento. Devolvemos
+    // 409 com o mesmo formato semântico que a verificação best-effort acima.
+    if (error && error.code === 11000) {
+      return res.status(409).json({
+        message: "Já existe um agendamento para este horário.",
+        code: "slot_taken",
+      });
+    }
     console.error("Erro ao criar agendamento:", error);
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map(err => err.message);
