@@ -37,10 +37,13 @@ export async function handle(input) {
     return { delivered: false, source: 'skipped' };
   }
 
-  // If Client already received the auto-greeting once (etapaConversa set),
-  // do NOT send again. The professional handles subsequent inbounds.
+  // Skip only if THIS handler already greeted the Client (sentinel value
+  // 'aguardando_laura' set on a previous run). The schema default is
+  // 'inicial' (truthy), so testing for any truthy value would skip every
+  // existing Client — that was a pre-F12 bug. The correct sentinel is the
+  // one we set ourselves below.
   const existingClient = persistedState?.existingClient || null;
-  if (existingClient?.etapaConversa) {
+  if (existingClient?.etapaConversa === 'aguardando_laura') {
     return { delivered: false, source: 'skipped' };
   }
 
@@ -62,14 +65,17 @@ _La Estética Avançada_`;
 
   await sendWhatsAppMessage(telefoneNormalizado, mensagemAutomatica, instanceName);
 
-  // Mark Client as already greeted (only when we have a Client + models)
+  // Mark Client as already greeted using the sentinel 'aguardando_laura'.
+  // Uses updateOne (no schema validators) because the value is intentionally
+  // outside the strict enum defined on `etapaConversa`. The sentinel is read
+  // by the early-return guard above to prevent duplicate greetings; it is
+  // never user-facing.
   if (existingClient && models?.Cliente) {
     try {
-      const cliente = await models.Cliente.findById(existingClient._id);
-      if (cliente) {
-        cliente.etapaConversa = 'aguardando_laura';
-        await cliente.save();
-      }
+      await models.Cliente.updateOne(
+        { _id: existingClient._id },
+        { $set: { etapaConversa: 'aguardando_laura' } },
+      );
     } catch (err) {
       console.warn('[legacyFallback] failed to mark Client.etapaConversa:', err?.message);
     }

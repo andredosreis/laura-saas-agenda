@@ -24,17 +24,12 @@ export const enviarMensagemDiretaSchema = z
   })
   .strict();
 
-// ─── Webhooks externos (Evolution/Z-API) — NÃO strict ───────────────
+// ─── Webhooks externos (Z-API legacy) — NÃO strict ──────────────────
 // Validamos apenas o que o controller lê. Campos extra vindos da API
 // externa devem fluir sem 400 — caso contrário perdemos mensagens em
-// produção quando a Evolution adicionar campos novos.
-
-export const evolutionWebhookSchema = z.looseObject({
-  event: z.string().optional(),
-  data: z.looseObject({
-    key: z.looseObject({ remoteJid: z.string().optional() }).optional(),
-  }).optional(),
-});
+// produção quando a Z-API adicionar campos novos.
+// NOTA: evolutionWebhookSchema foi movido para
+// `src/modules/messaging/webhookSchemas.js` em F12 Phase 5 (ADR-022).
 
 export const zapiWebhookSchema = z.looseObject({
   phone: z.string().optional(),
