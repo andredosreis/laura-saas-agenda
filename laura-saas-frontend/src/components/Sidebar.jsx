@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -20,7 +21,9 @@ import {
   CalendarClock,
   ListChecks,
   Settings,
-  CalendarCheck
+  CalendarCheck,
+  Inbox,
+  Columns
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
 import ThemeToggle from './ThemeToggle';
@@ -30,10 +33,29 @@ function Sidebar() {
   const [expandedGroups, setExpandedGroups] = useState({
     financas: true,
     agendamento: true,
-    administrativo: true
+    administrativo: true,
+    crm: true
   });
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+
+  // 🤖 Badge: agendamentos criados pela IA ainda não vistos.
+  // Polling a cada 30s. Endpoint: GET /api/v1/agendamentos/ia-pendentes.
+  const [iaPendingCount, setIaPendingCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const { data } = await api.get('/agendamentos/ia-pendentes');
+        if (!cancelled) setIaPendingCount(data?.data?.count || 0);
+      } catch {
+        // silent — endpoint pode estar a 401 se logout, ignorar
+      }
+    };
+    fetchCount();
+    const id = setInterval(fetchCount, 30000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -67,10 +89,18 @@ function Sidebar() {
       ]
     },
     {
+      id: 'crm',
+      label: 'CRM / VENDAS',
+      items: [
+        { to: "/leads", text: "Leads", icon: Inbox, perm: 'verLeads' },
+        { to: "/leads/kanban", text: "Pipeline", icon: Columns, perm: 'verLeads' }
+      ]
+    },
+    {
       id: 'agendamento',
       label: 'AGENDAMENTO',
       items: [
-        { to: "/agendamentos", text: "Agendamentos", icon: ListChecks, perm: 'verAgendamentos' },
+        { to: "/agendamentos", text: "Agendamentos", icon: ListChecks, perm: 'verAgendamentos', badge: iaPendingCount },
         { to: "/calendario", text: "Calendário", icon: Calendar, perm: 'verAgendamentos' },
         { to: "/atendimentos", text: "Atendimentos", icon: CalendarClock, perm: 'verAgendamentos' }
       ]
@@ -178,10 +208,18 @@ function Sidebar() {
                         to={link.to}
                         className={getLinkClasses}
                         onClick={closeMobileMenu}
-                        end={link.to === "/dashboard"}
+                        end={link.to === "/dashboard" || link.to === "/leads"}
                       >
                         <link.icon className="w-5 h-5" />
-                        <span>{link.text}</span>
+                        <span className="flex-1">{link.text}</span>
+                        {link.badge > 0 && (
+                          <span
+                            className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-500 text-white text-[11px] font-semibold"
+                            title={`${link.badge} marcação(ões) novas pela IA`}
+                          >
+                            🤖 {link.badge}
+                          </span>
+                        )}
                       </NavLink>
                     ))}
                   </motion.div>

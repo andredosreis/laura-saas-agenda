@@ -1,0 +1,17 @@
+{
+  "event": "messages.upsert",
+  "instance": "marcai",
+  "data": {
+    "key": {
+      "remoteJid": "351910000001@s.whatsapp.net",
+      "fromMe": false,
+      "id": "3EB0B5A7F2C4D1E9F0A2"
+    },
+    "pushName": "João Silva",
+    "message": {
+      "conversation": "Olá, quero marcar uma consulta"
+    },
+    "messageTimestamp": 1746388800,
+    "messageType": "conversation"
+  }
+}
