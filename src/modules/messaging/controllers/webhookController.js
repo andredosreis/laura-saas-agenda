@@ -19,6 +19,7 @@
  */
 
 import { markMessageSeen } from '../../../utils/webhookDedupe.js';
+import { withPhoneLock } from '../../../utils/phoneLock.js';
 import logger from '../../../utils/logger.js';
 import { telefoneHash } from '../../../utils/telefoneHash.js';
 
@@ -86,6 +87,11 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       return res.status(400).json({ error: 'Dados incompletos' });
     }
 
+    const trimmed = mensagem.trim();
+    if (trimmed.length <= 2 && /^[?!.,;:…]+$/.test(trimmed)) {
+      return res.status(200).json({ message: 'Pontuação isolada ignorada' });
+    }
+
     const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
     const instanceName = req.body?.instance ? String(req.body.instance) : null;
 
@@ -96,15 +102,20 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     res.status(200).json({ success: true, message: 'Mensagem aceite, processando' });
 
     // ── Async pipeline: fetch state → decide → dispatch → telemetry ──
-    processInbound({
-      classified,
-      telefoneNormalizado,
-      mensagem,
-      messageId,
-      timestamp: new Date(timestampMensagem),
-      instanceName,
-      startMs,
-    }).catch((err) => {
+    // Phone lock serializes concurrent messages from the same number so that
+    // the second message sees the Lead created by the first (prevents duplicate
+    // Lead creation from Evolution retry/rapid-fire).
+    withPhoneLock(telefoneNormalizado, () =>
+      processInbound({
+        classified,
+        telefoneNormalizado,
+        mensagem,
+        messageId,
+        timestamp: new Date(timestampMensagem),
+        instanceName,
+        startMs,
+      }),
+    ).catch((err) => {
       logger.error({ err: err.message, stack: err.stack }, '[webhook] async pipeline failed');
     });
   } catch (error) {

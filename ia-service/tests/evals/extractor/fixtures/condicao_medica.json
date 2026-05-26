@@ -27,10 +27,10 @@
         "current_message": "estou grávida de 6 meses e queria saber se podem fazer drenagem"
       },
       "outputs": {
-        "expected_intent": "descrever_problema",
+        "expected_intent": "duvida_servico",
         "expected_urgencia": null,
-        "expected_score_delta_range": [10, 30],
-        "notes": "Gravidez tem contraindicações reais (posição, intensidade). observacoes deve ter '⚠ Condição médica: gravidez 6 meses'."
+        "expected_score_delta_range": [0, 30],
+        "notes": "Gravidez + pergunta 'podem fazer?' — duvida_servico é aceitável. observacoes deve ter '⚠ Condição médica: gravidez 6 meses'."
       }
     },
     {

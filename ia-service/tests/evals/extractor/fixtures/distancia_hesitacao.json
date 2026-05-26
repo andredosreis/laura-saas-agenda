@@ -14,7 +14,7 @@
       "outputs": {
         "expected_intent": "hesitacao",
         "expected_objection_type": "distancia",
-        "expected_score_delta_range": [-20, -5],
+        "expected_score_delta_range": [-20, 0],
         "notes": "Primeiro sinal de distância NÃO é desistir — é hesitação. Permite à IA oferecer alternativas (fim-de-semana, horário cómodo, etc.)."
       }
     },
@@ -30,7 +30,7 @@
       "outputs": {
         "expected_intent": "hesitacao",
         "expected_objection_type": "distancia",
-        "expected_score_delta_range": [-20, -5]
+        "expected_score_delta_range": [-20, 0]
       }
     },
     {

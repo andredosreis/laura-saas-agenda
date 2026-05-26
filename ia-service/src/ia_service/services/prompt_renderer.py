@@ -38,7 +38,6 @@ Usage:
 from __future__ import annotations
 
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -60,21 +59,32 @@ _WEEKDAYS_PT = [
 NOT_YET = "(ainda não recolhido)"
 
 
-@lru_cache(maxsize=1)
 def _load_template() -> str:
-    """Load the system prompt template once. Cache forever."""
     return _TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
+_MONTHS_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+]
+
+
 def _today_string(timezone_name: str = "Europe/Lisbon") -> str:
-    """Format today in PT for the LLM ('Quinta-feira, 8 de Maio de 2026')."""
     now = datetime.now(ZoneInfo(timezone_name))
     weekday = _WEEKDAYS_PT[now.weekday()]
-    months = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-    ]
-    return f"{weekday}, {now.day} de {months[now.month - 1]} de {now.year} (ISO: {now.strftime('%Y-%m-%d')})"
+    return f"{weekday}, {now.day} de {_MONTHS_PT[now.month - 1]} de {now.year} (ISO: {now.strftime('%Y-%m-%d')})"
+
+
+def _calendar_next_14_days(timezone_name: str = "Europe/Lisbon") -> str:
+    from datetime import timedelta
+    now = datetime.now(ZoneInfo(timezone_name))
+    lines = []
+    for i in range(14):
+        d = now + timedelta(days=i)
+        wd = _WEEKDAYS_PT[d.weekday()]
+        tag = " ← HOJE" if i == 0 else (" ← amanhã" if i == 1 else "")
+        lines.append(f"- {wd} {d.day}/{d.month:02d} (ISO {d.strftime('%Y-%m-%d')}){tag}")
+    return "\n".join(lines)
 
 
 def render_system_prompt(
@@ -118,6 +128,7 @@ def render_system_prompt(
         .replace("{{catalogo}}", tenant_knowledge.load_catalogo(tenant_id))
         .replace("{{politicas}}", tenant_knowledge.load_politicas(tenant_id))
         .replace("{{today}}", _today_string())
+        .replace("{{calendario}}", _calendar_next_14_days())
         .replace("{{lead_nome}}", nome)
         .replace("{{lead_motivo}}", motivo)
         .replace("{{lead_urgencia}}", urgencia)

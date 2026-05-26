@@ -305,6 +305,18 @@ Casos especiais críticos:
   mês", "queria fazer drenagens") → `descrever_problema` (objectivo é
   problema o suficiente). NUNCA `outra` quando há intenção de tratamento.
 
+- **Off-topic persistente / conversa social = `desistir`**:
+  Se olhares para as últimas mensagens do histórico e o lead:
+  - Recusou falar de serviços da clínica
+  - Quer "só conversar" / "bater um papo" / temas off-topic (futebol,
+    música, notícias, vida pessoal)
+  - Já recebeu redirect da assistente ≥2 vezes e continua off-topic
+  → classifica como `desistir` com `perdido_motivo: "sem interesse
+  em serviços"` e `score_delta: -30`.
+
+  Lead que quer usar o bot como chatbot social não é lead — é abuso de
+  tokens. Marcar como perdido desactiva a IA para esse número.
+
 Regra-tese: em caso de ambiguidade entre `primeira_msg` e outra categoria,
 escolhe **a outra** — `primeira_msg` é o ÚLTIMO recurso, apenas para o
 primeiríssimo "olá" / "boa tarde" sem contexto anterior.

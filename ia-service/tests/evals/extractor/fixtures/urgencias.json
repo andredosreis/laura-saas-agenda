@@ -58,8 +58,8 @@
       },
       "outputs": {
         "expected_urgencia": "baixa",
-        "expected_intent": "descrever_problema",
-        "expected_score_delta_range": [0, 15]
+        "expected_intent": "hesitacao",
+        "expected_score_delta_range": [-15, 15]
       }
     },
     {

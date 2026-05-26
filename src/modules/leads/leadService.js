@@ -78,6 +78,7 @@ export function transitionStage({ lead, toStage, motivo, actor, isInternalCall =
       throw new LeadError('Motivo é obrigatório ao marcar como "perdido"', 400, 'motivo_required');
     }
     lead.perdido = { motivo: motivo.trim(), em: new Date() };
+    lead.iaAtiva = false;
   }
 
   lead.status = toStage;

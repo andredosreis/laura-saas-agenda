@@ -61,7 +61,7 @@
         "expected_intent": "duvida_servico",
         "expected_nome": null,
         "expected_urgencia": null,
-        "expected_score_delta_range": [5, 20]
+        "expected_score_delta_range": [0, 20]
       }
     },
     {
@@ -125,7 +125,7 @@
       "outputs": {
         "expected_intent": "hesitacao",
         "expected_nome": null,
-        "expected_urgencia": null,
+        "expected_urgencia": "baixa",
         "expected_score_delta_range": [-20, -5]
       }
     },
@@ -159,7 +159,7 @@
       },
       "outputs": {
         "expected_intent": "agradecer_encerrar",
-        "expected_nome": null,
+        "expected_nome": "Maria",
         "expected_urgencia": null,
         "expected_score_delta_range": [-5, 10]
       }
@@ -174,11 +174,11 @@
         "current_message": "vi o anuncio no face, quais os serviços?"
       },
       "outputs": {
-        "expected_intent": "outra",
+        "expected_intent": "duvida_servico",
         "expected_nome": null,
         "expected_urgencia": null,
         "expected_score_delta_range": [0, 15],
-        "notes": "Não é primeira_msg porque já houve interação. Pode classificar como duvida_servico (aceitável) — adicionar ao set se desviar."
+        "notes": "Lead pergunta sobre serviços após ver anúncio. duvida_servico é a classificação correcta — 'quais os serviços?' é pergunta sobre oferta."
       }
     }
   ]

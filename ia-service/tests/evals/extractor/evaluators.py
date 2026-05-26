@@ -24,6 +24,14 @@ from typing import Any
 
 # ─────────────────────────── Row-level evaluators ───────────────────────────
 
+import unicodedata
+
+
+def _strip_accents(s: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
+    )
+
 
 def _outputs(obj) -> dict:
     return getattr(obj, "outputs", None) or {}
@@ -112,12 +120,13 @@ def perdido_motivo_contains(run, example) -> dict[str, Any]:
     needle = _outputs(example).get("expected_perdido_motivo_contains")
     if not needle:
         return _na("perdido_motivo_contains")
-    haystack = (_outputs(run).get("perdido_motivo") or "").lower()
-    score = 1 if needle.lower() in haystack else 0
+    haystack = _strip_accents((_outputs(run).get("perdido_motivo") or "").lower())
+    needle_norm = _strip_accents(needle.lower())
+    score = 1 if needle_norm in haystack else 0
     return {
         "key": "perdido_motivo_contains",
         "score": score,
-        "comment": f"haystack={haystack!r} needle={needle!r}",
+        "comment": f"haystack={haystack!r} needle={needle_norm!r}",
     }
 
 
