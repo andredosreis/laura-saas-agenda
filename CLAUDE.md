@@ -149,6 +149,10 @@ Ficheiros existentes `.jsx` e `.js` não são convertidos a menos que a tarefa e
 Novos ficheiros: `.tsx` para componentes React, `.ts` para lógica pura.
 
 ---
+## Segurança
+- Sempre validar isolamento de tenantId
+- Webhooks do Evolution API devem validar origem
+- Dados pessoais seguem GDPR — região UE obrigatória
 
 ## Quando Ler os Guidelines
 

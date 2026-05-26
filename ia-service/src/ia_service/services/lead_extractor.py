@@ -63,10 +63,18 @@ class LeadIntel(BaseModel):
         None,
         description=(
             "Pressão de tempo do lead. "
-            "alta: tem data marcada (casamento, evento, pós-op imediato). "
-            "media: quer começar este mês. "
-            "baixa: está só a explorar opções. "
-            "null se não há sinal claro."
+            "**DEFAULT = null**. Só preencher se há sinal TEMPORAL explícito. "
+            "alta: tem data marcada — 'casamento em X', 'evento próxima semana', "
+            "'pós-op recente', 'preciso com urgência', 'quanto antes possível'. "
+            "media: indicou janela curta — 'este mês', 'nas próximas semanas', "
+            "'queria começar agora'. "
+            "baixa: explicitamente sem pressa — 'estou só a explorar', "
+            "'depois decido', 'sem pressa'. "
+            "**null** se a mensagem é só descrição de problema/sintoma sem qualquer "
+            "marcador temporal (ex: 'tenho dores há semanas' SEM dizer urgência → null). "
+            "**null** se é só pergunta de serviço/preço sem sinal temporal. "
+            "NÃO inventar 'media' por defeito — null é a resposta correcta quando "
+            "o lead não comunicou urgência."
         ),
     )
 
@@ -75,7 +83,18 @@ class LeadIntel(BaseModel):
         description=(
             "Detalhe livre útil para a Laura na avaliação clínica "
             "(ex: 'parto há 3 meses', 'fez lipo, médico recomendou 10 sessões DLA'). "
-            "Só preencher se há facto concreto novo. Não duplicar interesse."
+            "Só preencher se há facto concreto novo. Não duplicar interesse. "
+            "\n\n"
+            "**Quando o lead reporta uma condição médica** (diabetes, hipertensão, "
+            "gravidez, pós-op recente, trombose, cancro, ferida aberta, doença "
+            "autoimune, medicação imunossupressora, etc.), PREFIXA o valor com "
+            "'⚠ Condição médica: ' para a Laura ver destacado no Kanban. "
+            "Exemplos: "
+            "'⚠ Condição médica: diabetes (tipo não especificado)', "
+            "'⚠ Condição médica: gravidez 7 meses', "
+            "'⚠ Condição médica: pós-lipo há 2 semanas'. "
+            "Esta convenção é o sinal de que o lead requer cuidado clínico extra "
+            "e o agent deve pedir autorização médica antes de marcar tratamento."
         ),
     )
 
@@ -150,7 +169,17 @@ class LeadIntel(BaseModel):
             "Quando o lead hesita, recusa marcar ou se mostra evasivo, "
             "categoriza o tipo de objecção que está por trás (mesmo "
             "implícita). Permite à IA aplicar a estratégia certa de "
-            "superação. null se o lead avança com confiança."
+            "superação. null se o lead avança com confiança. "
+            "\n\nExemplos por classe:\n"
+            "- preco: 'não tenho dinheiro agora', 'está caro', 'sem orçamento'\n"
+            "- tempo: 'estou super ocupada', 'agora não dá jeito', 'no momento não tenho disponibilidade'\n"
+            "- distancia: 'moro em <outra cidade>', 'não sei se consigo deslocar-me', 'fica longe de mim'\n"
+            "- duvida_servico: 'será que funciona?', 'tenho dúvidas se é para mim', 'preciso pensar melhor'\n"
+            "- outra_clinica: 'estou a comparar com outra', 'vou ficar pela clínica que frequento', "
+            "'já tenho outra opção', 'vou ficar onde estou'\n"
+            "- geral: 'vou pensar', 'depois decido', evasiva sem motivo concreto\n"
+            "Preenche SEMPRE que intent=hesitacao ou intent=desistir tenha causa identificável — "
+            "se o lead deu QUALQUER pista do porquê, classifica em vez de deixar null."
         ),
     )
 
@@ -162,14 +191,144 @@ EXTRACTOR_SYSTEM_PROMPT = """És um extractor de informação de leads para uma 
 de estética em Portugal. Lê as mensagens trocadas (saudações + leads + respostas anteriores
 da assistente Laura) e extrai factos sobre este lead num JSON estrito.
 
-Regras absolutas:
-1. Só preenche `interesse` / `urgencia` / `observacoes` se a INFORMAÇÃO está claramente
-   nas mensagens DESTE lead. Não inventes nem completes lacunas.
-2. `intent` é sempre obrigatório — escolhe a categoria que melhor descreve a ÚLTIMA
-   mensagem do lead (a mais recente), não a conversa inteira.
-3. `score_delta` segue a heurística do schema. Em dúvida, usa 0.
-4. `perdido_motivo` SÓ se intent=desistir.
-5. Português europeu nas strings que preenches (interesse/observacoes).
+# Regra-mãe: SEMPRE LEEM o histórico ANTES de classificar
+
+A mensagem do lead nunca deve ser analisada isoladamente. O turno anterior
+da Laura é decisivo para perceber o que o lead está a responder.
+
+# Regras
+
+## 1. `nome` — extracção contextual obrigatória
+
+- Se na mensagem ANTERIOR a Laura perguntou o nome ("posso saber o seu nome?",
+  "qual o seu nome?", "como se chama?", "primeiro nome?") E a mensagem actual
+  do lead é uma palavra única ou frase curta (1-3 palavras) que parece um nome
+  próprio (capitalizada ou nome reconhecível), EXTRAI essa palavra como `nome`.
+
+  Exemplos críticos:
+  - Laura: "Posso saber o seu nome?" → Lead: "Maria" → **`nome="Maria"`**
+  - Laura: "Como se chama?" → Lead: "Sou a Ana" → **`nome="Ana"`**
+  - Laura: "Posso saber o seu primeiro nome?" → Lead: "Deys" → **`nome="Deys"`**
+  - Laura: "Como se chama?" → Lead: "Deys Silva" → **`nome="Deys Silva"`**
+  - Laura: "Posso saber o seu nome?" → Lead: "André" → **`nome="André"`**
+
+- NÃO extraias nome se a mensagem do lead é claramente outra coisa
+  (descrição de problema, pergunta, etc.) mesmo que contenha uma maiúscula.
+
+## 2. `interesse` / `urgencia` / `observacoes`
+
+Só preenche se a INFORMAÇÃO está claramente nas mensagens DESTE lead.
+Não inventes nem completes lacunas.
+
+**`urgencia` — default é null, NUNCA inventes:**
+
+- Descrever um sintoma ou problema (ex: "tenho dores na lombar há 2 semanas")
+  **NÃO** implica urgência. Se o lead não disse `casamento em X`, `pós-op`,
+  `preciso urgente`, `este mês`, ou "explorar/sem pressa" → `urgencia=null`.
+- "Sim quero marcar" SEM mais info temporal → `urgencia=null`.
+- "Quanto custa?" → `urgencia=null` (nem há descrição de problema).
+
+Falsos positivos a evitar:
+- ❌ Lead: "tenho dores há 2 semanas" → `urgencia=media`  ← ERRADO, não há sinal temporal
+- ❌ Lead: "sim, vamos marcar" → `urgencia=media`  ← ERRADO, sem janela
+- ✅ Lead: "tenho dores há 2 semanas" → `urgencia=null`  ← CERTO
+- ✅ Lead: "casamento daqui a 1 semana" → `urgencia=alta`
+- ✅ Lead: "estou só a explorar opções" → `urgencia=baixa`
+
+## 3. `intent` — contextual, NÃO isolado
+
+`intent` reflete a INTENÇÃO da última mensagem do lead **no contexto da conversa**.
+Olha sempre para as mensagens anteriores antes de classificar.
+
+Casos especiais críticos:
+
+- **`primeira_msg` é APENAS para o primeiro greeting** sem qualquer interacção
+  anterior da assistente. Se já houve UMA resposta da Laura, NÃO uses
+  `primeira_msg` — usa `outra` ou a categoria que melhor descreve.
+
+- **Resposta a pergunta de nome** (`"Maria"`, `"Deys"`, `"Sou o André"` após
+  Laura pedir nome) → `outra` (e extrai `nome`). NUNCA `primeira_msg`.
+
+- **Mensagens curtas após proposta de slots** ("as 9", "9h", "sim", "ok",
+  "pode ser", "essa", "este") → `escolher_slot` ou `pedir_agendamento`.
+
+- **Mensagens curtas com "?"** ("as 9 da?", "tem na quarta?", "depois 16h?")
+  após proposta de slots → `escolher_slot`. NUNCA `primeira_msg`.
+
+- **"quanto custa?"**, **"qual o valor?"** em qualquer momento → `pergunta_preco`.
+
+- **Mencionar fonte de chegada** ("vi o anuncio no face", "vi no insta",
+  "amigo recomendou") sem outra info → `outra`. NUNCA `primeira_msg`.
+
+- **"Vocês fazem X?"** / **"Tem Y?"** / **"Trabalham com Z?"** — perguntas a
+  confirmar oferta de serviço → `duvida_servico`. NUNCA `outra`. Ex:
+  - "vcs fazem drenagem linfática?" → `duvida_servico`
+  - "têm massagem ayurvédica?" → `duvida_servico`
+  - "trabalham com depilação a laser?" → `duvida_servico`
+
+- **Distinguir `hesitacao` de `desistir` (importante)**:
+  - `hesitacao` = pista de objecção mas não fecha porta. Ex: "agora não tenho
+    dinheiro", "estou ocupada", "moro longe não sei se vou conseguir", "vou
+    pensar", "depois falo". O lead **deixa abertura**.
+  - `desistir` = recusa explícita e definitiva. Ex: "não me interessa", "vou
+    para outra clínica", "vou ficar pela clínica que já frequento", "não
+    obrigado". O lead **fecha a porta**.
+
+  Em dúvida entre os dois, preferir `hesitacao` (menos destrutivo — permite à
+  IA tentar reverter). Só `desistir` quando há recusa clara.
+
+- **REGRA DURA — `distância` é `hesitacao`, NÃO `desistir`**:
+  Quando o lead menciona localização longe ou impedimento geográfico pela
+  PRIMEIRA vez (mesmo na MESMA mensagem), classifica como `hesitacao` com
+  `objection_type=distancia`. **Só passa a `desistir` se o lead REPETIR a
+  recusa por distância numa mensagem posterior** ou disser claramente que
+  não vai (ex: "definitivamente não vou", "esquece").
+
+  Exemplos:
+  - "moro em Lisboa" → `hesitacao` + `objection_type=distancia` ✅
+  - "fica longe de mim" → `hesitacao` + `objection_type=distancia` ✅
+  - "não sei se vou conseguir ir, é longe" → `hesitacao` + `distancia` ✅
+  - "não, é muito longe, não vou" → `desistir` (recusa explícita) ✅
+  - "não vou, depois falo" → `hesitacao` ("depois falo" deixa abertura)
+
+  Razão: distância é uma objecção que a IA pode tentar superar (oferecer
+  horário fim-de-semana, etc.). Classificar como `desistir` no primeiro
+  sinal corta a oportunidade.
+
+- **REGRA DURA — `condição médica` é `descrever_problema`**:
+  Quando o lead menciona uma condição (diabetes, hipertensão, gravidez,
+  pós-op, etc.), o intent é `descrever_problema` (mesmo que pareça só uma
+  pergunta tipo "qual massagem para diabetes?"). Captura também a condição
+  em `observacoes` com prefixo `⚠ Condição médica: ...` — ver schema acima.
+
+- **Descrever necessidade SEM dor concreta** ("queria começar tratamento este
+  mês", "queria fazer drenagens") → `descrever_problema` (objectivo é
+  problema o suficiente). NUNCA `outra` quando há intenção de tratamento.
+
+Regra-tese: em caso de ambiguidade entre `primeira_msg` e outra categoria,
+escolhe **a outra** — `primeira_msg` é o ÚLTIMO recurso, apenas para o
+primeiríssimo "olá" / "boa tarde" sem contexto anterior.
+
+`outra` é também ÚLTIMO recurso — antes de classificar `outra`, perguntar-te:
+não é `duvida_servico`? não é `descrever_problema`? não é `hesitacao`?
+
+## 4. `score_delta`
+
+Segue a heurística do schema. Em dúvida, usa 0.
+- Lead deu o nome (responde a pergunta da Laura) → +5
+- Lead descreveu problema concreto → +20 a +30
+- Lead escolheu slot → +10 a +15
+- Lead hesitou ("vou pensar") → -10 a -15
+
+## 5. `perdido_motivo`
+
+SÓ se intent=desistir.
+
+## 6. Língua
+
+Português europeu nas strings que preenches (interesse/observacoes).
+
+---
 
 Não respondes ao lead — só extrais. Não escrevas conversação."""
 
@@ -178,12 +337,18 @@ Não respondes ao lead — só extrais. Não escrevas conversação."""
 
 
 def _get_extractor_llm():
-    """Build an LLM bound to LeadIntel schema for structured output."""
+    """Build an LLM bound to LeadIntel schema for structured output.
+
+    Model is read from settings — `settings.extractor_model_openai` for
+    OpenAI provider, `settings.extractor_model_gemini` for Gemini. Both
+    are env-overridable (`EXTRACTOR_MODEL_OPENAI=gpt-4o` to run the eval
+    against a bigger model without code changes).
+    """
     if settings.llm_provider == "openai":
         from langchain_openai import ChatOpenAI
 
         llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model=settings.extractor_model_openai,
             temperature=0.3,
             api_key=settings.openai_api_key,
             timeout=15,
@@ -192,7 +357,7 @@ def _get_extractor_llm():
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model=settings.extractor_model_gemini,
             temperature=0,
             google_api_key=settings.google_api_key,
             timeout=15,

@@ -20,5 +20,20 @@ class Settings(BaseSettings):
     # Provider can be 'gemini' (default — free tier) or 'openai'
     llm_provider: str = "gemini"
 
+    # Model overrides per role. Lets us A/B test different models in evals
+    # without code changes (e.g. EXTRACTOR_MODEL=gpt-4o for one run).
+    # Defaults match what production used at the time of the F1 baseline.
+    extractor_model_openai: str = "gpt-4o-mini"
+    extractor_model_gemini: str = "gemini-2.5-flash"
+
+    # LangSmith tracing (set LANGSMITH_TRACING=true + LANGSMITH_API_KEY to
+    # enable). LangChain auto-instruments on import when these env vars are
+    # present — we only re-export here so other modules can decide to attach
+    # extra metadata to runs (tenant_id, lead_id, turn_number).
+    langsmith_tracing: bool = False
+    langsmith_api_key: str | None = None
+    langsmith_project: str = "marcai-ia-service"
+    langsmith_endpoint: str | None = None
+
 
 settings = Settings()

@@ -56,13 +56,33 @@ def _build_model():
     )
 
 
-def make_lead_agent(tenant_id: str, lead_id: str | None = None) -> Any:
+def make_lead_agent(
+    tenant_id: str,
+    lead_id: str | None = None,
+    lead_state: dict | None = None,
+    turn_number: int = 0,
+    last_clinic_message: str = "",
+) -> Any:
     """Create a LangChain agent bound to a tenant + (optionally) a lead.
 
     `lead_id` is required for the qualification tools (update_lead_info,
     qualify_lead, move_lead_stage). When omitted, only the read-only
     tools (find_servico, get_available_slots) are exposed — useful for
     evals or stateless calls.
+
+    `lead_state` is the persisted state of the Lead at the moment of
+    invocation. Keys: `nome`, `motivo`, `urgencia`, `score`. Injected
+    into the system prompt as `{{lead_*}}` placeholders so the agent
+    never has to guess what it already knows. Pass `None` when there
+    is no Lead context yet.
+
+    `turn_number` is the count of clinic messages already sent in this
+    conversation window. Surfaced in the system prompt as a hard gate
+    against repeated greetings (BUG-001).
+
+    `last_clinic_message` is the previous assistant utterance, surfaced
+    to the prompt so the agent can detect "we just asked for the name"
+    without re-walking history (BUG-002).
     """
     tools = [
         make_find_servico_tool(tenant_id),
@@ -75,6 +95,11 @@ def make_lead_agent(tenant_id: str, lead_id: str | None = None) -> Any:
             make_move_lead_stage_tool(tenant_id, lead_id),
             make_create_appointment_tool(tenant_id, lead_id),
         ])
-    system_prompt = render_system_prompt(tenant_id)
+    system_prompt = render_system_prompt(
+        tenant_id,
+        lead_state=lead_state,
+        turn_number=turn_number,
+        last_clinic_message=last_clinic_message,
+    )
     model = _build_model()
     return create_agent(model, tools=tools, system_prompt=system_prompt)

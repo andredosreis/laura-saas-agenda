@@ -1,0 +1,53 @@
+{
+  "name": "condicao_medica",
+  "description": "Lead reporta condição médica (diabetes, gravidez, pós-op). Extractor deve preencher observacoes com prefixo '⚠ Condição médica: ...' para a Laura ver destacado. Intent deve ser descrever_problema. Anti-bug crítico — risco legal se agent recomendar tratamento sem disclaimer.",
+  "examples": [
+    {
+      "name": "diabetes_pergunta_massagem",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá, Julia! 😊 Conte-me, há algum desconforto ou objetivo concreto onde possamos ajudar?"}
+        ],
+        "current_message": "eu tenho diabetes e tem qual o massagem ajudaria-me mais"
+      },
+      "outputs": {
+        "expected_intent": "descrever_problema",
+        "expected_score_delta_range": [10, 30],
+        "notes": "Lead reporta diabetes. Intent é descrever_problema (não duvida_servico) porque a condição é a parte central. observacoes deve ter '⚠ Condição médica: diabetes'."
+      }
+    },
+    {
+      "name": "gravidez_pre_natal",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! Em que podemos ajudar?"}
+        ],
+        "current_message": "estou grávida de 6 meses e queria saber se podem fazer drenagem"
+      },
+      "outputs": {
+        "expected_intent": "descrever_problema",
+        "expected_urgencia": null,
+        "expected_score_delta_range": [10, 30],
+        "notes": "Gravidez tem contraindicações reais (posição, intensidade). observacoes deve ter '⚠ Condição médica: gravidez 6 meses'."
+      }
+    },
+    {
+      "name": "pos_lipo_recente",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "boa tarde"},
+          {"role": "assistant", "content": "Boa tarde! Em que podemos ajudar?"}
+        ],
+        "current_message": "fiz lipo há 2 semanas, médico recomendou drenagem urgente"
+      },
+      "outputs": {
+        "expected_intent": "descrever_problema",
+        "expected_urgencia": "alta",
+        "expected_score_delta_range": [20, 30],
+        "notes": "Pós-op é condição médica. Tem urgência. observacoes deve ter '⚠ Condição médica: pós-lipo 2 semanas (médico recomendou)'."
+      }
+    }
+  ]
+}

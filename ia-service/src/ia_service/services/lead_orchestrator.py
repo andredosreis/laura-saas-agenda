@@ -39,7 +39,7 @@ def _period_of_day(dt: datetime) -> str:
 
 async def _build_conversation_history(
     tenant_id: str, lead_id: str | None, current_message: str, log
-) -> list[dict]:
+) -> tuple[list[dict], int, str]:
     """Build the LangChain `messages` array with conversation history.
 
     Pulls the last 10 persisted messages from the lead's conversation
@@ -47,8 +47,18 @@ async def _build_conversation_history(
 
     `direcao=entrada` (lead → clinic) → role=user
     `direcao=saida`   (clinic → lead) → role=assistant
+
+    Returns a tuple `(messages, turn_number, last_clinic_message)` where:
+      - `turn_number` counts how many assistant messages are already in
+        the window — i.e. how many times the clinic spoke before this
+        new inbound. Used by the system prompt to gate greetings.
+      - `last_clinic_message` is the latest assistant utterance (empty
+        string if the clinic has not spoken yet). Used by the system
+        prompt to detect e.g. "we just asked the lead's name".
     """
     messages: list[dict] = []
+    turn_number = 0
+    last_clinic_message = ""
     if lead_id:
         try:
             history = await marcai_client.get_recent_messages(
@@ -73,14 +83,22 @@ async def _build_conversation_history(
                 content = m.get("mensagem", "").strip()
                 if content:
                     messages.append({"role": role, "content": content})
-            log.info("history_loaded", turns=len(messages), cutoff_min=30)
+                    if role == "assistant":
+                        turn_number += 1
+                        last_clinic_message = content
+            log.info(
+                "history_loaded",
+                turns=len(messages),
+                cutoff_min=30,
+                clinic_turns=turn_number,
+            )
         except Exception as exc:
             log.warning("history_load_failed", error=str(exc))
 
     # Append current message — orchestrator persists it AFTER this call,
     # so it's not yet in the history we just fetched.
     messages.append({"role": "user", "content": current_message})
-    return messages
+    return messages, turn_number, last_clinic_message
 
 
 async def _generate_reply(
@@ -103,17 +121,50 @@ async def _generate_reply(
         # need to instantiate ChatOpenAI on import.
         from ..agents.lead_agent import make_lead_agent
 
-        messages = await _build_conversation_history(
-            tenant_id, lead_id, mensagem, log
+        messages, turn_number, last_clinic_message = (
+            await _build_conversation_history(tenant_id, lead_id, mensagem, log)
         )
 
-        agent = make_lead_agent(tenant_id, lead_id=lead_id)
+        # Fetch the persisted Lead state so the agent can inject it into
+        # the system prompt and never has to guess what it already knows
+        # (name, motivo, urgência, score). Failure here is non-fatal —
+        # the agent still works, just without the {{lead_*}} hints.
+        lead_state = await _get_lead_state(tenant_id, lead_id, log)
+
+        agent = make_lead_agent(
+            tenant_id,
+            lead_id=lead_id,
+            lead_state=lead_state,
+            turn_number=turn_number,
+            last_clinic_message=last_clinic_message,
+        )
+
+        # Metadata + tags surfaced to LangSmith traces — lets us filter
+        # runs by tenant / lead / turn in the LangSmith UI and pivot on
+        # the specific bug we are debugging (e.g. "all turn_number=1
+        # replies where lead_nome is populated").
+        run_config = {
+            "tags": [
+                f"tenant:{tenant_id}",
+                f"turn:{turn_number}",
+                f"provider:{settings.llm_provider}",
+            ],
+            "metadata": {
+                "tenant_id": tenant_id,
+                "lead_id": lead_id or "",
+                "turn_number": turn_number,
+                "lead_nome": (lead_state or {}).get("nome") or "",
+                "lead_score": (lead_state or {}).get("score") or 0,
+                "last_clinic_message_excerpt": last_clinic_message[:80],
+            },
+            "run_name": "lead_agent_turn",
+        }
 
         # Gemini Flash sometimes returns empty content after tool calls
         # (transient quirk). Retry once before falling back to greeting.
         content = ""
         for attempt in (1, 2):
-            result = await agent.ainvoke({"messages": messages})
+            result = await agent.ainvoke({"messages": messages}, config=run_config)
             last_msg = result["messages"][-1]
             raw = getattr(last_msg, "content", "")
             if isinstance(raw, list):
@@ -149,10 +200,64 @@ import re as _re
 _BOOKING_REGEX = _re.compile(
     # Roots: marc/agend/confirm cover "marcado", "marcação", "marcar",
     # "agendado", "agendamento", "agendar", "confirmado", "confirmar",
-    # "confirmação". Followed (in same sentence) by an HH:MM or "Xh" time.
-    r"(?:marc|agend|confirm)\w*\b[^.!?]*?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
+    # "confirmação". Followed (in same paragraph) by an HH:MM or "Xh"
+    # time within ~120 chars.
+    #
+    # 2026-05-20: lookahead used to exclude "!" / "." / "?", which broke
+    # auto-book on perfectly valid confirmations like
+    #   "Está marcado, Cintia! 🎉 ... às 09:00"
+    # because "!" after the name terminated the lazy match too early.
+    # Now we only exclude "." and "?" (sentence terminators), and cap the
+    # gap at 120 chars to avoid pulling unrelated times from much later
+    # in the reply.
+    r"(?:marc|agend|confirm)\w*\b[^.?]{0,120}?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
     _re.IGNORECASE,
 )
+
+
+async def _get_lead_state(
+    tenant_id: str, lead_id: str | None, log
+) -> dict | None:
+    """Read the Lead's persisted state directly from Mongo for the system prompt.
+
+    Returns a dict with keys `nome`, `motivo`, `urgencia`, `score` — or
+    None when `lead_id` is missing or the document can't be loaded.
+    Used by `_generate_reply` to inject lead context into the agent's
+    system prompt so the LLM never has to guess what is already known.
+
+    Failure is non-fatal: returns None and the agent runs without the
+    {{lead_*}} placeholders filled in (they default to the sentinel
+    '(ainda não recolhido)' inside `prompt_renderer`).
+    """
+    if not lead_id:
+        return None
+    try:
+        from bson import ObjectId
+
+        from . import mongo_reader
+
+        db = mongo_reader.get_tenant_db(tenant_id)
+        doc = db.leads.find_one(
+            {"_id": ObjectId(lead_id)},
+            {
+                "nome": 1,
+                "urgencia": 1,
+                "qualificacao.score": 1,
+                "qualificacao.motivoInteresse": 1,
+            },
+        )
+        if not doc:
+            return None
+        qual = doc.get("qualificacao") or {}
+        return {
+            "nome": doc.get("nome") or "",
+            "motivo": qual.get("motivoInteresse") or "",
+            "urgencia": doc.get("urgencia") or "",
+            "score": int(qual.get("score") or 0),
+        }
+    except Exception as exc:
+        log.warning("lead_state_load_failed", error=str(exc))
+        return None
 
 
 async def _maybe_auto_book(content: str, tenant_id: str, lead_id: str | None, log) -> None:

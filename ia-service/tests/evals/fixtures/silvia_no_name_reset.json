@@ -1,0 +1,56 @@
+{
+  "name": "silvia_no_name_reset",
+  "description": "Regressão da conversa 'Silvia' da sessão 2026-05-18 — extractor capturou o nome ('Silvia') mas o agent ignorou e voltou ao greeting genérico (BUG-002).",
+  "examples": [
+    {
+      "name": "t2_lead_replies_name_silvia",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! 😊 Em que posso ajudar?"},
+          {"role": "user", "content": "vi o seu anuncio no face... quais os serviços?"},
+          {"role": "assistant", "content": "Olá! 😊 Trabalhamos sobretudo com drenagens linfáticas, massagens terapêuticas e experiências SPA. Antes de avançarmos, posso saber o seu primeiro nome?"}
+        ],
+        "current_message": "Silvia",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 2,
+        "last_clinic_message": "Olá! 😊 Trabalhamos sobretudo com drenagens linfáticas, massagens terapêuticas e experiências SPA. Antes de avançarmos, posso saber o seu primeiro nome?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": "Silvia",
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "BUG-002: a resposta DEVE conter 'Silvia' e PROIBIDO repetir a pergunta do nome. Gate 7 permite 'Olá Silvia!' por isso must_not_start_with_greeting_word=false."
+      }
+    },
+    {
+      "name": "t3_lead_asks_price_after_name",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! 😊 Em que posso ajudar?"},
+          {"role": "user", "content": "vi o seu anuncio no face... quais os serviços?"},
+          {"role": "assistant", "content": "Olá! 😊 Trabalhamos sobretudo com drenagens linfáticas, massagens terapêuticas e experiências SPA. Antes de avançarmos, posso saber o seu primeiro nome?"},
+          {"role": "user", "content": "Silvia"},
+          {"role": "assistant", "content": "Olá Silvia! 😊 Conte-me, há algum desconforto ou objectivo concreto onde possamos ajudar?"}
+        ],
+        "current_message": "quanto custa?",
+        "lead_state": {"nome": "Silvia", "motivo": "", "urgencia": "", "score": 5},
+        "turn_number": 3,
+        "last_clinic_message": "Olá Silvia! 😊 Conte-me, há algum desconforto ou objectivo concreto onde possamos ajudar?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": true,
+        "must_contain_name": "Silvia",
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Turn 3 com nome conhecido. Pergunta sobre preço — regra 1 do prompt obriga 'a partir de 40 €' + redirect para avaliação. PROIBIDO saudar de novo."
+      }
+    }
+  ]
+}

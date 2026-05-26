@@ -128,22 +128,41 @@ describe('messageRouter (F12 §6.2 decision tree)', () => {
     expect(d.reason).toBe(Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT);
   });
 
-  test('SIM without pending appointment → NO_PENDING_APPOINTMENT_REPLY', () => {
+  // Regression — 2026-05-20: a confirmation-shaped message ("ok", "sim",
+  // "perfeito", "nao", "cancelar"…) without a pending appointment must NOT
+  // short-circuit to NO_PENDING_APPOINTMENT_REPLY anymore. The classifier
+  // is too eager (matches "ok agradeço mas vou pensar" mid-conversation),
+  // so the router now only treats confirmation-kind as a reminder reply
+  // when there is actually an appointment to confirm. New phone → IA_LEAD.
+  test('SIM without pending appointment, no Lead/Client → IA_LEAD (new phone capture)', () => {
     const d = decide(buildInput({
       classified: SIM,
       persistedState: { hasPendingAppointment: false, existingClient: null, existingLead: null },
     }));
-    expect(d.route).toBe(Route.NO_PENDING_APPOINTMENT_REPLY);
-    expect(d.reason).toBe(Reason.CONFIRMATION_WITHOUT_PENDING_APPOINTMENT);
+    expect(d.route).toBe(Route.IA_LEAD);
+    expect(d.reason).toBe(Reason.NEW_PHONE_CAPTURE);
   });
 
-  test('NÃO without pending appointment → NO_PENDING_APPOINTMENT_REPLY', () => {
+  test('NÃO without pending appointment, no Lead/Client → IA_LEAD (new phone capture)', () => {
     const d = decide(buildInput({
       classified: NAO,
       persistedState: { hasPendingAppointment: false, existingClient: null, existingLead: null },
     }));
-    expect(d.route).toBe(Route.NO_PENDING_APPOINTMENT_REPLY);
-    expect(d.reason).toBe(Reason.CONFIRMATION_WITHOUT_PENDING_APPOINTMENT);
+    expect(d.route).toBe(Route.IA_LEAD);
+    expect(d.reason).toBe(Reason.NEW_PHONE_CAPTURE);
+  });
+
+  test('SIM without pending appointment + active IA Lead → IA_LEAD (agent owns the turn)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      persistedState: {
+        hasPendingAppointment: false,
+        existingClient: null,
+        existingLead: { _id: 'l1', iaAtiva: true, status: 'em_conversa' },
+      },
+    }));
+    expect(d.route).toBe(Route.IA_LEAD);
+    expect(d.reason).toBe(Reason.LEAD_IA_ACTIVE);
   });
 
   // ── Branch 4: data-integrity guard ─────────────────────────────────

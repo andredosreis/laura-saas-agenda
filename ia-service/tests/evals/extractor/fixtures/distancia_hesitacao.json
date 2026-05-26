@@ -1,0 +1,55 @@
+{
+  "name": "distancia_hesitacao",
+  "description": "Lead menciona distância pela primeira vez. Deve ser classificado como hesitacao + objection_type=distancia, NÃO desistir. Regressão da sessão E2E 2026-05-19 (Joana) onde 'moro em Lisboa' foi classificado como desistir prematuramente.",
+  "examples": [
+    {
+      "name": "moro_em_outra_cidade",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "tenho dores lombar"},
+          {"role": "assistant", "content": "A clínica fica em Leiria. Quer marcar avaliação?"}
+        ],
+        "current_message": "moro em Lisboa, para mim nao da"
+      },
+      "outputs": {
+        "expected_intent": "hesitacao",
+        "expected_objection_type": "distancia",
+        "expected_score_delta_range": [-20, -5],
+        "notes": "Primeiro sinal de distância NÃO é desistir — é hesitação. Permite à IA oferecer alternativas (fim-de-semana, horário cómodo, etc.)."
+      }
+    },
+    {
+      "name": "fica_longe",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "tenho retenção pós-parto"},
+          {"role": "assistant", "content": "Compreendo! Quer marcar avaliação?"}
+        ],
+        "current_message": "fica longe de mim, não sei se vou conseguir ir"
+      },
+      "outputs": {
+        "expected_intent": "hesitacao",
+        "expected_objection_type": "distancia",
+        "expected_score_delta_range": [-20, -5]
+      }
+    },
+    {
+      "name": "distancia_recusa_explicita_desistir",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "moro em Lisboa, é longe"},
+          {"role": "assistant", "content": "Compreendo. De onde em Lisboa vem? Posso ver horário fim-de-semana."},
+          {"role": "user", "content": "não vou deslocar-me, é muito longe"},
+          {"role": "assistant", "content": "Entendo. Se decidir vir um dia, é só dizer."}
+        ],
+        "current_message": "esquece, nao vou mesmo"
+      },
+      "outputs": {
+        "expected_intent": "desistir",
+        "expected_objection_type": "distancia",
+        "expected_score_delta_range": [-30, -20],
+        "notes": "Recusa REPETIDA + 'esquece' = desistir clara. Diferente do primeiro sinal."
+      }
+    }
+  ]
+}

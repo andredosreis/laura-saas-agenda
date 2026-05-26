@@ -134,18 +134,28 @@ export function decide(input) {
     return { route: Route.LEGACY_FALLBACK, reason: Reason.LEADS_DISABLED_ON_TENANT };
   }
 
-  // 3) Confirmation routing — most specific match for matrix row 2
+  // 3) Confirmation routing — ONLY short-circuits when this message is a
+  //    reply to a pending appointment reminder. The classifier flags ANY
+  //    message starting with "ok", "sim", "perfeito", "claro" (and the
+  //    NÃO equivalents) as a confirmation — fine for SIM/NÃO answers to
+  //    a reminder, but catastrophic mid-conversation when the lead writes
+  //    "ok agradeço mas vou pensar" or "sim quero saber mais" during an
+  //    active IA Lead chat. Before 2026-05-20 this branch hijacked those
+  //    messages to a generic legacy reply ("não encontrei agendamento
+  //    pendente…"), bypassing the agent.
+  //
+  //    Fix: only fire LEGACY_CONFIRMATION when the lead has an actual
+  //    pending appointment to confirm. Otherwise fall through — steps
+  //    4–7 below will dispatch correctly (Client → CLIENT_LIFECYCLE,
+  //    active Lead → IA_LEAD, no lead → IA_LEAD NEW_PHONE_CAPTURE).
+  //
+  //    See docs/testes-ia/05-sessao-2026-05-19-bugs.md §1 for the two
+  //    E2E sessions (Jasmin, Joana) where this manifested.
   const isConfirmation = CONFIRMATION_KINDS.includes(classified?.kind);
-  if (isConfirmation) {
-    if (persistedState.hasPendingAppointment) {
-      return {
-        route: Route.LEGACY_CONFIRMATION,
-        reason: Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT,
-      };
-    }
+  if (isConfirmation && persistedState.hasPendingAppointment) {
     return {
-      route: Route.NO_PENDING_APPOINTMENT_REPLY,
-      reason: Reason.CONFIRMATION_WITHOUT_PENDING_APPOINTMENT,
+      route: Route.LEGACY_CONFIRMATION,
+      reason: Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT,
     };
   }
 

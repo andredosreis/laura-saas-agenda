@@ -1,0 +1,83 @@
+{
+  "name": "nome_extraction",
+  "description": "Captura contextual de nome — só extrair quando a Laura pediu nome na mensagem anterior + lead respondeu com palavra que parece nome (Maria, Silvia, Deys). Inclui caso negativo onde NÃO deve extrair.",
+  "examples": [
+    {
+      "name": "nome_maria_after_question",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Posso saber o seu primeiro nome?"}
+        ],
+        "current_message": "Maria"
+      },
+      "outputs": {
+        "expected_nome": "Maria",
+        "expected_intent": "outra",
+        "expected_score_delta_range": [0, 15]
+      }
+    },
+    {
+      "name": "nome_silvia_capitalizado",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "vi o anuncio no face... quais os serviços?"},
+          {"role": "assistant", "content": "Trabalhamos com drenagens, massagens e SPA. Antes de avançarmos, posso saber o seu primeiro nome?"}
+        ],
+        "current_message": "Silvia"
+      },
+      "outputs": {
+        "expected_nome": "Silvia",
+        "expected_intent": "outra",
+        "expected_score_delta_range": [0, 15]
+      }
+    },
+    {
+      "name": "nome_deys_uncommon",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá tudo bem?"},
+          {"role": "assistant", "content": "Olá, tudo bem sim! 😊 E consigo? Posso saber o seu nome?"}
+        ],
+        "current_message": "Deys"
+      },
+      "outputs": {
+        "expected_nome": "Deys",
+        "expected_intent": "outra",
+        "expected_score_delta_range": [0, 15],
+        "notes": "Nome menos comum — testa se o extractor não duvida da estrutura por ser pouco familiar."
+      }
+    },
+    {
+      "name": "nome_sou_a_ana",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! Como se chama?"}
+        ],
+        "current_message": "Sou a Ana"
+      },
+      "outputs": {
+        "expected_nome": "Ana",
+        "expected_intent": "outra",
+        "expected_score_delta_range": [0, 15]
+      }
+    },
+    {
+      "name": "no_nome_lead_asks_service",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! Em que podemos ajudar?"}
+        ],
+        "current_message": "vcs fazem drenagem linfática?"
+      },
+      "outputs": {
+        "expected_nome": null,
+        "expected_intent": "duvida_servico",
+        "expected_score_delta_range": [0, 15],
+        "notes": "Não deve inferir nome — Laura não perguntou, lead não se apresentou."
+      }
+    }
+  ]
+}

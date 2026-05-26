@@ -330,15 +330,35 @@ router.get('/:id/messages', async (req, res) => {
     }
 
     const db = getTenantDB(String(tenantId));
-    const { Lead, Mensagem } = getModels(db);
+    const { Lead, Mensagem, Conversa } = getModels(db);
 
-    const lead = await Lead.findOne({ _id: id, tenantId }).select('conversa').lean();
-    if (!lead || !lead.conversa) {
+    const lead = await Lead.findOne({ _id: id, tenantId }).select('conversa telefone').lean();
+    if (!lead) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Resolve the conversation id. Lead.conversa is the canonical link, but
+    // historically some paths created the Conversa without back-linking it on
+    // the Lead (race between create_lead + create_message in the orchestrator).
+    // Fallback: look the Conversa up by tenantId + telefone and self-heal the
+    // Lead.conversa pointer so subsequent reads use the fast path.
+    let conversaId = lead.conversa;
+    if (!conversaId && lead.telefone) {
+      const c = await Conversa.findOne({ tenantId, telefone: lead.telefone })
+        .select('_id')
+        .lean();
+      if (c && c._id) {
+        conversaId = c._id;
+        Lead.updateOne({ _id: id, tenantId }, { $set: { conversa: c._id } }).catch(() => {});
+      }
+    }
+
+    if (!conversaId) {
       return res.json({ success: true, data: [] });
     }
 
     // newest-first then reverse to chronological
-    const recent = await Mensagem.find({ conversa: lead.conversa, tenantId })
+    const recent = await Mensagem.find({ conversa: conversaId, tenantId })
       .sort({ data: -1, createdAt: -1 })
       .limit(limit)
       .select('mensagem origem direcao data createdAt')

@@ -1,0 +1,48 @@
+{
+  "description": "Cenários de conversa simulada — exercitam o stack completo (extractor v2 + agent) end-to-end sem WhatsApp. Cobrem os 4 fluxos críticos identificados no PRD CRM-Leads.",
+  "scenarios": [
+    {
+      "name": "maria_happy_path",
+      "description": "Réplica da conversa real Maria/2026-05-18 que terminou em agendamento.",
+      "user_messages": [
+        "olan",
+        "Maria",
+        "obrigado pela resposta, eu estou com problema de dores na lombar",
+        "amanha tem algum horario?",
+        "me da jeito as 9"
+      ]
+    },
+    {
+      "name": "hesitation_preco",
+      "description": "Lead pergunta preço, hesita por orçamento, agent tem de superar objecção sem ser pushy.",
+      "user_messages": [
+        "ola tudo bem?",
+        "queria saber preço de drenagem linfática",
+        "Carla",
+        "estou em fase pós-parto, queria recuperar",
+        "agora não tenho muito dinheiro para isso"
+      ]
+    },
+    {
+      "name": "urgent_casamento",
+      "description": "Lead com urgência alta (casamento próximo). Agent deve detectar urgência e propor avaliação rápida.",
+      "user_messages": [
+        "boa tarde",
+        "tenho um casamento daqui a 10 dias e preciso entrar no vestido",
+        "Sofia",
+        "será que ainda dá tempo de ver resultados?",
+        "sim quero marcar uma avaliação"
+      ]
+    },
+    {
+      "name": "lead_desiste_cedo",
+      "description": "Lead recusa cedo — agent deve respeitar e fechar com elegância, não pressionar.",
+      "user_messages": [
+        "ola",
+        "queria info sobre drenagem",
+        "Ana",
+        "obrigada mas vou ficar pela clínica que já frequento, era só curiosidade"
+      ]
+    }
+  ]
+}

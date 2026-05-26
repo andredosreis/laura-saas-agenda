@@ -1,0 +1,82 @@
+{
+  "name": "urgencias",
+  "description": "Classificação de urgência — 3 classes (baixa/media/alta) + caso onde deve ficar null.",
+  "examples": [
+    {
+      "name": "urgencia_alta_casamento_semana",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"}
+        ],
+        "current_message": "tenho um casamento para a semana que vem, preciso entrar no vestido"
+      },
+      "outputs": {
+        "expected_urgencia": "alta",
+        "expected_intent": "descrever_problema",
+        "expected_score_delta_range": [15, 30]
+      }
+    },
+    {
+      "name": "urgencia_alta_pos_operatorio",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá!"}
+        ],
+        "current_message": "fiz lipo há 1 semana e o médico disse para começar drenagem com urgência"
+      },
+      "outputs": {
+        "expected_urgencia": "alta",
+        "expected_intent": "descrever_problema",
+        "expected_score_delta_range": [20, 30]
+      }
+    },
+    {
+      "name": "urgencia_media_este_mes",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"}
+        ],
+        "current_message": "queria começar este mês a fazer drenagens, ainda sem data específica"
+      },
+      "outputs": {
+        "expected_urgencia": "media",
+        "expected_intent": "descrever_problema",
+        "expected_score_delta_range": [10, 25]
+      }
+    },
+    {
+      "name": "urgencia_baixa_apenas_explorar",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"}
+        ],
+        "current_message": "estou só a explorar opções de drenagem, ainda não decidi nada"
+      },
+      "outputs": {
+        "expected_urgencia": "baixa",
+        "expected_intent": "descrever_problema",
+        "expected_score_delta_range": [0, 15]
+      }
+    },
+    {
+      "name": "urgencia_null_apenas_preco",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"}
+        ],
+        "current_message": "quanto custa?"
+      },
+      "outputs": {
+        "expected_urgencia": null,
+        "expected_intent": "pergunta_preco",
+        "expected_score_delta_range": [-5, 10],
+        "notes": "Sem sinal de tempo — urgência deve ser null."
+      }
+    }
+  ]
+}

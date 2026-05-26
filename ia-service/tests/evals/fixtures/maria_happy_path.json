@@ -1,0 +1,97 @@
+{
+  "name": "maria_happy_path",
+  "description": "Conversa 'Maria' da sessão 2026-05-18 que terminou em agendamento bem-sucedido. Valida nome capturado, persistência através de turns e não-fabricação de slots.",
+  "examples": [
+    {
+      "name": "t0_inbound_greeting_no_name",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [],
+        "current_message": "olan",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": true,
+        "notes": "Primeiro turn — pode saudar e deve pedir nome. NÃO pode fabricar slots."
+      }
+    },
+    {
+      "name": "t1_lead_replies_name_only",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "olan"},
+          {"role": "assistant", "content": "Olá! 😊 Antes de avançarmos, posso saber o seu primeiro nome?"}
+        ],
+        "current_message": "Maria",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 1,
+        "last_clinic_message": "Olá! 😊 Antes de avançarmos, posso saber o seu primeiro nome?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": "Maria",
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Gate 7 do prompt: única saudação permitida é 'Olá Maria!' por isso must_not_start_with_greeting_word=false. Mas TEM de usar Maria — anti-BUG-002."
+      }
+    },
+    {
+      "name": "t2_lead_describes_pain_lower_back",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "olan"},
+          {"role": "assistant", "content": "Olá! 😊 Antes de avançarmos, posso saber o seu primeiro nome?"},
+          {"role": "user", "content": "Maria"},
+          {"role": "assistant", "content": "Olá Maria! 😊 Conte-me — há alguma dor ou desconforto específico?"}
+        ],
+        "current_message": "obrigado pela resposta, eu estou com problema de dores na lombar",
+        "lead_state": {"nome": "Maria", "motivo": "", "urgencia": "", "score": 5},
+        "turn_number": 2,
+        "last_clinic_message": "Olá Maria! 😊 Conte-me — há alguma dor ou desconforto específico?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": true,
+        "must_contain_name": "Maria",
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Turn 2, com nome conhecido. NÃO pode saudar. Deve usar Maria e propor avaliação."
+      }
+    },
+    {
+      "name": "t3_lead_asks_tomorrow_slots",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "olan"},
+          {"role": "assistant", "content": "Olá! 😊 Antes de avançarmos, posso saber o seu primeiro nome?"},
+          {"role": "user", "content": "Maria"},
+          {"role": "assistant", "content": "Olá Maria! 😊 Conte-me — há alguma dor ou desconforto específico?"},
+          {"role": "user", "content": "obrigado pela resposta, eu estou com problema de dores na lombar"},
+          {"role": "assistant", "content": "Compreendo, Maria. Lombar é uma queixa frequente e podemos ajudar. Quando lhe daria jeito passar para uma avaliação gratuita?"}
+        ],
+        "current_message": "amanha tem algum horario?",
+        "lead_state": {"nome": "Maria", "motivo": "dores na lombar", "urgencia": "media", "score": 30},
+        "turn_number": 3,
+        "last_clinic_message": "Compreendo, Maria. Lombar é uma queixa frequente e podemos ajudar. Quando lhe daria jeito passar para uma avaliação gratuita?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": true,
+        "must_contain_name": "Maria",
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Lead pediu slots — agent DEVE chamar get_available_slots antes de citar HH:MM. Se citar horários sem ter chamado a tool, falha (BUG-004)."
+      }
+    }
+  ]
+}

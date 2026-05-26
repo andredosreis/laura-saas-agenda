@@ -1,0 +1,56 @@
+{
+  "name": "jessica_no_repeat_greeting",
+  "description": "Regressão da conversa 'Jessica' da sessão 2026-05-18 — agent saudava em cada turn (BUG-001). Cada example valida que turn_number >= 1 não inicia com 'Olá!' / 'Bom dia!' etc.",
+  "examples": [
+    {
+      "name": "t2_asks_services_after_name_given",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! 😊 Antes de avançarmos, posso saber o seu primeiro nome?"},
+          {"role": "user", "content": "Jessica"},
+          {"role": "assistant", "content": "Olá Jessica! 😊 Em que posso ajudá-la?"}
+        ],
+        "current_message": "quais os serviços que vc estao oferencendo?",
+        "lead_state": {"nome": "Jessica", "motivo": "", "urgencia": "", "score": 5},
+        "turn_number": 2,
+        "last_clinic_message": "Olá Jessica! 😊 Em que posso ajudá-la?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": true,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "BUG-001: agent saudou 'Olá!' aqui originalmente. Com turn_number=2 e nome conhecido, PROIBIDO saudar. Resposta deve começar directo: 'Jessica, trabalhamos...' / 'Claro, ...' / 'Trabalhamos...'."
+      }
+    },
+    {
+      "name": "t3_lead_reveals_wedding_urgency",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! 😊 Antes de avançarmos, posso saber o seu primeiro nome?"},
+          {"role": "user", "content": "Jessica"},
+          {"role": "assistant", "content": "Olá Jessica! 😊 Em que posso ajudá-la?"},
+          {"role": "user", "content": "quais os serviços que vc estao oferencendo?"},
+          {"role": "assistant", "content": "Jessica, trabalhamos sobretudo em 3 áreas: drenagens linfáticas, massagens terapêuticas e experiências SPA. Há alguma dor ou desconforto onde possamos ajudar?"}
+        ],
+        "current_message": "tenho um casamento para a semana que vem, e tenho que entrar no vestido",
+        "lead_state": {"nome": "Jessica", "motivo": "", "urgencia": "", "score": 5},
+        "turn_number": 3,
+        "last_clinic_message": "Jessica, trabalhamos sobretudo em 3 áreas: drenagens linfáticas, massagens terapêuticas e experiências SPA. Há alguma dor ou desconforto onde possamos ajudar?"
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": true,
+        "must_contain_name": "Jessica",
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Regressão original: agent voltou a perguntar 'posso saber o seu primeiro nome' aqui. Deve apenas mostrar empatia + propor avaliação rápida (urgência alta)."
+      }
+    }
+  ]
+}

@@ -255,7 +255,12 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalledTimes(1);
   });
 
-  test('SIM without pending appointment → NO_PENDING_APPOINTMENT_REPLY verbatim copy', async () => {
+  test('SIM without pending appointment + new phone → IA_LEAD (agent handles it)', async () => {
+    // Regression — 2026-05-20: a confirmation-shaped message ("sim", "ok",
+    // "perfeito"…) from a brand-new phone is no longer hijacked by the
+    // legacy NO_PENDING_APPOINTMENT_REPLY handler. The agent owns the
+    // turn so it can respond naturally (treat "sim" as a fragment of an
+    // organic conversation start). See messageRouter.js step 3.
     await createTenant({ slug: 'no-pending' });
 
     const res = await request(app)
@@ -266,10 +271,7 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
-    expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalledTimes(1);
-    const sentCopy = evolutionClientMock.sendWhatsAppMessage.mock.calls[0][1];
-    expect(sentCopy).toBe(NO_PENDING_APPOINTMENT_COPY);
+    expect(iaServiceClientMock.processLead).toHaveBeenCalledTimes(1);
   });
 
   test('Lead convertido but cliente=null → LEGACY_FALLBACK + warn (data integrity guard)', async () => {

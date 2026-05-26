@@ -1,0 +1,185 @@
+{
+  "name": "intents_coverage",
+  "description": "Um exemplo positivo por classe de intent (10 classes). Inclui o caso 'as 9 da?' que era classificado como primeira_msg antes do fix do prompt (bug 3 da sessão 2026-05-18).",
+  "examples": [
+    {
+      "name": "primeira_msg_simple_ola",
+      "inputs": {
+        "history": [],
+        "current_message": "olá",
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "expected_intent": "primeira_msg",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [-5, 5]
+      }
+    },
+    {
+      "name": "descrever_problema_lombar",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! Em que podemos ajudar?"}
+        ],
+        "current_message": "tenho dores na lombar há 2 semanas e queria fazer drenagem"
+      },
+      "outputs": {
+        "expected_intent": "descrever_problema",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [15, 30]
+      }
+    },
+    {
+      "name": "pergunta_preco_direto",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"}
+        ],
+        "current_message": "quanto custa?"
+      },
+      "outputs": {
+        "expected_intent": "pergunta_preco",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [-5, 10]
+      }
+    },
+    {
+      "name": "duvida_servico_duracao",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"}
+        ],
+        "current_message": "a sessão de drenagem dura quanto tempo?"
+      },
+      "outputs": {
+        "expected_intent": "duvida_servico",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [5, 20]
+      }
+    },
+    {
+      "name": "pedir_agendamento_ok",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "tenho retenção pós-parto"},
+          {"role": "assistant", "content": "Compreendo. A avaliação é gratuita. Quer marcar?"}
+        ],
+        "current_message": "sim quero marcar"
+      },
+      "outputs": {
+        "expected_intent": "pedir_agendamento",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [10, 25]
+      }
+    },
+    {
+      "name": "escolher_slot_short_after_offer",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "quero marcar"},
+          {"role": "assistant", "content": "Para amanhã, terça-feira dia 19, tenho 09:00, 11:00, 13:00, 14:00, 15:00."}
+        ],
+        "current_message": "as 9 dá-me jeito"
+      },
+      "outputs": {
+        "expected_intent": "escolher_slot",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [5, 20]
+      }
+    },
+    {
+      "name": "escolher_slot_question_mark_regression",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "quero marcar"},
+          {"role": "assistant", "content": "Para amanhã, terça-feira dia 19, tenho 09:00, 11:00, 13:00, 14:00, 15:00."}
+        ],
+        "current_message": "as 9 da?"
+      },
+      "outputs": {
+        "expected_intent": "escolher_slot",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [0, 15],
+        "notes": "Regressão original do bug 3 — era classificado como primeira_msg apesar do contexto."
+      }
+    },
+    {
+      "name": "hesitacao_vou_pensar",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "tenho dores"},
+          {"role": "assistant", "content": "Compreendo. A avaliação é gratuita. Quer marcar?"}
+        ],
+        "current_message": "vou pensar e depois falo"
+      },
+      "outputs": {
+        "expected_intent": "hesitacao",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [-20, -5]
+      }
+    },
+    {
+      "name": "desistir_outra_clinica",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "olá"},
+          {"role": "assistant", "content": "Olá! Em que posso ajudar?"},
+          {"role": "user", "content": "quanto custa drenagem?"},
+          {"role": "assistant", "content": "A partir de 40 €. A avaliação é gratuita — quer marcar?"}
+        ],
+        "current_message": "não obrigado, já encontrei outra clínica mais perto"
+      },
+      "outputs": {
+        "expected_intent": "desistir",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [-30, -20],
+        "expected_perdido_motivo_contains": "clinica"
+      }
+    },
+    {
+      "name": "agradecer_encerrar_after_booking",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "as 9 dá-me jeito"},
+          {"role": "assistant", "content": "Está marcado, Maria! 🎉 Amanhã às 09:00. Até já!"}
+        ],
+        "current_message": "obrigada, até amanhã"
+      },
+      "outputs": {
+        "expected_intent": "agradecer_encerrar",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [-5, 10]
+      }
+    },
+    {
+      "name": "outra_facebook_anuncio",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "ola"},
+          {"role": "assistant", "content": "Olá! 😊 Em que posso ajudar?"}
+        ],
+        "current_message": "vi o anuncio no face, quais os serviços?"
+      },
+      "outputs": {
+        "expected_intent": "outra",
+        "expected_nome": null,
+        "expected_urgencia": null,
+        "expected_score_delta_range": [0, 15],
+        "notes": "Não é primeira_msg porque já houve interação. Pode classificar como duvida_servico (aceitável) — adicionar ao set se desviar."
+      }
+    }
+  ]
+}

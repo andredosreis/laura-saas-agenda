@@ -1,0 +1,67 @@
+{
+  "name": "desistencia",
+  "description": "Classificação de objection_type quando o lead hesita ou desiste — 6 classes (preco/tempo/distancia/duvida_servico/outra_clinica/geral) + perdido_motivo quando intent=desistir.",
+  "examples": [
+    {
+      "name": "objection_preco_sem_orcamento",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "quanto custa drenagem?"},
+          {"role": "assistant", "content": "A partir de 40 €. A avaliação é gratuita — quer marcar?"}
+        ],
+        "current_message": "agora não tenho dinheiro para isso"
+      },
+      "outputs": {
+        "expected_intent": "hesitacao",
+        "expected_objection_type": "preco",
+        "expected_score_delta_range": [-30, -15]
+      }
+    },
+    {
+      "name": "objection_tempo_ocupada",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "tenho retenção"},
+          {"role": "assistant", "content": "Posso ver disponibilidade para esta semana?"}
+        ],
+        "current_message": "esta semana estou super ocupada, agora não dá"
+      },
+      "outputs": {
+        "expected_intent": "hesitacao",
+        "expected_objection_type": "tempo",
+        "expected_score_delta_range": [-20, -5]
+      }
+    },
+    {
+      "name": "objection_distancia_moro_longe",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "tenho dores lombar"},
+          {"role": "assistant", "content": "A clínica é em Leiria. Quer marcar avaliação?"}
+        ],
+        "current_message": "moro em Lisboa, não sei se vou conseguir deslocar-me"
+      },
+      "outputs": {
+        "expected_intent": "hesitacao",
+        "expected_objection_type": "distancia",
+        "expected_score_delta_range": [-20, -5]
+      }
+    },
+    {
+      "name": "desistir_outra_clinica_explicit",
+      "inputs": {
+        "history": [
+          {"role": "user", "content": "quanto custa?"},
+          {"role": "assistant", "content": "A partir de 40 €. Quer marcar avaliação?"}
+        ],
+        "current_message": "não obrigada, vou ficar pela clínica que já frequento"
+      },
+      "outputs": {
+        "expected_intent": "desistir",
+        "expected_objection_type": "outra_clinica",
+        "expected_perdido_motivo_contains": "clinica",
+        "expected_score_delta_range": [-30, -20]
+      }
+    }
+  ]
+}

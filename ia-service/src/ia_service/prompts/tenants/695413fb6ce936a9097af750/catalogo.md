@@ -7,6 +7,7 @@
 - **Drenagem Linfática Pré e Pós-Operatório** — apoio a cirurgias plásticas (abdominoplastia, lipo, mama)
 - **Drenagem Linfática Modeladora** — modela abdómen/glúteo/pernas, depois do trabalho prévio de desinchaço
 
+
 ## Massagens Terapêuticas e Estéticas
 - **Massagem Relaxante** — alívio de dores e tensão muscular, calma mental
 - **Massagem com Pedras Quentes** — técnica milenar, dores + reconexão energética
