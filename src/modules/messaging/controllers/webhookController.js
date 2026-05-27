@@ -32,6 +32,7 @@ import { handle as handleIaLeadLifecycle } from '../handlers/iaLeadLifecycle.js'
 import { handle as handleLegacyFallback } from '../handlers/legacyFallback.js';
 import { handle as handleManualSilent } from '../handlers/manualSilent.js';
 import { handle as handleNoPendingAppointmentReply } from '../handlers/noPendingAppointmentReply.js';
+import { handle as handleClientLifecycle } from '../handlers/iaClientLifecycle.js';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
@@ -218,9 +219,8 @@ async function processInbound({
         return await handleIaLeadLifecycle(handlerInput);
 
       case Route.CLIENT_LIFECYCLE_PENDING:
-        // Matrix rows 4-5: existing Client. v1 stub falls through to greeting.
-        // The Client lifecycle SDD will replace this dispatch with the real handler.
-        return await handleLegacyFallback(handlerInput);
+        // Matrix rows 4-5: existing Client → IA agent for booking/reschedule.
+        return await handleClientLifecycle(handlerInput);
 
       case Route.MANUAL_SILENT:
         // Lead.iaAtiva=false: persist inbound, no reply

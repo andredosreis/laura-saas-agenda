@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ..deps import require_service_token
 from ..services import lead_orchestrator
+from ..services import client_orchestrator
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -42,6 +43,42 @@ async def process_lead(payload: ProcessLeadRequest) -> ProcessLeadResponse:
     except Exception as exc:
         logger.error(
             "process_lead_error",
+            tenant_id=payload.tenant_id,
+            telefone=payload.telefone,
+            error=str(exc),
+        )
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+class ProcessClientRequest(BaseModel):
+    tenant_id: str
+    instance_name: str
+    telefone: str
+    mensagem: str
+    message_id: str
+    timestamp: datetime
+    cliente_id: str
+    cliente_nome: str | None = None
+
+
+class ProcessClientResponse(BaseModel):
+    status: Literal["processed", "error"]
+    cliente_id: str | None = None
+    action_taken: str | None = None
+
+
+@router.post(
+    "/process-client",
+    response_model=ProcessClientResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def process_client(payload: ProcessClientRequest) -> ProcessClientResponse:
+    try:
+        result = await client_orchestrator.run(payload)
+        return result
+    except Exception as exc:
+        logger.error(
+            "process_client_error",
             tenant_id=payload.tenant_id,
             telefone=payload.telefone,
             error=str(exc),

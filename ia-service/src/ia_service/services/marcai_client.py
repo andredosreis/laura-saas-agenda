@@ -256,3 +256,60 @@ async def update_lead_info(
         json=payload,
     )
     return resp["data"]
+
+
+# ─────────────────────── Client lifecycle ───────────────────────────
+
+
+async def get_client_packages(tenant_id: str, cliente_id: str) -> list[dict]:
+    """Returns active packages with remaining sessions for a client."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(
+            f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/pacotes",
+            params={"tenantId": tenant_id},
+            headers=_auth_headers(),
+        )
+        r.raise_for_status()
+        return r.json().get("data", [])
+
+
+async def get_client_appointments(tenant_id: str, cliente_id: str) -> list[dict]:
+    """Returns upcoming non-cancelled appointments for a client."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(
+            f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/agendamentos",
+            params={"tenantId": tenant_id},
+            headers=_auth_headers(),
+        )
+        r.raise_for_status()
+        return r.json().get("data", [])
+
+
+async def create_client_appointment(
+    tenant_id: str,
+    cliente_id: str,
+    data_hora_iso: str,
+    tipo: str = "Sessao",
+) -> dict:
+    """Creates a new appointment for an existing client."""
+    resp = await _post_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/agendamentos",
+        json={"tenantId": tenant_id, "dataHoraISO": data_hora_iso, "tipo": tipo},
+    )
+    return resp["data"]
+
+
+async def get_client_messages(
+    tenant_id: str,
+    cliente_id: str,
+    limit: int = 10,
+) -> list[dict]:
+    """Returns recent conversation messages for a client (by phone)."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(
+            f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/messages",
+            params={"tenantId": tenant_id, "limit": limit},
+            headers=_auth_headers(),
+        )
+        r.raise_for_status()
+        return r.json().get("data", [])

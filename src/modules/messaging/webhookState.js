@@ -108,7 +108,7 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
   const [existingClient, existingLeadRaw, pendingApptLeadSide] = await Promise.all([
     models.Cliente
       ? models.Cliente.findOne({ telefone: { $in: variants } })
-          .select('_id etapaConversa')
+          .select('_id nome telefone etapaConversa')
           .lean()
       : null,
     models.Lead

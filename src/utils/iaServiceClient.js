@@ -55,6 +55,26 @@ export const processLead = async ({
   return data;
 };
 
+export const processClient = async ({
+  tenantId, instanceName, telefone, mensagem,
+  messageId, timestamp, clienteId, clienteNome = null,
+}) => {
+  if (!_client) throw new Error('IA_SERVICE_URL não configurado — defina no .env');
+  const { data } = await withRetry(() =>
+    _client.post('/process-client', {
+      tenant_id: tenantId,
+      instance_name: instanceName,
+      telefone,
+      mensagem,
+      message_id: messageId,
+      timestamp,
+      cliente_id: clienteId,
+      cliente_nome: clienteNome,
+    })
+  );
+  return data;
+};
+
 export const checkHealth = async () => {
   if (!_client) return { reachable: false, reason: 'IA_SERVICE_URL not set' };
   try {

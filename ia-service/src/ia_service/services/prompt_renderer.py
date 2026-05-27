@@ -48,6 +48,9 @@ from . import tenant_knowledge
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent / "prompts" / "system_lead_agent.md"
 )
+_CLIENT_TEMPLATE_PATH = (
+    Path(__file__).parent.parent / "prompts" / "system_client_agent.md"
+)
 _WEEKDAYS_PT = [
     "Segunda-feira", "Terça-feira", "Quarta-feira",
     "Quinta-feira", "Sexta-feira", "Sábado", "Domingo",
@@ -135,5 +138,31 @@ def render_system_prompt(
         .replace("{{lead_score}}", score_str)
         .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{is_first_turn}}", is_first_turn)
+        .replace("{{last_clinic_message}}", last_clinic)
+    )
+
+
+def render_client_system_prompt(
+    tenant_id: str,
+    client_state: Optional[dict] = None,
+    upcoming_appointments: str = "Nenhum agendamento futuro.",
+    turn_number: int = 0,
+    last_clinic_message: str = "",
+) -> str:
+    state = client_state or {}
+    nome = (state.get("nome") or "").strip() or "Cliente"
+    last_clinic = (last_clinic_message or "").strip() or NOT_YET
+
+    template = _CLIENT_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return (
+        template
+        .replace("{{voz}}", tenant_knowledge.load_voz(tenant_id))
+        .replace("{{catalogo}}", tenant_knowledge.load_catalogo(tenant_id))
+        .replace("{{politicas}}", tenant_knowledge.load_politicas(tenant_id))
+        .replace("{{today}}", _today_string())
+        .replace("{{calendario}}", _calendar_next_14_days())
+        .replace("{{client_nome}}", nome)
+        .replace("{{upcoming_appointments}}", upcoming_appointments)
+        .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{last_clinic_message}}", last_clinic)
     )
