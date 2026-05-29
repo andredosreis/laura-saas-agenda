@@ -39,17 +39,27 @@ def _build_model():
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model="gpt-4o-mini",
+            model=settings.agent_model_openai,
             temperature=0,
             api_key=settings.openai_api_key,
             timeout=20,
         )
 
-    # Default: Gemini 2.5 Flash — free tier good for the pilot
+    if settings.llm_provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(
+            model=settings.agent_model_anthropic,
+            temperature=0,
+            api_key=settings.anthropic_api_key,
+            timeout=20,
+            max_tokens=2048,
+        )
+
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model=settings.agent_model_gemini,
         temperature=0,
         google_api_key=settings.google_api_key,
         timeout=20,

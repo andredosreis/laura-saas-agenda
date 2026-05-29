@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     openai_api_key: str | None = None
     google_api_key: str | None = None
-    # Provider can be 'gemini' (default — free tier) or 'openai'
+    anthropic_api_key: str | None = None
+    # Provider can be 'gemini' (default — free tier), 'openai' or 'anthropic'
     llm_provider: str = "gemini"
 
     # Model overrides per role. Lets us A/B test different models in evals
@@ -25,6 +26,15 @@ class Settings(BaseSettings):
     # Defaults match what production used at the time of the F1 baseline.
     extractor_model_openai: str = "gpt-4o-mini"
     extractor_model_gemini: str = "gemini-2.5-flash"
+
+    # Agent model override (conversation agent — lead + client).
+    # Default: same as extractor. Override via AGENT_MODEL_OPENAI env var.
+    agent_model_openai: str = "gpt-4o-mini"
+    # Gemini variant of the agent model. Override via AGENT_MODEL_GEMINI
+    # to A/B test models (e.g. gemini-3.1-flash-lite) without code changes.
+    agent_model_gemini: str = "gemini-2.5-flash"
+    # Anthropic variant. Override via AGENT_MODEL_ANTHROPIC (e.g. Haiku 4.5).
+    agent_model_anthropic: str = "claude-haiku-4-5-20251001"
 
     # LangSmith tracing (set LANGSMITH_TRACING=true + LANGSMITH_API_KEY to
     # enable). LangChain auto-instruments on import when these env vars are
