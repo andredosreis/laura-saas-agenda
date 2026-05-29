@@ -313,3 +313,25 @@ async def get_client_messages(
         )
         r.raise_for_status()
         return r.json().get("data", [])
+
+
+async def reschedule_client_appointment(
+    tenant_id: str, cliente_id: str, agendamento_id: str, nova_data_hora_iso: str
+) -> dict:
+    """Reschedule an existing appointment to a new time."""
+    resp = await _patch_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/agendamentos/{agendamento_id}/reschedule",
+        json={"tenantId": tenant_id, "novaDataHoraISO": nova_data_hora_iso},
+    )
+    return resp["data"]
+
+
+async def cancel_client_appointment(
+    tenant_id: str, cliente_id: str, agendamento_id: str
+) -> dict:
+    """Cancel an existing appointment."""
+    resp = await _patch_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/agendamentos/{agendamento_id}/cancel",
+        json={"tenantId": tenant_id},
+    )
+    return resp["data"]

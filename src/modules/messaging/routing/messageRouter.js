@@ -151,19 +151,37 @@ export function decide(input) {
   //
   //    See docs/testes-ia/05-sessao-2026-05-19-bugs.md §1 for the two
   //    E2E sessions (Jasmin, Joana) where this manifested.
+  const { existingLead, existingClient } = persistedState;
   const isConfirmation = CONFIRMATION_KINDS.includes(classified?.kind);
+
+  // 3) Confirmation routing — short confirmation ("sim", "ok", "pode")
+  //    with pending appointment. For existing clients this ONLY fires when
+  //    the entire message is the confirmation keyword (reply to a reminder).
+  //    Longer messages like "pode ser a sexta?" go to the IA agent so the
+  //    mid-conversation reschedule is not hijacked.
   if (isConfirmation && persistedState.hasPendingAppointment) {
+    const words = (classified?.normalized || '').trim().split(/\s+/);
+    const isShortReply = words.length <= 2;
+    if (!existingClient || isShortReply) {
+      return {
+        route: Route.LEGACY_CONFIRMATION,
+        reason: Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT,
+      };
+    }
+  }
+
+  // 4) Client lifecycle — existing clients go to the IA agent.
+  if (existingClient) {
     return {
-      route: Route.LEGACY_CONFIRMATION,
-      reason: Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT,
+      route: Route.CLIENT_LIFECYCLE_PENDING,
+      reason: Reason.CLIENT_INBOUND_PENDING_LIFECYCLE,
     };
   }
 
-  // 4) Data-integrity guard: Lead.status='convertido' MUST come with a
+  // 5) Data-integrity guard: Lead.status='convertido' MUST come with a
   //    non-null Lead.cliente (F04 atomic conversion transaction guarantees
   //    this). If this branch fires, F04 regressed — fall through to
   //    LEGACY_FALLBACK with a distinguishing reason that surfaces in logs.
-  const { existingLead, existingClient } = persistedState;
   if (
     existingLead?.status === 'convertido' &&
     !existingLead.cliente &&
@@ -172,19 +190,6 @@ export function decide(input) {
     return {
       route: Route.LEGACY_FALLBACK,
       reason: Reason.CLIENT_CONVERSION_INCONSISTENCY,
-    };
-  }
-
-  // 5) Client lifecycle stub (matrix rows 4-5).
-  //    Cliente present OVERRIDES Lead present: a converted Lead has both
-  //    records; the Client is the post-conversion authoritative identity.
-  //    v1 routing falls through to LEGACY_FALLBACK (handler dispatch in
-  //    Phase 5); the reason flag makes the pending volume visible for the
-  //    future Client lifecycle SDD.
-  if (existingClient) {
-    return {
-      route: Route.CLIENT_LIFECYCLE_PENDING,
-      reason: Reason.CLIENT_INBOUND_PENDING_LIFECYCLE,
     };
   }
 

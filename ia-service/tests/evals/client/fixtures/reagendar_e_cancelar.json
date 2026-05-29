@@ -1,0 +1,92 @@
+{
+  "name": "reagendar_e_cancelar",
+  "description": "Cliente com agendamento quer reagendar ou cancelar. Testa regra 24h e fluxo completo.",
+  "examples": [
+    {
+      "name": "t0_reagendar_mais_24h",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [],
+        "current_message": "Preciso mudar a minha sessao de sexta para outro dia",
+        "client_state": {"nome": "Carla", "telefone": "351912000002"},
+        "upcoming_appointments": "- Sessao: 2026-05-30T10:00:00Z (status: Agendado)",
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_call_tool": "get_my_appointments",
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "must_acknowledge_current_appointment": true,
+        "must_ask_new_date": true,
+        "notes": "Sexta 30/05 a mais de 24h. Agente deve mostrar agendamento actual e perguntar nova data."
+      }
+    },
+    {
+      "name": "t1_reagendar_menos_24h",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [],
+        "current_message": "Preciso mudar a sessao de hoje para amanha",
+        "client_state": {"nome": "Carla", "telefone": "351912000002"},
+        "upcoming_appointments": "- Sessao: 2026-05-28T09:00:00Z (status: Agendado)",
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_block_reschedule": true,
+        "must_mention_24h_rule": true,
+        "must_redirect_to_laura": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "notes": "Sessao hoje as 9h, menos de 24h. Agente DEVE bloquear e redirecionar para Laura."
+      }
+    },
+    {
+      "name": "t2_cancelar",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [],
+        "current_message": "Quero cancelar a minha sessao",
+        "client_state": {"nome": "Carla", "telefone": "351912000002"},
+        "upcoming_appointments": "- Sessao: 2026-05-30T14:00:00Z (status: Agendado)",
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_call_tool": "get_my_appointments",
+        "must_confirm_before_cancel": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "notes": "Deve mostrar agendamento e pedir confirmacao antes de cancelar."
+      }
+    },
+    {
+      "name": "t3_mesmo_dia_outro_horario",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [
+          {"role": "user", "content": "Preciso mudar a sessao de sexta"},
+          {"role": "assistant", "content": "A sua sessao esta marcada para sexta 30/05 as 10h. Para que dia prefere mudar?"}
+        ],
+        "current_message": "pode ser no mesmo dia mas outro horario?",
+        "client_state": {"nome": "Carla", "telefone": "351912000002"},
+        "upcoming_appointments": "- Sessao: 2026-05-30T10:00:00Z (status: Agendado)",
+        "turn_number": 1,
+        "last_clinic_message": "A sua sessao esta marcada para sexta 30/05 as 10h. Para que dia prefere mudar?"
+      },
+      "outputs": {
+        "must_call_tool": "get_available_slots",
+        "must_not_confirm_existing": true,
+        "must_show_alternative_slots": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "notes": "Mesmo dia outro horario = buscar slots para sexta. NAO confirmar agendamento existente."
+      }
+    }
+  ]
+}

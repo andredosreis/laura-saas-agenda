@@ -19,12 +19,32 @@
 
 import { jest } from '@jest/globals';
 
+// Shared spy arrays — workaround for jest.unstable_mockModule ESM namespace
+// binding issue where the mock reference in the test file can differ from
+// the one the handler sees. The handler's call pushes to these arrays,
+// which the test can assert on reliably.
+const processLeadCalls = [];
+const processClientCalls = [];
+let processLeadNextError = null;
+
 // Mocks MUST be declared before importing app
 jest.unstable_mockModule('../src/utils/evolutionClient.js', () => ({
   sendWhatsAppMessage: jest.fn().mockResolvedValue({ success: true }),
 }));
 jest.unstable_mockModule('../src/utils/iaServiceClient.js', () => ({
-  processLead: jest.fn().mockResolvedValue({ success: true, source: 'agent' }),
+  processLead: jest.fn().mockImplementation((args) => {
+    processLeadCalls.push(args);
+    if (processLeadNextError) {
+      const err = processLeadNextError;
+      processLeadNextError = null;
+      return Promise.reject(err);
+    }
+    return Promise.resolve({ success: true, source: 'agent' });
+  }),
+  processClient: jest.fn().mockImplementation((args) => {
+    processClientCalls.push(args);
+    return Promise.resolve({ success: true, source: 'agent' });
+  }),
 }));
 
 const request = (await import('supertest')).default;
@@ -44,7 +64,7 @@ const VALID_API_KEY = 'test-secret-key';
 
 // Wait briefly for the fire-and-forget async pipeline to flush its side
 // effects. The HTTP ACK returns immediately; mocks/DB writes happen after.
-const flushAsync = (ms = 800) => new Promise((r) => setTimeout(r, ms));
+const flushAsync = (ms = 1500) => new Promise((r) => setTimeout(r, ms));
 
 function buildPayload({ messageId, phone, text, instance = 'marcai' }) {
   return {
@@ -78,11 +98,18 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
 
   afterAll(teardownTestDB);
 
+  afterEach(async () => {
+    await flushAsync(500);
+  });
+
   beforeEach(async () => {
     await clearDB();
     evolutionClientMock.sendWhatsAppMessage.mockClear();
     iaServiceClientMock.processLead.mockClear();
-    iaServiceClientMock.processLead.mockResolvedValue({ success: true, source: 'agent' });
+    iaServiceClientMock.processClient.mockClear();
+    processLeadCalls.length = 0;
+    processClientCalls.length = 0;
+    processLeadNextError = null;
   });
 
   // ── PRD §1.1 row 2: SIM/NÃO + pending appointment ─────────────────
@@ -114,7 +141,7 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(updated.status).toBe('Confirmado');
     expect(updated.confirmacao.tipo).toBe('confirmado');
     expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalled();
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
+    expect(processLeadCalls).toHaveLength(0);
   });
 
   // ── PRD §1.1 row 3: phone with no Lead AND no Client → IA_LEAD ──
@@ -130,20 +157,19 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).toHaveBeenCalledTimes(1);
-    const call = iaServiceClientMock.processLead.mock.calls[0][0];
-    expect(call.leadId).toBeNull();
-    expect(call.clienteId).toBeNull();
-    expect(call.telefone).toBe('351999000111');
+    expect(processLeadCalls).toHaveLength(1);
+    expect(processLeadCalls[0].leadId).toBeNull();
+    expect(processLeadCalls[0].clienteId).toBeNull();
+    expect(processLeadCalls[0].telefone).toBe('351999000111');
   });
 
   // ── PRD §1.1 rows 4-5: existing Client → CLIENT_LIFECYCLE_PENDING ──
 
-  test('row 4: existing Client → CLIENT_LIFECYCLE_PENDING (v1 stub) + greeting + etapaConversa set', async () => {
+  test('row 4: existing Client → CLIENT_LIFECYCLE_PENDING → processClient called', async () => {
     const tenant = await createTenant();
     const tenantId = tenant._id.toString();
     const { Cliente } = getModels(getTenantDB(tenantId));
-    await Cliente.create({ tenantId, nome: 'João', telefone: '351911222333' });
+    const cliente = await Cliente.create({ tenantId, nome: 'João', telefone: '351911222333' });
 
     const res = await request(app)
       .post(WEBHOOK_URL)
@@ -153,16 +179,14 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
-    expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalledTimes(1);
-    const greeting = evolutionClientMock.sendWhatsAppMessage.mock.calls[0][1];
-    expect(greeting).toMatch(/Bom dia|Boa tarde|Boa noite/);
-
-    const reloaded = await Cliente.findOne({ tenantId, telefone: '351911222333' });
-    expect(reloaded.etapaConversa).toBe('aguardando_laura');
+    expect(processLeadCalls).toHaveLength(0);
+    expect(processClientCalls).toHaveLength(1);
+    expect(processClientCalls[0].clienteId).toBe(cliente._id.toString());
+    expect(processClientCalls[0].clienteNome).toBe('João');
+    expect(processClientCalls[0].telefone).toBe('351911222333');
   });
 
-  test('row 5: existing Client reschedule/cancel intent → same stub (matches row 4 in v1)', async () => {
+  test('row 5: existing Client reschedule/cancel intent → processClient called', async () => {
     const tenant = await createTenant({ slug: 'row5' });
     const tenantId = tenant._id.toString();
     const { Cliente } = getModels(getTenantDB(tenantId));
@@ -176,10 +200,8 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    // v1 does not distinguish booking-vs-reschedule for Clients — both route
-    // to CLIENT_LIFECYCLE_PENDING → LEGACY_FALLBACK greeting.
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
-    expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalledTimes(1);
+    expect(processLeadCalls).toHaveLength(0);
+    expect(processClientCalls).toHaveLength(1);
   });
 
   // ── PRD §1.1 row 1 (reminder) and row 6 (birthday) ────────────────
@@ -214,7 +236,7 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
+    expect(processLeadCalls).toHaveLength(0);
     expect(evolutionClientMock.sendWhatsAppMessage).not.toHaveBeenCalled();
 
     const persisted = await Mensagem.findOne({ tenantId, telefone: '351922333444' });
@@ -234,13 +256,13 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
+    expect(processLeadCalls).toHaveLength(0);
     expect(evolutionClientMock.sendWhatsAppMessage).not.toHaveBeenCalled();
   });
 
   test('ia-service unreachable → IA_LEAD chosen, handler degrades to greeting', async () => {
     await createTenant({ slug: 'ia-down' });
-    iaServiceClientMock.processLead.mockRejectedValueOnce(new Error('ETIMEDOUT'));
+    processLeadNextError = new Error('ETIMEDOUT');
 
     const res = await request(app)
       .post(WEBHOOK_URL)
@@ -250,17 +272,11 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).toHaveBeenCalledTimes(1);
-    // Handler caught the error and dispatched legacyFallback → greeting sent
+    expect(processLeadCalls).toHaveLength(1);
     expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalledTimes(1);
   });
 
   test('SIM without pending appointment + new phone → IA_LEAD (agent handles it)', async () => {
-    // Regression — 2026-05-20: a confirmation-shaped message ("sim", "ok",
-    // "perfeito"…) from a brand-new phone is no longer hijacked by the
-    // legacy NO_PENDING_APPOINTMENT_REPLY handler. The agent owns the
-    // turn so it can respond naturally (treat "sim" as a fragment of an
-    // organic conversation start). See messageRouter.js step 3.
     await createTenant({ slug: 'no-pending' });
 
     const res = await request(app)
@@ -271,7 +287,7 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(iaServiceClientMock.processLead).toHaveBeenCalledTimes(1);
+    expect(processLeadCalls).toHaveLength(1);
   });
 
   test('Lead convertido but cliente=null → LEGACY_FALLBACK + warn (data integrity guard)', async () => {
@@ -303,7 +319,7 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     await flushAsync();
 
     // Data-integrity branch routes to LEGACY_FALLBACK greeting, NOT IA_LEAD
-    expect(iaServiceClientMock.processLead).not.toHaveBeenCalled();
+    expect(processLeadCalls).toHaveLength(0);
     expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalledTimes(1);
     const greeting = evolutionClientMock.sendWhatsAppMessage.mock.calls[0][1];
     expect(greeting).toMatch(/Bom dia|Boa tarde|Boa noite/);

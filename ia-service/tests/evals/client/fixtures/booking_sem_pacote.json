@@ -1,0 +1,76 @@
+{
+  "name": "booking_sem_pacote",
+  "description": "Cliente sem pacote activo quer marcar. Agente deve verificar pacotes, sugerir avulsa com referencia a Laura para pacote, usar PT-PT.",
+  "examples": [
+    {
+      "name": "t0_greeting",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [],
+        "current_message": "Ola Laura tudo bem?",
+        "client_state": {"nome": "Ana Sofia", "telefone": "351912000001"},
+        "upcoming_appointments": "Nenhum agendamento futuro.",
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_contain_name": "Ana Sofia",
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "max_sentences": 4,
+        "must_not_offer_slots_without_asking": true,
+        "notes": "Saudacao inicial. Deve usar nome, perguntar como ajudar. NAO deve oferecer slots nem verificar pacotes ainda."
+      }
+    },
+    {
+      "name": "t1_quer_marcar",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [
+          {"role": "user", "content": "Ola Laura tudo bem?"},
+          {"role": "assistant", "content": "Ola, Ana Sofia! Como posso ajudar hoje?"}
+        ],
+        "current_message": "Quero marcar uma sessao",
+        "client_state": {"nome": "Ana Sofia", "telefone": "351912000001"},
+        "upcoming_appointments": "Nenhum agendamento futuro.",
+        "turn_number": 1,
+        "last_clinic_message": "Ola, Ana Sofia! Como posso ajudar hoje?"
+      },
+      "outputs": {
+        "must_call_tool": "get_my_packages",
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "must_mention_pacote_or_avulsa": true,
+        "notes": "Quando cliente pede para marcar, PRIMEIRO chama get_my_packages. Depois sugere avulsa com referencia a Laura para pacote."
+      }
+    },
+    {
+      "name": "t2_pergunta_preco",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [
+          {"role": "user", "content": "Ola Laura tudo bem?"},
+          {"role": "assistant", "content": "Ola, Ana Sofia! Como posso ajudar hoje?"},
+          {"role": "user", "content": "Quero marcar uma sessao"},
+          {"role": "assistant", "content": "Nao tem pacotes activos. Podemos marcar uma sessao avulsa e la combina com a Laura qual pacote lhe fica melhor. Que dia lhe da jeito?"}
+        ],
+        "current_message": "Quanto custa a sessao?",
+        "client_state": {"nome": "Ana Sofia", "telefone": "351912000001"},
+        "upcoming_appointments": "Nenhum agendamento futuro.",
+        "turn_number": 2,
+        "last_clinic_message": "Nao tem pacotes activos. Podemos marcar uma sessao avulsa e la combina com a Laura qual pacote lhe fica melhor. Que dia lhe da jeito?"
+      },
+      "outputs": {
+        "must_contain_40_eur": true,
+        "must_mention_laura_for_price": true,
+        "must_mention_pacote_mais_em_conta": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "notes": "Precos: a partir de 40 EUR + pacote fica mais em conta + combinar com a Laura. NAO citar precos especificos."
+      }
+    }
+  ]
+}

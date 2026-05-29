@@ -11,6 +11,7 @@
 
 import * as iaServiceClient from '../../../utils/iaServiceClient.js';
 import { handle as handleLegacyFallback } from './legacyFallback.js';
+import logger from '../../../utils/logger.js';
 
 export async function handle(input) {
   const {
@@ -47,7 +48,7 @@ export async function handle(input) {
     });
     return { delivered: true, source: 'ia_service' };
   } catch (err) {
-    console.error('[iaClientLifecycle] ia_service_unreachable — fallback:', err?.message);
+    logger.error({ err: err?.message }, '[iaClientLifecycle] ia_service_unreachable — fallback');
     await handleLegacyFallback(input);
     return { delivered: true, source: 'fallback' };
   }

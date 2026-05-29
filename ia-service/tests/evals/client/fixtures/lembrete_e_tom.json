@@ -1,0 +1,96 @@
+{
+  "name": "lembrete_e_tom",
+  "description": "Testa anti-alucinacao (lembretes, info inventada) e tom PT-PT.",
+  "examples": [
+    {
+      "name": "t0_pergunta_lembrete",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [
+          {"role": "user", "content": "Ola Laura"},
+          {"role": "assistant", "content": "Ola, Rita! Como posso ajudar?"},
+          {"role": "user", "content": "Ja marquei uma sessao para sexta"},
+          {"role": "assistant", "content": "Optimo, Rita! A sua sessao esta confirmada para sexta."}
+        ],
+        "current_message": "Vou ter algum lembrete antes?",
+        "client_state": {"nome": "Rita", "telefone": "351912000003"},
+        "upcoming_appointments": "- Sessao: 2026-05-30T11:00:00Z (status: Agendado)",
+        "turn_number": 2,
+        "last_clinic_message": "Optimo, Rita! A sua sessao esta confirmada para sexta."
+      },
+      "outputs": {
+        "must_say_automatic": true,
+        "must_not_ask_preference": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "max_sentences": 2,
+        "notes": "Lembretes sao automaticos. NAO perguntar quando quer receber. Resposta curta: 1-2 frases."
+      }
+    },
+    {
+      "name": "t1_pergunta_localizacao",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [],
+        "current_message": "Onde fica a clinica?",
+        "client_state": {"nome": "Rita", "telefone": "351912000003"},
+        "upcoming_appointments": "Nenhum agendamento futuro.",
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_invent_address": true,
+        "must_redirect_to_laura": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "notes": "Agente NAO sabe a morada. Deve dizer que vai confirmar com a Laura."
+      }
+    },
+    {
+      "name": "t2_tom_pt_pt",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [],
+        "current_message": "Ola boa noite, queria saber que dias tem livres esta semana",
+        "client_state": {"nome": "Joana", "telefone": "351912000004"},
+        "upcoming_appointments": "Nenhum agendamento futuro.",
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_contain_name": "Joana",
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "must_not_contain_br_pt": true,
+        "max_sentences": 4,
+        "notes": "Deve usar PT-PT: dar jeito, consigo, etc. NAO usar BR-PT: voce pode, tudo bem, beleza."
+      }
+    },
+    {
+      "name": "t3_max_1_pendente",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "cliente_id": "6a1637c410c61577dd5e3150",
+        "history": [
+          {"role": "user", "content": "Quero marcar outra sessao"},
+          {"role": "assistant", "content": "Ja tem uma sessao marcada para sexta as 10h. Assim que essa passar, pode marcar outra."}
+        ],
+        "current_message": "Mas eu quero marcar para a semana seguinte tambem",
+        "client_state": {"nome": "Joana", "telefone": "351912000004"},
+        "upcoming_appointments": "- Sessao: 2026-05-30T10:00:00Z (status: Agendado)",
+        "turn_number": 1,
+        "last_clinic_message": "Ja tem uma sessao marcada para sexta as 10h. Assim que essa passar, pode marcar outra."
+      },
+      "outputs": {
+        "must_enforce_max_1": true,
+        "must_offer_reagendar": true,
+        "must_not_contain_markdown": true,
+        "must_be_pt_pt": true,
+        "notes": "Limite max 1 pendente. Deve manter regra e sugerir reagendar se preferir."
+      }
+    }
+  ]
+}
