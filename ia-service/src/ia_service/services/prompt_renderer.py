@@ -75,14 +75,25 @@ _MONTHS_PT = [
 def _today_string(timezone_name: str = "Europe/Lisbon") -> str:
     now = datetime.now(ZoneInfo(timezone_name))
     weekday = _WEEKDAYS_PT[now.weekday()]
-    return f"{weekday}, {now.day} de {_MONTHS_PT[now.month - 1]} de {now.year} (ISO: {now.strftime('%Y-%m-%d')})"
+    hour = now.hour
+    if 6 <= hour < 12:
+        periodo = "manha — usa 'bom dia'"
+    elif 12 <= hour < 20:
+        periodo = "tarde — usa 'boa tarde'"
+    else:
+        periodo = "noite — usa 'boa noite'"
+    return (
+        f"{weekday}, {now.day} de {_MONTHS_PT[now.month - 1]} de {now.year} "
+        f"(ISO: {now.strftime('%Y-%m-%d')}), sao cerca das {now.strftime('%H:%M')} "
+        f"({periodo})"
+    )
 
 
-def _calendar_next_14_days(timezone_name: str = "Europe/Lisbon") -> str:
+def _calendar_next_days(days: int = 30, timezone_name: str = "Europe/Lisbon") -> str:
     from datetime import timedelta
     now = datetime.now(ZoneInfo(timezone_name))
     lines = []
-    for i in range(14):
+    for i in range(days):
         d = now + timedelta(days=i)
         wd = _WEEKDAYS_PT[d.weekday()]
         tag = " ← HOJE" if i == 0 else (" ← amanhã" if i == 1 else "")
@@ -131,7 +142,7 @@ def render_system_prompt(
         .replace("{{catalogo}}", tenant_knowledge.load_catalogo(tenant_id))
         .replace("{{politicas}}", tenant_knowledge.load_politicas(tenant_id))
         .replace("{{today}}", _today_string())
-        .replace("{{calendario}}", _calendar_next_14_days())
+        .replace("{{calendario}}", _calendar_next_days())
         .replace("{{lead_nome}}", nome)
         .replace("{{lead_motivo}}", motivo)
         .replace("{{lead_urgencia}}", urgencia)
@@ -160,7 +171,7 @@ def render_client_system_prompt(
         .replace("{{catalogo}}", tenant_knowledge.load_catalogo(tenant_id))
         .replace("{{politicas}}", tenant_knowledge.load_politicas(tenant_id))
         .replace("{{today}}", _today_string())
-        .replace("{{calendario}}", _calendar_next_14_days())
+        .replace("{{calendario}}", _calendar_next_days())
         .replace("{{client_nome}}", nome)
         .replace("{{upcoming_appointments}}", upcoming_appointments)
         .replace("{{turn_number}}", str(max(0, turn_number)))

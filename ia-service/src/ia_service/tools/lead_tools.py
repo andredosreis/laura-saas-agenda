@@ -256,7 +256,7 @@ def make_get_available_slots_tool(tenant_id: str):
     @tool
     def get_available_slots(
         dia: str | None = None,
-        dias_a_frente: int = 14,
+        dias_a_frente: int = 30,
     ) -> str:
         """Devolve TODOS os slots livres num dia específico.
 
@@ -273,7 +273,7 @@ def make_get_available_slots_tool(tenant_id: str):
         Args:
             dia: Data em formato YYYY-MM-DD (ex: '2026-05-12') ou None
                 para próximo dia disponível.
-            dias_a_frente: Janela de busca em dias (default 14, max 30).
+            dias_a_frente: Janela de busca em dias (default 30, max 30).
         """
         all_slots = mongo_reader.find_available_slots(
             tenant_id, dias_a_frente=min(dias_a_frente, 30)
