@@ -60,6 +60,19 @@ export async function handle(input) {
           { $set: { conversa: conversa._id } },
         );
       }
+    } else if (models.Conversa) {
+      // Cliente (sem lead) com IA pausada: resolve a Conversa por telefone
+      // para o inbound ficar ligado à thread (handoff humano no inbox).
+      const conv = await models.Conversa
+        .findOne({ tenantId, telefone: telefoneNormalizado })
+        .select('_id')
+        .lean();
+      conversaId = conv?._id
+        || (await models.Conversa.create({
+          tenantId,
+          telefone: telefoneNormalizado,
+          estado: 'aguardando_agendamento',
+        }))._id;
     }
 
     // 2) Persist the inbound Mensagem

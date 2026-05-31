@@ -128,6 +128,34 @@ describe('messageRouter (F12 §6.2 decision tree)', () => {
     expect(d.reason).toBe(Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT);
   });
 
+  test('SIM + pending + existing Client + IA conversation active → CLIENT_LIFECYCLE (não hijack legacy)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      persistedState: {
+        hasPendingAppointment: true,
+        existingClient: { _id: 'c1' },
+        existingLead: null,
+        iaConversationActive: true,
+      },
+    }));
+    expect(d.route).toBe(Route.CLIENT_LIFECYCLE_PENDING);
+    expect(d.reason).toBe(Reason.CLIENT_INBOUND_PENDING_LIFECYCLE);
+  });
+
+  test('SIM + pending + existing Client + SEM conversa IA activa → LEGACY_CONFIRMATION (resposta a lembrete preservada)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      persistedState: {
+        hasPendingAppointment: true,
+        existingClient: { _id: 'c1' },
+        existingLead: null,
+        iaConversationActive: false,
+      },
+    }));
+    expect(d.route).toBe(Route.LEGACY_CONFIRMATION);
+    expect(d.reason).toBe(Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT);
+  });
+
   // Regression — 2026-05-20: a confirmation-shaped message ("ok", "sim",
   // "perfeito", "nao", "cancelar"…) without a pending appointment must NOT
   // short-circuit to NO_PENDING_APPOINTMENT_REPLY anymore. The classifier
@@ -191,6 +219,18 @@ describe('messageRouter (F12 §6.2 decision tree)', () => {
     }));
     expect(d.route).toBe(Route.CLIENT_LIFECYCLE_PENDING);
     expect(d.reason).toBe(Reason.CLIENT_INBOUND_PENDING_LIFECYCLE);
+  });
+
+  test('Free-text + existing Client + iaAtiva=false → MANUAL_SILENT / client_ia_paused', () => {
+    const d = decide(buildInput({
+      persistedState: {
+        hasPendingAppointment: false,
+        existingClient: { _id: 'c1', iaAtiva: false },
+        existingLead: null,
+      },
+    }));
+    expect(d.route).toBe(Route.MANUAL_SILENT);
+    expect(d.reason).toBe(Reason.CLIENT_IA_PAUSED);
   });
 
   test('Cliente present OVERRIDES Lead present → CLIENT_LIFECYCLE_PENDING (Client wins)', () => {

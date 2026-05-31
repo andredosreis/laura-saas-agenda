@@ -278,3 +278,34 @@ def make_cancel_appointment_tool(tenant_id: str, cliente_id: str):
             return f"ERRO ao cancelar: {msg}. Diz ao cliente que vais passar a recepcao."
 
     return cancel_appointment
+
+
+def make_pausar_atendimento_tool(tenant_id: str, cliente_id: str):
+
+    @tool
+    async def pausar_atendimento() -> str:
+        """Pausa o atendimento automatico e encerra a conversa com este cliente.
+
+        Usa esta tool APENAS depois de esgotares o protocolo off-topic (ja
+        deste o redirect, a firmeza e o farewell) e o cliente CONTINUA a
+        insistir em assuntos fora do ambito — conversar com a Laura por
+        motivos pessoais/sociais, ou temas nao relacionados com a clinica.
+
+        Depois de chamar esta tool, da a mensagem final de despedida e NAO
+        respondas mais — a conversa fica em modo manual para a equipa decidir
+        pelo painel se retoma.
+
+        Nao precisa de argumentos.
+        """
+        try:
+            await marcai_client.pause_client_ia(
+                tenant_id=tenant_id, cliente_id=cliente_id
+            )
+            return (
+                "OK — atendimento automatico pausado. Da a mensagem final de "
+                "despedida ao cliente e NAO respondas mais."
+            )
+        except Exception as exc:
+            return f"ERRO ao pausar: {exc}. Da na mesma a despedida e termina."
+
+    return pausar_atendimento

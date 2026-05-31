@@ -335,3 +335,16 @@ async def cancel_client_appointment(
         json={"tenantId": tenant_id},
     )
     return resp["data"]
+
+
+async def pause_client_ia(tenant_id: str, cliente_id: str) -> dict:
+    """Pausa o agente de IA para este cliente (iaAtiva=false).
+
+    A partir daí, as mensagens deste cliente caem em MANUAL_SILENT no router
+    (sem invocar o LLM, sem responder) ate o humano reactivar pelo inbox.
+    """
+    resp = await _patch_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/pausar-ia",
+        json={"tenantId": tenant_id, "ativa": False},
+    )
+    return resp["data"]

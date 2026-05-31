@@ -385,6 +385,48 @@ router.patch('/:id/agendamentos/:agendamentoId/cancel', async (req, res) => {
 });
 
 // =====================================================================
+// PATCH /api/internal/clientes/:id/pausar-ia
+// Body: { tenantId, ativa? }  — pausa (ativa=false/omitido) ou reactiva
+// (ativa=true) a IA para este cliente. Usado pela auto-pausa off-topic do
+// agente e pelo handoff humano do inbox de Conversas.
+// =====================================================================
+router.patch('/:id/pausar-ia', async (req, res) => {
+  try {
+    const clienteId = req.params.id;
+    const { tenantId, ativa } = req.body || {};
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenantId é obrigatório' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+      return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+
+    const { models } = await resolveTenantContext(tenantId);
+
+    const cliente = await models.Cliente.findOneAndUpdate(
+      { _id: clienteId, tenantId },
+      { iaAtiva: ativa === true },
+      { new: true }
+    )
+      .select('_id iaAtiva')
+      .lean();
+
+    if (!cliente) {
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
+    }
+
+    res.json({ success: true, data: { iaAtiva: cliente.iaAtiva } });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] PATCH /clientes/:id/pausar-ia');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
 // GET /api/internal/clientes/:id/pacotes?tenantId=...
 // Returns active packages with sessions remaining.
 // =====================================================================

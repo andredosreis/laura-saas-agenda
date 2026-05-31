@@ -65,6 +65,13 @@ const clienteSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // IA do client lifecycle: quando false, o webhook não invoca o agente
+  // (modo manual / pausa). Usado pelo handoff do inbox de Conversas e pela
+  // auto-pausa anti-abuso quando o protocolo off-topic se esgota.
+  iaAtiva: {
+    type: Boolean,
+    default: true
+  },
   // --- CAMPOS DA FICHA DE ANAMNESE ---
   costumaPermanecerMuitoTempoSentada: { type: Boolean, default: false },
   alergias: { type: String, trim: true, default: '' },

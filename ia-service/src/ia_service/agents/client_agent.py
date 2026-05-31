@@ -22,6 +22,7 @@ from ..tools.client_tools import (
     make_create_client_appointment_tool,
     make_reschedule_appointment_tool,
     make_cancel_appointment_tool,
+    make_pausar_atendimento_tool,
 )
 from .lead_agent import _build_model
 
@@ -42,6 +43,7 @@ def make_client_agent(
         make_create_client_appointment_tool(tenant_id, cliente_id),
         make_reschedule_appointment_tool(tenant_id, cliente_id),
         make_cancel_appointment_tool(tenant_id, cliente_id),
+        make_pausar_atendimento_tool(tenant_id, cliente_id),
     ]
     system_prompt = render_client_system_prompt(
         tenant_id,

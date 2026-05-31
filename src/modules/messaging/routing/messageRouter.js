@@ -61,6 +61,7 @@ export const Reason = Object.freeze({
 
   // ── Client lifecycle stub (v1) → CLIENT_LIFECYCLE_PENDING ────────
   CLIENT_INBOUND_PENDING_LIFECYCLE: 'client_inbound_pending_lifecycle',
+  CLIENT_IA_PAUSED:                 'client_ia_paused',                 // → MANUAL_SILENT
 
   // ── Lead lifecycle ────────────────────────────────────────────────
   LEAD_IA_PAUSED:    'lead_ia_paused',    // → MANUAL_SILENT
@@ -162,7 +163,13 @@ export function decide(input) {
   if (isConfirmation && persistedState.hasPendingAppointment) {
     const words = (classified?.normalized || '').trim().split(/\s+/);
     const isShortReply = words.length <= 2;
-    if (!existingClient || isShortReply) {
+    // Se o cliente está a meio de uma conversa com a IA (a última mensagem
+    // foi o agente a perguntar algo — ex: "confirma o cancelamento?"), o
+    // "sim" é uma resposta ao agente, NÃO uma confirmação de lembrete.
+    // Nesse caso não curto-circuitar para o confirmador legacy — deixar
+    // seguir para CLIENT_LIFECYCLE (passo 4) e a IA continua o fluxo.
+    const midIaConversation = Boolean(existingClient) && persistedState.iaConversationActive === true;
+    if (!midIaConversation && (!existingClient || isShortReply)) {
       return {
         route: Route.LEGACY_CONFIRMATION,
         reason: Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT,
@@ -170,8 +177,14 @@ export function decide(input) {
     }
   }
 
-  // 4) Client lifecycle — existing clients go to the IA agent.
+  // 4) Client lifecycle — existing clients go to the IA agent, A NÃO SER
+  //    que o agente esteja pausado para este cliente (iaAtiva=false):
+  //    handoff humano (inbox) ou auto-pausa off-topic anti-abuso →
+  //    MANUAL_SILENT (persiste o inbound, não responde, não chama o LLM).
   if (existingClient) {
+    if (existingClient.iaAtiva === false) {
+      return { route: Route.MANUAL_SILENT, reason: Reason.CLIENT_IA_PAUSED };
+    }
     return {
       route: Route.CLIENT_LIFECYCLE_PENDING,
       reason: Reason.CLIENT_INBOUND_PENDING_LIFECYCLE,

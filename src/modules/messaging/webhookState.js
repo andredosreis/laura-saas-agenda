@@ -104,11 +104,12 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
   const duasHorasAtras = agora.minus({ hours: 2 }).toJSDate();
   const doisDias = agora.plus({ days: 2 }).toJSDate();
   const janelaQuery = { $gte: duasHorasAtras, $lte: doisDias };
+  const trintaMinAtras = agora.minus({ minutes: 30 }).toJSDate();
 
-  const [existingClient, existingLeadRaw, pendingApptLeadSide] = await Promise.all([
+  const [existingClient, existingLeadRaw, pendingApptLeadSide, lastMessage] = await Promise.all([
     models.Cliente
       ? models.Cliente.findOne({ telefone: { $in: variants } })
-          .select('_id nome telefone etapaConversa')
+          .select('_id nome telefone etapaConversa iaAtiva')
           .lean()
       : null,
     models.Lead
@@ -124,7 +125,26 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
     })
       .select('_id')
       .lean(),
+    models.Mensagem
+      ? models.Mensagem.findOne({ tenantId, telefone: { $in: variants } })
+          .sort({ data: -1, createdAt: -1 })
+          .select('direcao data createdAt')
+          .lean()
+      : null,
   ]);
+
+  // Conversa IA activa: a última mensagem registada foi um outbound do bot
+  // (a IA a perguntar/responder) nos últimos 30 min. Os lembretes NÃO são
+  // persistidos como Mensagem, por isso um outbound recente = agente IA.
+  // Usado para não rotear um "sim" de cliente (resposta à IA) para o
+  // confirmador legacy de lembretes.
+  const lastMsgDate = lastMessage?.data || lastMessage?.createdAt || null;
+  const iaConversationActive = Boolean(
+    lastMessage &&
+      lastMessage.direcao === 'saida' &&
+      lastMsgDate &&
+      new Date(lastMsgDate) >= trintaMinAtras
+  );
 
   // ── Step 5: Cliente-side appointment fallback (conditional) ────────
   let pendingAppointmentId = pendingApptLeadSide?._id || null;
@@ -146,6 +166,12 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
     ? { ...existingLeadRaw, iaAtiva: existingLeadRaw.iaAtiva !== false }
     : null;
 
+  // Coerce Cliente.iaAtiva to strict boolean (default true for older docs
+  // predating the field). false → o agente está pausado para este cliente.
+  const existingClientCoerced = existingClient
+    ? { ...existingClient, iaAtiva: existingClient.iaAtiva !== false }
+    : null;
+
   return {
     tenant,
     models,
@@ -153,8 +179,9 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
     persistedState: Object.freeze({
       hasPendingAppointment: Boolean(pendingAppointmentId),
       pendingAppointmentId: pendingAppointmentId ? String(pendingAppointmentId) : null,
-      existingClient: existingClient || null,
+      existingClient: existingClientCoerced,
       existingLead,
+      iaConversationActive,
     }),
   };
 }
