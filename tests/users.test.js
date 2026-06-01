@@ -6,6 +6,9 @@ jest.unstable_mockModule('../src/services/emailService.js', () => ({
   sendEmail: jest.fn().mockResolvedValue({ messageId: 'mocked' }),
   sendPasswordResetEmail: jest.fn().mockResolvedValue({ messageId: 'mocked' }),
   sendEmailVerificationEmail: jest.fn().mockResolvedValue({ messageId: 'mocked' }),
+  // usersController importa sendInvitationEmail (convites) — sem isto no mock,
+  // o ESM falha com "does not provide an export named 'sendInvitationEmail'".
+  sendInvitationEmail: jest.fn().mockResolvedValue({ messageId: 'mocked' }),
 }));
 
 const request = (await import('supertest')).default;

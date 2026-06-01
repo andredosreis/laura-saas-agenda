@@ -9,7 +9,7 @@
 
 import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
 import Tenant from '../src/models/Tenant.js';
-import { resolveTenantByInstance } from '../src/modules/ia/webhookController.js';
+import { resolveTenantByInstance } from '../src/modules/messaging/webhookState.js';
 
 beforeAll(setupTestDB);
 afterAll(teardownTestDB);
