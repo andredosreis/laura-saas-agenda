@@ -43,6 +43,7 @@ const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const Leads = lazy(() => import('./pages/Leads'));
 const LeadsKanban = lazy(() => import('./pages/LeadsKanban'));
 const LeadDetalhe = lazy(() => import('./pages/LeadDetalhe'));
+const Conversas = lazy(() => import('./pages/Conversas'));
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -156,6 +157,9 @@ const App = () => {
             } />
             <Route path="/leads/:id" element={
               <ProtectedLayout><LeadDetalhe /></ProtectedLayout>
+            } />
+            <Route path="/conversas" element={
+              <ProtectedLayout><Conversas /></ProtectedLayout>
             } />
 
             {/* ⚙️ Configurações */}

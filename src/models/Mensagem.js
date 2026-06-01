@@ -6,6 +6,10 @@ const MensagemSchema = new mongoose.Schema({
   mensagem: { type: String, required: true },
   origem:   { type: String, enum: ['cliente', 'laura'], required: true },
   direcao:  { type: String, enum: ['entrada', 'saida'], default: 'entrada' },
+  // Quem produziu a mensagem outbound: 'ia' (agente), 'humano' (resposta manual
+  // no inbox) ou 'cliente' (inbound). Aditivo e opcional — docs antigos não têm
+  // o campo; o inbox trata ausência de 'ia'/'humano' em outbound como IA.
+  geradoPor: { type: String, enum: ['ia', 'humano', 'cliente'] },
   data:     { type: Date, default: Date.now },
   conversa: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversa' },
 }, { timestamps: false });

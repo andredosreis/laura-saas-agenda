@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { MessageSquare, Bot, User } from 'lucide-react';
+import { MessageSquare, Bot, User, Headset } from 'lucide-react';
 
 export interface ThreadMessage {
   _id: string;
   mensagem: string;
   origem: 'cliente' | 'laura';
+  /** Quem produziu o outbound: 'ia' (agente) ou 'humano' (resposta manual no inbox). Ausente em mensagens antigas → tratado como IA. */
+  geradoPor?: 'ia' | 'humano' | 'cliente';
   data: string;
 }
 
@@ -30,11 +32,18 @@ function formatDia(iso: string) {
 }
 
 export function ConversationThread({ messages, isDarkMode }: ConversationThreadProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Scroll fiável até ao fim: mexer no scrollTop do próprio container é mais
+  // robusto que scrollIntoView (que falhava a esconder a última mensagem atrás
+  // do composer). Re-corre quando muda o nº de mensagens OU a última (id/texto)
+  // — cobre o envio otimista + a reconciliação do refetch sem scrollar a cada poll.
+  const lastId = messages[messages.length - 1]?._id;
+  const lastText = messages[messages.length - 1]?.mensagem;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, lastId, lastText]);
 
   if (messages.length === 0) {
     return (
@@ -65,7 +74,7 @@ export function ConversationThread({ messages, isDarkMode }: ConversationThreadP
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       {grupos.map(({ dia, msgs }) => (
         <div key={dia}>
           {/* Day separator */}
@@ -80,29 +89,41 @@ export function ConversationThread({ messages, isDarkMode }: ConversationThreadP
           <div className="space-y-2">
             {msgs.map((msg) => {
               const isOutbound = msg.origem === 'laura';
+              const isHuman = isOutbound && msg.geradoPor === 'humano';
               return (
                 <div key={msg._id} className={`flex items-end gap-2 ${isOutbound ? 'flex-row-reverse' : 'flex-row'}`}>
-                  {/* Avatar */}
+                  {/* Avatar: humano (resposta manual) vs IA vs cliente */}
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                    isOutbound
-                      ? 'bg-indigo-500/20 text-indigo-400'
-                      : isDarkMode ? 'bg-white/10 text-slate-400' : 'bg-gray-200 text-gray-500'
+                    !isOutbound
+                      ? isDarkMode ? 'bg-white/10 text-slate-400' : 'bg-gray-200 text-gray-500'
+                      : isHuman
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-indigo-500/20 text-indigo-400'
                   }`}>
-                    {isOutbound
-                      ? <Bot className="w-4 h-4" />
-                      : <User className="w-4 h-4" />
+                    {!isOutbound
+                      ? <User className="w-4 h-4" />
+                      : isHuman
+                        ? <Headset className="w-4 h-4" />
+                        : <Bot className="w-4 h-4" />
                     }
                   </div>
-                  {/* Bubble */}
+                  {/* Bubble — humano usa verde para se distinguir da IA (indigo) */}
                   <div className={`max-w-xs lg:max-w-sm xl:max-w-md rounded-2xl px-4 py-2.5 text-sm ${
-                    isOutbound
-                      ? 'bg-indigo-500 text-white rounded-br-sm'
-                      : isDarkMode
-                        ? 'bg-slate-700 text-white rounded-bl-sm'
-                        : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                    !isOutbound
+                      ? isDarkMode ? 'bg-slate-700 text-white rounded-bl-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                      : isHuman
+                        ? 'bg-emerald-600 text-white rounded-br-sm'
+                        : 'bg-indigo-500 text-white rounded-br-sm'
                   }`}>
+                    {isOutbound && (
+                      <p className={`text-[10px] font-semibold mb-0.5 ${isHuman ? 'text-emerald-100' : 'text-indigo-200'}`}>
+                        {isHuman ? '👩 Laura (manual)' : '🤖 IA'}
+                      </p>
+                    )}
                     <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.mensagem}</p>
-                    <p className={`text-xs mt-1 text-right ${isOutbound ? 'text-indigo-200' : isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                    <p className={`text-xs mt-1 text-right ${
+                      !isOutbound ? (isDarkMode ? 'text-slate-500' : 'text-gray-400') : isHuman ? 'text-emerald-200' : 'text-indigo-200'
+                    }`}>
                       {formatHora(msg.data)}
                     </p>
                   </div>
@@ -112,7 +133,6 @@ export function ConversationThread({ messages, isDarkMode }: ConversationThreadP
           </div>
         </div>
       ))}
-      <div ref={bottomRef} />
     </div>
   );
 }

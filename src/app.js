@@ -33,6 +33,7 @@ import historicoAtendimentoRoutes from './modules/historico/historicoAtendimento
 import usersRoutes from './modules/users/usersRoutes.js';
 import fechamentoMensalRoutes from './modules/financeiro/fechamentoMensalRoutes.js';
 import leadRoutes from './modules/leads/leadRoutes.js';
+import conversasRoutes from './modules/messaging/conversas/conversasRoutes.js';
 import leadInternalRoutes from './modules/leads/leadInternalRoutes.js';
 import clienteInternalRoutes from './modules/clientes/clienteInternalRoutes.js';
 
@@ -109,6 +110,7 @@ const apiResources = [
   ['/users', usersRoutes],
   ['/fechamentos-mensais', fechamentoMensalRoutes],
   ['/leads', leadRoutes],
+  ['/conversas', conversasRoutes],
 ];
 
 for (const [path, router] of apiResources) {

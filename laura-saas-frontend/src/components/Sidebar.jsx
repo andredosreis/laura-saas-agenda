@@ -23,7 +23,8 @@ import {
   Settings,
   CalendarCheck,
   Inbox,
-  Columns
+  Columns,
+  MessageSquare
 } from 'lucide-react';
 import MarcaiLogo from './MarcaiLogo';
 import ThemeToggle from './ThemeToggle';
@@ -92,6 +93,7 @@ function Sidebar() {
       id: 'crm',
       label: 'CRM / VENDAS',
       items: [
+        { to: "/conversas", text: "Conversas", icon: MessageSquare, perm: 'verLeads' },
         { to: "/leads", text: "Leads", icon: Inbox, perm: 'verLeads' },
         { to: "/leads/kanban", text: "Pipeline", icon: Columns, perm: 'verLeads' }
       ]
