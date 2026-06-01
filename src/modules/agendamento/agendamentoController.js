@@ -149,6 +149,10 @@ export const getAllAgendamentos = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
+    // Ordenação por dataHora: ascendente por defeito (cronológico, p/ calendário e
+    // listas de "próximos"). `?sort=desc` para listas que querem os mais recentes
+    // primeiro (ex: "Todos") e não esconder os recentes atrás do limite de 100.
+    const sortDir = req.query.sort === 'desc' ? -1 : 1;
 
     const query = scopeAgendamentoQuery(req);
 
@@ -167,7 +171,11 @@ export const getAllAgendamentos = async (req, res) => {
     const [agendamentos, total] = await Promise.all([
       Agendamento.find(query)
         .populate("cliente pacote")
-        .sort({ dataHora: 1 })
+        // Serviço contratado: a maioria das sessões liga-se ao pacote via
+        // compraPacote (não via `pacote` directo). Popular o pacote da compra
+        // permite à UI mostrar o nome do serviço em vez de "Serviço" genérico.
+        .populate({ path: "compraPacote", populate: { path: "pacote", select: "nome" } })
+        .sort({ dataHora: sortDir })
         .skip(skip)
         .limit(limit),
       Agendamento.countDocuments(query),

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -6,6 +6,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import luxonPlugin from '@fullcalendar/luxon3';
 import { DateTime } from 'luxon';
+import { nomeServicoAgendamento } from '../utils/agendamento';
 import {
     CalendarDays,
     CalendarCheck,
@@ -57,7 +58,7 @@ function CalendarView() {
     const [clientes, setClientes] = useState([]);
     const [pacotes, setPacotes] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [currentView, setCurrentView] = useState(isMobile ? 'timeGridDay' : 'timeGridWeek');
+    const [currentView, setCurrentView] = useState(isMobile ? 'timeGridDay' : 'dayGridMonth');
     const [calendarApi, setCalendarApi] = useState(null);
     const [currentTitle, setCurrentTitle] = useState('');
 
@@ -91,17 +92,32 @@ function CalendarView() {
         selectedDate: null
     });
 
-    // Fetch data
+    // Janela de datas actualmente visível no calendário (mês/semana/dia).
+    // O backend /agendamentos ordena por dataHora ASC com limit default 20 —
+    // sem filtro de data, devolvia só os 20 mais antigos e o calendário ficava
+    // vazio nas vistas actuais. Buscamos sempre a janela visível (datesSet).
+    const dateRangeRef = useRef({ start: null, end: null });
+
+    // Fetch data — agendamentos da janela visível + clientes + pacotes
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            const params = { limit: 100 };
+            const { start, end } = dateRangeRef.current;
+            if (start) params.dataInicio = start.toISOString();
+            if (end) params.dataFim = end.toISOString();
+
             const [agendamentosRes, clientesRes, pacotesRes] = await Promise.all([
-                api.get('/agendamentos'),
+                api.get('/agendamentos', { params }),
                 api.get('/clientes'),
                 api.get('/pacotes')
             ]);
 
-            setAgendamentos(agendamentosRes.data?.data || []);
+            const ags = agendamentosRes.data?.data || [];
+            if (ags.length >= 100) {
+                console.warn('[CalendarView] janela com ≥100 agendamentos — alguns podem não aparecer (limite do backend).');
+            }
+            setAgendamentos(ags);
             setClientes(clientesRes.data?.data || []);
             setPacotes(pacotesRes.data?.data || []);
         } catch (error) {
@@ -112,18 +128,15 @@ function CalendarView() {
         }
     }, []);
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    // O fetch inicial é disparado pelo datesSet do FullCalendar (que corre no
+    // mount com a janela inicial), por isso não há useEffect de mount aqui.
 
     // Transform appointments to FullCalendar events
     const events = useMemo(() => {
         return agendamentos.map(agendamento => {
             const statusConfig = STATUS_COLORS[agendamento.status] || STATUS_COLORS['Agendado'];
             const clienteName = agendamento.cliente?.nome || agendamento.lead?.nome || 'Sem nome';
-            const pacoteName = agendamento.tipo === 'Avaliacao'
-              ? 'Avaliação'
-              : (agendamento.pacote?.nome || agendamento.servicoAvulsoNome || 'Serviço');
+            const pacoteName = nomeServicoAgendamento(agendamento);
 
             // Calculate end time (default 1 hour if not specified)
             const startDate = DateTime.fromISO(agendamento.dataHora, { zone: 'Europe/Lisbon' });
@@ -319,11 +332,14 @@ function CalendarView() {
         }
     }, []);
 
-    // Update title when calendar dates change
+    // Update title + refetch agendamentos para a janela agora visível.
+    // Corre no mount (initial range) e em cada navegação/troca de vista.
     const handleDatesSet = useCallback((arg) => {
         setCurrentTitle(arg.view.title);
         setCurrentView(arg.view.type);
-    }, []);
+        dateRangeRef.current = { start: arg.start, end: arg.end };
+        fetchData();
+    }, [fetchData]);
 
     // View buttons
     const viewButtons = [
@@ -443,17 +459,19 @@ function CalendarView() {
                 </div>
 
                 {/* Calendar */}
-                <div className={`rounded-2xl border ${cardClass} p-4 ${currentView === 'timeGridWeek' ? 'overflow-x-auto' : 'overflow-hidden'}`}>
-                    {loading ? (
-                        <div className="flex items-center justify-center h-96">
+                <div className={`relative rounded-2xl border ${cardClass} p-4 ${currentView === 'timeGridWeek' ? 'overflow-x-auto' : 'overflow-hidden'}`}>
+                    {/* Spinner como overlay — o FullCalendar fica SEMPRE montado para
+                        o datesSet disparar (mount + navegação) e accionar o fetch. */}
+                    {loading && (
+                        <div className={`absolute inset-0 z-10 flex items-center justify-center rounded-2xl ${isDarkMode ? 'bg-slate-900/50' : 'bg-white/60'}`}>
                             <Loader2 className={`w-8 h-8 animate-spin ${subtextClass}`} />
                         </div>
-                    ) : (
-                        <div className={`calendar-container ${isDarkMode ? 'dark-calendar' : 'light-calendar'} ${currentView === 'timeGridWeek' ? 'min-w-[1000px]' : ''}`}>
+                    )}
+                    <div className={`calendar-container ${isDarkMode ? 'dark-calendar' : 'light-calendar'} ${currentView === 'timeGridWeek' ? 'min-w-[1000px]' : ''}`}>
                             <FullCalendar
                                 ref={handleCalendarRef}
                                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, luxonPlugin]}
-                                initialView={isMobile ? 'timeGridDay' : 'timeGridWeek'}
+                                initialView={isMobile ? 'timeGridDay' : 'dayGridMonth'}
                                 locale="pt"
                                 timeZone="Europe/Lisbon"
                                 headerToolbar={false}
@@ -463,6 +481,7 @@ function CalendarView() {
                                 selectable={true}
                                 selectMirror={true}
                                 dayMaxEvents={true}
+                                eventDisplay="block"
                                 weekends={true}
                                 nowIndicator={true}
                                 slotMinTime={BUSINESS_HOURS.start}
@@ -484,27 +503,35 @@ function CalendarView() {
                                 datesSet={handleDatesSet}
                                 eventContent={(arg) => {
                                     const clienteName = arg.event.extendedProps.cliente?.nome || arg.event.extendedProps.lead?.nome || 'Sem nome';
-                                    const serviceName = arg.event.extendedProps.tipo === 'Avaliacao'
-                                      ? 'Avaliação'
-                                      : (arg.event.extendedProps.pacote?.nome || arg.event.extendedProps.servicoAvulsoNome || 'Serviço');
+                                    // Nome do serviço contratado (pacote/avulso) ou "Avaliação".
+                                    const servico = nomeServicoAgendamento(arg.event.extendedProps);
+                                    const isMonth = arg.view.type === 'dayGridMonth';
 
+                                    // Vista Mês: chip compacto numa só linha (hora + nome).
+                                    if (isMonth) {
+                                        return (
+                                            <div className="px-1 flex items-center gap-1 overflow-hidden w-full">
+                                                <span className="text-[10px] font-semibold text-white shrink-0">{arg.timeText}</span>
+                                                <span className="text-[10px] text-white/90 truncate">{clienteName}</span>
+                                            </div>
+                                        );
+                                    }
+
+                                    // Vista Semana/Dia: nome + (hora · serviço).
                                     return (
                                         <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">
-                                            {/* Nome do Cliente */}
                                             <div className="font-bold text-xs leading-tight text-white wrap-break-word w-full mb-0.5">
                                                 {clienteName}
                                             </div>
-                                            {/* Serviço */}
                                             <div className="text-[10px] leading-tight text-white/80 font-normal wrap-break-word w-full">
-                                                {serviceName}
+                                                {servico}
                                             </div>
                                         </div>
                                     );
                                 }}
                             />
                         </div>
-                    )}
-                </div>
+                    </div>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">

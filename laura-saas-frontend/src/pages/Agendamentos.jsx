@@ -7,6 +7,7 @@ import {
   Loader2, Plus, Bell, BellOff, ChevronRight, AlertCircle, Sparkles, UserCheck, UserX
 } from 'lucide-react';
 import api from '../services/api';
+import { nomeServicoAgendamento } from '../utils/agendamento';
 import { useTheme } from '../contexts/ThemeContext';
 import { subscribeToPush, getPushStatus, unsubscribeFromPush } from '../services/notificationService';
 import FinalizarAtendimentoModal from '../components/FinalizarAtendimentoModal';
@@ -66,6 +67,9 @@ function Agendamentos() {
       if (dataInicio) params.append('dataInicio', dataInicio);
       if (dataFim) params.append('dataFim', dataFim);
       params.append('limit', '100');
+      // "Todos" não tem filtro de data → com ordenação ascendente + limite 100 os
+      // mais recentes ficavam escondidos. Pede os mais recentes primeiro.
+      if (filtroData === 'todos') params.append('sort', 'desc');
 
       const url = params.toString() ? `/agendamentos?${params.toString()}` : '/agendamentos';
       const response = await api.get(url);
@@ -445,7 +449,7 @@ function Agendamentos() {
             const dataStr = dt.toFormat('dd/MM');
             const isHoje = dt.hasSame(DateTime.now().setZone(ZONA), 'day');
             const nomeCliente = ag.cliente?.nome || ag.lead?.nome || 'Sem nome';
-            const servico = ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço';
+            const servico = nomeServicoAgendamento(ag);
             const isLead = ag.tipo === 'Avaliacao' && !ag.clienteConvertido;
             const conf = ag.confirmacao?.tipo || 'pendente';
 

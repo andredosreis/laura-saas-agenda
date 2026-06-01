@@ -26,6 +26,7 @@ import {
   SkeletonAgendamentoGrid
 } from '../components/SkeletonCard';
 import DashboardChart from '../components/DashboardChart';
+import { nomeServicoAgendamento } from '../utils/agendamento';
 import ThemeToggle from '../components/ThemeToggle';
 import toastService from '../services/toastService.jsx';
 
@@ -438,7 +439,7 @@ function Dashboard() {
                         <h4 className={`font-semibold text-base sm:text-lg mb-1 truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}</h4>
                         <p className="text-slate-400 text-xs sm:text-sm flex items-center gap-2 truncate">
                           <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
-                          <span className="truncate">{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço Geral')}</span>
+                          <span className="truncate">{nomeServicoAgendamento(ag)}</span>
                         </p>
                       </div>
 
@@ -594,7 +595,7 @@ function Dashboard() {
                           <div className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             <span className="font-medium">{hora}</span>
                             <span className="mx-1.5">•</span>
-                            <span className="truncate">{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço')}</span>
+                            <span className="truncate">{nomeServicoAgendamento(ag)}</span>
                           </div>
                         </div>
 
@@ -730,7 +731,7 @@ function Dashboard() {
                   </div>
                   <div className="min-w-0">
                     <p className={`text-sm font-medium truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{ag.cliente?.nome || ag.lead?.nome || 'Sem nome'}</p>
-                    <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{ag.tipo === 'Avaliacao' ? 'Avaliação' : (ag.pacote?.nome || ag.servicoAvulsoNome || 'Serviço')}</p>
+                    <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{nomeServicoAgendamento(ag)}</p>
                   </div>
                 </div>
               ))}
