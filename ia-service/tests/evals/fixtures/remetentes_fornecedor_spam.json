@@ -1,0 +1,101 @@
+{
+  "name": "remetentes_fornecedor_spam",
+  "description": "Identificação do remetente (fornecedor/comercial, contabilista, spam) vs lead real. O agente NÃO pode tratar não-leads como clientes (pedir nome, oferecer avaliação) — deve encaminhar para a Laura. Inclui 1 lead real como regressão do happy-path.",
+  "examples": [
+    {
+      "name": "fornecedor_ipl",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [],
+        "current_message": "Bom dia, somos da BTL International, distribuímos equipamentos de IPL e laser para clínicas de estética. Temos condições especiais este mês. Tem interesse em conhecer?",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Fornecedor B2B (caso B). Deve encaminhar para a Laura, NÃO pedir nome, NÃO oferecer avaliação."
+      }
+    },
+    {
+      "name": "contabilista_faturas",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [],
+        "current_message": "Boa tarde, é da contabilidade. Preciso das faturas de abril para fechar o IVA, pode enviar até amanhã?",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Contabilista (caso B). Encaminhar para a Laura, sem onboarding nem pedido de nome."
+      }
+    },
+    {
+      "name": "propaganda_spam_cripto",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [],
+        "current_message": "🎉 GANHE DINHEIRO EM CASA! Invista em cripto e multiplique o seu dinheiro x10. Vagas limitadas, clique já: http://bit.ly/ganhar-agora",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Spam/propaganda (caso C). Resposta mínima ou nenhuma; nunca pedir nome nem oferecer avaliação."
+      }
+    },
+    {
+      "name": "fornecedor_so_link_btl_real",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [],
+        "current_message": "https://app.livestorm.co/btl-international/exilite-ipl-pt?utm_source=ebl",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": false,
+        "notes": "Caso REAL que falhou: mensagem só-link (webinar IPL da BTL). NÃO pode fazer onboarding nem pedir nome. Aceitável: deferir à Laura OU perguntar com quem fala (caso D)."
+      }
+    },
+    {
+      "name": "lead_real_drenagem_regressao",
+      "inputs": {
+        "tenant_id": "695413fb6ce936a9097af750",
+        "lead_id": null,
+        "history": [],
+        "current_message": "Olá, tenho retenção de líquidos e queria saber sobre drenagem linfática",
+        "lead_state": {"nome": "", "motivo": "", "urgencia": "", "score": 0},
+        "turn_number": 0,
+        "last_clinic_message": ""
+      },
+      "outputs": {
+        "must_not_start_with_greeting_word": false,
+        "must_contain_name": null,
+        "must_not_fabricate_slots": true,
+        "must_ask_for_name": true,
+        "notes": "Lead REAL (caso A) — regressão do happy-path. Deve engajar com empatia e avançar para nome/avaliação, NÃO encaminhar para a Laura como se fosse comercial."
+      }
+    }
+  ]
+}
