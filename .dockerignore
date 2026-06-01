@@ -1,0 +1,31 @@
+# Não copiar para a imagem do backend
+node_modules
+npm-debug.log*
+
+# Segredos — nunca dentro da imagem
+.env
+.env.*
+!.env.production.example
+
+# Frontend (deploy separado na Vercel)
+laura-saas-frontend
+
+# ia-service (build próprio em ./ia-service/Dockerfile)
+ia-service
+
+# Infra / docs / testes — não precisos em runtime
+nginx
+deploy
+docs
+.claude
+coverage
+tests
+scripts/tools
+seeds/output
+
+# Git / editor / SO
+.git
+.gitignore
+.vscode
+.DS_Store
+*.md
