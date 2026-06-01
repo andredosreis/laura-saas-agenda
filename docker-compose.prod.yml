@@ -1,0 +1,161 @@
+# Marcai — topologia de produção (ADR-023: consolidação VPS Contabo)
+#
+# Único ponto exposto à internet: nginx (80/443).
+# backend, ia-service, evolution-api e redis comunicam na rede interna `marcai`
+# por nome de serviço — nenhum tem porta publicada no host.
+#
+# A chamada backend -> ia-service passa a ser interna (http://ia-service:8000) e
+# ambos lêem o MESMO `.env` (env_file) => INTERNAL_SERVICE_TOKEN é sempre idêntico.
+# Isto elimina a causa-raiz do 401 que existia no split Render.
+#
+# Uso:
+#   cp .env.production.example .env   # preencher segredos
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: marcai-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+      - certbot-etc:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - evolution-api
+    networks:
+      - marcai
+
+  # Painel de logs web (read-only ao Docker) — exposto em logs.<dominio> com basic auth
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: marcai-dozzle
+    restart: unless-stopped
+    environment:
+      - DOZZLE_NO_ANALYTICS=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - marcai
+
+  # Renovação automática dos certificados Let's Encrypt (verifica de 12 em 12h).
+  certbot:
+    image: certbot/certbot:latest
+    container_name: marcai-certbot
+    restart: unless-stopped
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+
+  backend:
+    build: .
+    container_name: marcai-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      # URLs internas (topologia, não segredos) — sobrepõem o que vier do .env
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - IA_SERVICE_URL=http://ia-service:8000
+      - IA_SERVICE_ENABLED=true
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      - redis
+      - evolution-api
+    networks:
+      - marcai
+
+  ia-service:
+    build: ./ia-service
+    container_name: marcai-ia-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PORT=8000
+      - MARCAI_API_URL=http://backend:5000
+      - EVOLUTION_API_URL=http://evolution-api:8080
+    depends_on:
+      - backend
+    networks:
+      - marcai
+
+  # Evolution API v2 (igual à produção Hostinger). A v2 resolve os @lid
+  # nativamente — guarda o mapeamento LID↔número no Postgres. Requer
+  # PostgreSQL (dados) + Redis (cache).
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.7
+    container_name: marcai-evolution
+    restart: unless-stopped
+    environment:
+      - SERVER_URL=https://${WHATSAPP_DOMAIN}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - DEL_INSTANCE=false
+      - LOG_LEVEL=ERROR
+      - LOG_COLOR=true
+      # base de dados — obrigatória na v2 (guarda instâncias, mensagens, @lid)
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+      - DATABASE_SAVE_DATA_LABELS=true
+      - DATABASE_SAVE_DATA_HISTORIC=true
+      # cache — reaproveita o redis existente (db 6, isolado do BullMQ no db 0)
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://:${REDIS_PASSWORD}@redis:6379/6
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_REDIS_SAVE_INSTANCES=false
+      - CACHE_LOCAL_ENABLED=false
+    volumes:
+      - evolution_data:/evolution/instances
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - marcai
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: marcai-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=evolution
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=evolution
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - marcai
+
+  redis:
+    image: redis:7-alpine
+    container_name: marcai-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - marcai
+
+networks:
+  marcai:
+    driver: bridge
+
+volumes:
+  evolution_data:
+  postgres-data:
+  redis-data:
+  certbot-etc:
+  certbot-www:
