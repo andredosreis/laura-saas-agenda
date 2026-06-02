@@ -13,10 +13,16 @@ import {
   getConversaMensagens,
   replyConversa,
   pauseConversaIa,
+  getIaGlobal,
+  setIaGlobal,
 } from './conversasController.js';
 
 const router = Router();
 router.use(authenticate);
+
+// Master switch da IA da clínica — paths estáticos ANTES das rotas com :telefone.
+router.get('/ia-global', getIaGlobal);
+router.post('/ia-global', setIaGlobal);
 
 router.get('/', listConversas);
 router.get('/:telefone/mensagens', getConversaMensagens);

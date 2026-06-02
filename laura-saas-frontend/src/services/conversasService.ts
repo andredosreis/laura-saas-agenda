@@ -44,6 +44,17 @@ export const conversasService = {
     const { data } = await api.post(`/conversas/${telefone}/pause-ai`, { ativa });
     return data;
   },
+
+  // Master switch da IA da clínica (todos os contactos de uma vez).
+  getIaGlobal: async (): Promise<{ success: boolean; data: { ativa: boolean } }> => {
+    const { data } = await api.get('/conversas/ia-global');
+    return data;
+  },
+
+  setIaGlobal: async (ativa: boolean): Promise<{ success: boolean; data: { ativa: boolean } }> => {
+    const { data } = await api.post('/conversas/ia-global', { ativa });
+    return data;
+  },
 };
 
 export type { ConversaTipo };

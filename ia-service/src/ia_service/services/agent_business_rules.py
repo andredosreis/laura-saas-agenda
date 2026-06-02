@@ -28,6 +28,7 @@ Não precisa adicionar tenant aqui se as regras default servirem.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional, TypedDict
 
 # 0=Monday, 1=Tuesday, ..., 6=Sunday (Python's datetime.weekday() convention)
@@ -71,6 +72,37 @@ RULES_PER_TENANT: dict[str, dict[str, Optional[DayRule]]] = {
 }
 
 
+# ════════════════════════════════════════════════════════════════════════
+# EXCEÇÕES POR DATA (feriados e dias especiais) — EDITA AQUI LIVREMENTE
+# ════════════════════════════════════════════════════════════════════════
+# Sobrepõem a regra normal do dia da semana, SÓ para a data indicada.
+# Formato da chave: "YYYY-MM-DD".  Valor:
+#   - None                                  → FECHADO nesse dia (feriado)
+#   - {"start": "HH:MM", "end": "HH:MM"}    → ABERTO com horário especial
+#     (podes juntar "break_start"/"break_end" se quiseres pausa)
+#
+# Casos de uso:
+#   "2026-12-25": None,                                 # Natal — fechado
+#   "2026-06-10": {"start": "09:00", "end": "13:00"},   # feriado mas trabalha de manhã
+#   "2026-08-15": {"start": "10:00", "end": "16:00"},   # horário reduzido só nesse dia
+#   "2026-11-01": {"start": "09:00", "end": "19:00"},   # abrir um domingo (normalmente fechado)
+#
+# Uma exceção ABRE um dia mesmo que o dia da semana esteja fechado, e FECHA
+# um dia mesmo que normalmente esteja aberto.
+# Depois de editar: rebuild + restart do ia-service.
+DATE_OVERRIDES_PER_TENANT: dict[str, dict[str, Optional[DayRule]]] = {
+
+    # L.A. Estética Avançada (Laura)
+    "695413fb6ce936a9097af750": {
+        # Chave SEMPRE no formato "YYYY-MM-DD" (sem texto à frente).
+        "2026-12-25": None,   # Natal
+        "2026-06-03": None,
+        "2026-06-04": None,
+        "2026-06-10": None,
+    },
+}
+
+
 def get_day_rule(tenant_id: str, weekday: int) -> Optional[DayRule]:
     """Return the rule for `weekday` (0=Mon..6=Sun) for the given tenant.
 
@@ -80,3 +112,19 @@ def get_day_rule(tenant_id: str, weekday: int) -> Optional[DayRule]:
     rules = RULES_PER_TENANT.get(tenant_id, RULES_PER_TENANT["_default"])
     day_name = WEEKDAY_NAMES[weekday]
     return rules.get(day_name)
+
+
+def get_rule_for_date(tenant_id: str, the_date: date) -> Optional[DayRule]:
+    """Regra efectiva para uma DATA concreta.
+
+    1. Se houver uma excepção em DATE_OVERRIDES_PER_TENANT para essa data,
+       usa-a (None = fechado nesse dia; ou um horário especial).
+    2. Caso contrário, usa a regra normal do dia da semana.
+
+    Returns None when the day is closed (by override or by weekday rule).
+    """
+    overrides = DATE_OVERRIDES_PER_TENANT.get(tenant_id, {})
+    iso = the_date.isoformat()  # "YYYY-MM-DD"
+    if iso in overrides:
+        return overrides[iso]
+    return get_day_rule(tenant_id, the_date.weekday())

@@ -42,6 +42,9 @@ function Conversas() {
   const [messages, setMessages] = useState<ConversaMensagem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
+  // Master switch da IA da clínica (null = ainda a carregar)
+  const [iaGlobalAtiva, setIaGlobalAtiva] = useState<boolean | null>(null);
+  const [togglingGlobal, setTogglingGlobal] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const selectedPhoneRef = useRef<string | null>(null);
@@ -82,6 +85,32 @@ function Conversas() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [fetchConversas, fetchMensagens]);
+
+  // Estado do master switch da IA da clínica (carrega uma vez ao montar)
+  useEffect(() => {
+    conversasService
+      .getIaGlobal()
+      .then((res) => setIaGlobalAtiva(res.data.ativa))
+      .catch(() => { /* mantém null — botão fica escondido */ });
+  }, []);
+
+  const toggleIaGlobal = async () => {
+    if (iaGlobalAtiva === null || togglingGlobal) return;
+    setTogglingGlobal(true);
+    try {
+      const res = await conversasService.setIaGlobal(!iaGlobalAtiva);
+      setIaGlobalAtiva(res.data.ativa);
+      toast.success(
+        res.data.ativa
+          ? 'IA da clínica ligada — volta a responder.'
+          : 'IA da clínica desligada — silêncio total, você assume.',
+      );
+    } catch {
+      toast.error('Erro ao alternar a IA da clínica.');
+    } finally {
+      setTogglingGlobal(false);
+    }
+  };
 
   const handleSelect = async (conv: ConversaListItem) => {
     setSelected(conv);
@@ -144,7 +173,30 @@ function Conversas() {
       <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-white/10' : 'border-gray-100'}`}>
         <div className="flex items-center justify-between mb-3">
           <h2 className={`font-semibold ${textClass}`}>Conversas</h2>
-          {isPolling && <span className={`text-xs ${subClass}`}>a actualizar…</span>}
+          <div className="flex items-center gap-2">
+            {isPolling && <span className={`text-xs ${subClass}`}>a actualizar…</span>}
+            {iaGlobalAtiva !== null && (
+              <button
+                onClick={toggleIaGlobal}
+                disabled={togglingGlobal}
+                title="Liga/desliga a IA para toda a clínica"
+                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg transition-all disabled:opacity-50 ${
+                  iaGlobalAtiva
+                    ? 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25'
+                    : 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                }`}
+              >
+                {togglingGlobal ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : iaGlobalAtiva ? (
+                  <Brain className="w-3.5 h-3.5" />
+                ) : (
+                  <WifiOff className="w-3.5 h-3.5" />
+                )}
+                {iaGlobalAtiva ? 'IA ligada' : 'IA desligada'}
+              </button>
+            )}
+          </div>
         </div>
         {/* Busca */}
         <div className="relative mb-3">

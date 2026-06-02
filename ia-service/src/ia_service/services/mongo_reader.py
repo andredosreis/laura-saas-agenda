@@ -122,7 +122,9 @@ def find_available_slots(
     while current <= end_date:
         py_weekday = current.weekday()  # 0=Mon..6=Sun
 
-        rule = agent_business_rules.get_day_rule(tenant_id, py_weekday)
+        # Regra efectiva para ESTA data: uma excepção (feriado/dia especial)
+        # sobrepõe a regra normal do dia da semana. Ver agent_business_rules.
+        rule = agent_business_rules.get_rule_for_date(tenant_id, current)
         if rule is None:
             current += timedelta(days=1)
             continue
