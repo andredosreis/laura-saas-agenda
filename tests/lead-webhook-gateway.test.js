@@ -9,6 +9,7 @@ jest.unstable_mockModule('../src/utils/iaServiceClient.js', () => ({
 
 jest.unstable_mockModule('../src/utils/webhookDedupe.js', () => ({
   markMessageSeen: jest.fn().mockResolvedValue(true),
+  markContentSeen: jest.fn().mockResolvedValue(true),
 }));
 
 jest.unstable_mockModule('../src/utils/evolutionClient.js', () => ({

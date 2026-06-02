@@ -18,7 +18,7 @@
  * @see docs/F12-ia-legacy-handoff-coordinator/spec.md §3, §6
  */
 
-import { markMessageSeen } from '../../../utils/webhookDedupe.js';
+import { markMessageSeen, markContentSeen } from '../../../utils/webhookDedupe.js';
 import { withPhoneLock } from '../../../utils/phoneLock.js';
 import logger from '../../../utils/logger.js';
 import { telefoneHash } from '../../../utils/telefoneHash.js';
@@ -95,6 +95,19 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
     const instanceName = req.body?.instance ? String(req.body.instance) : null;
+
+    // ── Anti-duplicação semântica ──────────────────────────────────
+    // O Evolution pode emitir 2 eventos da MESMA mensagem com messageId
+    // diferentes (a dedup por ID não os apanha → IA responde 2x). Ignora a
+    // mesma (telefone+texto) repetida numa janela curta de 15s.
+    const contentNew = await markContentSeen(telefoneNormalizado, mensagem);
+    if (!contentNew) {
+      logger.warn(
+        { telefone_hash: telefoneHash(telefoneNormalizado) },
+        '[webhook] conteúdo duplicado (janela curta) — ignorado',
+      );
+      return res.status(200).json({ message: 'Conteúdo duplicado ignorado' });
+    }
 
     // ── Classify (pure, cheap) ─────────────────────────────────────
     const classified = classify(mensagem);
