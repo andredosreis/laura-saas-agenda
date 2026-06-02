@@ -86,9 +86,21 @@ export const getCliente = async (req, res) => {
 export const updateCliente = async (req, res) => {
   try {
     const { Cliente } = req.models;
+
+    // Email vazio: REMOVER o campo ($unset) em vez de o guardar como null.
+    // O índice é unique+sparse — `null` é indexado (e colide entre clientes
+    // sem email), mas um campo AUSENTE é ignorado pelo sparse.
+    const { email, ...rest } = req.body;
+    const update = { $set: rest };
+    if (email == null || email === '') {
+      update.$unset = { email: '' };
+    } else {
+      update.$set.email = email;
+    }
+
     const clienteAtualizado = await Cliente.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      req.body,
+      update,
       { new: true, runValidators: true }
     );
 
