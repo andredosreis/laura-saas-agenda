@@ -51,6 +51,7 @@ function PacotesAtivos() {
   const [pacoteEditando, setPacoteEditando] = useState(null);
   const [editForm, setEditForm] = useState({
     valorTotal: '',
+    sessoesContratadas: 1,
     sessoesUsadas: 0,
     observacoes: ''
   });
@@ -149,6 +150,7 @@ function PacotesAtivos() {
     setPacoteEditando(pacote);
     setEditForm({
       valorTotal: pacote.valorTotal?.toString() || '',
+      sessoesContratadas: pacote.sessoesContratadas || 1,
       sessoesUsadas: pacote.sessoesUsadas || 0,
       observacoes: pacote.observacoes || ''
     });
@@ -166,6 +168,7 @@ function PacotesAtivos() {
 
     const payload = {
       valorTotal: valorTotalNum,
+      sessoesContratadas: parseInt(editForm.sessoesContratadas) || 1,
       sessoesUsadas: parseInt(editForm.sessoesUsadas) || 0,
       observacoes: editForm.observacoes || ''
     };
@@ -832,19 +835,32 @@ function PacotesAtivos() {
                 />
               </div>
 
+              {/* Total de sessões (contratadas) */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Total de sessões</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editForm.sessoesContratadas}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, sessoesContratadas: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                />
+                <p className={`text-xs ${subTextClass} mt-1`}>Número total de sessões do pacote.</p>
+              </div>
+
               {/* Sessões já usadas */}
               <div>
                 <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Sessões já realizadas</label>
                 <input
                   type="number"
                   min="0"
-                  max={pacoteEditando.sessoesContratadas}
+                  max={editForm.sessoesContratadas}
                   value={editForm.sessoesUsadas}
                   onChange={(e) => setEditForm(prev => ({ ...prev, sessoesUsadas: e.target.value }))}
                   className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
                 />
                 <p className={`text-xs ${subTextClass} mt-1`}>
-                  Contratadas: {pacoteEditando.sessoesContratadas}
+                  Não pode passar do total ({editForm.sessoesContratadas}).
                 </p>
               </div>
 
