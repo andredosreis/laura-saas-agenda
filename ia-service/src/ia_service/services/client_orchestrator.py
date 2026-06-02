@@ -94,7 +94,11 @@ async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) ->
             tipo = appt.get("tipo", "Sessao")
             servico = appt.get("servicoAvulsoNome", "")
             label = servico or tipo
-            lines.append(f"- {label}: {dt} ({status})")
+            # Distinguir origem: marcacoes feitas pela Laura no painel
+            # (criadoPorIA=False) contam tanto como as da IA — a IA deve
+            # respeita-las e NAO marcar uma segunda sessao por cima.
+            origem = "marcado pela clinica" if appt.get("criadoPorIA") is False else "marcado pela IA"
+            lines.append(f"- {label}: {dt} ({status}) — {origem}")
         return "\n".join(lines)
     except Exception as exc:
         log.warning("client_appointments_fetch_failed", error=str(exc))

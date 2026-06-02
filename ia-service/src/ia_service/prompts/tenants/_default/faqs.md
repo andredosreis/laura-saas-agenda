@@ -14,7 +14,7 @@ Multibanco, MB Way, Visa/Mastercard e dinheiro. Não aceitamos cheques.
 
 ## Posso cancelar ou reagendar uma marcação?
 
-Sim, com pelo menos 24 horas de antecedência sem custo. Cancelamentos com menos de 24h podem ter taxa de 50%.
+Sim, com pelo menos 2 horas de antecedência sem custo. Cancelamentos com menos de 2h podem ter taxa de 50%.
 
 ## Têm pacotes ou planos mensais?
 

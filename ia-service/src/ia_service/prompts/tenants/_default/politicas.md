@@ -2,14 +2,14 @@
 
 ## Cancelamento
 
-- Cancelamentos com mais de 24 horas de antecedência: sem custo
-- Cancelamentos com menos de 24 horas: taxa de 50% do valor do tratamento
+- Cancelamentos com mais de 2 horas de antecedência: sem custo
+- Cancelamentos com menos de 2 horas: taxa de 50% do valor do tratamento
 - Não comparecer sem aviso (no-show): cobrança de 100% (a deduzir num pacote ou pago numa próxima visita)
 
 ## Reagendamento
 
-- Pode reagendar livremente até 24h antes da marcação
-- Reagendamentos com menos de 24h são tratados como cancelamento + nova marcação
+- Pode reagendar livremente até 2h antes da marcação
+- Reagendamentos com menos de 2h são tratados como cancelamento + nova marcação
 
 ## Pagamento
 
