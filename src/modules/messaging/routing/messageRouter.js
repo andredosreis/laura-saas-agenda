@@ -51,6 +51,7 @@ export const Reason = Object.freeze({
   PLAN_INACTIVE:            'plan_inactive',               // → IGNORE
   IA_SERVICE_DISABLED:      'ia_service_disabled',         // → LEGACY_FALLBACK
   LEADS_DISABLED_ON_TENANT: 'leads_disabled_on_tenant',    // → LEGACY_FALLBACK
+  IA_GLOBAL_DISABLED:       'ia_global_disabled',          // → MANUAL_SILENT (master switch da clínica)
 
   // ── Confirmation routing ──────────────────────────────────────────
   CONFIRMATION_WITH_PENDING_APPOINTMENT:    'confirmation_with_pending_appointment',    // → LEGACY_CONFIRMATION
@@ -130,6 +131,12 @@ export function decide(input) {
   // 2) IA availability guards — both env-level and tenant-level
   if (!env?.IA_SERVICE_ENABLED || !env?.IA_SERVICE_URL_CONFIGURED) {
     return { route: Route.LEGACY_FALLBACK, reason: Reason.IA_SERVICE_DISABLED };
+  }
+  // Master switch da clínica — desligado pela Laura no inbox. Silêncio total:
+  // mensagens chegam ao inbox, a IA não responde a ninguém (cliente ou lead).
+  // Default é ON: só dispara quando o campo é explicitamente false.
+  if (tenant.configuracoes?.iaGlobalAtiva === false) {
+    return { route: Route.MANUAL_SILENT, reason: Reason.IA_GLOBAL_DISABLED };
   }
   if (tenant.limites?.leadsAtivo === false) {
     return { route: Route.LEGACY_FALLBACK, reason: Reason.LEADS_DISABLED_ON_TENANT };

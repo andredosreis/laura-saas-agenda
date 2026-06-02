@@ -94,7 +94,11 @@ const TenantSchema = new Schema({
         duracaoSessaoPadrao: { type: Number, default: 60 }, // minutos
         antecedenciaMinAgendamento: { type: Number, default: 2 }, // horas
         antecedenciaMaxAgendamento: { type: Number, default: 30 }, // dias
-        permitirAgendamentoOnline: { type: Boolean, default: false }
+        permitirAgendamentoOnline: { type: Boolean, default: false },
+        // Master switch da IA conversacional (controlado pela Laura no inbox).
+        // true = IA responde; false = silêncio total (humano assume tudo).
+        // Default true: nunca desliga sozinho — só quando explicitamente posto a false.
+        iaGlobalAtiva: { type: Boolean, default: true }
     },
 
     // =============================================

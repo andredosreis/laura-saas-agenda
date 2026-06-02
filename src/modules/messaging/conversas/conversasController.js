@@ -380,3 +380,53 @@ async function pauseContactsByPhone(models, tenantOid, variants, ativa) {
   const results = await Promise.all(ops);
   return results.some((r) => (r?.matchedCount ?? r?.n ?? 0) > 0);
 }
+
+/**
+ * GET /conversas/ia-global
+ *
+ * Estado do master switch da IA da clínica (Tenant.configuracoes.iaGlobalAtiva).
+ * Default ON — undefined/null contam como activa.
+ */
+export const getIaGlobal = async (req, res) => {
+  try {
+    const tenant = await Tenant.findById(req.tenantId)
+      .select('configuracoes.iaGlobalAtiva')
+      .lean();
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+    }
+    const ativa = tenant.configuracoes?.iaGlobalAtiva !== false;
+    return res.status(200).json({ success: true, data: { ativa } });
+  } catch (err) {
+    logger.error({ err: err.message }, '[conversas] getIaGlobal falhou');
+    return res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+};
+
+/**
+ * POST /conversas/ia-global   body: { ativa: boolean }
+ *
+ * Master switch da clínica: liga/desliga a IA para TODOS os contactos de uma
+ * vez. Quando desligada (ativa=false), o router devolve MANUAL_SILENT para
+ * qualquer inbound — silêncio total, o humano assume no inbox.
+ */
+export const setIaGlobal = async (req, res) => {
+  try {
+    const ativa = req.body.ativa === true;
+    const tenant = await Tenant.findByIdAndUpdate(
+      req.tenantId,
+      { $set: { 'configuracoes.iaGlobalAtiva': ativa } },
+      { new: true },
+    )
+      .select('configuracoes.iaGlobalAtiva')
+      .lean();
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+    }
+    logger.info({ tenantId: req.tenantId, ativa }, '[conversas] IA global alternada');
+    return res.status(200).json({ success: true, data: { ativa } });
+  } catch (err) {
+    logger.error({ err: err.message }, '[conversas] setIaGlobal falhou');
+    return res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+};
