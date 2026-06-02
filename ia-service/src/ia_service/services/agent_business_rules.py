@@ -94,12 +94,11 @@ DATE_OVERRIDES_PER_TENANT: dict[str, dict[str, Optional[DayRule]]] = {
 
     # L.A. Estética Avançada (Laura)
     "695413fb6ce936a9097af750": {
-        # adiciona aqui os feriados / dias especiais, ex:
-         "2026-12-25": None,
-         "2026-06-03": None,
-         "2026-06-04": None,
-         "Wenesday, 2026-06-10": None,
-         
+        # Chave SEMPRE no formato "YYYY-MM-DD" (sem texto à frente).
+        "2026-12-25": None,   # Natal
+        "2026-06-03": None,
+        "2026-06-04": None,
+        "2026-06-10": None,
     },
 }
 
