@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { MessageSquare, Bot, User, Headset } from 'lucide-react';
+import { MessageSquare, Bot, User, Headset, Bell } from 'lucide-react';
 
 export interface ThreadMessage {
   _id: string;
   mensagem: string;
   origem: 'cliente' | 'laura';
-  /** Quem produziu o outbound: 'ia' (agente) ou 'humano' (resposta manual no inbox). Ausente em mensagens antigas → tratado como IA. */
-  geradoPor?: 'ia' | 'humano' | 'cliente';
+  /** Quem produziu o outbound: 'ia' (agente), 'humano' (resposta manual), 'sistema' (lembrete automático). Ausente em mensagens antigas → tratado como IA. */
+  geradoPor?: 'ia' | 'humano' | 'cliente' | 'sistema';
   data: string;
 }
 
@@ -89,40 +89,36 @@ export function ConversationThread({ messages, isDarkMode }: ConversationThreadP
           <div className="space-y-2">
             {msgs.map((msg) => {
               const isOutbound = msg.origem === 'laura';
-              const isHuman = isOutbound && msg.geradoPor === 'humano';
+              // Tema do balão outbound: humano (verde), lembrete automático (âmbar) ou IA (indigo).
+              const tema = msg.geradoPor === 'humano'
+                ? { avatar: 'bg-emerald-500/20 text-emerald-400', bubble: 'bg-emerald-600', label: '👩 Laura (manual)', sub: 'text-emerald-100', icon: <Headset className="w-4 h-4" /> }
+                : msg.geradoPor === 'sistema'
+                  ? { avatar: 'bg-amber-500/20 text-amber-400', bubble: 'bg-amber-600', label: '🔔 Lembrete automático', sub: 'text-amber-100', icon: <Bell className="w-4 h-4" /> }
+                  : { avatar: 'bg-indigo-500/20 text-indigo-400', bubble: 'bg-indigo-500', label: '🤖 IA', sub: 'text-indigo-200', icon: <Bot className="w-4 h-4" /> };
               return (
                 <div key={msg._id} className={`flex items-end gap-2 ${isOutbound ? 'flex-row-reverse' : 'flex-row'}`}>
-                  {/* Avatar: humano (resposta manual) vs IA vs cliente */}
+                  {/* Avatar: cliente vs (humano / lembrete / IA) */}
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
                     !isOutbound
                       ? isDarkMode ? 'bg-white/10 text-slate-400' : 'bg-gray-200 text-gray-500'
-                      : isHuman
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-indigo-500/20 text-indigo-400'
+                      : tema.avatar
                   }`}>
-                    {!isOutbound
-                      ? <User className="w-4 h-4" />
-                      : isHuman
-                        ? <Headset className="w-4 h-4" />
-                        : <Bot className="w-4 h-4" />
-                    }
+                    {!isOutbound ? <User className="w-4 h-4" /> : tema.icon}
                   </div>
-                  {/* Bubble — humano usa verde para se distinguir da IA (indigo) */}
+                  {/* Bubble — cada origem outbound tem a sua cor */}
                   <div className={`max-w-xs lg:max-w-sm xl:max-w-md rounded-2xl px-4 py-2.5 text-sm ${
                     !isOutbound
                       ? isDarkMode ? 'bg-slate-700 text-white rounded-bl-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'
-                      : isHuman
-                        ? 'bg-emerald-600 text-white rounded-br-sm'
-                        : 'bg-indigo-500 text-white rounded-br-sm'
+                      : `${tema.bubble} text-white rounded-br-sm`
                   }`}>
                     {isOutbound && (
-                      <p className={`text-[10px] font-semibold mb-0.5 ${isHuman ? 'text-emerald-100' : 'text-indigo-200'}`}>
-                        {isHuman ? '👩 Laura (manual)' : '🤖 IA'}
+                      <p className={`text-[10px] font-semibold mb-0.5 ${tema.sub}`}>
+                        {tema.label}
                       </p>
                     )}
                     <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.mensagem}</p>
                     <p className={`text-xs mt-1 text-right ${
-                      !isOutbound ? (isDarkMode ? 'text-slate-500' : 'text-gray-400') : isHuman ? 'text-emerald-200' : 'text-indigo-200'
+                      !isOutbound ? (isDarkMode ? 'text-slate-500' : 'text-gray-400') : tema.sub
                     }`}>
                       {formatHora(msg.data)}
                     </p>
