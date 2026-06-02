@@ -193,6 +193,40 @@ export const listConversas = async (req, res) => {
       return { ...m, tipo: 'lead', contactoId: null, nome: 'Desconhecido', iaAtiva: true, estado: null };
     });
 
+    // ── 3.5) Espelho de contactos: incluir TODOS os clientes, mesmo sem
+    //         conversa (aparecem sem última mensagem). Não se aplica a 'leads'.
+    if (Cliente && tipo !== 'leads') {
+      const telsExistentes = new Set(items.map((i) => i.telefone));
+      const todosClientes = await Cliente.find({ tenantId: tenantOid })
+        .select('_id nome telefone iaAtiva')
+        .lean();
+      for (const c of todosClientes) {
+        const canon = canonicalPhone(c.telefone);
+        if (telsExistentes.has(canon)) continue; // já tem conversa
+        telsExistentes.add(canon);
+        items.push({
+          telefone: canon,
+          ultimaMensagem: '',
+          ultimaData: null,
+          ultimaDirecao: null,
+          naoLidas: 0,
+          tipo: 'cliente',
+          contactoId: String(c._id),
+          nome: c.nome || 'Cliente',
+          iaAtiva: c.iaAtiva !== false,
+          estado: null,
+        });
+      }
+      // Conversas activas primeiro (por data desc); contactos sem conversa
+      // depois, por nome (alfabético PT-PT).
+      items.sort((a, b) => {
+        if (a.ultimaData && b.ultimaData) return new Date(b.ultimaData) - new Date(a.ultimaData);
+        if (a.ultimaData) return -1;
+        if (b.ultimaData) return 1;
+        return (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' });
+      });
+    }
+
     // ── 4) Filtro por tipo + paginação ───────────────────────────────────
     if (tipo === 'leads') items = items.filter((i) => i.tipo === 'lead');
     else if (tipo === 'clientes') items = items.filter((i) => i.tipo === 'cliente');
