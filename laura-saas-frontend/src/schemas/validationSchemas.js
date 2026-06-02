@@ -102,24 +102,8 @@ export const clienteSchema = z.object({
     .email('Formato de email inválido')
     .optional()
     .or(z.literal('')),
-  dataNascimento: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        if (!val) return true; // Opcional
-        const birthDate = new Date(val);
-        const today = new Date();
-        const age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        const actualAge =
-          monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())
-            ? age - 1
-            : age;
-        return actualAge >= 0;
-      },
-      { message: 'Data de nascimento inválida' }
-    ),
+  // Data de nascimento — campo livre opcional, sem regra de validação.
+  dataNascimento: z.string().optional(),
   observacoes: z.string().max(500, 'Observações devem ter no máximo 500 caracteres').optional(),
 });
 

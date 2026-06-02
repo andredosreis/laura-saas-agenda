@@ -16,12 +16,20 @@ const telefone = z
 
 const email = z.string().trim().toLowerCase().email('Email inválido');
 
+// Data de nascimento opcional e tolerante: '' (campo vazio do formulário) ou
+// null viram undefined. Sem isto, z.coerce.date() rebenta com Invalid Date
+// em '' e bloqueia a edição do cliente. Sem regra de idade/data futura.
+const dataNascimento = z.preprocess(
+  (v) => (v === '' || v == null ? undefined : v),
+  z.coerce.date().optional(),
+);
+
 export const createClienteSchema = z
   .object({
     nome: z.string().trim().min(1, 'Nome é obrigatório').max(100),
     telefone,
     email: email.optional(),
-    dataNascimento: z.coerce.date().optional().nullable(),
+    dataNascimento,
     observacoes: z.string().max(1000).optional(),
   })
   .strict();
@@ -31,7 +39,7 @@ export const updateClienteSchema = z
     nome: z.string().trim().min(1).max(100).optional(),
     telefone: telefone.optional(),
     email: email.optional().nullable(),
-    dataNascimento: z.coerce.date().optional().nullable(),
+    dataNascimento,
     observacoes: z.string().max(1000).optional(),
   })
   .strict();
