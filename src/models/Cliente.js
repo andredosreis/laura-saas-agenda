@@ -33,14 +33,7 @@ const clienteSchema = new mongoose.Schema({
   },
   dataNascimento: {
     type: Date,
-    required: false,
-    validate: {
-      validator: function (data) {
-        if (!data) return true;
-        return data <= new Date();
-      },
-      message: 'Data de nascimento não pode ser uma data futura.'
-    }
+    required: false
   },
   sessoesRestantes: {
     type: Number,
