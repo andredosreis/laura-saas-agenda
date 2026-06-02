@@ -468,6 +468,7 @@ export const editarVenda = async (req, res) => {
       numeroParcelas,
       valorEntrada,
       sessoesUsadas,
+      sessoesContratadas,
       diasValidade,
       formaPagamento
     } = req.body;
@@ -493,9 +494,15 @@ export const editarVenda = async (req, res) => {
       ? parseFloat(valorTotalNovo)
       : compraPacote.valorTotal;
 
+    // Total de sessões contratadas (correcção de erro de registo). Mínimo 1.
+    const sessoesContratadasFinal = sessoesContratadas !== undefined
+      ? Math.max(1, parseInt(sessoesContratadas) || compraPacote.sessoesContratadas)
+      : compraPacote.sessoesContratadas;
+
+    // Usadas nunca podem exceder o (novo) total contratado.
     const sessoesUsadasFinal = sessoesUsadas !== undefined
-      ? Math.max(0, Math.min(parseInt(sessoesUsadas) || 0, compraPacote.sessoesContratadas))
-      : compraPacote.sessoesUsadas;
+      ? Math.max(0, Math.min(parseInt(sessoesUsadas) || 0, sessoesContratadasFinal))
+      : Math.min(compraPacote.sessoesUsadas, sessoesContratadasFinal);
 
     const parceladoFinal = parcelado !== undefined ? !!parcelado : compraPacote.parcelado;
     const numParcelasFinal = parceladoFinal
@@ -519,8 +526,9 @@ export const editarVenda = async (req, res) => {
     compraPacote.parcelado = parceladoFinal;
     compraPacote.numeroParcelas = numParcelasFinal;
     compraPacote.valorParcela = valorParcelaNovo;
+    compraPacote.sessoesContratadas = sessoesContratadasFinal;
     compraPacote.sessoesUsadas = sessoesUsadasFinal;
-    compraPacote.sessoesRestantes = compraPacote.sessoesContratadas - sessoesUsadasFinal;
+    compraPacote.sessoesRestantes = sessoesContratadasFinal - sessoesUsadasFinal;
     if (parceladoFinal && compraPacote.valorParcela > 0) {
       compraPacote.parcelasPagas = Math.floor(valorPagoReal / compraPacote.valorParcela);
     }

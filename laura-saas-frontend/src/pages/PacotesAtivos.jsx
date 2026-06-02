@@ -32,6 +32,7 @@ function PacotesAtivos() {
   const [comprasPacotes, setComprasPacotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('Ativo');
+  const [busca, setBusca] = useState('');
   const [alertas, setAlertas] = useState({ expirando: [], poucasSessoes: [] });
   const [highlightedId, setHighlightedId] = useState(null);
   const cardRefs = useRef({});
@@ -51,6 +52,7 @@ function PacotesAtivos() {
   const [pacoteEditando, setPacoteEditando] = useState(null);
   const [editForm, setEditForm] = useState({
     valorTotal: '',
+    sessoesContratadas: 1,
     sessoesUsadas: 0,
     observacoes: ''
   });
@@ -149,6 +151,7 @@ function PacotesAtivos() {
     setPacoteEditando(pacote);
     setEditForm({
       valorTotal: pacote.valorTotal?.toString() || '',
+      sessoesContratadas: pacote.sessoesContratadas || 1,
       sessoesUsadas: pacote.sessoesUsadas || 0,
       observacoes: pacote.observacoes || ''
     });
@@ -166,6 +169,7 @@ function PacotesAtivos() {
 
     const payload = {
       valorTotal: valorTotalNum,
+      sessoesContratadas: parseInt(editForm.sessoesContratadas) || 1,
       sessoesUsadas: parseInt(editForm.sessoesUsadas) || 0,
       observacoes: editForm.observacoes || ''
     };
@@ -295,6 +299,14 @@ function PacotesAtivos() {
     sessoesTotais: comprasPacotes.reduce((sum, c) => sum + (c.sessoesRestantes || 0), 0)
   };
 
+  // Filtro por nome do cliente + ordenação alfabética (PT-PT, ignora acentos/maiúsculas)
+  const termo = busca.trim().toLowerCase();
+  const comprasFiltradas = comprasPacotes
+    .filter((c) => !termo || (c.cliente?.nome || '').toLowerCase().includes(termo))
+    .sort((a, b) =>
+      (a.cliente?.nome || '').localeCompare(b.cliente?.nome || '', 'pt', { sensitivity: 'base' }),
+    );
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} pt-24 pb-8 px-4`}>
       <div className="max-w-7xl mx-auto">
@@ -309,7 +321,14 @@ function PacotesAtivos() {
               </span>
             </p>
           </div>
-          <div className="flex gap-3 mt-4 md:mt-0">
+          <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="🔍 Procurar cliente…"
+              className={`px-4 py-2 rounded-xl border ${inputClass} w-full sm:w-56`}
+            />
             <select
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
@@ -429,26 +448,30 @@ function PacotesAtivos() {
           <div className="flex items-center justify-center p-12">
             <Loader2 className={`w-8 h-8 animate-spin ${subTextClass}`} />
           </div>
-        ) : comprasPacotes.length === 0 ? (
+        ) : comprasFiltradas.length === 0 ? (
           <div className={`${cardClass} rounded-2xl p-12 text-center`}>
             <Package className={`w-12 h-12 mx-auto mb-4 ${subTextClass}`} />
             <p className={textClass}>Nenhum serviço encontrado</p>
             <p className={`text-sm ${subTextClass}`}>
-              {filtroStatus === 'Ativo' 
-                ? 'Venda um novo serviço para começar' 
-                : `Nenhum serviço com status "${filtroStatus}"`
+              {termo
+                ? `Nenhum cliente com "${busca.trim()}"`
+                : filtroStatus === 'Ativo'
+                  ? 'Venda um novo serviço para começar'
+                  : `Nenhum serviço com status "${filtroStatus}"`
               }
             </p>
-            <button
-              onClick={() => navigate('/vender-pacote')}
-              className="mt-4 px-6 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
-            >
-              Vender Pacote
-            </button>
+            {!termo && (
+              <button
+                onClick={() => navigate('/vender-pacote')}
+                className="mt-4 px-6 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all"
+              >
+                Vender Pacote
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {comprasPacotes.map((compra) => {
+            {comprasFiltradas.map((compra) => {
               const porcentagem = calcularPorcentagem(compra.sessoesUsadas, compra.sessoesContratadas);
               const isExpirando = compra.dataExpiracao && 
                 DateTime.fromISO(compra.dataExpiracao) <= DateTime.now().plus({ days: 7 });
@@ -832,19 +855,32 @@ function PacotesAtivos() {
                 />
               </div>
 
+              {/* Total de sessões (contratadas) */}
+              <div>
+                <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Total de sessões</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editForm.sessoesContratadas}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, sessoesContratadas: e.target.value }))}
+                  className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
+                />
+                <p className={`text-xs ${subTextClass} mt-1`}>Número total de sessões do pacote.</p>
+              </div>
+
               {/* Sessões já usadas */}
               <div>
                 <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Sessões já realizadas</label>
                 <input
                   type="number"
                   min="0"
-                  max={pacoteEditando.sessoesContratadas}
+                  max={editForm.sessoesContratadas}
                   value={editForm.sessoesUsadas}
                   onChange={(e) => setEditForm(prev => ({ ...prev, sessoesUsadas: e.target.value }))}
                   className={`w-full px-4 py-3 rounded-xl border ${inputClass}`}
                 />
                 <p className={`text-xs ${subTextClass} mt-1`}>
-                  Contratadas: {pacoteEditando.sessoesContratadas}
+                  Não pode passar do total ({editForm.sessoesContratadas}).
                 </p>
               </div>
 

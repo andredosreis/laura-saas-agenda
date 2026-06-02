@@ -147,6 +147,7 @@ export const editarVendaPacoteSchema = z
     observacoes: z.string().trim().max(1000).optional(),
     formaPagamento: formaPagamento.optional(),
     sessoesUsadas: z.number().int().min(0).optional(),
+    sessoesContratadas: z.number().int().positive().optional(),
     diasValidade: z.number().int().positive().optional().nullable(),
   });
 
