@@ -18,7 +18,8 @@ import {
   XCircle,
   Edit,
   Trash2,
-  MoreVertical
+  MoreVertical,
+  Search
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
@@ -322,13 +323,26 @@ function PacotesAtivos() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
-            <input
-              type="text"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="🔍 Procurar cliente…"
-              className={`px-4 py-2 rounded-xl border ${inputClass} w-full sm:w-56`}
-            />
+            <div className="relative w-full sm:w-64">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${subTextClass} pointer-events-none`} />
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Procurar cliente…"
+                className={`w-full pl-10 pr-9 py-2 rounded-xl border ${inputClass}`}
+              />
+              {busca && (
+                <button
+                  type="button"
+                  onClick={() => setBusca('')}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'} ${subTextClass} transition-colors`}
+                  title="Limpar busca"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <select
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
