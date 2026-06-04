@@ -34,7 +34,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' (não 'autoUpdate'): a app nunca recarrega sozinha — mostra um
+      // banner "Atualizar" e o utilizador decide quando (ver PWAUpdatePrompt.tsx).
+      // Evita perder dados a meio de um formulário durante um reload silencioso.
+      registerType: 'prompt',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}'],
         runtimeCaching: [

@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import Sidebar from './components/Sidebar';
 import InstallPrompt from './components/InstallPrompt';
+import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 
 // Login eager: rota de entrada, precisa pintar imediatamente
 import Login from './pages/Login';
@@ -182,6 +183,7 @@ const App = () => {
             limit={3}
           />
           <InstallPrompt />
+          <PWAUpdatePrompt />
         </Router>
       </AuthProvider>
     </ThemeProvider>
