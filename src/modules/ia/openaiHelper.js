@@ -7,9 +7,16 @@ import functionsSchema from './functionsSchema.json' with { type: 'json' };
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-init: só instancia o cliente OpenAI quando é mesmo necessário.
+// Assim o módulo pode ser importado sem OPENAI_API_KEY (testes/CI, arranque
+// sem IA) — o SDK da OpenAI lança erro no construtor se a chave faltar.
+let openaiClient;
+const getOpenAI = () => {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+};
 
 // Carrega o prompt do sistema uma única vez quando o módulo é iniciado
 const systemPrompt = await readFile(path.join(__dirname, 'prompt/systemLaura.md'), 'utf8');
@@ -36,7 +43,7 @@ export const chatWithLaura = async ({ userMsg, ctx, toolOutputs }) => {
   }
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages,
       tools: functionsSchema,
@@ -59,7 +66,7 @@ export const chatWithLaura = async ({ userMsg, ctx, toolOutputs }) => {
  */
 export const classificarIntencaoCliente = async (texto) => {
     try {
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAI().chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: [
                 {
