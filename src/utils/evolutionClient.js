@@ -42,3 +42,40 @@ export const sendWhatsAppMessage = async (to, message, instanceName) => {
     return { success: false, error: error.response?.data || error.message };
   }
 };
+
+/**
+ * Descarrega o conteúdo (base64) de uma mensagem de media (ex.: nota de voz).
+ *
+ * Usa o endpoint `POST /chat/getBase64FromMediaMessage/{instance}` do Evolution
+ * v2, passando a `key` da mensagem recebida no webhook.
+ *
+ * @param {object} messageKey         msgData.key da mensagem (id, remoteJid, ...)
+ * @param {string} [instanceName]     instância Evolution; cai para EVOLUTION_INSTANCE
+ * @returns {Promise<{success:boolean, base64?:string, mimetype?:string|null, error?}>}
+ */
+export const getMediaBase64 = async (messageKey, instanceName) => {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+    logger.warn('[Evolution] EVOLUTION_API_URL/KEY não configurado — media não descarregada');
+    return { success: false, error: 'Evolution API não configurada' };
+  }
+
+  const instance = (instanceName && String(instanceName).trim()) || EVOLUTION_INSTANCE;
+
+  try {
+    const response = await axios.post(
+      `${EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${instance}`,
+      { message: { key: messageKey }, convertToMp4: false },
+      { headers: { apikey: EVOLUTION_API_KEY, 'Content-Type': 'application/json' } }
+    );
+    const base64 = response.data?.base64;
+    const mimetype = response.data?.mimetype || response.data?.mediaType || null;
+    if (!base64) {
+      logger.warn({ instance }, '[Evolution] resposta sem base64');
+      return { success: false, error: 'sem base64 na resposta' };
+    }
+    return { success: true, base64, mimetype };
+  } catch (error) {
+    logger.error({ instance, err: error.response?.data || error.message }, '[Evolution] Erro ao descarregar media');
+    return { success: false, error: error.response?.data || error.message };
+  }
+};

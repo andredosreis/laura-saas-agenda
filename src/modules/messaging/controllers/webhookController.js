@@ -22,6 +22,12 @@ import { markMessageSeen, markContentSeen } from '../../../utils/webhookDedupe.j
 import { withPhoneLock } from '../../../utils/phoneLock.js';
 import logger from '../../../utils/logger.js';
 import { telefoneHash } from '../../../utils/telefoneHash.js';
+// Namespace imports: estes módulos são substituídos por mocks parciais em vários
+// testes de webhook. Com import nomeado, o link ESM falharia nesses testes por
+// "export não fornecido"; com namespace, um nome em falta é só undefined (e só
+// seria acedido no caminho de áudio, que esses testes não exercem).
+import * as evolutionClient from '../../../utils/evolutionClient.js';
+import * as iaServiceClient from '../../../utils/iaServiceClient.js';
 
 import { classify } from '../routing/messageClassifier.js';
 import { decide, Route, Reason } from '../routing/messageRouter.js';
@@ -77,6 +83,42 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     if (remoteJidRaw.endsWith('@lid')) {
       logger.warn({ remoteJid: remoteJidRaw }, '[webhook] @lid payload — aguardando resolução');
       return res.status(200).json({ message: 'LID ignorado, aguardando resolução' });
+    }
+
+    // ── Áudio (nota de voz) ────────────────────────────────────────
+    // O WhatsApp não traz texto numa nota de voz. Descarrega o áudio do
+    // Evolution, transcreve via Gemini (ia-service) e injecta a transcrição no
+    // pipeline normal de texto — assim a IA "ouve" o áudio e responde.
+    const textoDirecto =
+      msgData?.message?.conversation || msgData?.message?.extendedTextMessage?.text || '';
+    const isAudio =
+      Boolean(msgData?.message?.audioMessage) || msgData?.messageType === 'audioMessage';
+    if (isAudio && !textoDirecto) {
+      const telefoneAudio = remoteJidRaw
+        .replace('@s.whatsapp.net', '')
+        .replace('@c.us', '')
+        .replace(/[^\d]/g, '');
+      if (!telefoneAudio) {
+        return res.status(200).json({ message: 'Áudio sem telefone ignorado' });
+      }
+      const instanceAudio = req.body?.instance ? String(req.body.instance) : null;
+
+      res.status(200).json({ success: true, message: 'Áudio recebido, a transcrever' });
+
+      withPhoneLock(telefoneAudio, () =>
+        processAudioInbound({
+          messageKey: msgData.key,
+          mimetype: msgData?.message?.audioMessage?.mimetype || 'audio/ogg',
+          telefoneNormalizado: telefoneAudio,
+          messageId,
+          timestamp: new Date(timestampMensagem),
+          instanceName: instanceAudio,
+          startMs,
+        }),
+      ).catch((err) =>
+        logger.error({ err: err.message, stack: err.stack }, '[webhook] audio pipeline failed'),
+      );
+      return;
     }
 
     const telefone = remoteJidRaw.replace('@s.whatsapp.net', '').replace('@c.us', '');
@@ -139,6 +181,70 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     }
   }
 };
+
+/**
+ * Pipeline de áudio: descarrega o áudio do Evolution → transcreve via
+ * ia-service (Gemini) → injecta a transcrição no pipeline de texto normal.
+ * Fire-and-forget após o ACK. Degrada em silêncio (apenas log) se o download
+ * ou a transcrição falharem — não rebenta o webhook.
+ */
+async function processAudioInbound({
+  messageKey,
+  mimetype,
+  telefoneNormalizado,
+  messageId,
+  timestamp,
+  instanceName,
+  startMs,
+}) {
+  const media = await evolutionClient.getMediaBase64(messageKey, instanceName);
+  if (!media.success || !media.base64) {
+    logger.warn(
+      { telefone_hash: telefoneHash(telefoneNormalizado) },
+      '[webhook] áudio: download falhou',
+    );
+    return;
+  }
+
+  let texto = '';
+  try {
+    const r = await iaServiceClient.transcribeAudio({
+      audioBase64: media.base64,
+      mimeType: media.mimetype || mimetype,
+    });
+    texto = String(r?.text || '').trim();
+  } catch (err) {
+    logger.warn(
+      { telefone_hash: telefoneHash(telefoneNormalizado), err: err.message },
+      '[webhook] áudio: transcrição falhou',
+    );
+    return;
+  }
+
+  if (!texto) {
+    logger.info(
+      { telefone_hash: telefoneHash(telefoneNormalizado) },
+      '[webhook] áudio sem fala — ignorado',
+    );
+    return;
+  }
+
+  logger.info(
+    { telefone_hash: telefoneHash(telefoneNormalizado), chars: texto.length },
+    '[webhook] áudio transcrito',
+  );
+
+  // Injecta a transcrição no pipeline normal (mesma rota que uma msg de texto).
+  await processInbound({
+    classified: classify(texto),
+    telefoneNormalizado,
+    mensagem: texto,
+    messageId,
+    timestamp,
+    instanceName,
+    startMs,
+  });
+}
 
 /**
  * Asynchronous routing + dispatch pipeline. Runs fire-and-forget after the

@@ -75,6 +75,24 @@ export const processClient = async ({
   return data;
 };
 
+/**
+ * Transcreve um áudio (base64) via Gemini no ia-service.
+ * @param {object} args
+ * @param {string} args.audioBase64
+ * @param {string} [args.mimeType]
+ * @returns {Promise<{ text: string }>}
+ */
+export const transcribeAudio = async ({ audioBase64, mimeType = 'audio/ogg' }) => {
+  if (!_client) throw new Error('IA_SERVICE_URL não configurado — defina no .env');
+  const { data } = await withRetry(() =>
+    _client.post('/transcribe', {
+      audio_base64: audioBase64,
+      mime_type: mimeType,
+    })
+  );
+  return data;
+};
+
 export const checkHealth = async () => {
   if (!_client) return { reachable: false, reason: 'IA_SERVICE_URL not set' };
   try {
