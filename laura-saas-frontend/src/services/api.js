@@ -198,42 +198,26 @@ api.interceptors.response.use(
 const apiHelpers = {
   // GET com tratamento de erro simplificado
   async get(url, config = {}) {
-    try {
-      const response = await api.get(url, config);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.get(url, config);
+    return response.data;
   },
 
   // POST com tratamento de erro simplificado
   async post(url, data = {}, config = {}) {
-    try {
-      const response = await api.post(url, data, config);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.post(url, data, config);
+    return response.data;
   },
 
   // PUT com tratamento de erro simplificado
   async put(url, data = {}, config = {}) {
-    try {
-      const response = await api.put(url, data, config);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.put(url, data, config);
+    return response.data;
   },
 
   // DELETE com tratamento de erro simplificado
   async delete(url, config = {}) {
-    try {
-      const response = await api.delete(url, config);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.delete(url, config);
+    return response.data;
   }
 };
 

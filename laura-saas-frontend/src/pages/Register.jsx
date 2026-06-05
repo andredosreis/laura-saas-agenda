@@ -67,7 +67,7 @@ function Register() {
             } else {
                 setError(result.error || 'Erro ao criar conta');
             }
-        } catch (err) {
+        } catch {
             setError('Erro ao conectar com o servidor');
         } finally {
             setIsLoading(false);

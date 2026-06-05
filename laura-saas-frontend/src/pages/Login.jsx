@@ -20,7 +20,7 @@ function Login() {
     const {
         register,
         handleSubmit,
-        formState: { errors, touchedFields, isValid, dirtyFields },
+        formState: { errors, dirtyFields },
     } = useForm({
         resolver: zodResolver(loginSchema),
         mode: 'onChange', // Validação em tempo real
@@ -45,7 +45,7 @@ function Login() {
             } else {
                 setError(result.error || 'Erro ao fazer login');
             }
-        } catch (err) {
+        } catch {
             setError('Erro ao conectar com o servidor');
         } finally {
             setIsLoading(false);

@@ -177,17 +177,6 @@ function Agendamentos() {
     }
   };
 
-  const atualizarStatus = async (id, novoStatus) => {
-    try {
-      await api.put(`/agendamentos/${id}/status`, { status: novoStatus });
-      toast.success('Status do agendamento atualizado com sucesso!');
-      carregarAgendamentos();
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      toast.error(error.response?.data?.message || 'Erro ao atualizar status do agendamento.');
-    }
-  };
-
   const marcarPresencaCliente = async (id, compareceu) => {
     try {
       setMarcandoPresenca(id);
@@ -205,7 +194,7 @@ function Agendamentos() {
   const confirmarAgendamento = async (id, confirmacao) => {
     try {
       setConfirmando(id);
-      const response = await api.patch(`/agendamentos/${id}/confirmar`, {
+      await api.patch(`/agendamentos/${id}/confirmar`, {
         confirmacao: confirmacao,
         respondidoPor: 'laura'
       });

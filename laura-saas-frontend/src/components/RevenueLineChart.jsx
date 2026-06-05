@@ -13,7 +13,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
-function RevenueLineChart({ data = [], periodo = 'dia', isLoading = false }) {
+function RevenueLineChart({ data = [], isLoading = false }) {
     const { isDarkMode } = useTheme();
 
     // Memoize formatted data

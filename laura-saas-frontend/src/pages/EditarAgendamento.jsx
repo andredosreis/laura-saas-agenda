@@ -28,7 +28,7 @@ function EditarAgendamento() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [agendamentoOriginal, setAgendamentoOriginal] = useState(null);
+  const [, setAgendamentoOriginal] = useState(null);
 
   useEffect(() => {
     async function fetchInitialData() {
