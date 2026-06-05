@@ -10,6 +10,8 @@ e a chave — assim o Node não precisa de um SDK de STT nem de custos extra.
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from langchain_core.messages import HumanMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from ..config import settings
@@ -28,11 +30,11 @@ class TranscribeResponse(BaseModel):
     text: str
 
 
-# Factory separada para os testes poderem monkeypatchar com um LLM falso
-# (mesmo padrão de lead_agent._build_model) — evita chamar o Gemini real.
+# Factory separada (não inline) por uma razão de testes: os testes fazem
+# monkeypatch de `_build_transcriber` para devolver um LLM falso, evitando
+# chamar o Gemini real / precisar de chave. O import do ChatGoogleGenerativeAI
+# fica no topo do módulo (não local) — está sempre instalado (provider default).
 def _build_transcriber():
-    from langchain_google_genai import ChatGoogleGenerativeAI
-
     return ChatGoogleGenerativeAI(
         model=settings.transcribe_model_gemini,
         temperature=0,
@@ -56,8 +58,6 @@ _PROMPT = (
 async def transcribe(payload: TranscribeRequest) -> TranscribeResponse:
     if not payload.audio_base64:
         raise HTTPException(status_code=400, detail="audio_base64 vazio")
-
-    from langchain_core.messages import HumanMessage
 
     message = HumanMessage(
         content=[
