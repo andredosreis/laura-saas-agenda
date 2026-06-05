@@ -39,6 +39,7 @@ import { handle as handleLegacyFallback } from '../handlers/legacyFallback.js';
 import { handle as handleManualSilent } from '../handlers/manualSilent.js';
 import { handle as handleNoPendingAppointmentReply } from '../handlers/noPendingAppointmentReply.js';
 import { handle as handleClientLifecycle } from '../handlers/iaClientLifecycle.js';
+import { persistManualOutbound } from '../handlers/manualOutbound.js';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
@@ -65,8 +66,46 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       return res.status(200).json({ message: 'Grupo ou reação ignorada' });
     }
 
+    // Saída do próprio salão. Se for a profissional a responder pelo telemóvel,
+    // gravamos como saída humana para a conversa ficar COMPLETA no inbox — mas
+    // NUNCA encaminhamos para a IA (mantém o anti-loop com as próprias mensagens).
     if (msgData?.key?.fromMe === true) {
-      return res.status(200).json({ message: 'Mensagem do salão ignorada' });
+      const textoSaida =
+        msgData?.message?.conversation || msgData?.message?.extendedTextMessage?.text || '';
+      const idSaida = msgData?.key?.id;
+      const tsSaidaMs = (msgData?.messageTimestamp || 0) * 1000 || Date.now();
+
+      // Só texto, não-@lid, recente e não-duplicada (Evolution faz retry).
+      if (remoteJidRaw.endsWith('@lid') || !textoSaida.trim()) {
+        return res.status(200).json({ message: 'Saída sem texto/lid ignorada' });
+      }
+      if (Date.now() - tsSaidaMs > FIVE_MIN_MS) {
+        return res.status(200).json({ message: 'Saída antiga ignorada' });
+      }
+      if (!(await markMessageSeen(idSaida))) {
+        return res.status(200).json({ message: 'Saída duplicada ignorada' });
+      }
+
+      const telSaida = remoteJidRaw
+        .replace('@s.whatsapp.net', '')
+        .replace('@c.us', '')
+        .replace(/[^\d]/g, '');
+      const instanceSaida = req.body?.instance ? String(req.body.instance) : null;
+
+      res.status(200).json({ success: true, message: 'Saída registada' });
+
+      persistManualOutbound({
+        instanceName: instanceSaida,
+        telefoneNormalizado: telSaida,
+        mensagem: textoSaida,
+        timestamp: new Date(tsSaidaMs),
+      }).catch((err) =>
+        logger.error(
+          { err: err.message, stack: err.stack },
+          '[webhook] persistManualOutbound falhou',
+        ),
+      );
+      return;
     }
 
     const timestampMensagem = (msgData?.messageTimestamp || 0) * 1000 || Date.now();
