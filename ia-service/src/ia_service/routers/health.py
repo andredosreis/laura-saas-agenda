@@ -1,3 +1,5 @@
+import os
+
 import httpx
 import structlog
 from fastapi import APIRouter
@@ -6,6 +8,10 @@ from ..config import settings
 
 router = APIRouter()
 logger = structlog.get_logger()
+
+# Commit deployado — injectado no build (GIT_SHA). Confirma que versão corre.
+GIT_SHA = os.getenv("GIT_SHA", "unknown")
+BUILT_AT = os.getenv("BUILT_AT") or None
 
 
 @router.get("/health")
@@ -22,5 +28,12 @@ async def health_check():
     return {
         "status": "ok",
         "version": "0.2.0",
+        "git_sha": GIT_SHA,
         "marcai_reachable": marcai_reachable,
     }
+
+
+@router.get("/version")
+async def version():
+    """Versão deployada — para confirmar rapidamente que commit está a correr."""
+    return {"version": GIT_SHA, "built_at": BUILT_AT}

@@ -126,17 +126,30 @@ app.use('/api/internal/clientes', clienteInternalRoutes);
 // Webhook Evolution API — limite maior para payloads com dados binários de grupos
 app.use('/webhook', express.json({ limit: '1mb' }), webhookRoutes);
 
+// Versão deployada — injectada no build (GIT_SHA/BUILT_AT). Permite confirmar
+// num instante qual commit está MESMO a correr em produção (ver /api/version).
+const DEPLOY_VERSION = process.env.GIT_SHA || 'unknown';
+const DEPLOY_BUILT_AT = process.env.BUILT_AT || null;
+
 // Health check endpoint (para Vercel e monitoramento)
 const healthHandler = (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    version: DEPLOY_VERSION
   });
 };
 app.get('/api/health', healthHandler);
 app.get('/api/v1/health', healthHandler);
+
+// Versão deployada (público, leve) — confirmar qual commit está a correr.
+const versionHandler = (req, res) => {
+  res.status(200).json({ success: true, data: { version: DEPLOY_VERSION, builtAt: DEPLOY_BUILT_AT } });
+};
+app.get('/api/version', versionHandler);
+app.get('/api/v1/version', versionHandler);
 
 // Rota de teste
 app.get('/', (req, res) => {
