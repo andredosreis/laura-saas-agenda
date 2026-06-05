@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # Anthropic variant. Override via AGENT_MODEL_ANTHROPIC (e.g. Haiku 4.5).
     agent_model_anthropic: str = "claude-haiku-4-5-20251001"
 
+    # Modelo Gemini usado SÓ para transcrever áudios (notas de voz) → texto.
+    # NÃO afecta a resposta ao cliente: quem gera a resposta é o agente
+    # (agent_model_gemini). Por isso fica fixo no modelo grátis e independente
+    # do A/B do agente. gemini-2.5-flash lida bem com áudio (incl. ogg/opus).
+    transcribe_model_gemini: str = "gemini-2.5-flash"
+
     # LangSmith tracing (set LANGSMITH_TRACING=true + LANGSMITH_API_KEY to
     # enable). LangChain auto-instruments on import when these env vars are
     # present — we only re-export here so other modules can decide to attach
