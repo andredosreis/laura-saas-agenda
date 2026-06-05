@@ -262,7 +262,7 @@ function Conversas() {
                     <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500 text-white">{c.naoLidas}</span>
                   )}
                   {!c.iaAtiva && (
-                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500" title="IA pausada">⏸</span>
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500" title="IA pausada — responde tu">⏸ tu</span>
                   )}
                 </div>
               </button>
@@ -342,7 +342,7 @@ function Conversas() {
           </div>
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${selected.iaAtiva ? 'bg-green-500' : 'bg-amber-500'}`} />
-            <span className={`text-sm ${subClass}`}>{selected.iaAtiva ? 'IA activa' : 'IA pausada (humano assume)'}</span>
+            <span className={`text-sm ${subClass}`}>{selected.iaAtiva ? 'IA activa' : 'IA pausada — responde tu'}</span>
           </div>
         </div>
       </div>
