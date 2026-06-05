@@ -100,10 +100,6 @@ const HistoricoAtendimentos = ({ clienteId }) => {
     return DateTime.fromISO(data).setLocale('pt').toFormat("dd 'de' MMMM 'de' yyyy");
   };
 
-  const formatarHora = (data) => {
-    return DateTime.fromISO(data).toFormat('HH:mm');
-  };
-
   const handleEditar = (e, historico) => {
     e.stopPropagation(); // Evita expandir o card
     setHistoricoParaEditar(historico);
@@ -236,7 +232,7 @@ const HistoricoAtendimentos = ({ clienteId }) => {
 
         {/* Cards de atendimentos */}
         <div className="space-y-6">
-          {historicos.map((historico, index) => {
+          {historicos.map((historico) => {
             const isExpanded = expandido === historico._id;
 
             return (

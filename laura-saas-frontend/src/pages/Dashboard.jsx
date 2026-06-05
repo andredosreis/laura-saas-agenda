@@ -45,7 +45,7 @@ function Dashboard() {
   const [totais, setTotais] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [contagemAmanha, setContagemAmanha] = useState(0);
-  const [concluidosSemana, setConcluidosSemana] = useState(0);
+  const [, setConcluidosSemana] = useState(0);
   const [sessoesBaixas, setSessoesBaixas] = useState([]);
   const [enviandoLembrete, setEnviandoLembrete] = useState(null);
   const [financeiro, setFinanceiro] = useState({ faturamentoMes: 0, taxaComparecimento: 0 });
@@ -427,7 +427,7 @@ function Dashboard() {
             <div className="p-4 sm:p-6">
               {agendamentosHoje.length > 0 ? (
                 <div className="space-y-4">
-                  {agendamentosHoje.map((ag, i) => (
+                  {agendamentosHoje.map((ag) => (
                     <div key={ag._id} className={`group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border transition-all duration-300 ${isDark ? 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/20' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 hover:border-slate-300'}`}>
                       {/* Time Block */}
                       <div className="flex flex-col items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-900 border border-white/10 group-hover:border-indigo-500/50 transition-colors shrink-0">

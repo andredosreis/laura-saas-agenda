@@ -12,9 +12,9 @@ function EditarCliente() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [pacotes, setPacotes] = useState([]);
+  const [, setPacotes] = useState([]);
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
-  const [pacotesEncerrados, setPacotesEncerrados] = useState([]);
+  const [, setPacotesEncerrados] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('dados');

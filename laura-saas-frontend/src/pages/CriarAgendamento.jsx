@@ -24,7 +24,7 @@ const avaliacaoSchema = z.object({
   leadTelefone: z
     .string()
     .min(9, 'Telefone deve ter pelo menos 9 dígitos')
-    .regex(/^[\d\+\-\(\)\s]+$/, 'Formato de telefone inválido'),
+    .regex(/^[\d+\-()\s]+$/, 'Formato de telefone inválido'),
   leadEmail: z.string().email('Email inválido').optional().or(z.literal('')),
   dataHora: z
     .string()
@@ -38,8 +38,8 @@ function CriarAgendamento() {
   const [tipo, setTipo] = useState('Sessao');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dataSelecionada, setDataSelecionada] = useState('');
-  const [horariosVagos, setHorariosVagos] = useState([]);
+  const [dataSelecionada] = useState('');
+  const [, setHorariosVagos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
