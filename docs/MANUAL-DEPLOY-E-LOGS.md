@@ -53,16 +53,41 @@ Copiar ficheiros muda o **disco**; o contentor só corre o código novo depois d
 Depois de configurado (secção 6), **não fazes nada**: cada merge em `main` que
 toque no backend/ia-service dispara o deploy. Vês o progresso em **GitHub → Actions**.
 
-### Opção B — Manual (entrar no servidor)
+### Opção B — Manual, com 1 comando (script)
 1. No Terminal do Mac: `ssh root@80.241.222.235`
-2. No servidor:
+2. Já no servidor (a linha começa por `root@vmi3244070`):
    ```bash
    bash /opt/marcai/deploy/deploy.sh
    ```
-   O script baixa o código novo de `main`, copia só o código da app (não toca em
-   `.env` nem `nginx/`) e reconstrói o backend + ia-service. No fim mostra a versão.
+   O script baixa `main`, copia só o código da app (não toca em `.env`/`nginx`),
+   reconstrói o backend + ia-service e no fim mostra a versão deployada.
 
-> Para entrar no servidor e não conseguires: painel Contabo → menu `⋮` →
+### Opção C — Manual, passo a passo (à mão)
+Útil para perceberes o que acontece. Comandos curtos (colar **um por linha**):
+
+```
+ssh root@80.241.222.235
+```
+Já dentro do servidor (linha `root@vmi3244070`):
+```
+cd /tmp
+rm -rf new
+git clone --depth 1 https://github.com/andredosreis/laura-saas-agenda.git new
+cp -rf new/src/. /opt/marcai/src/
+cp -rf new/ia-service/src/. /opt/marcai/ia-service/src/
+cd /opt/marcai
+docker compose -f docker-compose.prod.yml up -d --build backend ia-service
+```
+1. `git clone` → baixa o código de `main` para `/tmp/new`.
+2. `cp` → copia o código novo para `/opt/marcai` (não mexe em `.env`/`nginx`).
+3. `up -d --build` → **reconstrói** a imagem com o código novo e **reinicia** os
+   contentores. **O `--build` é obrigatório** — sem ele, reinicia o código antigo.
+
+> ⚠️ Se um comando longo se partir ao colar (o terminal mete uma quebra a meio),
+> cola **uma linha de cada vez**. Confirma sempre que estás no servidor: a linha
+> tem de começar por `root@vmi3244070` (e não `…@MacBookPro`).
+
+> Não consegues entrar no servidor? Painel Contabo → menu `⋮` →
 > **"Redefinir Credenciais"** (nova senha root) ou **"Controle VNC"** (console no browser).
 
 ---
@@ -118,13 +143,47 @@ sozinho. Para disparar à mão: **Actions → Deploy (Contabo) → Run workflow*
 
 ---
 
-## 7. Verificar se está tudo atualizado (checklist rápido)
+## 7. Verificar se está MESMO atualizado
 
-1. **Backend/IA:** abre `https://api.<dominio>/api/version` → compara o `version`
-   com o último commit em `main` (GitHub). Iguais = atualizado.
-2. **Frontend:** painel da Vercel mostra o commit publicado.
-3. **Dúvida sobre um ficheiro específico:** no servidor,
-   `docker exec marcai-backend ls /app/src/...` (o que está MESMO a correr).
+A pergunta-chave: **"o commit que está a correr é o último de `main`?"**
+
+### Passo 1 — Qual é o último commit em `main` (no GitHub)
+Abre: `https://github.com/andredosreis/laura-saas-agenda/commits/main`
+→ o commit do topo tem um código curto (ex.: `a1b2c3d`). É a "versão alvo".
+
+### Passo 2 — Qual o commit a correr no servidor
+Duas formas (qualquer uma serve):
+
+**a) Pelo navegador** (mais fácil):
+```
+https://api.<o-teu-dominio>/api/version
+```
+→ devolve `{ "version": "a1b2c3d", ... }`. Esse `version` é o que está a correr.
+
+**b) No servidor** (terminal):
+```
+docker exec marcai-backend printenv GIT_SHA
+docker exec marcai-ia-service printenv GIT_SHA
+```
+
+### Passo 3 — Comparar
+- **Iguais** (Passo 1 == Passo 2) → ✅ está atualizado.
+- **Diferentes** → ❌ falta deploy (corre a secção 3).
+
+> Nota: se o `/api/version` ou o `GIT_SHA` disser **`unknown`**, foi um deploy
+> feito sem passar a versão (ex.: à mão sem `GIT_SHA=`). O `deploy.sh` e o
+> auto-deploy passam sempre — usa um deles para o número aparecer certo.
+
+### Confirmar um ficheiro/feature específico (opcional)
+Para ver se um ficheiro novo está MESMO dentro do contentor a correr:
+```
+docker exec marcai-backend ls /app/src/modules/messaging/handlers/manualOutbound.js
+docker exec marcai-ia-service ls /app/src/ia_service/routers/transcribe.py
+```
+Mostra o caminho = está lá. `No such file` = não está (falta reconstruir).
+
+### Frontend (Vercel)
+No painel da Vercel, o deployment do topo mostra o commit publicado.
 
 ---
 
