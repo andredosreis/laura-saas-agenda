@@ -18,6 +18,14 @@ COPY seeds/ seeds/
 
 ENV NODE_ENV=production
 ENV PORT=5000
+
+# Versão deployada — passada no build (docker compose build-arg). Fica disponível
+# em /api/version para confirmar que commit está a correr.
+ARG GIT_SHA=unknown
+ARG BUILT_AT=
+ENV GIT_SHA=$GIT_SHA
+ENV BUILT_AT=$BUILT_AT
+
 EXPOSE 5000
 
 # server.js arranca o Express + o worker BullMQ de notificações no mesmo processo

@@ -54,7 +54,11 @@ services:
     entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
 
   backend:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILT_AT: ${BUILT_AT:-}
     container_name: marcai-backend
     restart: unless-stopped
     env_file: .env
@@ -73,7 +77,11 @@ services:
       - marcai
 
   ia-service:
-    build: ./ia-service
+    build:
+      context: ./ia-service
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILT_AT: ${BUILT_AT:-}
     container_name: marcai-ia-service
     restart: unless-stopped
     env_file: .env

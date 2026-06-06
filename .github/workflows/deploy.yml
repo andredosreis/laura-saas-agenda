@@ -1,0 +1,64 @@
+name: Deploy (Contabo)
+
+# Auto-deploy do backend + ia-service para o VPS Contabo a cada merge em main.
+# SEGURANÇA: sincroniza apenas o código da app (src/, ia-service/src/ e ficheiros
+# de build). NUNCA toca em `.env` (segredos) nem em `nginx/` (configs com os
+# domínios reais já substituídos no servidor). O frontend continua na Vercel.
+#
+# Pré-requisitos (uma vez) — Settings → Secrets and variables → Actions:
+#   CONTABO_HOST    -> 80.241.222.235
+#   CONTABO_USER    -> root
+#   CONTABO_SSH_KEY -> chave PRIVADA cuja pública está em ~/.ssh/authorized_keys do servidor
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'ia-service/**'
+      - 'Dockerfile'
+      - 'docker-compose.prod.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch: {}   # permite disparar à mão no separador Actions
+
+concurrency:
+  group: deploy-contabo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar chave SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ secrets.CONTABO_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sincronizar código (sem tocar em .env nem nginx)
+        env:
+          RSH: ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes
+          DEST: ${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}:/opt/marcai
+        run: |
+          # --delete só nos dirs de código (src) — remove ficheiros apagados no repo.
+          rsync -az --delete -e "$RSH" src/ "$DEST/src/"
+          rsync -az --delete -e "$RSH" ia-service/src/ "$DEST/ia-service/src/"
+          # ficheiros de build (sem --delete) — não mexem em .env/nginx.
+          rsync -az -e "$RSH" package.json package-lock.json Dockerfile docker-compose.prod.yml "$DEST/"
+          rsync -az -e "$RSH" ia-service/pyproject.toml ia-service/Dockerfile "$DEST/ia-service/"
+
+      - name: Reconstruir e reiniciar (backend + ia-service)
+        run: |
+          SHA="${GITHUB_SHA::7}"
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          ssh -i ~/.ssh/id_deploy "${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}" \
+            "cd /opt/marcai && GIT_SHA=$SHA BUILT_AT=$NOW docker compose -f docker-compose.prod.yml up -d --build backend ia-service"
+
+      - name: Confirmar versão deployada
+        run: |
+          echo "Commit deployado: ${GITHUB_SHA::7}"
+          echo "Verifica em: https://api.<o-teu-dominio>/api/version"
