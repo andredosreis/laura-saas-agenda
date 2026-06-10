@@ -57,7 +57,12 @@ jobs:
         run: |
           TIMESTAMP=$(date -u +"%Y-%m-%d_%H%M")
           echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
-          mongodump --uri="$MONGO_URI" --archive="backup_${TIMESTAMP}.archive.gz" --gzip
+          # O sistema é DB-per-tenant: o dump tem de cobrir o CLUSTER INTEIRO
+          # (laura-saas + todas as tenant_*). Se o URI tiver um nome de base
+          # no caminho (ex: .../laura-saas?...), o mongodump limita-se a essa
+          # base — por isso removemos o caminho antes do dump.
+          MONGO_URI_ALL=$(printf '%s' "$MONGO_URI" | sed -E 's#^(mongodb(\+srv)?://[^/]+)/[^?]*#\1/#')
+          mongodump --uri="$MONGO_URI_ALL" --archive="backup_${TIMESTAMP}.archive.gz" --gzip
           ls -lh "backup_${TIMESTAMP}.archive.gz"
 
       - name: Upload para R2 (daily + weekly/monthly quando aplicável)
