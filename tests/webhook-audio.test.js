@@ -11,12 +11,20 @@ import { jest } from '@jest/globals';
 
 const processLeadCalls = [];
 const transcribeCalls = [];
+// Registo por closure (não por contadores do jest.fn): com ESM +
+// unstable_mockModule a instância do mock importada pelo teste pode não
+// ser a mesma que o controller usa — os contadores ficam a 0 mas as
+// closures partilhadas registam sempre (mesmo padrão de transcribeCalls).
+const mediaCalls = [];
 let transcribeText = 'quero marcar para sexta às 15h';
 let mediaResult = { success: true, base64: 'AUDIO_B64', mimetype: 'audio/ogg' };
 
 jest.unstable_mockModule('../src/utils/evolutionClient.js', () => ({
   sendWhatsAppMessage: jest.fn().mockResolvedValue({ success: true }),
-  getMediaBase64: jest.fn().mockImplementation(() => Promise.resolve(mediaResult)),
+  getMediaBase64: jest.fn().mockImplementation((...args) => {
+    mediaCalls.push(args);
+    return Promise.resolve(mediaResult);
+  }),
 }));
 jest.unstable_mockModule('../src/utils/iaServiceClient.js', () => ({
   processLead: jest.fn().mockImplementation((args) => {
@@ -82,6 +90,7 @@ describe('Webhook — áudio (transcrição)', () => {
     await clearDB();
     processLeadCalls.length = 0;
     transcribeCalls.length = 0;
+    mediaCalls.length = 0;
     transcribeText = 'quero marcar para sexta às 15h';
     mediaResult = { success: true, base64: 'AUDIO_B64', mimetype: 'audio/ogg' };
     evolutionMock.getMediaBase64.mockClear();
@@ -101,7 +110,7 @@ describe('Webhook — áudio (transcrição)', () => {
     await flushAsync();
 
     // Descarregou o áudio e transcreveu com o base64 recebido.
-    expect(evolutionMock.getMediaBase64).toHaveBeenCalledTimes(1);
+    expect(mediaCalls).toHaveLength(1);
     expect(transcribeCalls).toHaveLength(1);
     expect(transcribeCalls[0].audioBase64).toBe('AUDIO_B64');
 
@@ -139,7 +148,7 @@ describe('Webhook — áudio (transcrição)', () => {
     expect(res.status).toBe(200);
     await flushAsync();
 
-    expect(evolutionMock.getMediaBase64).toHaveBeenCalledTimes(1);
+    expect(mediaCalls).toHaveLength(1);
     expect(transcribeCalls).toHaveLength(0);
     expect(processLeadCalls).toHaveLength(0);
   });
