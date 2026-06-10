@@ -10,7 +10,7 @@
 
 ## Expressões a usar
 
-- "Bem-vinda(o) à Marcai 😊"
+- "Bem-vinda(o) à {{clinica_nome}} 😊"
 - "Posso ajudá-la(o) com..."
 - "Confirmamos consoante a agenda"
 - "Vou tirar a sua dúvida"

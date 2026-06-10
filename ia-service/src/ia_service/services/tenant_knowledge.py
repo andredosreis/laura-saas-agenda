@@ -8,6 +8,7 @@ Usage:
     txt = load_catalogo(tenant_id)             # always-injected
     txt = load_voz(tenant_id)                  # always-injected
     txt = load_politicas(tenant_id)            # always-injected
+    cfg = load_clinica_config(tenant_id)       # identidade (nome, dona, profissao)
     section = find_servico(tenant_id, "drenagem")  # on-demand
     section = find_faq(tenant_id, "pagamento")     # on-demand
 
@@ -97,6 +98,40 @@ def load_voz(tenant_id: str) -> str:
 @lru_cache(maxsize=128)
 def load_politicas(tenant_id: str) -> str:
     return _read_file(tenant_id, "politicas.md")
+
+
+# ─────────────────── Identidade da clínica ───────────────────
+#
+# clinica.md tem linhas `chave: valor` (nome, dona, profissao). Alimenta os
+# placeholders {{clinica_nome}}, {{owner_nome}} e {{owner_profissao}} dos
+# system prompts — o produto é multi-tenant, nunca hardcodar a identidade
+# de uma clínica concreta nos templates.
+#
+# Os defaults são genéricos mas gramaticais: os prompts escrevem
+# "a {{owner_nome}}" / "da {{clinica_nome}}", por isso os valores não
+# devem incluir artigo.
+
+_CLINICA_DEFAULTS = {
+    "nome": "clínica",
+    "dona": "responsável",
+    "profissao": "profissional de estética e bem-estar",
+}
+
+
+@lru_cache(maxsize=128)
+def load_clinica_config(tenant_id: str) -> dict[str, str]:
+    """Identidade da clínica com fallback a _default. Não mutar o resultado."""
+    cfg = dict(_CLINICA_DEFAULTS)
+    raw = _read_file(tenant_id, "clinica.md")
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key, value = key.strip().lower(), value.strip()
+        if key in cfg and value:
+            cfg[key] = value
+    return cfg
 
 
 # ────────────────────────── On-demand ──────────────────────────
