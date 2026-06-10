@@ -23,7 +23,7 @@ export const getAlertaSessoesBaixas = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar alerta de sessões baixas:', error);
-    res.status(500).json({ message: 'Erro interno ao buscar alerta de sessões baixas.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao buscar alerta de sessões baixas.' });
   }
 };
 
@@ -179,7 +179,7 @@ export const getReceitaTemporal = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar receita temporal:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar receita temporal.', details: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar receita temporal.' });
   }
 };
 
@@ -284,7 +284,7 @@ export const getDistribuicaoServicos = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar distribuição de serviços:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar distribuição de serviços.', details: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar distribuição de serviços.' });
   }
 };
 
@@ -377,6 +377,6 @@ export const getTopClientes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar top clientes:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar top clientes.', details: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar top clientes.' });
   }
 };

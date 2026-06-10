@@ -22,6 +22,17 @@ export const registerLimiter = rateLimit({
   legacyHeaders: false
 });
 
+// Refresh token — 30 pedidos por 15 minutos por IP
+// Mais permissivo que login (uso legítimo frequente), mas impede brute force de refresh tokens
+export const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  skip: isTestEnv,
+  message: { success: false, error: 'Demasiadas tentativas. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // Forgot password — 3 pedidos por hora por IP
 export const forgotPasswordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,

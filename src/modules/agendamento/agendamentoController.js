@@ -192,7 +192,7 @@ export const getAllAgendamentos = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: "Erro ao buscar agendamentos.", details: error.message });
+    res.status(500).json({ message: "Erro ao buscar agendamentos." });
   }
 };
 
@@ -257,7 +257,7 @@ export const updateAgendamento = async (req, res) => {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ message: "Dados inválidos.", details: messages });
     }
-    res.status(500).json({ message: "Erro ao atualizar agendamento.", details: error.message });
+    res.status(500).json({ message: "Erro ao atualizar agendamento." });
   }
 };
 
@@ -329,7 +329,7 @@ export const updateStatusAgendamento = async (req, res) => {
     res.status(200).json(agendamento);
   } catch (error) {
     console.error('[updateStatusAgendamento] Erro:', error);
-    res.status(500).json({ message: "Erro ao atualizar status.", details: error.message });
+    res.status(500).json({ message: "Erro ao atualizar status." });
   }
 };
 
@@ -419,8 +419,7 @@ export const confirmarAgendamento = async (req, res) => {
   } catch (error) {
     console.error('Erro ao confirmar agendamento:', error);
     res.status(500).json({
-      message: "Erro ao confirmar agendamento.",
-      details: error.message
+      message: "Erro ao confirmar agendamento."
     });
   }
 };
@@ -524,8 +523,7 @@ export const registrarPagamentoServico = async (req, res) => {
   } catch (error) {
     console.error('Erro ao registrar pagamento de serviço:', error);
     res.status(500).json({
-      message: 'Erro ao registrar pagamento',
-      details: error.message
+      message: 'Erro ao registrar pagamento'
     });
   }
 };
@@ -598,8 +596,7 @@ _La Estética Avançada_`;
   } catch (error) {
     console.error('[Agendamento] ❌ Erro ao enviar lembrete manual:', error);
     res.status(500).json({
-      message: "Erro ao enviar lembrete.",
-      details: error.message
+      message: "Erro ao enviar lembrete."
     });
   }
 };
@@ -650,8 +647,7 @@ export const getHistorico = async (req, res) => {
   } catch (error) {
     console.error('[Agendamento] ❌ Erro ao buscar histórico:', error);
     res.status(500).json({
-      message: "Erro ao buscar histórico de atendimentos.",
-      details: error.message
+      message: "Erro ao buscar histórico de atendimentos."
     });
   }
 };
@@ -825,8 +821,7 @@ export const getStatsMes = async (req, res) => {
   } catch (error) {
     console.error('[Agendamento] ❌ Erro ao buscar estatísticas:', error);
     res.status(500).json({
-      message: "Erro ao buscar estatísticas.",
-      details: error.message
+      message: "Erro ao buscar estatísticas."
     });
   }
 };

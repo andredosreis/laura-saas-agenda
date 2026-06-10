@@ -158,7 +158,7 @@ export const venderPacote = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao vender pacote:', error);
-    res.status(500).json({ message: 'Erro ao vender pacote', details: error.message });
+    res.status(500).json({ message: 'Erro ao vender pacote' });
   }
 };
 
@@ -221,7 +221,7 @@ export const listarComprasPacotes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao listar compras:', error);
-    res.status(500).json({ message: 'Erro ao listar compras de pacotes', details: error.message });
+    res.status(500).json({ message: 'Erro ao listar compras de pacotes' });
   }
 };
 
@@ -243,7 +243,7 @@ export const pacotesDoCliente = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar pacotes do cliente:', error);
-    res.status(500).json({ message: 'Erro ao buscar pacotes do cliente', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar pacotes do cliente' });
   }
 };
 
@@ -276,7 +276,7 @@ export const buscarCompraPacote = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar compra:', error);
-    res.status(500).json({ message: 'Erro ao buscar compra de pacote', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar compra de pacote' });
   }
 };
 
@@ -317,7 +317,7 @@ export const estenderPrazo = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao estender prazo:', error);
-    res.status(500).json({ message: 'Erro ao estender prazo', details: error.message });
+    res.status(500).json({ message: 'Erro ao estender prazo' });
   }
 };
 
@@ -364,7 +364,7 @@ export const cancelarPacote = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao cancelar pacote:', error);
-    res.status(500).json({ message: 'Erro ao cancelar pacote', details: error.message });
+    res.status(500).json({ message: 'Erro ao cancelar pacote' });
   }
 };
 
@@ -381,7 +381,7 @@ export const pacotesExpirando = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar pacotes expirando:', error);
-    res.status(500).json({ message: 'Erro ao buscar pacotes expirando', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar pacotes expirando' });
   }
 };
 
@@ -407,7 +407,7 @@ export const alertasPacotes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar alertas:', error);
-    res.status(500).json({ message: 'Erro ao buscar alertas', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar alertas' });
   }
 };
 
@@ -449,7 +449,7 @@ export const estatisticasPacotes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({ message: 'Erro ao buscar estatísticas', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar estatísticas' });
   }
 };
 
@@ -570,7 +570,7 @@ export const editarVenda = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao editar venda:', error);
-    res.status(500).json({ message: 'Erro ao editar venda', details: error.message });
+    res.status(500).json({ message: 'Erro ao editar venda' });
   }
 };
 
@@ -674,7 +674,7 @@ export const registrarPagamentoParcela = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao registar pagamento:', error);
-    res.status(500).json({ message: 'Erro ao registar pagamento', details: error.message });
+    res.status(500).json({ message: 'Erro ao registar pagamento' });
   }
 };
 
@@ -725,6 +725,6 @@ export const deletarPacote = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao deletar pacote:', error);
-    res.status(500).json({ message: 'Erro ao deletar pacote', details: error.message });
+    res.status(500).json({ message: 'Erro ao deletar pacote' });
   }
 };

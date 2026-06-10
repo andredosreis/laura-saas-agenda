@@ -47,7 +47,7 @@ export const abrirCaixa = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao abrir caixa:', error);
-    res.status(500).json({ message: 'Erro ao abrir caixa', details: error.message });
+    res.status(500).json({ message: 'Erro ao abrir caixa' });
   }
 };
 
@@ -151,7 +151,7 @@ export const statusCaixa = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar status do caixa:', error);
-    res.status(500).json({ message: 'Erro ao buscar status do caixa', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar status do caixa' });
   }
 };
 
@@ -191,7 +191,7 @@ export const registrarSangria = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao registrar sangria:', error);
-    res.status(500).json({ message: 'Erro ao registrar sangria', details: error.message });
+    res.status(500).json({ message: 'Erro ao registrar sangria' });
   }
 };
 
@@ -231,7 +231,7 @@ export const registrarSuprimento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao registrar suprimento:', error);
-    res.status(500).json({ message: 'Erro ao registrar suprimento', details: error.message });
+    res.status(500).json({ message: 'Erro ao registrar suprimento' });
   }
 };
 
@@ -326,7 +326,7 @@ export const fecharCaixa = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao fechar caixa:', error);
-    res.status(500).json({ message: 'Erro ao fechar caixa', details: error.message });
+    res.status(500).json({ message: 'Erro ao fechar caixa' });
   }
 };
 
@@ -376,6 +376,6 @@ export const relatorioCaixas = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar relatório:', error);
-    res.status(500).json({ message: 'Erro ao buscar relatório de caixas', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar relatório de caixas' });
   }
 };

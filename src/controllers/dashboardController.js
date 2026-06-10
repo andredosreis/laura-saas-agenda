@@ -23,7 +23,7 @@ export const getAgendamentosDeHoje = async (req, res) => {
     res.status(200).json(agendamentos || []);
 
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao buscar agendamentos de hoje.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao buscar agendamentos de hoje.' });
   }
 };
 
@@ -42,7 +42,7 @@ export const getContagemAgendamentosAmanha = async (req, res) => {
 
     res.status(200).json({ contagem });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao contar agendamentos de amanhã.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao contar agendamentos de amanhã.' });
   }
 };
 
@@ -66,7 +66,7 @@ export const getAgendamentosAmanha = async (req, res) => {
 
     res.status(200).json(agendamentos || []);
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao buscar a lista de agendamentos de amanhã.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao buscar a lista de agendamentos de amanhã.' });
   }
 };
 
@@ -87,7 +87,7 @@ export const getClientesAtendidosSemana = async (req, res) => {
 
     res.status(200).json({ contagem });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao contar clientes atendidos na semana.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao contar clientes atendidos na semana.' });
   }
 };
 
@@ -113,7 +113,7 @@ export const getTotaisSistema = async (req, res) => {
       totalAgendamentosFuturos
     });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao buscar totais do sistema.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao buscar totais do sistema.' });
   }
 };
 
@@ -130,7 +130,7 @@ export const getClientesComSessoesBaixas = async (req, res) => {
 
     res.status(200).json({ total: clientesBaixos.length, clientes: clientesBaixos || [] });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao buscar clientes com sessões baixas.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao buscar clientes com sessões baixas.' });
   }
 };
 
@@ -152,7 +152,7 @@ export const getProximosAgendamentos = async (req, res) => {
 
     res.status(200).json({ total: agendamentos.length, agendamentos: agendamentos || [] });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao buscar próximos agendamentos.', details: error.message });
+    res.status(500).json({ message: 'Erro interno ao buscar próximos agendamentos.' });
   }
 };
 
@@ -251,6 +251,6 @@ export const getDadosFinanceiros = async (req, res) => {
 
   } catch (error) {
     logger.error({ err: error }, 'Erro em getDadosFinanceiros');
-    res.status(500).json({ message: 'Erro ao buscar dados financeiros.', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar dados financeiros.' });
   }
 };

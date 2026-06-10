@@ -52,7 +52,7 @@ export const notificarAgendamentosAmanha = async (req, res) => {
     return res.status(200).json({ ok: true, enviados: resultados.length, detalhes: resultados });
   } catch (error) {
     console.error('Erro ao enviar lembretes:', error);
-    return res.status(500).json({ ok: false, error: error.message });
+    return res.status(500).json({ ok: false, error: 'Erro interno ao enviar lembretes' });
   }
 };
 

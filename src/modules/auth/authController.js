@@ -8,8 +8,18 @@ import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../../servic
 // =============================================
 // CONFIGURAÇÕES JWT
 // =============================================
-const getJwtSecret = () => process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
-const getJwtRefreshSecret = () => process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production';
+const getJwtSecret = () => {
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET não configurado — define a variável de ambiente.');
+    }
+    return process.env.JWT_SECRET;
+};
+const getJwtRefreshSecret = () => {
+    if (!process.env.JWT_REFRESH_SECRET) {
+        throw new Error('JWT_REFRESH_SECRET não configurado — define a variável de ambiente.');
+    }
+    return process.env.JWT_REFRESH_SECRET;
+};
 const ACCESS_TOKEN_EXPIRES = '1h'; // Aumentado de 15m para 1h para evitar expiração durante preenchimento de formulários
 const REFRESH_TOKEN_EXPIRES = '7d';
 

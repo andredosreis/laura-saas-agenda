@@ -43,7 +43,7 @@ export const listarPagamentos = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao listar pagamentos:', error);
-    res.status(500).json({ message: 'Erro ao listar pagamentos', details: error.message });
+    res.status(500).json({ message: 'Erro ao listar pagamentos' });
   }
 };
 
@@ -70,7 +70,7 @@ export const buscarPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar pagamento:', error);
-    res.status(500).json({ message: 'Erro ao buscar pagamento', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar pagamento' });
   }
 };
 
@@ -117,7 +117,7 @@ export const atualizarPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao atualizar pagamento:', error);
-    res.status(500).json({ message: 'Erro ao atualizar pagamento', details: error.message });
+    res.status(500).json({ message: 'Erro ao atualizar pagamento' });
   }
 };
 
@@ -181,7 +181,7 @@ export const deletarPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao deletar pagamento:', error);
-    res.status(500).json({ message: 'Erro ao deletar pagamento', details: error.message });
+    res.status(500).json({ message: 'Erro ao deletar pagamento' });
   }
 };
 
@@ -240,7 +240,7 @@ export const estatisticasPorFormaPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({ message: 'Erro ao buscar estatísticas', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar estatísticas' });
   }
 };
 
@@ -288,7 +288,7 @@ export const resumoDiario = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar resumo diário:', error);
-    res.status(500).json({ message: 'Erro ao buscar resumo diário', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar resumo diário' });
   }
 };
 
@@ -362,6 +362,6 @@ export const resumoMensal = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar resumo mensal:', error);
-    res.status(500).json({ message: 'Erro ao buscar resumo mensal', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar resumo mensal' });
   }
 };

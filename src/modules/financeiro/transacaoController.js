@@ -48,7 +48,7 @@ export const criarTransacao = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao criar transação:', error);
-    res.status(500).json({ message: 'Erro ao criar transação', details: error.message });
+    res.status(500).json({ message: 'Erro ao criar transação' });
   }
 };
 
@@ -243,7 +243,7 @@ export const listarTransacoes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao listar transações:', error);
-    res.status(500).json({ message: 'Erro ao listar transações', details: error.message });
+    res.status(500).json({ message: 'Erro ao listar transações' });
   }
 };
 
@@ -270,7 +270,7 @@ export const buscarTransacao = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar transação:', error);
-    res.status(500).json({ message: 'Erro ao buscar transação', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar transação' });
   }
 };
 
@@ -312,7 +312,7 @@ export const atualizarTransacao = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao atualizar transação:', error);
-    res.status(500).json({ message: 'Erro ao atualizar transação', details: error.message });
+    res.status(500).json({ message: 'Erro ao atualizar transação' });
   }
 };
 
@@ -345,7 +345,7 @@ export const cancelarTransacao = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao cancelar transação:', error);
-    res.status(500).json({ message: 'Erro ao cancelar transação', details: error.message });
+    res.status(500).json({ message: 'Erro ao cancelar transação' });
   }
 };
 
@@ -374,7 +374,7 @@ export const listarTransacoesPendentes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao listar pendentes:', error);
-    res.status(500).json({ message: 'Erro ao listar transações pendentes', details: error.message });
+    res.status(500).json({ message: 'Erro ao listar transações pendentes' });
   }
 };
 
@@ -440,7 +440,7 @@ export const registrarPagamento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao registrar pagamento:', error);
-    res.status(500).json({ message: 'Erro ao registrar pagamento', details: error.message });
+    res.status(500).json({ message: 'Erro ao registrar pagamento' });
   }
 };
 
@@ -516,7 +516,7 @@ export const relatorioPorPeriodo = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao gerar relatório:', error);
-    res.status(500).json({ message: 'Erro ao gerar relatório', details: error.message });
+    res.status(500).json({ message: 'Erro ao gerar relatório' });
   }
 };
 
@@ -575,7 +575,7 @@ export const comissoesPendentes = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar comissões:', error);
-    res.status(500).json({ message: 'Erro ao buscar comissões pendentes', details: error.message });
+    res.status(500).json({ message: 'Erro ao buscar comissões pendentes' });
   }
 };
 
@@ -608,7 +608,7 @@ export const pagarComissao = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao pagar comissão:', error);
-    res.status(500).json({ message: 'Erro ao pagar comissão', details: error.message });
+    res.status(500).json({ message: 'Erro ao pagar comissão' });
   }
 };
 
@@ -670,6 +670,6 @@ export const deletarTransacao = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao deletar transação:', error);
-    res.status(500).json({ message: 'Erro ao deletar transação', details: error.message });
+    res.status(500).json({ message: 'Erro ao deletar transação' });
   }
 };

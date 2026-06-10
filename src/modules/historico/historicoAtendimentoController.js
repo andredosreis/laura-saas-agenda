@@ -5,7 +5,15 @@ import mongoose from 'mongoose';
 export const criarHistoricoAtendimento = async (req, res) => {
   try {
     const { HistoricoAtendimento, Cliente, Agendamento } = req.models;
-    const { cliente, agendamento, ...dadosHistorico } = req.body;
+    // Campos explícitos do schema — nunca spread de req.body (mass assignment)
+    const {
+      cliente, agendamento, dataAtendimento, servico, duracaoReal,
+      queixaPrincipal, expectativas, sintomasRelatados, restricoes,
+      tecnicasUtilizadas, produtosAplicados, equipamentosUsados, areasTrabalhas,
+      intensidade, resultadosImediatos, reacoesCliente, orientacoesPassadas,
+      proximosPassos, satisfacaoCliente, observacoesProfissional,
+      fotosAntes, fotosDepois, status
+    } = req.body;
 
     const clienteExiste = await Cliente.findOne({ _id: cliente, tenantId: req.tenantId });
 
@@ -25,7 +33,12 @@ export const criarHistoricoAtendimento = async (req, res) => {
       cliente,
       agendamento: agendamento || null,
       profissional: req.user.userId,
-      ...dadosHistorico
+      dataAtendimento, servico, duracaoReal,
+      queixaPrincipal, expectativas, sintomasRelatados, restricoes,
+      tecnicasUtilizadas, produtosAplicados, equipamentosUsados, areasTrabalhas,
+      intensidade, resultadosImediatos, reacoesCliente, orientacoesPassadas,
+      proximosPassos, satisfacaoCliente, observacoesProfissional,
+      fotosAntes, fotosDepois, status
     });
 
     await novoHistorico.save();
@@ -43,7 +56,7 @@ export const criarHistoricoAtendimento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao criar histórico de atendimento:', error);
-    res.status(500).json({ success: false, message: 'Erro ao criar histórico de atendimento', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao criar histórico de atendimento' });
   }
 };
 
@@ -91,7 +104,7 @@ export const listarHistoricosAtendimento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao listar históricos:', error);
-    res.status(500).json({ success: false, message: 'Erro ao listar históricos de atendimento', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao listar históricos de atendimento' });
   }
 };
 
@@ -116,7 +129,7 @@ export const buscarHistoricoPorId = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar histórico:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar histórico de atendimento', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar histórico de atendimento' });
   }
 };
 
@@ -124,7 +137,7 @@ export const buscarHistoricoPorId = async (req, res) => {
 // @route   PUT /api/historico-atendimentos/:id
 export const atualizarHistoricoAtendimento = async (req, res) => {
   try {
-    const { HistoricoAtendimento } = req.models;
+    const { HistoricoAtendimento, Agendamento } = req.models;
     const historico = await HistoricoAtendimento.findOne({ _id: req.params.id, tenantId: req.tenantId });
 
     if (!historico) {
@@ -135,8 +148,18 @@ export const atualizarHistoricoAtendimento = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Histórico finalizado não pode ser editado' });
     }
 
+    // Validar que o agendamento (se alterado) pertence ao tenant — como no create
+    if (req.body.agendamento) {
+      const agendamentoExiste = await Agendamento.findOne({ _id: req.body.agendamento, tenantId: req.tenantId });
+      if (!agendamentoExiste) {
+        return res.status(404).json({ success: false, message: 'Agendamento não encontrado' });
+      }
+    }
+
+    // Campos de controlo e relações sensíveis nunca são editáveis pelo cliente
+    const CAMPOS_PROTEGIDOS = ['tenantId', 'cliente', '_id', 'profissional', 'podeEditar', 'createdAt', 'updatedAt'];
     Object.keys(req.body).forEach(key => {
-      if (key !== 'tenantId' && key !== 'cliente' && key !== '_id') {
+      if (!CAMPOS_PROTEGIDOS.includes(key)) {
         historico[key] = req.body[key];
       }
     });
@@ -152,7 +175,7 @@ export const atualizarHistoricoAtendimento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao atualizar histórico:', error);
-    res.status(500).json({ success: false, message: 'Erro ao atualizar histórico de atendimento', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao atualizar histórico de atendimento' });
   }
 };
 
@@ -177,7 +200,7 @@ export const finalizarHistoricoAtendimento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao finalizar histórico:', error);
-    res.status(500).json({ success: false, message: 'Erro ao finalizar histórico de atendimento', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao finalizar histórico de atendimento' });
   }
 };
 
@@ -196,7 +219,7 @@ export const deletarHistoricoAtendimento = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao deletar histórico:', error);
-    res.status(500).json({ success: false, message: 'Erro ao deletar histórico de atendimento', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao deletar histórico de atendimento' });
   }
 };
 
@@ -241,7 +264,7 @@ export const buscarHistoricoCliente = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar histórico do cliente:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar histórico do cliente', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar histórico do cliente' });
   }
 };
 
@@ -259,7 +282,7 @@ export const buscarTecnicasMaisUsadas = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar técnicas:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar técnicas mais utilizadas', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar técnicas mais utilizadas' });
   }
 };
 
@@ -317,7 +340,7 @@ export const estatisticasAtendimentos = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({ success: false, message: 'Erro ao buscar estatísticas de atendimentos', error: error.message });
+    res.status(500).json({ success: false, message: 'Erro ao buscar estatísticas de atendimentos' });
   }
 };
 
