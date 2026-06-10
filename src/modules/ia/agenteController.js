@@ -159,7 +159,6 @@ _La Estética Avançada_`;
     return {
       success: false,
       message: 'Erro ao enviar lembretes',
-      error: error.message,
     };
   }
 };

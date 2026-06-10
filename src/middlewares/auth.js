@@ -25,7 +25,7 @@ export const authenticate = async (req, res, next) => {
         // Verificar token
         let decoded;
         try {
-            decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-key-change-in-production');
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
         } catch (error) {
             if (error.name === 'TokenExpiredError') {
                 return res.status(401).json({
@@ -282,7 +282,7 @@ export const optionalAuth = async (req, res, next) => {
         const token = authHeader.split(' ')[1];
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-key-change-in-production');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             req.user = decoded;
             req.tenantId = decoded.tenantId;
         } catch (error) {

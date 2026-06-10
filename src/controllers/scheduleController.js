@@ -58,7 +58,7 @@ export const getSchedules = async (req, res) => {
     });
   } catch (error) {
     console.error('Erro em getSchedules:', error);
-    res.status(500).json({ message: 'Erro ao buscar horários', error: error.message });
+    res.status(500).json({ message: 'Erro ao buscar horários' });
   }
 };
 
@@ -136,7 +136,7 @@ export const getAvailableSlots = async (req, res) => {
 
   } catch (error) {
     console.error('Erro em getAvailableSlots:', error);
-    res.status(500).json({ message: 'Erro ao buscar slots disponíveis', error: error.message });
+    res.status(500).json({ message: 'Erro ao buscar slots disponíveis' });
   }
 };
 
@@ -163,6 +163,6 @@ export const updateSchedule = async (req, res) => {
     res.status(200).json(updatedSchedule);
   } catch (error) {
     console.error('Erro em updateSchedule:', error);
-    res.status(500).json({ message: 'Erro ao atualizar horário', error: error.message });
+    res.status(500).json({ message: 'Erro ao atualizar horário' });
   }
 };

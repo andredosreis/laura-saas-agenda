@@ -10,6 +10,15 @@ import { initEmailService } from './services/emailService.js';
 import { startNotificationWorker } from './workers/notificationWorker.js';
 import { startLembreteParcelaCron } from './jobs/lembreteParcelaJob.js';
 
+// Validação fail-fast de env vars críticas — sem secrets o servidor não arranca.
+// Nunca usar fallbacks hardcoded para JWT (vulnerabilidade crítica).
+const REQUIRED_ENV = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
+if (missingEnv.length > 0) {
+  logger.fatal({ missingEnv }, 'Variáveis de ambiente obrigatórias em falta. Startup abortado.');
+  process.exit(1);
+}
+
 // Handlers globais para erros não tratados — enviados ao Sentry + log fatal
 process.on('uncaughtException', (err) => {
   logger.fatal({ err }, 'Uncaught exception — processo vai terminar');

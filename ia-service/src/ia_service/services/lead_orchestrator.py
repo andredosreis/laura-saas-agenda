@@ -416,6 +416,28 @@ async def run(payload) -> dict:
     lead_id = payload.lead_id
     conversa_id: str | None = None
     is_brand_new_lead = False
+
+    # Defesa em profundidade: quando o Node envia lead_id, validar que o
+    # lead existe na DB DESTE tenant antes de processar. Com DB-per-tenant
+    # um lead de outro tenant nunca aparece aqui — mismatch → ignorado.
+    # Falha na verificação (Mongo down, id inválido) é não-fatal: loga e
+    # continua, porque todos os reads/writes a jusante já são tenant-scoped.
+    if lead_id:
+        try:
+            from bson import ObjectId
+
+            from . import mongo_reader
+
+            db = mongo_reader.get_tenant_db(tenant_id)
+            if db.leads.find_one({"_id": ObjectId(lead_id)}, {"_id": 1}) is None:
+                log.warning("lead_tenant_mismatch", lead_id=lead_id)
+                return {
+                    "status": "ignored",
+                    "lead_id": None,
+                    "action_taken": "lead_tenant_mismatch",
+                }
+        except Exception as exc:
+            log.warning("lead_tenant_check_skipped", error=str(exc))
     if not lead_id:
         try:
             lead_data = await marcai_client.create_lead(

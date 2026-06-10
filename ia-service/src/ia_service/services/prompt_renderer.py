@@ -135,6 +135,10 @@ def render_system_prompt(
     is_first_turn = "sim" if turn_number <= 0 else "não"
     last_clinic = (last_clinic_message or "").strip() or NOT_YET
 
+    # Identidade da clínica por tenant — substituída DEPOIS de voz/catalogo/
+    # politicas para que placeholders dentro desses ficheiros também resolvam.
+    clinica = tenant_knowledge.load_clinica_config(tenant_id)
+
     template = _load_template()
     return (
         template
@@ -150,6 +154,9 @@ def render_system_prompt(
         .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{is_first_turn}}", is_first_turn)
         .replace("{{last_clinic_message}}", last_clinic)
+        .replace("{{clinica_nome}}", clinica["nome"])
+        .replace("{{owner_nome}}", clinica["dona"])
+        .replace("{{owner_profissao}}", clinica["profissao"])
     )
 
 
@@ -164,6 +171,10 @@ def render_client_system_prompt(
     nome = (state.get("nome") or "").strip() or "Cliente"
     last_clinic = (last_clinic_message or "").strip() or NOT_YET
 
+    # Identidade da clínica por tenant — substituída DEPOIS de voz/catalogo/
+    # politicas para que placeholders dentro desses ficheiros também resolvam.
+    clinica = tenant_knowledge.load_clinica_config(tenant_id)
+
     template = _CLIENT_TEMPLATE_PATH.read_text(encoding="utf-8")
     return (
         template
@@ -176,4 +187,7 @@ def render_client_system_prompt(
         .replace("{{upcoming_appointments}}", upcoming_appointments)
         .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{last_clinic_message}}", last_clinic)
+        .replace("{{clinica_nome}}", clinica["nome"])
+        .replace("{{owner_nome}}", clinica["dona"])
+        .replace("{{owner_profissao}}", clinica["profissao"])
     )

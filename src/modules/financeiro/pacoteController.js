@@ -2,7 +2,9 @@
 export const createPacote = async (req, res) => {
   try {
     const { Pacote } = req.models;
-    const novoPacote = new Pacote({ ...req.body, tenantId: req.tenantId });
+    // Campos explícitos — nunca passar req.body directamente (mass assignment)
+    const { nome, categoria, sessoes, valor, descricao, ativo } = req.body;
+    const novoPacote = new Pacote({ nome, categoria, sessoes, valor, descricao, ativo, tenantId: req.tenantId });
     await novoPacote.save();
     res.status(201).json(novoPacote);
   } catch (error) {
@@ -70,9 +72,15 @@ export const getPacote = async (req, res) => {
 export const updatePacote = async (req, res) => {
   try {
     const { Pacote } = req.models;
+    // Campos explícitos — nunca passar req.body directamente (mass assignment)
+    const { nome, categoria, sessoes, valor, descricao, ativo } = req.body;
+    const camposActualizaveis = { nome, categoria, sessoes, valor, descricao, ativo };
+    Object.keys(camposActualizaveis).forEach((key) => {
+      if (camposActualizaveis[key] === undefined) delete camposActualizaveis[key];
+    });
     const pacote = await Pacote.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      req.body,
+      camposActualizaveis,
       { new: true, runValidators: true }
     );
     if (!pacote) {

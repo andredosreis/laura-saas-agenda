@@ -63,8 +63,7 @@ export const runMigration = async (req, res) => {
         console.error('[Migration] Erro:', error);
         res.status(500).json({
             success: false,
-            message: 'Erro durante a migração',
-            error: error.message
+            message: 'Erro durante a migração'
         });
     }
 };

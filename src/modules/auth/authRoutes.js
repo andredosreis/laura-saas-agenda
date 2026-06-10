@@ -16,7 +16,7 @@ import {
 } from './authController.js';
 import { authenticate } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
-import { loginLimiter, registerLimiter, forgotPasswordLimiter } from '../../middlewares/rateLimiter.js';
+import { loginLimiter, registerLimiter, forgotPasswordLimiter, refreshLimiter } from '../../middlewares/rateLimiter.js';
 import {
     registerSchema,
     loginSchema,
@@ -35,7 +35,7 @@ const router = express.Router();
 // Rotas públicas
 router.post('/register', registerLimiter, validate(registerSchema), register);
 router.post('/login', loginLimiter, validate(loginSchema), login);
-router.post('/refresh', validate(refreshTokenSchema), refreshToken);
+router.post('/refresh', refreshLimiter, validate(refreshTokenSchema), refreshToken);
 router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), forgotPassword);
 router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
 router.get('/verify-reset-token/:token', validate(tokenParamSchema, 'params'), verifyResetToken);
