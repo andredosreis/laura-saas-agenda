@@ -29,6 +29,7 @@
 | 013 | [Notification Pipeline com BullMQ + Redis](./ADR-013-notification-pipeline-bullmq.md) | NOTIF | ✅ Accepted — Implementação planeada Fase 2 | 2026-04-12 | 135 |
 | 017 | [Lembretes Automáticos de Parcelas via WhatsApp (Evolution)](./ADR-017-lembretes-whatsapp-parcelas.md) | NOTIF | 🟡 Proposed | 2026-04-23 | 125 |
 | 020 | [Limite Explícito de 100 em Listagens de Clientes — Trajectória até Busca Server-Side](./ADR-020-listagem-paginacao-clientes-limit-100.md) | API | ✅ Accepted — Fase 1 | 2026-04-27 | 80 |
+| 026 | [Arquivamento de Mensagens para R2 (Cold Storage)](./ADR-026-arquivamento-mensagens-r2-cold-storage.md) | MESSAGING/INFRA | 🟡 Proposed | 2026-06-10 | 90 |
 
 ---
 
