@@ -63,4 +63,38 @@ jobs:
         run: npm run build
         working-directory: laura-saas-frontend
         env:
-          VITE_API_URL: https://placeholder.render.com
+          VITE_API_URL: https://placeholder.example.com
+
+  ia-service:
+    name: IA Service (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Setup Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+        working-directory: ia-service
+
+      - name: Ruff lint
+        run: uv run ruff check .
+        working-directory: ia-service
+
+      - name: Pytest
+        run: uv run pytest --ignore=tests/evals
+        working-directory: ia-service
+        env:
+          # Chaves falsas — os testes só CONSTROEM os clientes LLM (não fazem
+          # chamadas reais). Sem isto, ChatGoogleGenerativeAI rejeita na __init__.
+          # NÃO definir INTERNAL_SERVICE_TOKEN aqui — o conftest trata disso via
+          # setdefault e os testes assinam com esse valor; sobrepor causa 401.
+          GOOGLE_API_KEY: fake-gemini-key-ci
+          OPENAI_API_KEY: sk-fake-openai-key-ci
+          ANTHROPIC_API_KEY: fake-anthropic-key-ci

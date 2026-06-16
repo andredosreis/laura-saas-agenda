@@ -84,12 +84,14 @@ def load_examples(fixture_filter: str | None = None) -> list[dict[str, Any]]:
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         for ex in data.get("examples", []):
-            items.append({
-                "fixture": data["name"],
-                "name": ex["name"],
-                "inputs": ex["inputs"],
-                "outputs": ex["outputs"],
-            })
+            items.append(
+                {
+                    "fixture": data["name"],
+                    "name": ex["name"],
+                    "inputs": ex["inputs"],
+                    "outputs": ex["outputs"],
+                }
+            )
     return items
 
 
@@ -205,10 +207,7 @@ async def run_langsmith(items: list[dict[str, Any]]) -> int:
     try:
         from langsmith import Client, aevaluate
     except ImportError:
-        print(
-            "✗ langsmith SDK not installed. Run: "
-            "pip install '.[dev]' (inside ia-service venv)"
-        )
+        print("✗ langsmith SDK not installed. Run: pip install '.[dev]' (inside ia-service venv)")
         return 1
 
     client = Client()
@@ -240,16 +239,14 @@ async def run_langsmith(items: list[dict[str, Any]]) -> int:
         print(line)
 
     print(
-        f"\n→ Experiment finished. View at "
-        f"https://smith.langchain.com/  (project: marcai-ia-service-local)"
+        "\n→ Experiment finished. View at "
+        "https://smith.langchain.com/  (project: marcai-ia-service-local)"
     )
     return failed
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run lead-agent evals from JSON fixtures."
-    )
+    parser = argparse.ArgumentParser(description="Run lead-agent evals from JSON fixtures.")
     parser.add_argument(
         "--sync",
         action="store_true",

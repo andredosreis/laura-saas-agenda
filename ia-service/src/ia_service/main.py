@@ -20,9 +20,7 @@ if settings.langsmith_tracing and settings.langsmith_api_key:
     os.environ.setdefault("LANGSMITH_PROJECT", settings.langsmith_project)
     if settings.langsmith_endpoint:
         os.environ.setdefault("LANGSMITH_ENDPOINT", settings.langsmith_endpoint)
-    logger.info(
-        "langsmith_tracing_enabled", project=settings.langsmith_project
-    )
+    logger.info("langsmith_tracing_enabled", project=settings.langsmith_project)
 else:
     logger.info("langsmith_tracing_disabled")
 

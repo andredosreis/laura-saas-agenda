@@ -12,6 +12,7 @@ Phase 4c: agent integration with graceful fallback. If the agent fails for
 any reason (timeout, API error), falls back to the fixed time-based greeting.
 """
 
+import re
 from datetime import datetime, timezone
 
 import structlog
@@ -22,9 +23,18 @@ from . import evolution_client, lead_extractor, marcai_client
 logger = structlog.get_logger()
 
 _GREETINGS = {
-    "manha": "Bom dia! 😊 Obrigado por entrar em contacto connosco. Já vamos tratar do seu pedido — em breve entramos em contacto!",
-    "tarde": "Boa tarde! 😊 Obrigado por entrar em contacto connosco. Já vamos tratar do seu pedido — em breve entramos em contacto!",
-    "noite": "Boa noite! 😊 Obrigado por entrar em contacto connosco. Já vamos tratar do seu pedido — em breve entramos em contacto!",
+    "manha": (
+        "Bom dia! 😊 Obrigado por entrar em contacto connosco. "
+        "Já vamos tratar do seu pedido — em breve entramos em contacto!"
+    ),
+    "tarde": (
+        "Boa tarde! 😊 Obrigado por entrar em contacto connosco. "
+        "Já vamos tratar do seu pedido — em breve entramos em contacto!"
+    ),
+    "noite": (
+        "Boa noite! 😊 Obrigado por entrar em contacto connosco. "
+        "Já vamos tratar do seu pedido — em breve entramos em contacto!"
+    ),
 }
 
 
@@ -121,8 +131,8 @@ async def _generate_reply(
         # need to instantiate ChatOpenAI on import.
         from ..agents.lead_agent import make_lead_agent
 
-        messages, turn_number, last_clinic_message = (
-            await _build_conversation_history(tenant_id, lead_id, mensagem, log)
+        messages, turn_number, last_clinic_message = await _build_conversation_history(
+            tenant_id, lead_id, mensagem, log
         )
 
         # Fetch the persisted Lead state so the agent can inject it into
@@ -168,10 +178,7 @@ async def _generate_reply(
             last_msg = result["messages"][-1]
             raw = getattr(last_msg, "content", "")
             if isinstance(raw, list):
-                content = "".join(
-                    p.get("text", "") if isinstance(p, dict) else str(p)
-                    for p in raw
-                )
+                content = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in raw)
             else:
                 content = str(raw or "")
             if content.strip():
@@ -195,9 +202,7 @@ async def _generate_reply(
         return fallback_greeting, "greeting_fallback"
 
 
-import re as _re
-
-_BOOKING_REGEX = _re.compile(
+_BOOKING_REGEX = re.compile(
     # Roots: marc/agend/confirm cover "marcado", "marcação", "marcar",
     # "agendado", "agendamento", "agendar", "confirmado", "confirmar",
     # "confirmação". Followed (in same paragraph) by an HH:MM or "Xh"
@@ -211,13 +216,11 @@ _BOOKING_REGEX = _re.compile(
     # gap at 120 chars to avoid pulling unrelated times from much later
     # in the reply.
     r"(?:marc|agend|confirm)\w*\b[^.?]{0,120}?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
-    _re.IGNORECASE,
+    re.IGNORECASE,
 )
 
 
-async def _get_lead_state(
-    tenant_id: str, lead_id: str | None, log
-) -> dict | None:
+async def _get_lead_state(tenant_id: str, lead_id: str | None, log) -> dict | None:
     """Read the Lead's persisted state directly from Mongo for the system prompt.
 
     Returns a dict with keys `nome`, `motivo`, `urgencia`, `score` — or
@@ -265,9 +268,7 @@ async def _maybe_auto_book(content: str, tenant_id: str, lead_id: str | None, lo
     if not lead_id or not _BOOKING_REGEX.search(content):
         return
     try:
-        await marcai_client.move_lead_stage(
-            lead_id=lead_id, tenant_id=tenant_id, stage="agendado"
-        )
+        await marcai_client.move_lead_stage(lead_id=lead_id, tenant_id=tenant_id, stage="agendado")
         log.info("auto_book_stage_moved", stage="agendado")
     except Exception as exc:
         # Non-fatal: stage may already be agendado, or transition refused
@@ -370,11 +371,11 @@ async def _extract_and_apply_intel(
         # transition — correct behaviour.
         try:
             from bson import ObjectId
+
             from . import mongo_reader as _mr
+
             db = _mr.get_tenant_db(tenant_id)
-            lead_doc = db.leads.find_one(
-                {"_id": ObjectId(lead_id)}, {"status": 1}
-            )
+            lead_doc = db.leads.find_one({"_id": ObjectId(lead_id)}, {"status": 1})
             if lead_doc and lead_doc.get("status") == "novo":
                 await marcai_client.move_lead_stage(
                     lead_id=lead_id, tenant_id=tenant_id, stage="em_conversa"
@@ -447,7 +448,9 @@ async def run(payload) -> dict:
             lead_id = str(lead_data["_id"])
             conversa_id = str(lead_data.get("conversa") or "")
             is_brand_new_lead = not lead_data.get("_alreadyExisted", False)
-            log.info("lead_resolved", lead_id=lead_id, already_existed=lead_data.get("_alreadyExisted"))
+            log.info(
+                "lead_resolved", lead_id=lead_id, already_existed=lead_data.get("_alreadyExisted")
+            )
         except Exception as exc:
             log.error("lead_create_failed", error=str(exc))
             return {"status": "error", "lead_id": None, "action_taken": "lead_create_failed"}

@@ -26,7 +26,6 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 
-
 # ─────────────────────────── Schema ───────────────────────────
 
 
@@ -156,12 +155,12 @@ class LeadIntel(BaseModel):
 
     objection_type: Optional[
         Literal[
-            "preco",        # "não tenho dinheiro", "está caro"
-            "tempo",        # "estou ocupada", "agora não dá"
-            "distancia",    # "moro longe", "não sei se consigo ir"
+            "preco",  # "não tenho dinheiro", "está caro"
+            "tempo",  # "estou ocupada", "agora não dá"
+            "distancia",  # "moro longe", "não sei se consigo ir"
             "duvida_servico",  # "será que funciona?", "preciso de pensar mais"
-            "outra_clinica",   # "estou a comparar", "vi outra"
-            "geral",        # hesitação sem motivo claro ("vou pensar")
+            "outra_clinica",  # "estou a comparar", "vi outra"
+            "geral",  # hesitação sem motivo claro ("vou pensar")
         ]
     ] = Field(
         None,
@@ -172,10 +171,14 @@ class LeadIntel(BaseModel):
             "superação. null se o lead avança com confiança. "
             "\n\nExemplos por classe:\n"
             "- preco: 'não tenho dinheiro agora', 'está caro', 'sem orçamento'\n"
-            "- tempo: 'estou super ocupada', 'agora não dá jeito', 'no momento não tenho disponibilidade'\n"
-            "- distancia: 'moro em <outra cidade>', 'não sei se consigo deslocar-me', 'fica longe de mim'\n"
-            "- duvida_servico: 'será que funciona?', 'tenho dúvidas se é para mim', 'preciso pensar melhor'\n"
-            "- outra_clinica: 'estou a comparar com outra', 'vou ficar pela clínica que frequento', "
+            "- tempo: 'estou super ocupada', 'agora não dá jeito', "
+            "'no momento não tenho disponibilidade'\n"
+            "- distancia: 'moro em <outra cidade>', 'não sei se consigo "
+            "deslocar-me', 'fica longe de mim'\n"
+            "- duvida_servico: 'será que funciona?', 'tenho dúvidas se é "
+            "para mim', 'preciso pensar melhor'\n"
+            "- outra_clinica: 'estou a comparar com outra', "
+            "'vou ficar pela clínica que frequento', "
             "'já tenho outra opção', 'vou ficar onde estou'\n"
             "- geral: 'vou pensar', 'depois decido', evasiva sem motivo concreto\n"
             "Preenche SEMPRE que intent=hesitacao ou intent=desistir tenha causa identificável — "

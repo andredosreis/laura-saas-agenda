@@ -46,12 +46,15 @@ def test_make_lead_agent_uses_tenant_specific_prompt(monkeypatch):
     def fake_create_agent(model, tools, system_prompt, **kwargs):
         captured["system_prompt"] = system_prompt
         captured["tools"] = tools
+
         # Return a stub object that mimics the agent interface
         class Stub:
             def invoke(self, *args, **kwargs):
                 return None
+
             async def ainvoke(self, *args, **kwargs):
                 return None
+
         return Stub()
 
     monkeypatch.setattr(lead_agent, "create_agent", fake_create_agent)
@@ -71,11 +74,14 @@ def test_make_lead_agent_for_different_tenants_creates_different_tools(monkeypat
 
     def fake_create_agent(model, tools, system_prompt, **kwargs):
         captured_tools.append(tools[0])
+
         class Stub:
             def invoke(self, *args, **kwargs):
                 return None
+
             async def ainvoke(self, *args, **kwargs):
                 return None
+
         return Stub()
 
     monkeypatch.setattr(lead_agent, "create_agent", fake_create_agent)

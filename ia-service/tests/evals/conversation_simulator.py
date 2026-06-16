@@ -53,7 +53,6 @@ if _settings.langsmith_endpoint:
 from ia_service.agents.lead_agent import make_lead_agent  # noqa: E402
 from ia_service.services.lead_extractor import extract_intel  # noqa: E402
 
-
 TENANT_ID = "695413fb6ce936a9097af750"  # Laura / marcai
 SCENARIOS_PATH = Path(__file__).parent / "scenarios.json"
 
@@ -75,9 +74,7 @@ _FAKE_SLOTS = [
 def _extract_reply(last_message: Any) -> str:
     raw = getattr(last_message, "content", "") if last_message else ""
     if isinstance(raw, list):
-        return "".join(
-            (p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw
-        )
+        return "".join((p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw)
     return str(raw or "")
 
 
@@ -130,6 +127,7 @@ async def run_scenario(scenario: dict) -> dict:
     inter_turn_sleep_s = 8
 
     import re as _re
+
     _greeting = _re.compile(
         r"^\s*(ol[áa]|oi|bom\s+dia|boa\s+tarde|boa\s+noite|bem-?vind[oa])",
         _re.IGNORECASE,
@@ -176,21 +174,23 @@ async def run_scenario(scenario: dict) -> dict:
         if _time.search(reply) and "get_available_slots" not in tool_calls:
             flags["fabricated_slots"] = True
 
-        trace.append({
-            "turn": turn_number,
-            "user": user_msg,
-            "intel": {
-                "intent": intel.intent if intel else None,
-                "nome": intel.nome if intel else None,
-                "urgencia": intel.urgencia if intel else None,
-                "interesse": (intel.interesse or "")[:60] if intel else None,
-                "score_delta": intel.score_delta if intel else 0,
-                "objection_type": intel.objection_type if intel else None,
-            },
-            "lead_state_after": dict(lead_state),
-            "reply": reply,
-            "tool_calls": tool_calls,
-        })
+        trace.append(
+            {
+                "turn": turn_number,
+                "user": user_msg,
+                "intel": {
+                    "intent": intel.intent if intel else None,
+                    "nome": intel.nome if intel else None,
+                    "urgencia": intel.urgencia if intel else None,
+                    "interesse": (intel.interesse or "")[:60] if intel else None,
+                    "score_delta": intel.score_delta if intel else 0,
+                    "objection_type": intel.objection_type if intel else None,
+                },
+                "lead_state_after": dict(lead_state),
+                "reply": reply,
+                "tool_calls": tool_calls,
+            }
+        )
 
         # 5) Append both sides to history; advance turn counters
         history.append({"role": "user", "content": user_msg})
@@ -242,9 +242,17 @@ def render_trace(result: dict) -> None:
     print("ANÁLISE COMPORTAMENTAL")
     print("─" * 76)
     flags = result["flags"]
-    print(f"  {'✗' if flags['greeted_on_turn_gt_0'] else '✓'} Não saudou em turn ≥ 1 (anti-BUG-001)")
-    print(f"  {'✗' if flags['asked_for_name_after_known'] else '✓'} Não voltou a pedir nome após capturado (anti-BUG-002)")
-    print(f"  {'✗' if flags['fabricated_slots'] else '✓'} Não fabricou slots sem tool call (anti-BUG-004)")
+    print(
+        f"  {'✗' if flags['greeted_on_turn_gt_0'] else '✓'} Não saudou em turn ≥ 1 (anti-BUG-001)"
+    )
+    print(
+        f"  {'✗' if flags['asked_for_name_after_known'] else '✓'} "
+        "Não voltou a pedir nome após capturado (anti-BUG-002)"
+    )
+    print(
+        f"  {'✗' if flags['fabricated_slots'] else '✓'} "
+        "Não fabricou slots sem tool call (anti-BUG-004)"
+    )
     print(f"  Final state: {result['final_state']}")
 
 
@@ -268,11 +276,14 @@ async def main_async(filter_name: str | None):
         except Exception as exc:
             print(f"\n✗ Scenario {s['name']} crashed: {exc!r}")
             import traceback
+
             traceback.print_exc()
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Simulate WhatsApp conversations through the Marcai IA stack.")
+    p = argparse.ArgumentParser(
+        description="Simulate WhatsApp conversations through the Marcai IA stack."
+    )
     p.add_argument("--scenario", help="Filter by scenario name substring.")
     args = p.parse_args()
     asyncio.run(main_async(args.scenario))
