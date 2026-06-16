@@ -15,15 +15,14 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 _SRC = Path(__file__).resolve().parent.parent.parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-import os as _os
+import os as _os  # noqa: E402  (import após bootstrap de sys.path)
 
-from ia_service.config import settings as _settings
+from ia_service.config import settings as _settings  # noqa: E402
 
 if _settings.langsmith_api_key:
     _os.environ.setdefault("LANGSMITH_API_KEY", _settings.langsmith_api_key)
@@ -56,10 +55,10 @@ async def run_local(examples: list[dict], evaluators) -> tuple[int, int]:
     passed = 0
     total = 0
     for ex in examples:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  {ex['name']}")
         print(f"  msg: {ex['inputs']['current_message'][:60]}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         result = await client_agent_target(ex["inputs"])
         reply = result.get("reply", "")
@@ -94,11 +93,13 @@ def run_langsmith_sync(examples: list[dict], evaluators, label: str | None = Non
 
     ls_examples = []
     for ex in examples:
-        ls_examples.append({
-            "inputs": ex["inputs"],
-            "outputs": ex["outputs"],
-            "metadata": {"name": ex["name"]},
-        })
+        ls_examples.append(
+            {
+                "inputs": ex["inputs"],
+                "outputs": ex["outputs"],
+                "metadata": {"name": ex["name"]},
+            }
+        )
 
     try:
         dataset = client.read_dataset(dataset_name=DATASET_NAME)
@@ -123,10 +124,11 @@ def run_langsmith_sync(examples: list[dict], evaluators, label: str | None = Non
 
     async def target(inputs):
         from .target import client_agent_target
+
         return await client_agent_target(inputs)
 
     experiment_prefix = label or f"client-agent-{_settings.agent_model_openai}"
-    results = asyncio.run(
+    asyncio.run(
         aevaluate(
             target,
             data=DATASET_NAME,
@@ -160,9 +162,9 @@ def main():
     else:
         passed, total = asyncio.run(run_local(examples, ALL_EVALUATORS))
         pct = (passed / total * 100) if total else 0
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  Results: {passed}/{total} ({pct:.0f}%)")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         sys.exit(0 if passed == total else 1)
 
 

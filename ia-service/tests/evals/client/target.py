@@ -36,6 +36,8 @@ async def client_agent_target(inputs: dict[str, Any]) -> dict[str, Any]:
     for msg in result["messages"]:
         if hasattr(msg, "tool_calls") and msg.tool_calls:
             for tc in msg.tool_calls:
-                tool_calls.append(tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", ""))
+                tool_calls.append(
+                    tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
+                )
 
     return {"reply": reply.strip(), "tool_calls": tool_calls}

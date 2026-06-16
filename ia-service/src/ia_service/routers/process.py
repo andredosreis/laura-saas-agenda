@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..deps import require_service_token
-from ..services import lead_orchestrator
-from ..services import client_orchestrator
+from ..services import client_orchestrator, lead_orchestrator
 
 router = APIRouter()
 logger = structlog.get_logger()

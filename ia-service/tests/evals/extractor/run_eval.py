@@ -79,12 +79,14 @@ def load_examples(fixture_filter: str | None = None) -> list[dict[str, Any]]:
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         for ex in data.get("examples", []):
-            items.append({
-                "fixture": data["name"],
-                "name": ex["name"],
-                "inputs": ex["inputs"],
-                "outputs": ex["outputs"],
-            })
+            items.append(
+                {
+                    "fixture": data["name"],
+                    "name": ex["name"],
+                    "inputs": ex["inputs"],
+                    "outputs": ex["outputs"],
+                }
+            )
     return items
 
 
@@ -185,7 +187,7 @@ def _ensure_dataset(client, items):
     existing: set[str] = set()
     try:
         for ex in client.list_examples(dataset_id=dataset.id):
-            meta = (getattr(ex, "metadata", None) or {})
+            meta = getattr(ex, "metadata", None) or {}
             existing.add(f"{meta.get('fixture', '')}::{meta.get('name', '')}")
     except Exception:
         pass

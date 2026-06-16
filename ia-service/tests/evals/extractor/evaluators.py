@@ -18,19 +18,14 @@ weighted average would.
 
 from __future__ import annotations
 
+# ─────────────────────────── Row-level evaluators ───────────────────────────
+import unicodedata
 from collections.abc import Sequence
 from typing import Any
 
 
-# ─────────────────────────── Row-level evaluators ───────────────────────────
-
-import unicodedata
-
-
 def _strip_accents(s: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
-    )
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
 
 def _outputs(obj) -> dict:
@@ -188,7 +183,11 @@ def _gather_pairs(runs, examples, run_key: str, example_key: str):
 def intent_macro_f1(runs: Sequence, examples: Sequence) -> dict[str, Any]:
     pairs = _gather_pairs(runs, examples, "intent", "expected_intent")
     if not pairs:
-        return {"key": "intent_macro_f1", "score": None, "comment": "no examples with expected_intent"}
+        return {
+            "key": "intent_macro_f1",
+            "score": None,
+            "comment": "no examples with expected_intent",
+        }
     report = _per_class_prf(pairs)
     score = _macro_f1(report)
     return {
@@ -201,7 +200,11 @@ def intent_macro_f1(runs: Sequence, examples: Sequence) -> dict[str, Any]:
 def urgencia_macro_f1(runs: Sequence, examples: Sequence) -> dict[str, Any]:
     pairs = _gather_pairs(runs, examples, "urgencia", "expected_urgencia")
     if not pairs:
-        return {"key": "urgencia_macro_f1", "score": None, "comment": "no examples with expected_urgencia"}
+        return {
+            "key": "urgencia_macro_f1",
+            "score": None,
+            "comment": "no examples with expected_urgencia",
+        }
     report = _per_class_prf(pairs)
     score = _macro_f1(report)
     return {
@@ -214,7 +217,11 @@ def urgencia_macro_f1(runs: Sequence, examples: Sequence) -> dict[str, Any]:
 def objection_type_macro_f1(runs: Sequence, examples: Sequence) -> dict[str, Any]:
     pairs = _gather_pairs(runs, examples, "objection_type", "expected_objection_type")
     if not pairs:
-        return {"key": "objection_type_macro_f1", "score": None, "comment": "no expected_objection_type"}
+        return {
+            "key": "objection_type_macro_f1",
+            "score": None,
+            "comment": "no expected_objection_type",
+        }
     report = _per_class_prf(pairs)
     score = _macro_f1(report)
     return {

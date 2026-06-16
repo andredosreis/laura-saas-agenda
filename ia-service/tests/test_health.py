@@ -16,7 +16,9 @@ async def test_health_returns_ok(client):
 
 async def test_health_when_marcai_down(client):
     with respx.mock:
-        respx.get("http://marcai-test/api/auth/me").mock(side_effect=Exception("connection refused"))
+        respx.get("http://marcai-test/api/auth/me").mock(
+            side_effect=Exception("connection refused")
+        )
         r = await client.get("/health")
 
     assert r.status_code == 200

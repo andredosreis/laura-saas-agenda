@@ -48,7 +48,7 @@ export const forgotPasswordLimiter = rateLimit({
 });
 ```
 
-Verificar que `app.set('trust proxy', 1)` está em `app.js` (necessário no Render).
+Verificar que `app.set('trust proxy', 1)` está em `app.js` (necessário atrás do nginx reverse proxy no VPS Contabo).
 
 ## validateWebhook (WhatsApp Z-API)
 

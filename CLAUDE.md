@@ -1,7 +1,7 @@
 # Laura SaaS Agenda
 
 Sistema SaaS multi-tenant de gestão de agendamentos para profissionais de saúde/estética.
-Produto comercial: **Marcai** (nome fantasia). Backend Node.js/Express no Render, frontend React/Vite PWA no Vercel.
+Produto comercial: **Marcai** (nome fantasia). Backend Node.js/Express + microserviço IA Python (FastAPI/LangChain) num VPS Contabo (Docker + nginx), frontend React/Vite PWA no Vercel.
 
 ## Library Documentation Lookup
 
@@ -32,7 +32,9 @@ If the documatation returned does not match the installed version, flag the disc
 | Auth | JWT access 1h + refresh 7d |
 | Timezone | Europe/Lisbon via luxon |
 | Notificações | Web Push VAPID |
-| Integrações | WhatsApp via Z-API webhook, OpenAI GPT-4o-mini |
+| Integrações | WhatsApp via Evolution API webhook, OpenAI GPT-4o-mini |
+| IA Service | Python 3.12+, FastAPI, LangChain (OpenAI/Gemini/Anthropic), uv, pytest, Ruff |
+| Infra | Docker + docker-compose, nginx (TLS Let's Encrypt), VPS Contabo; CI via GitHub Actions |
 
 ## Environment
 
@@ -45,6 +47,11 @@ npm start            # node src/server.js (produção)
 # Frontend
 cd laura-saas-frontend && npm run dev   # Vite (porta 5173)
 # Verificar: http://localhost:5173 → ecrã de login Marcai
+
+# IA Service (Python)
+cd ia-service && uv sync                          # instala deps no .venv
+PYTHONPATH=src .venv/bin/uvicorn ia_service.main:app --port 8000
+# Verificar: GET http://localhost:8000/health → 200
 ```
 
 ## Folder Structure
@@ -54,12 +61,33 @@ laura-saas-agenda/
 ├── src/                         # Backend Node.js ESM
 │   ├── server.js                # Entry point — DB + Express startup
 │   ├── app.js                   # Express setup — middlewares, rotas, errorHandler
-│   ├── controllers/             # Validação de input + orquestração de negócio
-│   ├── models/                  # Mongoose schemas + índices compostos
-│   ├── routes/                  # Express routers (só routing, sem lógica)
-│   ├── middlewares/             # auth.js, rateLimiter.js, errorHandler.js
-│   ├── services/                # Integrações externas: email, push, openai, zapi
-│   └── utils/                   # Helpers puros sem side effects
+│   ├── modules/                 # Modular monolith (ADR-011) — controller+routes+services por módulo
+│   │   ├── auth/                # 11 módulos migrados: auth, clientes, agendamento, ia,
+│   │   ├── clientes/            #   financeiro, leads, historico, notificacoes, users,
+│   │   └── ...                  #   messaging, admin (ver .claude/rules/express-routes.md)
+│   ├── controllers/             # Não migrados: dashboard, analytics, migration, schedule
+│   ├── routes/                  # Routers dos controllers não migrados
+│   ├── services/                # Shared: emailService, pushService, analyticsService
+│   ├── models/                  # Mongoose schemas + índices compostos (crosscutting)
+│   ├── middlewares/             # auth.js, rateLimiter.js, errorHandler.js (crosscutting)
+│   ├── utils/                   # Helpers puros sem side effects
+│   ├── config/                  # Helpers de configuração
+│   ├── jobs/                    # Definições de jobs BullMQ
+│   ├── queues/                  # Setup de filas BullMQ (Redis)
+│   ├── workers/                 # Processos worker (lembretes, etc.)
+│   └── migrations/              # Scripts de migração de dados
+├── ia-service/                  # Microserviço IA Python (FastAPI/LangChain)
+│   ├── src/ia_service/
+│   │   ├── main.py              # FastAPI app entry
+│   │   ├── config.py            # Config via pydantic-settings
+│   │   ├── routers/             # health, transcribe, process
+│   │   ├── agents/              # client_agent, lead_agent (LangChain)
+│   │   ├── services/            # evolution_client, mongo_reader, tenant_knowledge, ...
+│   │   ├── tools/               # lead_tools, client_tools
+│   │   └── prompts/             # Templates de prompt
+│   ├── tests/                   # pytest (+ tests/evals/ — avaliações LangSmith)
+│   ├── pyproject.toml           # Deps (uv) + config Ruff + pytest
+│   └── Dockerfile
 ├── laura-saas-frontend/         # Frontend React (migração TypeScript em curso)
 │   └── src/
 │       ├── pages/               # Uma página por rota (.jsx existente / .tsx novo)
@@ -68,16 +96,22 @@ laura-saas-agenda/
 │       ├── services/            # api.js — axios com interceptors
 │       ├── schemas/             # Zod schemas de formulários
 │       └── types/               # TypeScript type definitions
+├── nginx/                       # Config nginx (reverse proxy + TLS) — stack Docker
+├── deploy/                      # Tooling de deploy para o VPS Contabo
+├── docker-compose.prod.yml      # Stack de produção (backend + ia-service + evolution + redis)
+├── Dockerfile                   # Imagem do backend Node.js
 ├── scripts/
 │   ├── maintenance/             # Scripts de correcção de dados (execução manual)
 │   └── tools/                   # Scripts utilitários e de teste manual
 ├── docs/
-│   ├── adrs/generated/          # Architecture Decision Records (ADR-001 a ADR-013)
+│   ├── adrs/generated/          # Architecture Decision Records (ADR-001 a ADR-026)
 │   └── guidelines/              # Guias de desenvolvimento JS e TS
 └── .claude/
     ├── CLAUDE.md                # Este ficheiro — regras universais + triggers
+    ├── rules/                   # Regras por tópico (multi-tenant, express, mongoose, react...)
     ├── guidelines/              # Contexto específico por tipo de tarefa
     ├── agents/                  # Definições de subagentes especializados
+    ├── skills/                  # Skills locais Marcai
     └── docs/                    # Referência técnica (API.md, ARQUITETURA.md)
 ```
 
@@ -92,6 +126,11 @@ npm test -- --testPathPattern=auth           # Ficheiro específico
 cd laura-saas-frontend
 npm run build                                # TypeScript check + build Vite
 npm run lint                                 # ESLint
+
+# IA Service (Python) — a partir de ia-service/
+ruff check .                                  # lint (regras E, F, I)
+ruff format .                                 # formatação
+pytest                                        # testes (asyncio mode, dir tests/)
 ```
 
 ## Universal Rules

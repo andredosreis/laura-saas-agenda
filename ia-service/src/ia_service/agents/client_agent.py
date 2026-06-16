@@ -12,17 +12,17 @@ from typing import Any
 from langchain.agents import create_agent
 
 from ..services.prompt_renderer import render_client_system_prompt
+from ..tools.client_tools import (
+    make_cancel_appointment_tool,
+    make_create_client_appointment_tool,
+    make_get_my_appointments_tool,
+    make_get_my_packages_tool,
+    make_pausar_atendimento_tool,
+    make_reschedule_appointment_tool,
+)
 from ..tools.lead_tools import (
     make_find_servico_tool,
     make_get_available_slots_tool,
-)
-from ..tools.client_tools import (
-    make_get_my_packages_tool,
-    make_get_my_appointments_tool,
-    make_create_client_appointment_tool,
-    make_reschedule_appointment_tool,
-    make_cancel_appointment_tool,
-    make_pausar_atendimento_tool,
 )
 from .lead_agent import _build_model
 

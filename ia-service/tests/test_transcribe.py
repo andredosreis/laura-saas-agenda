@@ -6,8 +6,6 @@ não chamar o Gemini nem precisar de chave nos testes.
 
 import base64
 
-import pytest
-
 from ia_service.routers import transcribe as transcribe_router
 
 

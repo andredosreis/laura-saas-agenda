@@ -61,7 +61,9 @@ async def test_process_lead_reuses_existing_lead_id(client, auth_headers):
             return_value=Response(200, json={"key": {"id": "evo-msg-002"}})
         )
         respx.patch("http://marcai-test/api/internal/leads/lead-existing-999/stage").mock(
-            return_value=Response(200, json={**STAGE_RESPONSE, "data": {"_id": "lead-existing-999"}})
+            return_value=Response(
+                200, json={**STAGE_RESPONSE, "data": {"_id": "lead-existing-999"}}
+            )
         )
 
         r = await client.post("/process-lead", json=payload, headers=auth_headers)
@@ -70,7 +72,9 @@ async def test_process_lead_reuses_existing_lead_id(client, auth_headers):
     assert r.json()["lead_id"] == "lead-existing-999"
     # create_lead was NOT called
     assert "http://marcai-test/api/internal/leads" not in [
-        str(req.url) for req in respx.calls if req.request.method == "POST" and "mensagens" not in str(req.request.url)
+        str(req.url)
+        for req in respx.calls
+        if req.request.method == "POST" and "mensagens" not in str(req.request.url)
     ]
 
 
@@ -111,6 +115,7 @@ async def test_process_lead_morning_greeting_contains_bom_dia(client, auth_heade
 
     def capture_evolution(request):
         import json
+
         body = json.loads(request.content)
         evolution_calls.append(body["text"])
         return Response(200, json={"key": {"id": "evo-111"}})

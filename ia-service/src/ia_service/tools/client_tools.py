@@ -101,7 +101,11 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
                 except Exception:
                     pass
 
-                can_reschedule = "SIM" if hours_until != "?" and float(hours_until.replace("h", "")) >= 24 else "NAO (<24h)"
+                can_reschedule = (
+                    "SIM"
+                    if hours_until != "?" and float(hours_until.replace("h", "")) >= 24
+                    else "NAO (<24h)"
+                )
                 lines.append(
                     f"- [id={appt_id}] {label}: {dt_str} (status: {status}) "
                     f"— faltam {hours_until}, reagendar/cancelar: {can_reschedule}"
@@ -160,8 +164,7 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
             )
             return (
                 f"OK — sessao marcada para {data} as {hora}. "
-                "Confirma o agendamento ao cliente com naturalidade."
-                + pkg_info
+                "Confirma o agendamento ao cliente com naturalidade." + pkg_info
             )
         except Exception as exc:
             msg = str(exc)
@@ -185,9 +188,7 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
 def make_reschedule_appointment_tool(tenant_id: str, cliente_id: str):
 
     @tool
-    async def reschedule_appointment(
-        agendamento_id: str, nova_data: str, nova_hora: str
-    ) -> str:
+    async def reschedule_appointment(agendamento_id: str, nova_data: str, nova_hora: str) -> str:
         """Reagenda um agendamento existente para nova data/hora.
 
         Usa esta tool quando a cliente pede para mudar a data ou hora
@@ -211,7 +212,7 @@ def make_reschedule_appointment_tool(tenant_id: str, cliente_id: str):
                 tzinfo=ZoneInfo("Europe/Lisbon")
             )
             iso_utc = local.astimezone(ZoneInfo("UTC")).isoformat()
-            result = await marcai_client.reschedule_client_appointment(
+            await marcai_client.reschedule_client_appointment(
                 tenant_id=tenant_id,
                 cliente_id=cliente_id,
                 agendamento_id=agendamento_id,
@@ -298,9 +299,7 @@ def make_pausar_atendimento_tool(tenant_id: str, cliente_id: str):
         Nao precisa de argumentos.
         """
         try:
-            await marcai_client.pause_client_ia(
-                tenant_id=tenant_id, cliente_id=cliente_id
-            )
+            await marcai_client.pause_client_ia(tenant_id=tenant_id, cliente_id=cliente_id)
             return (
                 "OK — atendimento automatico pausado. Da a mensagem final de "
                 "despedida ao cliente e NAO respondas mais."

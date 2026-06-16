@@ -25,7 +25,6 @@ from unittest.mock import patch
 
 from ia_service.agents.lead_agent import make_lead_agent
 
-
 _FAKE_SLOTS = [
     {"date": "2026-05-19", "time": "09:00", "weekday": "Terça-feira"},
     {"date": "2026-05-19", "time": "11:00", "weekday": "Terça-feira"},
@@ -66,9 +65,7 @@ def _extract_tool_calls(messages: list[Any]) -> list[str]:
 def _extract_reply(last_message: Any) -> str:
     raw = getattr(last_message, "content", "") if last_message else ""
     if isinstance(raw, list):
-        return "".join(
-            (p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw
-        )
+        return "".join((p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw)
     return str(raw or "")
 
 

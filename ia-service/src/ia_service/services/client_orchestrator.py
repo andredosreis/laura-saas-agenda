@@ -97,7 +97,9 @@ async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) ->
             # Distinguir origem: marcacoes feitas pela Laura no painel
             # (criadoPorIA=False) contam tanto como as da IA — a IA deve
             # respeita-las e NAO marcar uma segunda sessao por cima.
-            origem = "marcado pela clinica" if appt.get("criadoPorIA") is False else "marcado pela IA"
+            origem = (
+                "marcado pela clinica" if appt.get("criadoPorIA") is False else "marcado pela IA"
+            )
             lines.append(f"- {label}: {dt} ({status}) — {origem}")
         return "\n".join(lines)
     except Exception as exc:
@@ -119,8 +121,8 @@ async def _generate_reply(
     try:
         from ..agents.client_agent import make_client_agent
 
-        messages, turn_number, last_clinic_message = (
-            await _build_conversation_history(tenant_id, cliente_id, mensagem, log)
+        messages, turn_number, last_clinic_message = await _build_conversation_history(
+            tenant_id, cliente_id, mensagem, log
         )
 
         upcoming = await _format_upcoming_appointments(tenant_id, cliente_id, log)
@@ -137,7 +139,7 @@ async def _generate_reply(
         run_config = {
             "tags": [
                 f"tenant:{tenant_id}",
-                f"lifecycle:client",
+                "lifecycle:client",
                 f"turn:{turn_number}",
                 f"provider:{settings.llm_provider}",
             ],
@@ -156,10 +158,7 @@ async def _generate_reply(
             last_msg = result["messages"][-1]
             raw = getattr(last_msg, "content", "")
             if isinstance(raw, list):
-                content = "".join(
-                    p.get("text", "") if isinstance(p, dict) else str(p)
-                    for p in raw
-                )
+                content = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in raw)
             else:
                 content = str(raw or "")
             if content.strip():
@@ -185,8 +184,10 @@ async def run(payload) -> dict:
     cliente_id = payload.cliente_id
 
     log = logger.bind(
-        tenant_id=tenant_id, telefone=telefone,
-        instance=instance_name, cliente_id=cliente_id,
+        tenant_id=tenant_id,
+        telefone=telefone,
+        instance=instance_name,
+        cliente_id=cliente_id,
     )
 
     # Defesa em profundidade: validar que o cliente existe na DB DESTE
@@ -209,7 +210,7 @@ async def run(payload) -> dict:
             log.warning("cliente_tenant_check_skipped", error=str(exc))
 
     # 1. Build client state for the system prompt
-    cliente_nome = getattr(payload, 'cliente_nome', None) or "Cliente"
+    cliente_nome = getattr(payload, "cliente_nome", None) or "Cliente"
     client_state = {"nome": cliente_nome, "telefone": telefone}
 
     # 2. Persist inbound message

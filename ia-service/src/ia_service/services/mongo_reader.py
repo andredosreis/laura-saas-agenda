@@ -3,8 +3,6 @@
 All writes go through marcai_client (HTTP to Node). Never add write methods here.
 """
 
-from functools import lru_cache
-
 import structlog
 from bson import ObjectId
 from pymongo import MongoClient
@@ -113,8 +111,13 @@ def find_available_slots(
 
     # Build candidate slots
     weekday_labels_pt = [
-        "Segunda", "Terça", "Quarta", "Quinta",
-        "Sexta", "Sábado", "Domingo",
+        "Segunda",
+        "Terça",
+        "Quarta",
+        "Quinta",
+        "Sexta",
+        "Sábado",
+        "Domingo",
     ]
     free_slots: list[dict] = []
 
@@ -132,9 +135,7 @@ def find_available_slots(
         start_h, start_m = map(int, rule["start"].split(":"))
         end_h, end_m = map(int, rule["end"].split(":"))
 
-        slot = datetime.combine(current, datetime.min.time()).replace(
-            hour=start_h, minute=start_m
-        )
+        slot = datetime.combine(current, datetime.min.time()).replace(hour=start_h, minute=start_m)
         end_of_day = datetime.combine(current, datetime.min.time()).replace(
             hour=end_h, minute=end_m
         )
@@ -167,12 +168,14 @@ def find_available_slots(
                 slot += timedelta(minutes=slot_duration_min)
                 continue
             if _slot_is_free(slot, slot_end):
-                free_slots.append({
-                    "date": slot.strftime("%Y-%m-%d"),
-                    "time": slot.strftime("%H:%M"),
-                    "weekday": weekday_labels_pt[py_weekday],
-                    "iso": slot.isoformat(),
-                })
+                free_slots.append(
+                    {
+                        "date": slot.strftime("%Y-%m-%d"),
+                        "time": slot.strftime("%H:%M"),
+                        "weekday": weekday_labels_pt[py_weekday],
+                        "iso": slot.isoformat(),
+                    }
+                )
             slot += timedelta(minutes=slot_duration_min)
 
         current += timedelta(days=1)

@@ -45,15 +45,16 @@ from zoneinfo import ZoneInfo
 from . import tenant_knowledge
 
 # Resolve template path from this file: services/ → ia_service/ → prompts/
-_TEMPLATE_PATH = (
-    Path(__file__).parent.parent / "prompts" / "system_lead_agent.md"
-)
-_CLIENT_TEMPLATE_PATH = (
-    Path(__file__).parent.parent / "prompts" / "system_client_agent.md"
-)
+_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "system_lead_agent.md"
+_CLIENT_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "system_client_agent.md"
 _WEEKDAYS_PT = [
-    "Segunda-feira", "Terça-feira", "Quarta-feira",
-    "Quinta-feira", "Sexta-feira", "Sábado", "Domingo",
+    "Segunda-feira",
+    "Terça-feira",
+    "Quarta-feira",
+    "Quinta-feira",
+    "Sexta-feira",
+    "Sábado",
+    "Domingo",
 ]
 
 # Sentinel value used in the prompt to mean "not yet captured".
@@ -67,8 +68,18 @@ def _load_template() -> str:
 
 
 _MONTHS_PT = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
 ]
 
 
@@ -91,6 +102,7 @@ def _today_string(timezone_name: str = "Europe/Lisbon") -> str:
 
 def _calendar_next_days(days: int = 30, timezone_name: str = "Europe/Lisbon") -> str:
     from datetime import timedelta
+
     now = datetime.now(ZoneInfo(timezone_name))
     lines = []
     for i in range(days):
@@ -141,8 +153,7 @@ def render_system_prompt(
 
     template = _load_template()
     return (
-        template
-        .replace("{{voz}}", tenant_knowledge.load_voz(tenant_id))
+        template.replace("{{voz}}", tenant_knowledge.load_voz(tenant_id))
         .replace("{{catalogo}}", tenant_knowledge.load_catalogo(tenant_id))
         .replace("{{politicas}}", tenant_knowledge.load_politicas(tenant_id))
         .replace("{{today}}", _today_string())
@@ -177,8 +188,7 @@ def render_client_system_prompt(
 
     template = _CLIENT_TEMPLATE_PATH.read_text(encoding="utf-8")
     return (
-        template
-        .replace("{{voz}}", tenant_knowledge.load_voz(tenant_id))
+        template.replace("{{voz}}", tenant_knowledge.load_voz(tenant_id))
         .replace("{{catalogo}}", tenant_knowledge.load_catalogo(tenant_id))
         .replace("{{politicas}}", tenant_knowledge.load_politicas(tenant_id))
         .replace("{{today}}", _today_string())

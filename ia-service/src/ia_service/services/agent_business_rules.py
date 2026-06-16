@@ -33,41 +33,64 @@ from typing import Optional, TypedDict
 
 # 0=Monday, 1=Tuesday, ..., 6=Sunday (Python's datetime.weekday() convention)
 WEEKDAY_NAMES = [
-    "monday", "tuesday", "wednesday",
-    "thursday", "friday", "saturday", "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
 ]
 
 
 class DayRule(TypedDict, total=False):
-    start: str       # "HH:MM" hora local
-    end: str         # "HH:MM" hora local
-    break_start: str # opcional
-    break_end: str   # opcional
+    start: str  # "HH:MM" hora local
+    end: str  # "HH:MM" hora local
+    break_start: str  # opcional
+    break_end: str  # opcional
 
 
 # Map: tenant_id → { day_name → DayRule | None (None = fechado) }
 RULES_PER_TENANT: dict[str, dict[str, Optional[DayRule]]] = {
-
     # L.A. Estética Avançada (Laura) — pilot
     "695413fb6ce936a9097af750": {
-        "monday":    {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "tuesday":   {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "wednesday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "thursday":  {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "friday":    {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "saturday":  {"start": "09:00", "end": "13:00"},  # 4h sem break
-        "sunday":    None,  # fechado
+        "monday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
+        "tuesday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
+        "wednesday": {
+            "start": "09:00",
+            "end": "19:00",
+            "break_start": "12:00",
+            "break_end": "13:00",
+        },
+        "thursday": {
+            "start": "09:00",
+            "end": "19:00",
+            "break_start": "12:00",
+            "break_end": "13:00",
+        },
+        "friday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
+        "saturday": {"start": "09:00", "end": "13:00"},  # 4h sem break
+        "sunday": None,  # fechado
     },
-
     # Default para clínicas novas que ainda não definiram regras
     "_default": {
-        "monday":    {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "tuesday":   {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "wednesday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "thursday":  {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "friday":    {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
-        "saturday":  {"start": "09:00", "end": "13:00"},
-        "sunday":    None,
+        "monday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
+        "tuesday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
+        "wednesday": {
+            "start": "09:00",
+            "end": "19:00",
+            "break_start": "12:00",
+            "break_end": "13:00",
+        },
+        "thursday": {
+            "start": "09:00",
+            "end": "19:00",
+            "break_start": "12:00",
+            "break_end": "13:00",
+        },
+        "friday": {"start": "09:00", "end": "19:00", "break_start": "12:00", "break_end": "13:00"},
+        "saturday": {"start": "09:00", "end": "13:00"},
+        "sunday": None,
     },
 }
 
@@ -91,11 +114,10 @@ RULES_PER_TENANT: dict[str, dict[str, Optional[DayRule]]] = {
 # um dia mesmo que normalmente esteja aberto.
 # Depois de editar: rebuild + restart do ia-service.
 DATE_OVERRIDES_PER_TENANT: dict[str, dict[str, Optional[DayRule]]] = {
-
     # L.A. Estética Avançada (Laura)
     "695413fb6ce936a9097af750": {
         # Chave SEMPRE no formato "YYYY-MM-DD" (sem texto à frente).
-        "2026-12-25": None,   # Natal
+        "2026-12-25": None,  # Natal
         "2026-06-03": None,
         "2026-06-04": None,
         "2026-06-10": None,
