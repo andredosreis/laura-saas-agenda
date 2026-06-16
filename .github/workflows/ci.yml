@@ -90,3 +90,11 @@ jobs:
       - name: Pytest
         run: uv run pytest --ignore=tests/evals
         working-directory: ia-service
+        env:
+          # Chaves falsas — os testes só CONSTROEM os clientes LLM (não fazem
+          # chamadas reais). Sem isto, ChatGoogleGenerativeAI rejeita na __init__.
+          # NÃO definir INTERNAL_SERVICE_TOKEN aqui — o conftest trata disso via
+          # setdefault e os testes assinam com esse valor; sobrepor causa 401.
+          GOOGLE_API_KEY: fake-gemini-key-ci
+          OPENAI_API_KEY: sk-fake-openai-key-ci
+          ANTHROPIC_API_KEY: fake-anthropic-key-ci
