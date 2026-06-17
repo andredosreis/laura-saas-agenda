@@ -199,7 +199,7 @@ function Agendamentos() {
         respondidoPor: 'laura'
       });
 
-      toast.success(`✅ Agendamento ${confirmacao === 'confirmado' ? 'confirmado' : 'rejeitado'} com sucesso!`);
+      toast.success(`✅ Agendamento ${confirmacao === 'confirmado' ? 'confirmado' : 'cancelado'} com sucesso!`);
       carregarAgendamentos();
     } catch (error) {
       console.error('Erro ao confirmar agendamento:', error);
@@ -492,7 +492,7 @@ function Agendamentos() {
                   )}
                   {conf === 'rejeitado' && (
                     <span className="text-xs px-2 py-0.5 rounded-full border bg-red-500/10 text-red-500 border-red-500/20 font-medium">
-                      ✗ Rejeitado
+                      ✗ Cancelado
                     </span>
                   )}
                 </div>
@@ -515,7 +515,7 @@ function Agendamentos() {
                         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 transition-all text-sm font-medium disabled:opacity-50"
                       >
                         <XCircle className="w-4 h-4" />
-                        Rejeitar
+                        Cancelar
                       </button>
                     </div>
                   )}
