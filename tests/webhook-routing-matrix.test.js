@@ -295,6 +295,53 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(updated.ocupaSlot).toBe(false); // slot libertado pelo pre-save hook
   });
 
+  // ── Regressão: notificação de sistema recente NÃO bloqueia confirmação ──
+  //   A confirmação enviada ao criar o agendamento é persistida na thread
+  //   (geradoPor='sistema'). Antes do fix, marcava iaConversationActive=true e
+  //   um SIM/NÃO logo a seguir era tratado como resposta à IA (mid-conversa) e
+  //   ignorado. iaConversationActive passa a ignorar mensagens 'sistema'.
+
+  test('regressão: confirmação de sistema recente não bloqueia o SIM/NÃO seguinte', async () => {
+    const tenant = await createTenant({ slug: 'sistema-msg' });
+    const tenantId = tenant._id.toString();
+    const { Cliente, Agendamento, Mensagem } = getModels(getTenantDB(tenantId));
+
+    const cliente = await Cliente.create({ tenantId, nome: 'Nuno', telefone: '351913000333' });
+    const agendamento = await Agendamento.create({
+      tenantId,
+      tipo: 'Sessao',
+      cliente: cliente._id,
+      dataHora: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      status: 'Agendado',
+      confirmacao: { tipo: 'pendente' },
+    });
+
+    // Simula a confirmação que o worker grava na thread ao criar o agendamento.
+    await Mensagem.create({
+      tenantId,
+      telefone: '351913000333',
+      mensagem: '✅ Agendamento Confirmado!',
+      origem: 'laura',
+      direcao: 'saida',
+      geradoPor: 'sistema',
+      data: new Date(),
+    });
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildPayload({ messageId: 'msg-sistema-nao', phone: '351913000333', text: 'nao' }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const updated = await Agendamento.findById(agendamento._id);
+    expect(updated.status).toBe('Cancelado Pelo Cliente');
+    expect(updated.confirmacao.tipo).toBe('rejeitado');
+    // a notificação 'sistema' não foi tratada como conversa activa → não foi p/ a IA
+    expect(processClientCalls).toHaveLength(0);
+  });
+
   // ── PRD §1.1 row 3: phone with no Lead AND no Client → IA_LEAD ──
 
   test('row 3: unknown phone → IA_LEAD + iaServiceClient.processLead called with leadId=null', async () => {

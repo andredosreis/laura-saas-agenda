@@ -128,18 +128,26 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
       .select('_id')
       .lean(),
     models.Mensagem
-      ? models.Mensagem.findOne({ tenantId, telefone: { $in: variants } })
+      ? models.Mensagem.findOne({
+          tenantId,
+          telefone: { $in: variants },
+          // As notificações automáticas (confirmação/lembrete) SÃO persistidas
+          // como Mensagem com geradoPor='sistema' (feature "lembretes na thread").
+          // Excluímo-las aqui: senão a própria confirmação do agendamento marcaria
+          // iaConversationActive=true e um SIM/NÃO logo a seguir seria tratado como
+          // resposta à IA (mid-conversation) e ignorado. Só contam conversas reais.
+          geradoPor: { $ne: 'sistema' },
+        })
           .sort({ data: -1, createdAt: -1 })
           .select('direcao data createdAt')
           .lean()
       : null,
   ]);
 
-  // Conversa IA activa: a última mensagem registada foi um outbound do bot
-  // (a IA a perguntar/responder) nos últimos 30 min. Os lembretes NÃO são
-  // persistidos como Mensagem, por isso um outbound recente = agente IA.
-  // Usado para não rotear um "sim" de cliente (resposta à IA) para o
-  // confirmador legacy de lembretes.
+  // Conversa IA activa: a última mensagem CONVERSACIONAL (excluindo notificações
+  // geradoPor='sistema', filtradas na query acima) foi um outbound do bot/humano
+  // nos últimos 30 min. Usado para não rotear um "sim" de cliente (resposta à IA)
+  // para o confirmador legacy de lembretes.
   const lastMsgDate = lastMessage?.data || lastMessage?.createdAt || null;
   const iaConversationActive = Boolean(
     lastMessage &&
