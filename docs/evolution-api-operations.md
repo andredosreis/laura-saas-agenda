@@ -1,55 +1,66 @@
-# Evolution API — Operações e Manutenção (v2.x)
+# Evolution API — Operações e Manutenção (v2.x · VPS Contabo)
+
+> **Infra actual:** Evolution API corre na stack Docker do VPS Contabo (ADR-023),
+> atrás do nginx. **Não** é Railway, e o backend **não** é Render — essa topologia
+> foi descontinuada. Ver `docker-compose.prod.yml`.
 
 ## Infraestrutura
 
-| Componente | Localização | URL |
+| Componente | Localização | Endereço |
 |---|---|---|
-| Evolution API | Railway (Docker) | `https://evolution-api-production-d1564.up.railway.app` (v1) / *Sua nova URL (v2)* |
-| Backend (Node.js) | Render | `https://laura-saas.onrender.com` |
-| Instância WhatsApp | `marcai` | — |
-| Imagem Docker | `atendai/evolution-api:v2.1.1` (ou alvo) | — |
+| Evolution API | Docker no Contabo (`marcai-evolution`) | Público: `https://<WA_DOMAIN>` · Interno: `http://evolution-api:8080` |
+| Backend (Node.js) | Docker no Contabo (`marcai-backend`) | Público: `https://<API_DOMAIN>` · Interno: `http://backend:5000` |
+| Postgres (dados Evolution) | Docker no Contabo (`marcai-postgres`) | Interno: `postgres:5432` |
+| Redis (cache Evolution, db 6) | Docker no Contabo (`marcai-redis`) | Interno: `redis:6379` |
+| Imagem Docker | `evoapicloud/evolution-api:v2.3.7` | — |
+| Instância WhatsApp (partilhada) | `marcai` | `EVOLUTION_INSTANCE` |
 
-**API Key (Evolution):** `b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f`
+- `<WA_DOMAIN>` = valor de `WHATSAPP_DOMAIN` no `.env` do Contabo (ex.: `wa.marcai.pt`).
+- `<API_DOMAIN>` = domínio público do backend no nginx (ex.: `api.marcai.pt`).
+- Só o nginx está exposto à internet (80/443). Evolution/backend/redis/postgres
+  comunicam pela rede interna `marcai` por **nome de serviço** — nenhum publica
+  porta no host.
 
 ---
 
-## Variáveis de Ambiente
+## Segredos — nunca hardcoded
 
-### Render (backend Node.js)
-```
-EVOLUTION_API_URL=https://evolution-api-production-d1564.up.railway.app # (ou NOVA URL v2)
-EVOLUTION_API_KEY=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f # (ou NOVA API KEY v2)
-EVOLUTION_INSTANCE=marcai
-EVOLUTION_WEBHOOK_SECRET=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f # (ou NOVO SECRET v2)
+Todas as chaves vivem no `.env` do Contabo (não commitado). Antes de correr os
+comandos abaixo, exporta-os para o shell (a partir do VPS, ou de uma máquina com
+acesso ao domínio público):
+
+```bash
+export WA="https://<WA_DOMAIN>"          # Evolution (público, via nginx)
+export API="https://<API_DOMAIN>"        # backend (público, via nginx)
+export APIKEY="<EVOLUTION_API_KEY>"      # = AUTHENTICATION_API_KEY da Evolution
+export INSTANCE="marcai"                 # ou o instanceName do tenant
 ```
 
-### Railway (Evolution API v2.x)
+> Onde ler os valores reais: no Contabo, na pasta do stack, `grep -E 'WHATSAPP_DOMAIN|EVOLUTION_API_KEY|EVOLUTION_INSTANCE|EVOLUTION_WEBHOOK_SECRET' .env`.
+
+### Variáveis de ambiente relevantes
+
+`.env` (lido por backend, ia-service e pela própria Evolution via `docker-compose.prod.yml`):
 ```
-SERVER_TYPE=http
-SERVER_PORT=8080
-AUTHENTICATION_TYPE=apikey
-AUTHENTICATION_API_KEY=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f
-AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
-DATABASE_PROVIDER=postgresql
-DATABASE_CONNECTION_URI=${{Postgres.DATABASE_URL}}
-DATABASE_CONNECTION_CLIENT_NAME=evolution_marcai
-CACHE_REDIS_ENABLED=true
-CACHE_REDIS_URI=${{Redis.REDIS_URL}}
-LOG_LEVEL=VERBOSE
-DEL_INSTANCE=false
+WHATSAPP_DOMAIN=wa.exemplo.pt
+EVOLUTION_API_KEY=<chave>              # AUTHENTICATION_API_KEY da Evolution
+EVOLUTION_INSTANCE=marcai             # instância partilhada por omissão
+EVOLUTION_WEBHOOK_SECRET=<chave>      # validado pelo backend em /webhook/evolution
 ```
+
+`EVOLUTION_API_URL` **não** se define no `.env` — é fixado no compose como
+`http://evolution-api:8080` (topologia interna, não segredo) para backend e ia-service.
 
 ---
 
 ## 1. Verificar Estado da Conexão
 
 ```bash
-curl -s "https://evolution-api-production-d1564.up.railway.app/instance/fetchInstances" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" | python3 -c "
+curl -s "$WA/instance/fetchInstances" -H "apikey: $APIKEY" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-inst = data[0]['instance']
-print('Status:', inst['status'])
+inst = data[0]['instance'] if isinstance(data, list) else data
+print('Status:', inst.get('status') or inst.get('connectionStatus'))
 print('Número:', inst.get('owner', 'N/A'))
 print('Nome:', inst.get('profileName', 'N/A'))
 "
@@ -65,16 +76,15 @@ print('Nome:', inst.get('profileName', 'N/A'))
 
 ### Passo 1 — Criar instância (só na primeira vez)
 ```bash
-curl -s -X POST "https://evolution-api-production-d1564.up.railway.app/instance/create" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" \
+curl -s -X POST "$WA/instance/create" \
+  -H "apikey: $APIKEY" \
   -H "Content-Type: application/json" \
-  -d '{"instanceName":"marcai","qrcode":true}'
+  -d "{\"instanceName\":\"$INSTANCE\",\"qrcode\":true,\"integration\":\"WHATSAPP-BAILEYS\"}"
 ```
 
 ### Passo 2 — Obter QR Code e escanear
 ```bash
-curl -s "https://evolution-api-production-d1564.up.railway.app/instance/connect/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" | python3 -c "
+curl -s "$WA/instance/connect/$INSTANCE" -H "apikey: $APIKEY" | python3 -c "
 import sys, json, base64
 data = json.load(sys.stdin)
 b64 = data.get('base64', '')
@@ -95,8 +105,7 @@ else:
 ## 3. Desligar WhatsApp (Desconectar Número)
 
 ```bash
-curl -s -X DELETE "https://evolution-api-production-d1564.up.railway.app/instance/logout/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" | python3 -c "
+curl -s -X DELETE "$WA/instance/logout/$INSTANCE" -H "apikey: $APIKEY" | python3 -c "
 import sys, json; print(json.dumps(json.load(sys.stdin), indent=2))
 "
 ```
@@ -111,14 +120,11 @@ Se precisares de ligar um número diferente (ex: passar da conta pessoal para co
 
 ```bash
 # 1. Desliga o número actual
-curl -s -X DELETE "https://evolution-api-production-d1564.up.railway.app/instance/logout/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f"
+curl -s -X DELETE "$WA/instance/logout/$INSTANCE" -H "apikey: $APIKEY"
 
 # 2. Aguarda 3 segundos e gera novo QR
 sleep 3
-
-curl -s "https://evolution-api-production-d1564.up.railway.app/instance/connect/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" | python3 -c "
+curl -s "$WA/instance/connect/$INSTANCE" -H "apikey: $APIKEY" | python3 -c "
 import sys, json, base64
 data = json.load(sys.stdin)
 b64 = data.get('base64', '')
@@ -133,8 +139,7 @@ if b64:
 ## 5. Apagar Instância Completamente (recomeçar do zero)
 
 ```bash
-curl -s -X DELETE "https://evolution-api-production-d1564.up.railway.app/instance/delete/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f"
+curl -s -X DELETE "$WA/instance/delete/$INSTANCE" -H "apikey: $APIKEY"
 ```
 
 Depois recria com o **Passo 1** do ponto 2.
@@ -143,32 +148,43 @@ Depois recria com o **Passo 1** do ponto 2.
 
 ## 6. Configurar Webhook (após recriar instância)
 
-O webhook diz à Evolution API para onde enviar as mensagens recebidas (respostas SIM/NÃO dos clientes).
+O webhook diz à Evolution API para onde enviar as mensagens recebidas. O backend
+valida cada pedido em `POST /webhook/evolution` comparando o header `apikey` com
+`EVOLUTION_WEBHOOK_SECRET` (ver `src/middlewares/webhookAuth.js`) — por isso o
+secret enviado pela Evolution tem de ser igual a `EVOLUTION_WEBHOOK_SECRET`.
 
 ```bash
-curl -s -X POST "https://evolution-api-production-d1564.up.railway.app/webhook/set/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" \
+curl -s -X POST "$WA/webhook/set/$INSTANCE" \
+  -H "apikey: $APIKEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://laura-saas.onrender.com/webhook/evolution",
-    "webhook_by_events": false,
-    "webhook_base64": false,
-    "events": ["MESSAGES_UPSERT"]
-  }'
+  -d "{
+    \"webhook\": {
+      \"enabled\": true,
+      \"url\": \"$API/webhook/evolution\",
+      \"headers\": { \"apikey\": \"$APIKEY\" },
+      \"byEvents\": false,
+      \"base64\": false,
+      \"events\": [\"MESSAGES_UPSERT\"]
+    }
+  }"
 ```
+
+> **Nota v2.3.7:** o corpo do `webhook/set` é aninhado em `{"webhook": {...}}`. Em
+> versões mais antigas era plano (`{"url":..., "events":[...]}`). Confirma a versão
+> em `docker compose ps` / `GET $WA` se a Evolution rejeitar o payload.
 
 ---
 
 ## 7. Testar Envio de Mensagem
 
 ```bash
-curl -s -X POST "https://evolution-api-production-d1564.up.railway.app/message/sendText/marcai" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" \
+curl -s -X POST "$WA/message/sendText/$INSTANCE" \
+  -H "apikey: $APIKEY" \
   -H "Content-Type: application/json" \
-  -d '{"number":"351912462033","text":"✅ Teste — Evolution API v2 a funcionar!"}' | python3 -c "
+  -d '{"number":"351912462033","text":"✅ Teste — Evolution API v2 (Contabo) a funcionar!"}' | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-print('Resultado:', data.get('status', 'enviado') if 'status' in data else 'ENVIADO OK')
+print('Resultado:', data.get('status', 'ENVIADO OK'))
 "
 ```
 
@@ -178,17 +194,17 @@ Substitui `351912462033` pelo número de destino (formato: `351` + número sem e
 
 ## 8. Testar Webhook (segurança)
 
-Confirma que o webhook rejeita pedidos sem a chave correcta:
+Confirma que o webhook do backend rejeita pedidos sem a chave correcta:
 
 ```bash
-# Deve devolver 401
-curl -s -X POST "https://laura-saas.onrender.com/webhook/evolution" \
+# Deve devolver 401 (sem apikey)
+curl -s -X POST "$API/webhook/evolution" \
   -H "Content-Type: application/json" \
   -d '{"event":"messages.upsert"}' | python3 -c "import sys,json; print(json.load(sys.stdin))"
 
-# Deve devolver 200 (evento ignorado mas autenticado)
-curl -s -X POST "https://laura-saas.onrender.com/webhook/evolution" \
-  -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f" \
+# Deve devolver 200 (autenticado; evento ignorado)
+curl -s -X POST "$API/webhook/evolution" \
+  -H "apikey: <EVOLUTION_WEBHOOK_SECRET>" \
   -H "Content-Type: application/json" \
   -d '{"event":"other.event"}' | python3 -c "import sys,json; print(json.load(sys.stdin))"
 ```
@@ -198,26 +214,30 @@ curl -s -X POST "https://laura-saas.onrender.com/webhook/evolution" \
 ## 9. Checklist de Diagnóstico (quando algo não funciona)
 
 ```
+[ ] Stack Docker de pé?
+    No Contabo: docker compose -f docker-compose.prod.yml ps
+    → marcai-evolution, marcai-backend, marcai-postgres, marcai-redis = Up
+
 [ ] Evolution API online?
-    curl https://evolution-api-production-d1564.up.railway.app
-    → deve devolver {"status":200,"version":"2.x.x",...}
+    curl -s "$WA" → {"status":200,"version":"2.3.7",...}
 
 [ ] Instância conectada?
     → Verificar estado (ponto 1) — deve ser "open"
 
 [ ] Webhook configurado?
-    curl -s "https://evolution-api-production-d1564.up.railway.app/webhook/find/marcai" \
-      -H "apikey: b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f"
-    → deve mostrar url: "https://laura-saas.onrender.com/webhook/evolution"
+    curl -s "$WA/webhook/find/$INSTANCE" -H "apikey: $APIKEY"
+    → url deve ser "https://<API_DOMAIN>/webhook/evolution"
 
-[ ] Variáveis no Render correctas?
-    EVOLUTION_API_URL=https://evolution-api-production-d1564.up.railway.app
-    EVOLUTION_API_KEY=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f
-    EVOLUTION_INSTANCE=marcai
-    EVOLUTION_WEBHOOK_SECRET=b56b644bc387907ee06f9104cec84d65be293359ce0f5e200d82d5798cb4c27f
+[ ] Variáveis no .env do Contabo correctas?
+    grep -E 'WHATSAPP_DOMAIN|EVOLUTION_API_KEY|EVOLUTION_INSTANCE|EVOLUTION_WEBHOOK_SECRET' .env
+    (EVOLUTION_API_URL é interno e fixado no compose: http://evolution-api:8080)
 
-[ ] Render fez redeploy depois de alterar variáveis?
-    → No Render: Manual Deploy → Deploy latest commit
+[ ] Após alterar o .env, reiniciar os serviços?
+    docker compose -f docker-compose.prod.yml up -d backend ia-service
+    (a Evolution só relê env em restart: docker compose ... up -d evolution-api)
+
+[ ] Logs em tempo real?
+    docker logs -f marcai-evolution   |   ou o painel Dozzle em logs.<dominio>
 ```
 
 ---
@@ -225,25 +245,45 @@ curl -s -X POST "https://laura-saas.onrender.com/webhook/evolution" \
 ## 10. Fluxo Completo de Mensagens
 
 ```
-ENVIO (agendamento criado):
-  Render (Node.js)
-    → POST /message/sendText/marcai (Railway Evolution API)
-    → WhatsApp do cliente
+ENVIO (agendamento criado / resposta da IA):
+  backend (Node.js, marcai-backend)
+    → POST http://evolution-api:8080/message/sendText/<instance>   (rede interna)
+    → Evolution → WhatsApp do cliente
 
-RECEPÇÃO (cliente responde SIM/NÃO):
+RECEPÇÃO (cliente responde):
   WhatsApp do cliente
-    → Evolution API (Railway) detecta mensagem
-    → POST /webhook/evolution (Render)
-    → agendamento actualizado para Confirmado/Cancelado
+    → Evolution (marcai-evolution) detecta mensagem
+    → POST https://<API_DOMAIN>/webhook/evolution   (via nginx, header apikey)
+    → backend valida (EVOLUTION_WEBHOOK_SECRET) e processa
 ```
 
 ---
 
 ## 11. Painel de Gestão Visual (Evolution Manager)
 
-Acede ao painel web da Evolution API:
 ```
-https://evolution-api-production-d1564.up.railway.app/manager
+https://<WA_DOMAIN>/manager
 ```
 
-Permite ver instâncias, estado da ligação, e enviar mensagens de teste manualmente.
+Permite ver instâncias, estado da ligação e enviar mensagens de teste. Login com a
+`EVOLUTION_API_KEY` (AUTHENTICATION_API_KEY). É um complemento — o fluxo de
+provisionamento (criar instância → QR → webhook) faz-se por API (secções 2 e 6).
+
+---
+
+## 12. Multi-tenant: instância partilhada vs dedicada
+
+Hoje o `evolutionClient.js` cai para `EVOLUTION_INSTANCE` (`marcai`) quando o tenant
+não tem instância própria. O modelo `Tenant.whatsapp.instanceName` (índice único,
+sparse) foi desenhado para **uma instância por tenant** — a Evolution resolve o
+tenant a partir de `req.body.instance` no webhook.
+
+Ao activar um cliente novo, decide:
+- **Dedicada** → `instanceName` = slug do tenant; cria instância própria (secção 2)
+  e configura o webhook dessa instância (secção 6). Isolamento real por cliente.
+- **Partilhada** → reusa `marcai`. Atalho; todos partilham o mesmo número/instância.
+
+Este passo de activação **não existe ainda** no fluxo de registo — é o que o painel
+super-admin (ADR-024) terá de automatizar. Ver o teste-documento
+`tests/tenant-provisioning.test.js` (teste 6) que prova que um tenant nasce sem
+WhatsApp provisionado.
