@@ -1,16 +1,33 @@
 import { DateTime } from 'luxon';
 import { getNotificationQueue } from '../queues/notificationQueue.js';
+import { sendWhatsAppMessage } from './evolutionClient.js';
 import logger from './logger.js';
 
 const ZONA = 'Europe/Lisbon';
 
-export async function scheduleNotifications({ agendamentoId, tenantId, dataHora, clienteNome, clienteTelefone, servicoNome }) {
-  const queue = getNotificationQueue();
-  if (!queue) return; // Redis não configurado — degradação silenciosa
+function buildConfirmacaoMessage({ clienteNome, dataHora, servicoNome }) {
+  const dt = DateTime.fromISO(dataHora, { zone: ZONA });
+  const dataFormatada = dt.toFormat('dd/MM/yyyy');
+  const horaFormatada = dt.toFormat('HH:mm');
+  const servicoLinha = servicoNome ? `💆 Serviço: ${servicoNome}\n` : '';
 
+  return `✅ *Agendamento Confirmado!*
+
+Olá ${clienteNome}!
+
+O seu agendamento foi marcado com sucesso:
+${servicoLinha}📅 Data: ${dataFormatada}
+🕐 Horário: ${horaFormatada}
+
+Até breve! 💆‍♀️✨
+
+_LA Estética Avançada_`;
+}
+
+export async function scheduleNotifications({ agendamentoId, tenantId, dataHora, clienteNome, clienteTelefone, servicoNome }) {
   if (!clienteTelefone) {
     logger.warn({ agendamentoId }, '[Notifications] Sem telefone — jobs não agendados');
-    return;
+    return { queued: false, reason: 'missing_phone' };
   }
 
   const agendamento = DateTime.fromJSDate(new Date(dataHora)).setZone(ZONA);
@@ -25,6 +42,34 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
     servicoNome: servicoNome || 'sessão',
     dataHora: agendamento.toISO(),
   };
+
+  const queue = getNotificationQueue();
+  if (!queue) {
+    logger.warn(
+      { agendamentoId },
+      '[Notifications] Redis não configurado — lembretes futuros não agendados'
+    );
+
+    if (process.env.NODE_ENV === 'test') {
+      return { queued: false, reason: 'redis_unavailable' };
+    }
+
+    const mensagem = buildConfirmacaoMessage(baseData);
+    const resultado = await sendWhatsAppMessage(clienteTelefone, mensagem);
+    if (!resultado.success) {
+      logger.warn(
+        { agendamentoId, err: resultado.error },
+        '[Notifications] Confirmação imediata não enviada sem Redis'
+      );
+      return { queued: false, immediateSent: false, reason: 'redis_unavailable' };
+    }
+
+    logger.info(
+      { agendamentoId },
+      '[Notifications] Confirmação imediata enviada; lembretes futuros requerem Redis'
+    );
+    return { queued: false, immediateSent: true, reason: 'redis_unavailable' };
+  }
 
   // 1. Confirmação imediata (sem delay)
   await queue.add('confirmacao', { ...baseData, tipo: 'confirmacao' });
@@ -61,4 +106,5 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
   }
 
   logger.info({ agendamentoId, diasAte: Math.floor(diasAte) }, '[Notifications] Jobs agendados');
+  return { queued: true };
 }

@@ -5,6 +5,51 @@ import { sendWhatsAppMessage } from "../../utils/evolutionClient.js";
 import { scheduleNotifications } from "../../utils/scheduleNotifications.js";
 import { scopeAgendamentoQuery } from "./agendamentoScope.js";
 
+const ZONA = 'Europe/Lisbon';
+const STATUS_CANCELADO_CLIENTE = 'Cancelado Pelo Cliente';
+const STATUS_CANCELADO_SALAO = 'Cancelado Pelo Salão';
+
+const nowLisbonDate = () => DateTime.now().setZone(ZONA).toJSDate();
+
+const formatServicoNomeLembrete = (servicoTipo, servicoNome) => {
+  const nome = typeof servicoNome === 'string' ? servicoNome.trim() : servicoNome;
+  if (!nome) return null;
+  return servicoTipo === 'oferta' ? `${nome} (oferta sem cobrança)` : nome;
+};
+
+const getStatusForConfirmacao = (confirmacao, respondidoPor) => {
+  if (confirmacao === 'confirmado') return 'Confirmado';
+  return respondidoPor === 'cliente' ? STATUS_CANCELADO_CLIENTE : STATUS_CANCELADO_SALAO;
+};
+
+const getConfirmacaoPatchForStatus = (status, respondidoPor = 'laura') => {
+  if (status === 'Confirmado') {
+    return {
+      'confirmacao.tipo': 'confirmado',
+      'confirmacao.respondidoEm': nowLisbonDate(),
+      'confirmacao.respondidoPor': respondidoPor,
+    };
+  }
+
+  if (status === STATUS_CANCELADO_CLIENTE || status === STATUS_CANCELADO_SALAO) {
+    return {
+      'confirmacao.tipo': 'rejeitado',
+      'confirmacao.respondidoEm': nowLisbonDate(),
+      'confirmacao.respondidoPor': respondidoPor,
+    };
+  }
+
+  if (status === 'Agendado') {
+    return {
+      'confirmacao.tipo': 'pendente',
+      'confirmacao.respondidoEm': null,
+      'confirmacao.respondidoPor': null,
+    };
+  }
+
+  return {};
+};
+
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
 const timeToMinutes = (timeString) => {
   if (!timeString) return null;
@@ -16,7 +61,19 @@ const timeToMinutes = (timeString) => {
 export const createAgendamento = async (req, res) => {
   try {
     const { Agendamento } = req.models; // Schedule desactivado — ver bloco comentado abaixo
-    const { tipo = 'Sessao', cliente, lead, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
+    const {
+      tipo = 'Sessao',
+      cliente,
+      lead,
+      dataHora,
+      pacote,
+      compraPacote,
+      servicoTipo,
+      servicoAvulsoNome,
+      servicoAvulsoValor,
+      profissional,
+      observacoes,
+    } = req.body;
 
     // Validação contextual que não dá para expressar no Zod sem discriminated union mais complexa
     if (tipo === 'Avaliacao') {
@@ -27,11 +84,11 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ success: false, error: 'cliente é obrigatório para agendamentos do tipo Sessao ou Retorno' });
     }
 
-    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "Europe/Lisbon" });
+    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: ZONA });
     if (!agendamentoDateTime.isValid) {
       return res.status(400).json({ message: "Data e hora do agendamento inválidas." });
     }
-    if (agendamentoDateTime < DateTime.now().setZone("Europe/Lisbon")) {
+    if (agendamentoDateTime < DateTime.now().setZone(ZONA)) {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
 
@@ -66,50 +123,118 @@ export const createAgendamento = async (req, res) => {
     // }
 
     const agendamentoDurationMinutes = 60;
+    const conflictWindow = {
+      $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
+      $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
+    };
+
+    // Auto-heal de slots antigos: se um documento foi cancelado/rejeitado antes
+    // de `ocupaSlot` ser sincronizado, liberta a reserva antes de validar conflito.
+    await Agendamento.updateMany(
+      {
+        tenantId: req.tenantId,
+        dataHora: conflictWindow,
+        ocupaSlot: true,
+        $or: [
+          { status: { $in: [STATUS_CANCELADO_CLIENTE, STATUS_CANCELADO_SALAO] } },
+          { 'confirmacao.tipo': 'rejeitado' },
+        ],
+      },
+      { $set: { ocupaSlot: false } }
+    );
+
     const conflictingAgendamento = await Agendamento.findOne({
       tenantId: req.tenantId,
-      dataHora: {
-        $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
-        $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
-      },
-      status: { $in: ["Agendado", "Confirmado"] },
+      dataHora: conflictWindow,
+      $or: [
+        { ocupaSlot: true },
+        {
+          status: { $nin: [STATUS_CANCELADO_CLIENTE, STATUS_CANCELADO_SALAO] },
+          'confirmacao.tipo': { $ne: 'rejeitado' },
+        },
+      ],
     });
 
     if (conflictingAgendamento) {
       return res.status(400).json({ message: "Já existe um agendamento para este horário." });
     }
 
-    console.log('[createAgendamento] Dados recebidos:', { cliente, dataHora, pacote, compraPacote, tenantId: req.tenantId });
+    const servicoTipoFinal = servicoTipo || (servicoAvulsoNome ? 'avulso' : 'pacote');
+    const servicoAvulsoNomeFinal = typeof servicoAvulsoNome === 'string'
+      ? servicoAvulsoNome.trim()
+      : servicoAvulsoNome;
+    let pacoteFinal = pacote;
+    let compraPacoteFinal = compraPacote;
+    let servicoAvulsoValorFinal = servicoAvulsoValor;
+    let statusPagamentoInicial;
+    let valorCobradoInicial;
+
+    if (servicoTipoFinal === 'oferta') {
+      if (!servicoAvulsoNomeFinal) {
+        return res.status(400).json({ message: 'Informe o serviço ofertado.' });
+      }
+      pacoteFinal = undefined;
+      compraPacoteFinal = undefined;
+      servicoAvulsoValorFinal = 0;
+      statusPagamentoInicial = 'Isento';
+      valorCobradoInicial = 0;
+    } else if (servicoTipoFinal === 'avulso') {
+      if (!servicoAvulsoNomeFinal) {
+        return res.status(400).json({ message: 'Informe o nome do serviço avulso.' });
+      }
+      pacoteFinal = undefined;
+      compraPacoteFinal = undefined;
+      servicoAvulsoValorFinal = servicoAvulsoValorFinal ?? 0;
+    }
 
     const novoAgendamento = new Agendamento({
       tipo,
       cliente: tipo === 'Avaliacao' ? undefined : cliente,
       lead: tipo === 'Avaliacao' ? { nome: lead.nome, telefone: lead.telefone, email: lead.email } : undefined,
       dataHora: agendamentoDateTime.toJSDate(),
-      pacote,
-      compraPacote,
-      servicoAvulsoNome,
-      servicoAvulsoValor,
+      pacote: pacoteFinal,
+      compraPacote: compraPacoteFinal,
+      servicoTipo: servicoTipoFinal,
+      servicoAvulsoNome: servicoAvulsoNomeFinal,
+      servicoAvulsoValor: servicoAvulsoValorFinal,
+      statusPagamento: statusPagamentoInicial,
+      valorCobrado: valorCobradoInicial,
+      profissional,
+      observacoes,
       tenantId: req.tenantId
     });
     await novoAgendamento.save();
-
-    console.log('[createAgendamento] ✅ Agendamento criado:', {
-      _id: novoAgendamento._id,
-      cliente: novoAgendamento.cliente,
-      compraPacote: novoAgendamento.compraPacote,
-      status: novoAgendamento.status
-    });
 
     // Agendar notificações (confirmação + lembretes)
     let clienteNome = novoAgendamento.lead?.nome;
     let clienteTelefone = novoAgendamento.lead?.telefone;
 
-    if (tipo !== 'Avaliacao' && cliente) {
-      const { Cliente } = req.models;
-      const clienteDoc = await Cliente.findOne({ _id: cliente, tenantId: req.tenantId }).select('nome telefone');
-      clienteNome = clienteDoc?.nome;
-      clienteTelefone = clienteDoc?.telefone;
+    const { Cliente, Pacote, CompraPacote } = req.models;
+
+    const clientePromise =
+      tipo !== 'Avaliacao' && cliente
+        ? Cliente.findOne({ _id: cliente, tenantId: req.tenantId }).select('nome telefone')
+        : Promise.resolve(null);
+
+    // Avulso/oferta já têm o nome em servicoAvulsoNome; pacote precisa de lookup
+    // para que as notificações agendadas mostrem o nome real em vez do genérico.
+    let pacotePromise = Promise.resolve(null);
+    if (servicoTipoFinal === 'pacote' && compraPacoteFinal) {
+      pacotePromise = CompraPacote.findOne({ _id: compraPacoteFinal, tenantId: req.tenantId }).populate('pacote', 'nome');
+    } else if (servicoTipoFinal === 'pacote' && pacoteFinal) {
+      pacotePromise = Pacote.findOne({ _id: pacoteFinal, tenantId: req.tenantId }).select('nome');
+    }
+
+    const [clienteDoc, pacoteDoc] = await Promise.all([clientePromise, pacotePromise]);
+
+    if (clienteDoc) {
+      clienteNome = clienteDoc.nome;
+      clienteTelefone = clienteDoc.telefone;
+    }
+
+    let servicoNomeNotif = servicoAvulsoNomeFinal;
+    if (servicoTipoFinal === 'pacote' && pacoteDoc) {
+      servicoNomeNotif = pacoteDoc.pacote?.nome || pacoteDoc.nome || null;
     }
 
     scheduleNotifications({
@@ -118,7 +243,7 @@ export const createAgendamento = async (req, res) => {
       dataHora: novoAgendamento.dataHora,
       clienteNome,
       clienteTelefone,
-      servicoNome: servicoAvulsoNome,
+      servicoNome: formatServicoNomeLembrete(servicoTipoFinal, servicoNomeNotif),
     }).catch((err) => console.error('[createAgendamento] Falha ao agendar notificações:', err));
 
     res.status(201).json(novoAgendamento);
@@ -224,10 +349,14 @@ export const updateAgendamento = async (req, res) => {
       profissional,
       servicoAvulsoNome,
       servicoAvulsoValor,
+      servicoTipo,
       cliente,
       pacote,
       compraPacote,
-      lead
+      lead,
+      statusPagamento,
+      transacao,
+      valorCobrado
     } = req.body;
 
     const update = {};
@@ -237,10 +366,46 @@ export const updateAgendamento = async (req, res) => {
     if (profissional !== undefined) update.profissional = profissional;
     if (servicoAvulsoNome !== undefined) update.servicoAvulsoNome = servicoAvulsoNome;
     if (servicoAvulsoValor !== undefined) update.servicoAvulsoValor = servicoAvulsoValor;
+    if (servicoTipo !== undefined) update.servicoTipo = servicoTipo;
     if (cliente !== undefined) update.cliente = cliente || null;
     if (pacote !== undefined) update.pacote = pacote || null;
     if (compraPacote !== undefined) update.compraPacote = compraPacote || null;
     if (lead !== undefined) update.lead = lead || undefined;
+    if (statusPagamento !== undefined) update.statusPagamento = statusPagamento;
+    if (transacao !== undefined) update.transacao = transacao || null;
+    if (valorCobrado !== undefined) update.valorCobrado = valorCobrado;
+
+    if (servicoTipo === 'oferta') {
+      const nomeOferta = servicoAvulsoNome !== undefined ? servicoAvulsoNome?.trim() : undefined;
+      if (nomeOferta === '') {
+        return res.status(400).json({ message: 'Informe o serviço ofertado.' });
+      }
+      update.pacote = null;
+      update.compraPacote = null;
+      update.servicoAvulsoValor = 0;
+      update.valorCobrado = 0;
+      update.statusPagamento = 'Isento';
+      update.transacao = null;
+    } else if (servicoTipo === 'avulso') {
+      const nomeAvulso = servicoAvulsoNome !== undefined ? servicoAvulsoNome?.trim() : undefined;
+      if (nomeAvulso === '') {
+        return res.status(400).json({ message: 'Informe o nome do serviço avulso.' });
+      }
+      update.pacote = null;
+      update.compraPacote = null;
+    }
+
+    if (status !== undefined) {
+      const agendamentoAtual = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId })
+        .select('status')
+        .lean();
+      if (!agendamentoAtual) {
+        return res.status(404).json({ message: "Agendamento não encontrado." });
+      }
+      if (status !== agendamentoAtual.status) {
+        Object.assign(update, getConfirmacaoPatchForStatus(status, 'laura'));
+      }
+    }
 
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
@@ -270,8 +435,6 @@ export const updateStatusAgendamento = async (req, res) => {
       return res.status(400).json({ message: "O campo status é obrigatório." });
     }
 
-    console.log(`[updateStatusAgendamento] Alterando status para: ${status}`);
-
     const agendamentoAtual = await Agendamento.findOne(
       scopeAgendamentoQuery(req, { _id: req.params.id })
     );
@@ -280,9 +443,13 @@ export const updateStatusAgendamento = async (req, res) => {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
-    console.log(`[updateStatusAgendamento] Agendamento encontrado. compraPacote: ${agendamentoAtual.compraPacote}`);
-
-    if (status === 'Realizado' && agendamentoAtual.compraPacote) {
+    if (status === 'Realizado' && agendamentoAtual.servicoTipo === 'oferta') {
+      agendamentoAtual.valorCobrado = 0;
+      agendamentoAtual.servicoAvulsoValor = 0;
+      agendamentoAtual.statusPagamento = 'Isento';
+      agendamentoAtual.transacao = null;
+      await agendamentoAtual.save();
+    } else if (status === 'Realizado' && agendamentoAtual.compraPacote) {
       const compraPacote = await CompraPacote.findOne({ _id: agendamentoAtual.compraPacote, tenantId: req.tenantId }).populate('pacote');
 
       if (!compraPacote) {
@@ -290,21 +457,15 @@ export const updateStatusAgendamento = async (req, res) => {
         return res.status(404).json({ message: "Pacote comprado não encontrado." });
       }
 
-      console.log(`[updateStatusAgendamento] CompraPacote encontrada. Sessões restantes: ${compraPacote.sessoesRestantes}`);
-
       try {
         const valorPorSessao = compraPacote.pacote?.valor && compraPacote.pacote?.sessoes
           ? compraPacote.pacote.valor / compraPacote.pacote.sessoes
           : 0;
         await compraPacote.usarSessao(agendamentoAtual._id, valorPorSessao, req.user?._id);
-        console.log(`✅ Sessão decrementada do pacote ${compraPacote._id}. Restantes: ${compraPacote.sessoesRestantes - 1}`);
 
         agendamentoAtual.valorCobrado = valorPorSessao;
         agendamentoAtual.statusPagamento = 'Pago';
         await agendamentoAtual.save();
-
-        console.log(`✅ Sessão registrada sem criar transação (receita já contabilizada na venda do pacote)`);
-
       } catch (error) {
         console.error('⚠️ Erro ao decrementar sessão:', error.message);
         return res.status(400).json({
@@ -313,7 +474,6 @@ export const updateStatusAgendamento = async (req, res) => {
         });
       }
     } else if (status === 'Realizado' && !agendamentoAtual.compraPacote && agendamentoAtual.servicoAvulsoValor) {
-      console.log(`[updateStatusAgendamento] ⏳ Serviço avulso realizado. Aguardando registro de pagamento pelo frontend.`);
       agendamentoAtual.statusPagamento = 'Pendente';
       await agendamentoAtual.save();
     } else if (status === 'Realizado' && !agendamentoAtual.compraPacote) {
@@ -322,7 +482,10 @@ export const updateStatusAgendamento = async (req, res) => {
 
     const agendamento = await Agendamento.findOneAndUpdate(
       scopeAgendamentoQuery(req, { _id: req.params.id }),
-      { status },
+      {
+        status,
+        ...getConfirmacaoPatchForStatus(status, 'laura'),
+      },
       { new: true, runValidators: true }
     ).populate('compraPacote cliente');
 
@@ -365,21 +528,26 @@ export const confirmarAgendamento = async (req, res) => {
       });
     }
 
-    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('cliente');
+    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId })
+      .populate('cliente pacote')
+      .populate({ path: 'compraPacote', populate: { path: 'pacote', select: 'nome' } });
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
+    const novoStatus = getStatusForConfirmacao(confirmacao, respondidoPor);
+
     agendamento.confirmacao = {
       tipo: confirmacao,
-      respondidoEm: new Date(),
+      respondidoEm: nowLisbonDate(),
       respondidoPor: respondidoPor
     };
+    agendamento.status = novoStatus;
 
     await agendamento.save();
 
     try {
-      if (respondidoPor === 'laura') {
+      if (respondidoPor === 'laura' && agendamento.cliente?._id) {
         const subscriptionCliente = await UserSubscription.findOne({
           userId: agendamento.cliente._id.toString(),
           active: true,
@@ -462,6 +630,12 @@ export const registrarPagamentoServico = async (req, res) => {
       });
     }
 
+    if (agendamento.servicoTipo === 'oferta' || agendamento.statusPagamento === 'Isento') {
+      return res.status(400).json({
+        message: 'Este agendamento é uma oferta e não gera pagamento.'
+      });
+    }
+
     if (!agendamento.servicoAvulsoValor) {
       return res.status(400).json({
         message: 'Este agendamento não possui valor de serviço avulso definido.'
@@ -510,8 +684,6 @@ export const registrarPagamentoServico = async (req, res) => {
       { path: 'profissional', select: 'nome' }
     ]);
 
-    console.log(`✅ Pagamento de serviço avulso registrado: Transação ${transacao._id}, Pagamento ${pagamento._id}`);
-
     res.status(201).json({
       success: true,
       message: 'Pagamento registrado com sucesso',
@@ -532,9 +704,10 @@ export const registrarPagamentoServico = async (req, res) => {
 export const enviarLembreteManual = async (req, res) => {
   try {
     const { Agendamento } = req.models;
-    console.log('[Agendamento] 📱 Enviando lembrete manual via WhatsApp...');
 
-    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('cliente');
+    const agendamento = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId })
+      .populate('cliente pacote')
+      .populate({ path: 'compraPacote', populate: { path: 'pacote', select: 'nome' } });
 
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
@@ -554,13 +727,18 @@ export const enviarLembreteManual = async (req, res) => {
     const dataAgendamento = DateTime.fromJSDate(new Date(agendamento.dataHora));
     const dataFormatada = dataAgendamento.toFormat('dd/MM/yyyy');
     const horaFormatada = dataAgendamento.toFormat('HH:mm');
+    const servicoNome = formatServicoNomeLembrete(
+      agendamento.servicoTipo,
+      agendamento.compraPacote?.pacote?.nome || agendamento.pacote?.nome || agendamento.servicoAvulsoNome
+    );
+    const servicoLinha = servicoNome ? `💆 Serviço: ${servicoNome}\n` : '';
 
     const mensagem = `🔔 *Lembrete de Agendamento*
 
 Olá ${nome}!
 
 Você tem um agendamento marcado:
-📅 Data: ${dataFormatada}
+${servicoLinha}📅 Data: ${dataFormatada}
 🕐 Horário: ${horaFormatada}
 
 Por favor, confirme sua presença respondendo:
@@ -574,7 +752,6 @@ _La Estética Avançada_`;
     const resultado = await sendWhatsAppMessage(telefone, mensagem);
 
     if (resultado.success) {
-      console.log(`[Agendamento] ✅ Lembrete WhatsApp enviado para ${nome} (${telefone})`);
       return res.status(200).json({
         success: true,
         message: `Lembrete enviado via WhatsApp para ${nome}`,
@@ -785,6 +962,9 @@ export const getStatsMes = async (req, res) => {
     const receitaTotal = agendamentos
       .filter(a => a.status === 'Realizado')
       .reduce((acc, a) => {
+        if (a.servicoTipo === 'oferta' || a.statusPagamento === 'Isento') {
+          return acc;
+        }
         if (a.valorCobrado) {
           return acc + a.valorCobrado;
         } else if (a.servicoAvulsoValor) {

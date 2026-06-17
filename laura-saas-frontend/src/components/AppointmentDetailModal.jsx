@@ -1,14 +1,16 @@
-import { X, User, Package, Calendar, Clock, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, MessageCircle } from 'lucide-react';
+import { X, User, Package, Calendar, Clock, Edit, Trash2, MessageCircle, Gift } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { useTheme } from '../contexts/ThemeContext';
 
 const STATUS_OPTIONS = [
     { value: 'Agendado', label: 'Agendado', color: 'blue' },
     { value: 'Confirmado', label: 'Confirmado', color: 'teal' },
+    { value: 'Compareceu', label: 'Compareceu', color: 'purple' },
     { value: 'Realizado', label: 'Realizado', color: 'green' },
-    { value: 'Cancelado', label: 'Cancelado', color: 'red' },
-    { value: 'Não Compareceu', label: 'Não Compareceu', color: 'amber' },
-    { value: 'Remarcado', label: 'Remarcado', color: 'purple' }
+    { value: 'Fechado', label: 'Fechado', color: 'green' },
+    { value: 'Cancelado Pelo Cliente', label: 'Cancelado pelo Cliente', color: 'red' },
+    { value: 'Cancelado Pelo Salão', label: 'Cancelado pelo Salão', color: 'red' },
+    { value: 'Não Compareceu', label: 'Não Compareceu', color: 'amber' }
 ];
 
 function AppointmentDetailModal({
@@ -104,7 +106,13 @@ function AppointmentDetailModal({
                                     })()} de {appointment.pacote.sessoes || '?'}
                                 </p>
                             )}
-                            {appointment.servicoAvulsoValor && (
+                            {appointment.servicoTipo === 'oferta' && (
+                                <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-medium">
+                                    <Gift className="w-3 h-3" />
+                                    Oferta sem cobrança
+                                </span>
+                            )}
+                            {appointment.servicoTipo !== 'oferta' && appointment.servicoAvulsoValor && (
                                 <p className={`text-sm ${subtextClass}`}>
                                     €{Number(appointment.servicoAvulsoValor).toFixed(2)}
                                 </p>

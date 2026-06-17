@@ -2,9 +2,13 @@ import { useEffect, useState, useMemo } from "react";
 import { toast } from 'react-toastify';
 import { useNavigate } from "react-router-dom";
 import {
-  Users, Plus, Search, Phone, Package, Calendar, Edit, Trash2, Loader2, RefreshCw
+  Users, Plus, Search, Phone, Package, Calendar, CalendarPlus, Edit, Trash2, Loader2, RefreshCw
 } from 'lucide-react';
+import { DateTime } from 'luxon';
 import api from "../services/api";
+
+const ZONA = 'Europe/Lisbon';
+const STATUS_CANCELADOS = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
 import { useTheme } from '../contexts/ThemeContext';
 import ErrorBoundary from "../components/ErrorBoundary";
 
@@ -13,6 +17,7 @@ function Clientes() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [pacotesClientes, setPacotesClientes] = useState({}); // { clienteId: [pacotes] }
+  const [proximosAgendamentos, setProximosAgendamentos] = useState({}); // { clienteId: agendamento }
   const [isLoading, setIsLoading] = useState(true);
   const [busca, setBusca] = useState('');
   const [totalServidor, setTotalServidor] = useState(0); // total no DB (pode ser > clientes.length se houver mais que limit)
@@ -94,6 +99,34 @@ function Clientes() {
     return () => { cancelado = true; };
   }, [clientes]);
 
+  // Próximo agendamento por cliente — uma chamada (próximos, ordenados), mapeada
+  // ao primeiro (mais cedo) não cancelado de cada cliente. Best-effort: o card
+  // funciona na mesma se isto falhar ou se houver >100 próximos agendamentos.
+  useEffect(() => {
+    let cancelado = false;
+
+    const fetchProximos = async () => {
+      try {
+        const nowISO = new Date().toISOString();
+        const res = await api.get(`/agendamentos?dataInicio=${encodeURIComponent(nowISO)}&sort=asc&limit=100`);
+        const lista = Array.isArray(res.data?.data) ? res.data.data : [];
+
+        const mapa = {};
+        for (const ag of lista) {
+          const cid = ag.cliente?._id;
+          if (!cid || STATUS_CANCELADOS.includes(ag.status)) continue;
+          if (!mapa[cid]) mapa[cid] = ag; // primeiro = mais cedo (sort asc)
+        }
+        if (!cancelado) setProximosAgendamentos(mapa);
+      } catch {
+        // silencioso — o card não depende disto
+      }
+    };
+
+    fetchProximos();
+    return () => { cancelado = true; };
+  }, []);
+
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja eliminar este cliente?")) return;
     try {
@@ -113,6 +146,8 @@ function Clientes() {
   };
 
   const handleEdit = (id) => navigate(`/clientes/editar/${id}`);
+  const handleAgendar = (id) => navigate(`/criar-agendamento?cliente=${id}`);
+  const handleGerirAgendamento = (agendamentoId) => navigate(`/agendamentos/editar/${agendamentoId}`);
 
   if (isLoading) {
     return (
@@ -215,8 +250,11 @@ function Clientes() {
                   key={cliente._id}
                   cliente={cliente}
                   pacotes={pacotesClientes[cliente._id] || []}
+                  proximoAgendamento={proximosAgendamentos[cliente._id] || null}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onAgendar={handleAgendar}
+                  onGerirAgendamento={handleGerirAgendamento}
                   cardClass={cardClass}
                   textClass={textClass}
                   subTextClass={subTextClass}
@@ -231,12 +269,15 @@ function Clientes() {
   );
 }
 
-const ClienteCard = ({ cliente, pacotes = [], onEdit, onDelete, cardClass, textClass, subTextClass, isDarkMode }) => {
+const ClienteCard = ({ cliente, pacotes = [], proximoAgendamento, onEdit, onDelete, onAgendar, onGerirAgendamento, cardClass, textClass, subTextClass, isDarkMode }) => {
   if (!cliente) return null;
 
   const totalSessoes = pacotes.reduce((sum, cp) => sum + (cp.sessoesRestantes || 0), 0);
   const primeiroPacote = pacotes[0];
   const inicial = (cliente.nome || '?').charAt(0).toUpperCase();
+  const proximaData = proximoAgendamento
+    ? DateTime.fromISO(proximoAgendamento.dataHora).setZone(ZONA).toFormat("dd/MM '·' HH:mm")
+    : null;
 
   return (
     <div className={`${cardClass} rounded-2xl p-5 hover:shadow-lg transition-all`}>
@@ -283,17 +324,48 @@ const ClienteCard = ({ cliente, pacotes = [], onEdit, onDelete, cardClass, textC
         </div>
       </div>
 
-      {/* Acções */}
+      {/* Próximo agendamento (se existir) */}
+      {proximaData && (
+        <div className={`flex items-center gap-2 text-sm mb-3 px-3 py-2 rounded-xl ${
+          isDarkMode ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100'
+        }`}>
+          <Calendar className="w-4 h-4 shrink-0 text-indigo-500" />
+          <span className={`${textClass} truncate`}>
+            Próximo: <strong>{proximaData}</strong>
+          </span>
+        </div>
+      )}
+
+      {/* Acções — focadas no agendamento; editar dados do cliente é secundário */}
       <div className="flex gap-2">
+        {proximoAgendamento ? (
+          <button
+            onClick={() => onGerirAgendamento(proximoAgendamento._id)}
+            aria-label={`Gerir agendamento de ${cliente.nome || ''}`}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all text-sm font-medium"
+          >
+            <Calendar className="w-4 h-4" />
+            Gerir agendamento
+          </button>
+        ) : (
+          <button
+            onClick={() => onAgendar(cliente._id)}
+            aria-label={`Agendar para ${cliente.nome || ''}`}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90 transition-all text-sm font-medium"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Agendar
+          </button>
+        )}
         <button
           onClick={() => onEdit(cliente._id)}
-          aria-label={`Editar cliente ${cliente.nome || ''}`}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl ${
+          aria-label={`Editar dados de ${cliente.nome || ''}`}
+          title="Editar dados do cliente"
+          className={`p-2 rounded-xl ${
             isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'
-          } transition-colors text-sm font-medium`}
+          } transition-colors`}
         >
           <Edit className="w-4 h-4 text-indigo-500" />
-          <span className={textClass}>Editar</span>
         </button>
         <button
           onClick={() => onDelete(cliente._id)}

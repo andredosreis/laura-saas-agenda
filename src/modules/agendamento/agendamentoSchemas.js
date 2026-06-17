@@ -23,6 +23,7 @@ const leadSchema = z
   .strict();
 
 const tipoEnum = z.enum(['Sessao', 'Retorno', 'Avaliacao']);
+const servicoTipoEnum = z.enum(['pacote', 'avulso', 'oferta']);
 
 // Alinhado com enum em src/models/Agendamento.js
 const statusEnum = z.enum([
@@ -45,6 +46,7 @@ export const createAgendamentoSchema = z
     dataHora: z.string().min(1, 'dataHora é obrigatória'),
     pacote: objectId.optional().nullable(),
     compraPacote: objectId.optional().nullable(),
+    servicoTipo: servicoTipoEnum.optional(),
     servicoAvulsoNome: z.string().trim().max(200).optional(),
     servicoAvulsoValor: z.number().nonnegative().optional().nullable(),
     profissional: objectId.optional().nullable(),
@@ -60,12 +62,13 @@ export const updateAgendamentoSchema = z
     profissional: objectId.optional().nullable(),
     servicoAvulsoNome: z.string().trim().max(200).optional(),
     servicoAvulsoValor: z.number().nonnegative().optional().nullable(),
+    servicoTipo: servicoTipoEnum.optional(),
     cliente: objectId.optional().nullable(),
     pacote: objectId.optional().nullable(),
     compraPacote: objectId.optional().nullable(),
     lead: leadSchema.optional(),
     // Campos de pagamento (update após registar transação/pagamento)
-    statusPagamento: z.enum(['Pendente', 'Pago', 'Cancelado']).optional(),
+    statusPagamento: z.enum(['Pendente', 'Pago', 'Cancelado', 'Isento']).optional(),
     transacao: objectId.optional().nullable(),
     valorCobrado: z.number().nonnegative().optional(),
   })

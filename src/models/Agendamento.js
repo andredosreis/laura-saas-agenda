@@ -72,6 +72,12 @@ const agendamentoSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  servicoTipo: {
+    type: String,
+    enum: ['pacote', 'avulso', 'oferta'],
+    default: 'pacote',
+    index: true
+  },
   confirmacao: {
     tipo: {
       type: String,
@@ -110,7 +116,7 @@ const agendamentoSchema = new mongoose.Schema({
   },
   statusPagamento: {
     type: String,
-    enum: ['Pendente', 'Pago', 'Cancelado'],
+    enum: ['Pendente', 'Pago', 'Cancelado', 'Isento'],
     default: 'Pendente'
   },
 
@@ -213,16 +219,20 @@ agendamentoSchema.index(
   },
 );
 
-// Lista canónica de status que NÃO ocupam slot (libertam a "reserva").
-// Mantida em módulo dedicado para reutilização (handlers + migration script).
 const STATUSES_QUE_NAO_OCUPAM_SLOT = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
+const CONFIRMACOES_QUE_NAO_OCUPAM_SLOT = ['rejeitado'];
+
+function calculaOcupaSlot(status, confirmacao) {
+  return !STATUSES_QUE_NAO_OCUPAM_SLOT.includes(status) &&
+    !CONFIRMACOES_QUE_NAO_OCUPAM_SLOT.includes(confirmacao?.tipo);
+}
 
 agendamentoSchema.pre('save', function () {
   if (this.isNew && this.dataHora < new Date()) {
     throw new Error('Não é possível criar agendamentos com data no passado.');
   }
   // GAP-01: deriva ocupaSlot de status antes de persistir.
-  this.ocupaSlot = !STATUSES_QUE_NAO_OCUPAM_SLOT.includes(this.status);
+  this.ocupaSlot = calculaOcupaSlot(this.status, this.confirmacao);
 });
 
 // GAP-01: hooks de update para garantir que ocupaSlot acompanha mudanças
@@ -231,9 +241,14 @@ agendamentoSchema.pre('save', function () {
 function syncOcupaSlotInUpdate() {
   const update = this.getUpdate() || {};
   const $set = update.$set || update;
-  if ($set && Object.prototype.hasOwnProperty.call($set, 'status')) {
+  if ($set && (
+    Object.prototype.hasOwnProperty.call($set, 'status') ||
+    Object.prototype.hasOwnProperty.call($set, 'confirmacao') ||
+    Object.prototype.hasOwnProperty.call($set, 'confirmacao.tipo')
+  )) {
     const novoStatus = $set.status;
-    const novoOcupa = !STATUSES_QUE_NAO_OCUPAM_SLOT.includes(novoStatus);
+    const novaConfirmacao = $set.confirmacao || { tipo: $set['confirmacao.tipo'] };
+    const novoOcupa = calculaOcupaSlot(novoStatus, novaConfirmacao);
     if (update.$set) update.$set.ocupaSlot = novoOcupa;
     else update.ocupaSlot = novoOcupa;
   }

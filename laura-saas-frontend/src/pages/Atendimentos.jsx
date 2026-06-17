@@ -122,6 +122,23 @@ function Atendimentos() {
 
   const formatarData = (dataISO) => DateTime.fromISO(dataISO).setZone(ZONA).toFormat('dd/MM/yyyy HH:mm');
   const formatarValor = (v) => v == null ? '—' : new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v);
+  const isOferta = (a) => a?.servicoTipo === 'oferta' || a?.statusPagamento === 'Isento';
+  const formatarValorAtendimento = (a) => isOferta(a)
+    ? 'Oferta'
+    : formatarValor(a.valorCobrado || a.servicoAvulsoValor);
+  const pagamentoBadge = (a) => {
+    const oferta = isOferta(a);
+    const cls = oferta
+      ? 'bg-emerald-500/10 text-emerald-500'
+      : a.statusPagamento === 'Pago'
+        ? 'bg-emerald-500/10 text-emerald-500'
+        : 'bg-amber-500/10 text-amber-500';
+    return (
+      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+        {oferta ? 'Sem cobrança' : (a.statusPagamento || 'Pendente')}
+      </span>
+    );
+  };
 
   const statusBadge = (status) => {
     const map = {
@@ -401,16 +418,10 @@ function Atendimentos() {
                         </td>
                         <td className="px-4 py-3">{statusBadge(a.status)}</td>
                         <td className={`px-4 py-3 text-sm ${textClass} whitespace-nowrap`}>
-                          {formatarValor(a.valorCobrado || a.servicoAvulsoValor)}
+                          {formatarValorAtendimento(a)}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                            a.statusPagamento === 'Pago'
-                              ? 'bg-emerald-500/10 text-emerald-500'
-                              : 'bg-amber-500/10 text-amber-500'
-                          }`}>
-                            {a.statusPagamento || 'Pendente'}
-                          </span>
+                          {pagamentoBadge(a)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           {a.status === 'Realizado' ? (
@@ -451,15 +462,9 @@ function Atendimentos() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3 text-xs">
                         <span className={textClass}>
-                          <strong>{formatarValor(a.valorCobrado || a.servicoAvulsoValor)}</strong>
+                          <strong>{formatarValorAtendimento(a)}</strong>
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${
-                          a.statusPagamento === 'Pago'
-                            ? 'bg-emerald-500/10 text-emerald-500'
-                            : 'bg-amber-500/10 text-amber-500'
-                        }`}>
-                          {a.statusPagamento || 'Pendente'}
-                        </span>
+                        {pagamentoBadge(a)}
                       </div>
                       {a.status === 'Realizado' && (
                         <button

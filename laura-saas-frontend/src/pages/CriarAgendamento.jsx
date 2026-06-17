@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CheckCircle2, XCircle, ArrowLeft, UserPlus, Users } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowLeft, UserPlus, Users, Gift, Package } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -11,12 +11,50 @@ import { getAvailableSlots } from '../services/scheduleService';
 
 const sessaoSchema = z.object({
   cliente: z.string().min(1, 'Selecione um cliente'),
-  pacote: z.string().min(1, 'Selecione um pacote do cliente'),
+  servicoTipo: z.enum(['pacote', 'avulso', 'oferta']),
+  pacote: z.string().optional(),
+  servicoAvulsoNome: z.string().optional(),
+  servicoAvulsoValor: z.string().optional(),
+  servicoOfertaNome: z.string().optional(),
   dataHora: z
     .string()
     .min(1, 'Selecione data e hora')
     .refine((val) => new Date(val) > new Date(), { message: 'A data e hora devem ser no futuro' }),
   observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
+}).superRefine((data, ctx) => {
+  if (data.servicoTipo === 'pacote' && !data.pacote) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['pacote'],
+      message: 'Selecione um pacote do cliente',
+    });
+  }
+
+  if (data.servicoTipo === 'avulso') {
+    if (!data.servicoAvulsoNome?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['servicoAvulsoNome'],
+        message: 'Informe o nome do serviço avulso',
+      });
+    }
+    const valor = Number(data.servicoAvulsoValor);
+    if (!data.servicoAvulsoValor || Number.isNaN(valor) || valor <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['servicoAvulsoValor'],
+        message: 'Informe um valor maior que zero',
+      });
+    }
+  }
+
+  if (data.servicoTipo === 'oferta' && !data.servicoOfertaNome?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['servicoOfertaNome'],
+      message: 'Informe o serviço ofertado',
+    });
+  }
 });
 
 const avaliacaoSchema = z.object({
@@ -35,6 +73,8 @@ const avaliacaoSchema = z.object({
 
 function CriarAgendamento() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preSelecaoFeita = useRef(false);
   const [tipo, setTipo] = useState('Sessao');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,7 +90,16 @@ function CriarAgendamento() {
   const sessaoForm = useForm({
     resolver: zodResolver(sessaoSchema),
     mode: 'onChange',
-    defaultValues: { cliente: '', pacote: '', dataHora: formatDateForInput(new Date()), observacoes: '' },
+    defaultValues: {
+      cliente: '',
+      servicoTipo: 'pacote',
+      pacote: '',
+      servicoAvulsoNome: '',
+      servicoAvulsoValor: '',
+      servicoOfertaNome: '',
+      dataHora: formatDateForInput(new Date()),
+      observacoes: '',
+    },
   });
 
   // Formulário para Avaliação
@@ -62,6 +111,7 @@ function CriarAgendamento() {
 
   const watchObsSessao = sessaoForm.watch('observacoes');
   const watchObsAval = avaliacaoForm.watch('observacoes');
+  const servicoTipoSessao = sessaoForm.watch('servicoTipo');
 
   useEffect(() => {
     if (dataSelecionada) {
@@ -86,6 +136,19 @@ function CriarAgendamento() {
     fetchClientes();
   }, []);
 
+  // Pré-selecção via deep-link (?cliente=:id), ex: vindo do card do cliente.
+  // Corre uma vez assim que a lista de clientes existir.
+  useEffect(() => {
+    if (preSelecaoFeita.current) return;
+    const clienteParam = searchParams.get('cliente');
+    if (clienteParam && clientes.some((c) => c._id === clienteParam)) {
+      preSelecaoFeita.current = true;
+      handleClienteChange(clienteParam);
+    }
+    // handleClienteChange é uma função estável do componente — fora das deps de propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientes, searchParams]);
+
   async function handleClienteChange(clienteId) {
     if (!clienteId) {
       setClienteSelecionado(null);
@@ -109,10 +172,16 @@ function CriarAgendamento() {
       setPacotesDoCliente(pacotesAtivos);
 
       if (pacotesAtivos.length === 0) {
-        toast.warning('Cliente sem pacotes ativos. Vá em "Vendas" para vender um pacote.', { autoClose: 5000 });
+        toast.info('Cliente sem pacotes ativos. Pode vender um pacote, agendar avulso ou oferecer um serviço.', { autoClose: 6000 });
         sessaoForm.setValue('pacote', '', { shouldValidate: true });
+        if (sessaoForm.getValues('servicoTipo') === 'pacote') {
+          sessaoForm.setValue('servicoTipo', 'oferta', { shouldValidate: true });
+        }
       } else if (pacotesAtivos.length === 1) {
         sessaoForm.setValue('pacote', pacotesAtivos[0]._id, { shouldValidate: true });
+        if (sessaoForm.getValues('servicoTipo') === 'oferta') {
+          sessaoForm.setValue('servicoTipo', 'pacote', { shouldValidate: true });
+        }
       }
     } catch {
       toast.error('Erro ao carregar dados do cliente');
@@ -123,24 +192,43 @@ function CriarAgendamento() {
   }
 
   const onSubmitSessao = async (data) => {
-    if (pacotesDoCliente.length === 0) {
-      toast.error('Cliente não possui pacotes ativos.');
-      return;
+    let payload = {
+      tipo: 'Sessao',
+      cliente: data.cliente,
+      dataHora: data.dataHora,
+      observacoes: data.observacoes || '',
+    };
+
+    if (data.servicoTipo === 'pacote') {
+      const compraPacote = pacotesDoCliente.find((cp) => cp._id === data.pacote);
+      if (!compraPacote || compraPacote.sessoesRestantes <= 0) {
+        toast.error('Pacote sem sessões disponíveis');
+        return;
+      }
+      payload = {
+        ...payload,
+        servicoTipo: 'pacote',
+        compraPacote: data.pacote,
+      };
+    } else if (data.servicoTipo === 'avulso') {
+      payload = {
+        ...payload,
+        servicoTipo: 'avulso',
+        servicoAvulsoNome: data.servicoAvulsoNome.trim(),
+        servicoAvulsoValor: parseFloat(data.servicoAvulsoValor),
+      };
+    } else {
+      payload = {
+        ...payload,
+        servicoTipo: 'oferta',
+        servicoAvulsoNome: data.servicoOfertaNome.trim(),
+        servicoAvulsoValor: 0,
+      };
     }
-    const compraPacote = pacotesDoCliente.find((cp) => cp._id === data.pacote);
-    if (!compraPacote || compraPacote.sessoesRestantes <= 0) {
-      toast.error('Pacote sem sessões disponíveis');
-      return;
-    }
+
     setIsSubmitting(true);
     try {
-      await api.post('/agendamentos', {
-        tipo: 'Sessao',
-        cliente: data.cliente,
-        compraPacote: data.pacote,
-        dataHora: data.dataHora,
-        observacoes: data.observacoes || '',
-      });
+      await api.post('/agendamentos', payload);
       toast.success('Agendamento criado com sucesso!');
       navigate('/agendamentos');
     } catch (error) {
@@ -290,25 +378,93 @@ function CriarAgendamento() {
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h2 className="text-lg font-medium text-gray-700 mb-3">Pacote do Cliente</h2>
+              <h2 className="text-lg font-medium text-gray-700 mb-3">Serviço do Agendamento</h2>
 
               {clienteSelecionado && pacotesDoCliente.length === 0 && (
-                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200 mb-4">
                   <p className="text-sm text-yellow-800 font-medium flex items-center gap-2">
                     <XCircle className="w-5 h-5" />
                     Cliente não possui pacotes ativos
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/vender-pacote')}
-                    className="mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
-                  >
-                    Ir para Vendas
-                  </button>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Pode vender um pacote, cobrar um serviço avulso ou registrar uma oferta sem faturamento.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => sessaoForm.setValue('servicoTipo', 'oferta', { shouldValidate: true })}
+                      className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                    >
+                      Dar oferta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sessaoForm.setValue('servicoTipo', 'avulso', { shouldValidate: true })}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      Serviço avulso
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/vender-pacote')}
+                      className="px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                    >
+                      Ir para Vendas
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {pacotesDoCliente.length > 0 && (
+              <Controller
+                name="servicoTipo"
+                control={sessaoForm.control}
+                render={({ field }) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => field.onChange('pacote')}
+                      disabled={isSubmitting || pacotesDoCliente.length === 0}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                        field.value === 'pacote'
+                          ? 'border-amber-500 bg-amber-50 text-amber-700'
+                          : pacotesDoCliente.length === 0
+                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Package className="w-4 h-4" />
+                      Pacote
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => field.onChange('avulso')}
+                      disabled={isSubmitting}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                        field.value === 'avulso'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      Serviço avulso
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => field.onChange('oferta')}
+                      disabled={isSubmitting}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                        field.value === 'oferta'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Gift className="w-4 h-4" />
+                      Oferta
+                    </button>
+                  </div>
+                )}
+              />
+
+              {servicoTipoSessao === 'pacote' && pacotesDoCliente.length > 0 && (
                 <div className="space-y-3">
                   {pacotesDoCliente.map((cp) => (
                     <div key={cp._id} className="p-3 bg-blue-50 rounded-lg border border-blue-100">
@@ -343,6 +499,62 @@ function CriarAgendamento() {
                     />
                     <ErrorMsg form={sessaoForm} name="pacote" />
                   </div>
+                </div>
+              )}
+
+              {servicoTipoSessao === 'pacote' && pacotesDoCliente.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  Selecione “Oferta” ou “Serviço avulso” para continuar sem pacote ativo.
+                </p>
+              )}
+
+              {servicoTipoSessao === 'avulso' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Serviço avulso <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      {...sessaoForm.register('servicoAvulsoNome')}
+                      disabled={isSubmitting}
+                      className={getInputClasses(sessaoForm, 'servicoAvulsoNome')}
+                      placeholder="Ex: Drenagem linfática"
+                    />
+                    <ErrorMsg form={sessaoForm} name="servicoAvulsoNome" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Valor <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...sessaoForm.register('servicoAvulsoValor')}
+                      disabled={isSubmitting}
+                      className={getInputClasses(sessaoForm, 'servicoAvulsoValor')}
+                      placeholder="0.00"
+                    />
+                    <ErrorMsg form={sessaoForm} name="servicoAvulsoValor" />
+                  </div>
+                </div>
+              )}
+
+              {servicoTipoSessao === 'oferta' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Serviço ofertado <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    {...sessaoForm.register('servicoOfertaNome')}
+                    disabled={isSubmitting}
+                    className={getInputClasses(sessaoForm, 'servicoOfertaNome')}
+                    placeholder="Ex: Sessão cortesia"
+                  />
+                  <ErrorMsg form={sessaoForm} name="servicoOfertaNome" />
+                  <p className="mt-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg p-2">
+                    Esta oferta fica no agendamento e no histórico de realizados, mas não entra no faturamento.
+                  </p>
                 </div>
               )}
             </div>

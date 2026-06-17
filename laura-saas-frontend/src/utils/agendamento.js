@@ -35,6 +35,9 @@ export function nomeServicoAgendamento(ag) {
     ag.servicoAvulsoNome ||
     'Serviço';
   const nome = servicoCurto(bruto);
+  if (ag.servicoTipo === 'oferta') {
+    return `${nome} (Oferta)`;
+  }
 
   // Nº da sessão a fazer / total — derivado do progresso da compra de pacote
   // (numeroDaSessao não é gravado). "usadas + 1" = a sessão a realizar a seguir.

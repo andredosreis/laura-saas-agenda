@@ -49,7 +49,8 @@ export const getSchedules = async (req, res) => {
     const agendamentosExistentes = await Agendamento.find({
       tenantId: req.tenantId,
       dataHora: { $gte: inicioSemana, $lte: fimSemana },
-      status: { $in: ['Agendado', 'Confirmado'] }
+      status: { $in: ['Agendado', 'Confirmado'] },
+      'confirmacao.tipo': { $ne: 'rejeitado' }
     }).populate('cliente', 'nome telefone');
 
     res.status(200).json({
@@ -101,7 +102,8 @@ export const getAvailableSlots = async (req, res) => {
         $gte: targetDate.startOf('day').toJSDate(),
         $lte: targetDate.endOf('day').toJSDate(),
       },
-      status: { $in: ['Agendado', 'Confirmado'] }
+      status: { $in: ['Agendado', 'Confirmado'] },
+      'confirmacao.tipo': { $ne: 'rejeitado' }
     });
 
     const occupiedSlots = existingAgendamentos.map(ag => {

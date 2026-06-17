@@ -193,6 +193,84 @@ describe('messageRouter (F12 §6.2 decision tree)', () => {
     expect(d.reason).toBe(Reason.LEAD_IA_ACTIVE);
   });
 
+  // ── ADR-027: reminder confirmation is independent of the IA switch ──
+  //   A genuine SIM/NÃO reply to a pending appointment must confirm/cancel
+  //   even when the IA is off (clinic master switch or IA service disabled),
+  //   because it is a deterministic state machine. Non-confirmation messages
+  //   still obey the IA guards.
+
+  const MASTER_OFF_TENANT = {
+    _id: 'tenant_ia_off',
+    plano: { status: 'ativo' },
+    limites: { leadsAtivo: true },
+    configuracoes: { iaGlobalAtiva: false },
+  };
+
+  test('IA master switch OFF + SIM + pending → LEGACY_CONFIRMATION (ADR-027)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      tenant: MASTER_OFF_TENANT,
+      persistedState: { hasPendingAppointment: true, existingClient: null, existingLead: null },
+    }));
+    expect(d.route).toBe(Route.LEGACY_CONFIRMATION);
+    expect(d.reason).toBe(Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT);
+  });
+
+  test('IA master switch OFF + NÃO + pending → LEGACY_CONFIRMATION (ADR-027)', () => {
+    const d = decide(buildInput({
+      classified: NAO,
+      tenant: MASTER_OFF_TENANT,
+      persistedState: { hasPendingAppointment: true, existingClient: null, existingLead: null },
+    }));
+    expect(d.route).toBe(Route.LEGACY_CONFIRMATION);
+    expect(d.reason).toBe(Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT);
+  });
+
+  test('IA master switch OFF + free-text → MANUAL_SILENT (conversas continuam silenciadas)', () => {
+    const d = decide(buildInput({
+      classified: FREE_TEXT,
+      tenant: MASTER_OFF_TENANT,
+      persistedState: { hasPendingAppointment: false, existingClient: null, existingLead: null },
+    }));
+    expect(d.route).toBe(Route.MANUAL_SILENT);
+    expect(d.reason).toBe(Reason.IA_GLOBAL_DISABLED);
+  });
+
+  test('IA master switch OFF + SIM SEM pending → MANUAL_SILENT (não há lembrete a confirmar)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      tenant: MASTER_OFF_TENANT,
+      persistedState: { hasPendingAppointment: false, existingClient: null, existingLead: null },
+    }));
+    expect(d.route).toBe(Route.MANUAL_SILENT);
+    expect(d.reason).toBe(Reason.IA_GLOBAL_DISABLED);
+  });
+
+  test('IA service disabled (env) + SIM + pending → LEGACY_CONFIRMATION (ADR-027)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      env: { IA_SERVICE_ENABLED: false, IA_SERVICE_URL_CONFIGURED: true },
+      persistedState: { hasPendingAppointment: true, existingClient: null, existingLead: null },
+    }));
+    expect(d.route).toBe(Route.LEGACY_CONFIRMATION);
+    expect(d.reason).toBe(Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT);
+  });
+
+  test('IA master switch OFF + SIM + pending + Client mid-IA conversa → MANUAL_SILENT (sem hijack)', () => {
+    const d = decide(buildInput({
+      classified: SIM,
+      tenant: MASTER_OFF_TENANT,
+      persistedState: {
+        hasPendingAppointment: true,
+        existingClient: { _id: 'c1' },
+        existingLead: null,
+        iaConversationActive: true,
+      },
+    }));
+    expect(d.route).toBe(Route.MANUAL_SILENT);
+    expect(d.reason).toBe(Reason.IA_GLOBAL_DISABLED);
+  });
+
   // ── Branch 4: data-integrity guard ─────────────────────────────────
 
   test('Lead convertido but cliente null + no existingClient → LEGACY_FALLBACK / client_conversion_inconsistency', () => {

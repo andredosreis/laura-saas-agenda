@@ -76,6 +76,7 @@ router.get('/:id/agendamentos', async (req, res) => {
       tenantId,
       cliente: clienteId,
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
       dataHora: { $gte: DateTime.now().setZone('Europe/Lisbon').toJSDate() },
     })
       .sort({ dataHora: 1 })
@@ -134,6 +135,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       tenantId,
       cliente: clienteId,
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
       dataHora: { $gte: DateTime.now().setZone('Europe/Lisbon').toJSDate() },
     });
     if (pendingCount >= 1) {
@@ -152,6 +154,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       tenantId,
       dataHora: { $gte: windowStart, $lte: windowEnd },
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
     });
     if (conflict) {
       return res.status(409).json({
@@ -236,6 +239,7 @@ router.patch('/:id/agendamentos/:agendamentoId/reschedule', async (req, res) => 
       tenantId,
       cliente: clienteId,
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
     });
     if (!agendamento) {
       return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
@@ -263,6 +267,7 @@ router.patch('/:id/agendamentos/:agendamentoId/reschedule', async (req, res) => 
       _id: { $ne: agendamentoId },
       dataHora: { $gte: windowStart, $lte: windowEnd },
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
     });
     if (conflict) {
       return res.status(409).json({
@@ -341,6 +346,7 @@ router.patch('/:id/agendamentos/:agendamentoId/cancel', async (req, res) => {
       tenantId,
       cliente: clienteId,
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
     });
     if (!agendamento) {
       return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
@@ -372,6 +378,12 @@ router.patch('/:id/agendamentos/:agendamentoId/cancel', async (req, res) => {
     }
 
     agendamento.status = 'Cancelado Pelo Cliente';
+    agendamento.confirmacao = {
+      tipo: 'rejeitado',
+      respondidoEm: agora.toJSDate(),
+      respondidoPor: 'cliente',
+    };
+    agendamento.markModified('confirmacao');
     await agendamento.save();
 
     res.json({ success: true, data: { agendamento, lateCancel } });

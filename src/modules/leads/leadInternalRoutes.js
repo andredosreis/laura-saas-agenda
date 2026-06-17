@@ -413,6 +413,7 @@ router.post('/:id/agendamento', async (req, res) => {
       tenantId,
       dataHora: { $gte: windowStart, $lte: windowEnd },
       status: { $nin: cancelledStatus },
+      'confirmacao.tipo': { $ne: 'rejeitado' },
     });
     if (conflict) {
       return res.status(409).json({

@@ -150,3 +150,126 @@ describe('ADR-011: Status Avaliacao', () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ──────────────────────────────────────────────
+// Confirmação e rejeição
+// ──────────────────────────────────────────────
+
+describe('Agendamento: confirmação e liberação de slot', () => {
+  it('altera status para Confirmado quando o cliente confirma', async () => {
+    const { token } = await criarTenantEToken('salon-confirma-cliente');
+    await activarSchedule(token);
+    const clienteId = await criarCliente(token, '914000001');
+
+    const criarRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cliente: clienteId, dataHora: dataFutura() });
+
+    expect(criarRes.status).toBe(201);
+
+    const confirmarRes = await request(app)
+      .patch(`/api/agendamentos/${criarRes.body._id}/confirmar`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ confirmacao: 'confirmado', respondidoPor: 'cliente' });
+
+    expect(confirmarRes.status).toBe(200);
+    expect(confirmarRes.body.success).toBe(true);
+    expect(confirmarRes.body.agendamento.status).toBe('Confirmado');
+    expect(confirmarRes.body.agendamento.confirmacao.tipo).toBe('confirmado');
+    expect(confirmarRes.body.agendamento.confirmacao.respondidoPor).toBe('cliente');
+  });
+
+  it('rejeição pelo salão cancela e permite novo agendamento no mesmo horário', async () => {
+    const { token } = await criarTenantEToken('salon-rejeita-slot');
+    await activarSchedule(token);
+    const clienteId = await criarCliente(token, '915000001');
+    const dataHora = dataFutura();
+
+    const criarRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cliente: clienteId, dataHora });
+
+    expect(criarRes.status).toBe(201);
+
+    const rejeitarRes = await request(app)
+      .patch(`/api/agendamentos/${criarRes.body._id}/confirmar`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ confirmacao: 'rejeitado', respondidoPor: 'laura' });
+
+    expect(rejeitarRes.status).toBe(200);
+    expect(rejeitarRes.body.agendamento.status).toBe('Cancelado Pelo Salão');
+    expect(rejeitarRes.body.agendamento.confirmacao.tipo).toBe('rejeitado');
+    expect(rejeitarRes.body.agendamento.confirmacao.respondidoPor).toBe('laura');
+
+    const novoClienteId = await criarCliente(token, '915000002');
+    const novoRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cliente: novoClienteId, dataHora });
+
+    expect(novoRes.status).toBe(201);
+    expect(novoRes.body._id).toBeDefined();
+  });
+});
+
+describe('Agendamento: oferta sem faturamento', () => {
+  it('cria oferta para cliente sem pacote e realiza sem gerar pagamento pendente', async () => {
+    const { token } = await criarTenantEToken('salon-oferta-servico');
+    await activarSchedule(token);
+    const clienteId = await criarCliente(token, '916000001');
+
+    const criarRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        cliente: clienteId,
+        dataHora: dataFutura(),
+        servicoTipo: 'oferta',
+        servicoAvulsoNome: 'Sessão cortesia',
+      });
+
+    expect(criarRes.status).toBe(201);
+    expect(criarRes.body.servicoTipo).toBe('oferta');
+    expect(criarRes.body.servicoAvulsoNome).toBe('Sessão cortesia');
+    expect(criarRes.body.servicoAvulsoValor).toBe(0);
+    expect(criarRes.body.statusPagamento).toBe('Isento');
+
+    const realizadoRes = await request(app)
+      .patch(`/api/agendamentos/${criarRes.body._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'Realizado' });
+
+    expect(realizadoRes.status).toBe(200);
+    expect(realizadoRes.body.status).toBe('Realizado');
+    expect(realizadoRes.body.statusPagamento).toBe('Isento');
+    expect(realizadoRes.body.valorCobrado).toBe(0);
+  });
+
+  it('não permite registrar pagamento em uma oferta', async () => {
+    const { token } = await criarTenantEToken('salon-oferta-sem-pagamento');
+    await activarSchedule(token);
+    const clienteId = await criarCliente(token, '917000001');
+
+    const criarRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        cliente: clienteId,
+        dataHora: dataFutura(),
+        servicoTipo: 'oferta',
+        servicoAvulsoNome: 'Oferta de retorno',
+      });
+
+    expect(criarRes.status).toBe(201);
+
+    const pagamentoRes = await request(app)
+      .post(`/api/agendamentos/${criarRes.body._id}/pagamento`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ valor: 1, formaPagamento: 'Dinheiro' });
+
+    expect(pagamentoRes.status).toBe(400);
+    expect(pagamentoRes.body.message).toMatch(/oferta/i);
+  });
+});

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, User, Package, Calendar, Clock, FileText, Loader2 } from 'lucide-react';
+import { X, User, Package, Calendar, FileText, Loader2, Gift } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -19,9 +19,10 @@ function QuickAppointmentModal({
         dataHora: '',
         observacoes: '',
         servicoAvulsoNome: '',
-        servicoAvulsoValor: ''
+        servicoAvulsoValor: '',
+        servicoOfertaNome: ''
     });
-    const [useAvulso, setUseAvulso] = useState(false);
+    const [serviceMode, setServiceMode] = useState('pacote');
 
     // Update date when selectedDate changes
     useEffect(() => {
@@ -43,9 +44,10 @@ function QuickAppointmentModal({
                 dataHora: '',
                 observacoes: '',
                 servicoAvulsoNome: '',
-                servicoAvulsoValor: ''
+                servicoAvulsoValor: '',
+                servicoOfertaNome: ''
             });
-            setUseAvulso(false);
+            setServiceMode('pacote');
         }
     }, [isOpen]);
 
@@ -63,11 +65,15 @@ function QuickAppointmentModal({
             return;
         }
 
-        if (!useAvulso && !formData.pacote) {
+        if (serviceMode === 'pacote' && !formData.pacote) {
             return;
         }
 
-        if (useAvulso && (!formData.servicoAvulsoNome || !formData.servicoAvulsoValor)) {
+        if (serviceMode === 'avulso' && (!formData.servicoAvulsoNome || !formData.servicoAvulsoValor)) {
+            return;
+        }
+
+        if (serviceMode === 'oferta' && !formData.servicoOfertaNome.trim()) {
             return;
         }
 
@@ -76,14 +82,19 @@ function QuickAppointmentModal({
             const submitData = {
                 cliente: formData.cliente,
                 dataHora: formData.dataHora,
-                observacoes: formData.observacoes,
-                status: 'Agendado'
+                observacoes: formData.observacoes
             };
 
-            if (useAvulso) {
+            if (serviceMode === 'avulso') {
+                submitData.servicoTipo = 'avulso';
                 submitData.servicoAvulsoNome = formData.servicoAvulsoNome;
                 submitData.servicoAvulsoValor = parseFloat(formData.servicoAvulsoValor);
+            } else if (serviceMode === 'oferta') {
+                submitData.servicoTipo = 'oferta';
+                submitData.servicoAvulsoNome = formData.servicoOfertaNome.trim();
+                submitData.servicoAvulsoValor = 0;
             } else {
+                submitData.servicoTipo = 'pacote';
                 submitData.pacote = formData.pacote;
             }
 
@@ -145,31 +156,43 @@ function QuickAppointmentModal({
                     </div>
 
                     {/* Service Type Toggle */}
-                    <div className={`flex items-center gap-2 p-1 rounded-xl ${isDarkMode ? 'bg-white/5' : 'bg-slate-100'}`}>
+                    <div className={`grid grid-cols-3 gap-2 p-1 rounded-xl ${isDarkMode ? 'bg-white/5' : 'bg-slate-100'}`}>
                         <button
                             type="button"
-                            onClick={() => setUseAvulso(false)}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${!useAvulso
+                            onClick={() => setServiceMode('pacote')}
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${serviceMode === 'pacote'
                                 ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                 : `${subtextClass}`
                                 }`}
                         >
+                            <Package className="w-4 h-4" />
                             Pacote
                         </button>
                         <button
                             type="button"
-                            onClick={() => setUseAvulso(true)}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${useAvulso
+                            onClick={() => setServiceMode('avulso')}
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${serviceMode === 'avulso'
                                 ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                                 : `${subtextClass}`
                                 }`}
                         >
-                            Serviço Avulso
+                            Avulso
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setServiceMode('oferta')}
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${serviceMode === 'oferta'
+                                ? 'bg-linear-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
+                                : `${subtextClass}`
+                                }`}
+                        >
+                            <Gift className="w-4 h-4" />
+                            Oferta
                         </button>
                     </div>
 
                     {/* Package Select or Avulso Fields */}
-                    {!useAvulso ? (
+                    {serviceMode === 'pacote' ? (
                         <div>
                             <label className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
                                 <Package className="w-4 h-4" />
@@ -179,7 +202,7 @@ function QuickAppointmentModal({
                                 name="pacote"
                                 value={formData.pacote}
                                 onChange={handleChange}
-                                required={!useAvulso}
+                                required={serviceMode === 'pacote'}
                                 className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                             >
                                 <option value="">Selecione um pacote</option>
@@ -190,7 +213,7 @@ function QuickAppointmentModal({
                                 ))}
                             </select>
                         </div>
-                    ) : (
+                    ) : serviceMode === 'avulso' ? (
                         <div className="grid grid-cols-2 gap-3">
                             <div className="col-span-2">
                                 <label className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
@@ -203,7 +226,7 @@ function QuickAppointmentModal({
                                     value={formData.servicoAvulsoNome}
                                     onChange={handleChange}
                                     placeholder="Ex: Massagem Relaxante"
-                                    required={useAvulso}
+                                    required={serviceMode === 'avulso'}
                                     className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                                 />
                             </div>
@@ -219,10 +242,29 @@ function QuickAppointmentModal({
                                     placeholder="0.00"
                                     step="0.01"
                                     min="0"
-                                    required={useAvulso}
+                                    required={serviceMode === 'avulso'}
                                     className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                                 />
                             </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
+                                <Gift className="w-4 h-4" />
+                                Serviço ofertado *
+                            </label>
+                            <input
+                                type="text"
+                                name="servicoOfertaNome"
+                                value={formData.servicoOfertaNome}
+                                onChange={handleChange}
+                                placeholder="Ex: Sessão cortesia"
+                                required={serviceMode === 'oferta'}
+                                className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-emerald-500`}
+                            />
+                            <p className={`mt-2 text-xs ${subtextClass}`}>
+                                Oferta sem cobrança. O atendimento fica registado, mas não entra no faturamento.
+                            </p>
                         </div>
                     )}
 
