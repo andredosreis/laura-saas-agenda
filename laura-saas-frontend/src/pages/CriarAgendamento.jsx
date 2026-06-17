@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -73,6 +73,8 @@ const avaliacaoSchema = z.object({
 
 function CriarAgendamento() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preSelecaoFeita = useRef(false);
   const [tipo, setTipo] = useState('Sessao');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,6 +135,19 @@ function CriarAgendamento() {
     }
     fetchClientes();
   }, []);
+
+  // Pré-selecção via deep-link (?cliente=:id), ex: vindo do card do cliente.
+  // Corre uma vez assim que a lista de clientes existir.
+  useEffect(() => {
+    if (preSelecaoFeita.current) return;
+    const clienteParam = searchParams.get('cliente');
+    if (clienteParam && clientes.some((c) => c._id === clienteParam)) {
+      preSelecaoFeita.current = true;
+      handleClienteChange(clienteParam);
+    }
+    // handleClienteChange é uma função estável do componente — fora das deps de propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientes, searchParams]);
 
   async function handleClienteChange(clienteId) {
     if (!clienteId) {
