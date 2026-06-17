@@ -221,6 +221,80 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(updated.ocupaSlot).toBe(false); // slot libertado pelo pre-save hook
   });
 
+  // ── Oferta: a regra SIM/NÃO é agnóstica ao servicoTipo ─────────────
+  //   Um agendamento de oferta confirma/cancela como qualquer outro; a
+  //   confirmação não altera o estado de isenção (statusPagamento='Isento').
+
+  test('oferta + SIM with pending → Confirmado (mantém Isento e servicoTipo)', async () => {
+    const tenant = await createTenant({ slug: 'oferta-sim' });
+    const tenantId = tenant._id.toString();
+    const { Cliente, Agendamento } = getModels(getTenantDB(tenantId));
+
+    const cliente = await Cliente.create({ tenantId, nome: 'Lia', telefone: '351914000111' });
+    const agendamento = await Agendamento.create({
+      tenantId,
+      tipo: 'Sessao',
+      cliente: cliente._id,
+      dataHora: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      status: 'Agendado',
+      servicoTipo: 'oferta',
+      servicoAvulsoNome: 'Sessão cortesia',
+      servicoAvulsoValor: 0,
+      statusPagamento: 'Isento',
+      confirmacao: { tipo: 'pendente' },
+    });
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildPayload({ messageId: 'msg-oferta-sim', phone: '351914000111', text: 'sim' }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const updated = await Agendamento.findById(agendamento._id);
+    expect(updated.status).toBe('Confirmado');
+    expect(updated.confirmacao.tipo).toBe('confirmado');
+    expect(updated.servicoTipo).toBe('oferta');     // continua oferta
+    expect(updated.statusPagamento).toBe('Isento');  // confirmação não altera o isento
+    expect(updated.ocupaSlot).toBe(true);
+    expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalled();
+  });
+
+  test('oferta + NÃO with pending → Cancelado + slot libertado', async () => {
+    const tenant = await createTenant({ slug: 'oferta-nao' });
+    const tenantId = tenant._id.toString();
+    const { Cliente, Agendamento } = getModels(getTenantDB(tenantId));
+
+    const cliente = await Cliente.create({ tenantId, nome: 'Tomás', telefone: '351914000222' });
+    const agendamento = await Agendamento.create({
+      tenantId,
+      tipo: 'Sessao',
+      cliente: cliente._id,
+      dataHora: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      status: 'Agendado',
+      servicoTipo: 'oferta',
+      servicoAvulsoNome: 'Sessão cortesia',
+      servicoAvulsoValor: 0,
+      statusPagamento: 'Isento',
+      confirmacao: { tipo: 'pendente' },
+    });
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildPayload({ messageId: 'msg-oferta-nao', phone: '351914000222', text: 'nao' }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const updated = await Agendamento.findById(agendamento._id);
+    expect(updated.status).toBe('Cancelado Pelo Cliente');
+    expect(updated.confirmacao.tipo).toBe('rejeitado');
+    expect(updated.servicoTipo).toBe('oferta');
+    expect(updated.ocupaSlot).toBe(false); // slot libertado pelo pre-save hook
+  });
+
   // ── PRD §1.1 row 3: phone with no Lead AND no Client → IA_LEAD ──
 
   test('row 3: unknown phone → IA_LEAD + iaServiceClient.processLead called with leadId=null', async () => {
