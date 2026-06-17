@@ -144,6 +144,83 @@ describe('F12 — Webhook Routing Matrix (E2E)', () => {
     expect(processLeadCalls).toHaveLength(0);
   });
 
+  // ── ADR-027: confirmation works with the IA master switch OFF ──────
+  //   The clinic turned the IA off in the inbox (configuracoes.iaGlobalAtiva
+  //   = false). Reminders still go out via BullMQ, so a SIM/NÃO reply must
+  //   still confirm/cancel the appointment (and free the slot) — it does NOT
+  //   route to MANUAL_SILENT anymore.
+
+  async function createTenantIaOff(slug) {
+    return Tenant.create({
+      nome: 'Marcai IA Off',
+      slug,
+      plano: { tipo: 'pro', status: 'ativo', trialDias: 7 },
+      limites: { maxLeads: 100, leadsAtivo: true },
+      whatsapp: { instanceName: 'marcai' },
+      configuracoes: { iaGlobalAtiva: false },
+    });
+  }
+
+  test('ADR-027: master switch OFF + SIM with pending → Confirmado + slot ocupado + reply', async () => {
+    const tenant = await createTenantIaOff('ia-off-sim');
+    const tenantId = tenant._id.toString();
+    const { Cliente, Agendamento } = getModels(getTenantDB(tenantId));
+
+    const cliente = await Cliente.create({ tenantId, nome: 'Rita', telefone: '351913000111' });
+    const agendamento = await Agendamento.create({
+      tenantId,
+      tipo: 'Sessao',
+      cliente: cliente._id,
+      dataHora: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      status: 'Agendado',
+      confirmacao: { tipo: 'pendente' },
+    });
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildPayload({ messageId: 'msg-iaoff-sim', phone: '351913000111', text: 'sim' }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const updated = await Agendamento.findById(agendamento._id);
+    expect(updated.status).toBe('Confirmado');
+    expect(updated.confirmacao.tipo).toBe('confirmado');
+    expect(updated.ocupaSlot).toBe(true);
+    expect(evolutionClientMock.sendWhatsAppMessage).toHaveBeenCalled();
+    expect(processLeadCalls).toHaveLength(0);
+  });
+
+  test('ADR-027: master switch OFF + NÃO with pending → Cancelado + slot libertado', async () => {
+    const tenant = await createTenantIaOff('ia-off-nao');
+    const tenantId = tenant._id.toString();
+    const { Cliente, Agendamento } = getModels(getTenantDB(tenantId));
+
+    const cliente = await Cliente.create({ tenantId, nome: 'Bruno', telefone: '351913000222' });
+    const agendamento = await Agendamento.create({
+      tenantId,
+      tipo: 'Sessao',
+      cliente: cliente._id,
+      dataHora: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      status: 'Agendado',
+      confirmacao: { tipo: 'pendente' },
+    });
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildPayload({ messageId: 'msg-iaoff-nao', phone: '351913000222', text: 'nao' }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const updated = await Agendamento.findById(agendamento._id);
+    expect(updated.status).toBe('Cancelado Pelo Cliente');
+    expect(updated.confirmacao.tipo).toBe('rejeitado');
+    expect(updated.ocupaSlot).toBe(false); // slot libertado pelo pre-save hook
+  });
+
   // ── PRD §1.1 row 3: phone with no Lead AND no Client → IA_LEAD ──
 
   test('row 3: unknown phone → IA_LEAD + iaServiceClient.processLead called with leadId=null', async () => {

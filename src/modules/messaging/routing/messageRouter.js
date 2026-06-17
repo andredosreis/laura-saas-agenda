@@ -22,8 +22,14 @@
  *      integrity guard against an F04 regression. It NEVER routes the
  *      lead silently somewhere wrong; it falls through to LEGACY_FALLBACK
  *      so the inconsistency surfaces in observability.
+ *   6. A genuine SIM/NÃO reply to a pending appointment (LEGACY_CONFIRMATION)
+ *      is evaluated BEFORE the IA-availability guards, so deterministic
+ *      reminder confirmations work even with the IA off — master switch or
+ *      IA service disabled (ADR-027). Tenant/plan guards still take
+ *      precedence over it.
  *
  * @see docs/F12-ia-legacy-handoff-coordinator/spec.md §4.2, §6.1, §6.2
+ * @see docs/adrs/generated/ADR-027-confirmacao-lembrete-independente-da-ia.md
  */
 
 /**
@@ -128,45 +134,34 @@ export function decide(input) {
     return { route: Route.IGNORE, reason: Reason.PLAN_INACTIVE };
   }
 
-  // 2) IA availability guards — both env-level and tenant-level
-  if (!env?.IA_SERVICE_ENABLED || !env?.IA_SERVICE_URL_CONFIGURED) {
-    return { route: Route.LEGACY_FALLBACK, reason: Reason.IA_SERVICE_DISABLED };
-  }
-  // Master switch da clínica — desligado pela Laura no inbox. Silêncio total:
-  // mensagens chegam ao inbox, a IA não responde a ninguém (cliente ou lead).
-  // Default é ON: só dispara quando o campo é explicitamente false.
-  if (tenant.configuracoes?.iaGlobalAtiva === false) {
-    return { route: Route.MANUAL_SILENT, reason: Reason.IA_GLOBAL_DISABLED };
-  }
-  if (tenant.limites?.leadsAtivo === false) {
-    return { route: Route.LEGACY_FALLBACK, reason: Reason.LEADS_DISABLED_ON_TENANT };
-  }
-
-  // 3) Confirmation routing — ONLY short-circuits when this message is a
-  //    reply to a pending appointment reminder. The classifier flags ANY
-  //    message starting with "ok", "sim", "perfeito", "claro" (and the
-  //    NÃO equivalents) as a confirmation — fine for SIM/NÃO answers to
-  //    a reminder, but catastrophic mid-conversation when the lead writes
+  // 2) Confirmation routing — evaluated BEFORE the IA availability guards
+  //    (step 3) on purpose (ADR-027). A SIM/NÃO reply to a pending reminder
+  //    is a deterministic state machine that does NOT need the LLM, so it
+  //    must still confirm/cancel the appointment (and free the slot via the
+  //    Agendamento pre-save hook) even when the IA is off — whether by the
+  //    clinic master switch (would otherwise be MANUAL_SILENT) or the IA
+  //    service being disabled (LEGACY_FALLBACK). Reminders keep going out
+  //    via BullMQ regardless of the IA switch, so silently ignoring the
+  //    client's answer was incoherent.
+  //
+  //    The block ONLY short-circuits when this message is genuinely a reply
+  //    to a pending appointment reminder. The classifier flags ANY message
+  //    starting with "ok", "sim", "perfeito", "claro" (and the NÃO
+  //    equivalents) as a confirmation — fine for SIM/NÃO answers to a
+  //    reminder, but catastrophic mid-conversation when the lead writes
   //    "ok agradeço mas vou pensar" or "sim quero saber mais" during an
   //    active IA Lead chat. Before 2026-05-20 this branch hijacked those
-  //    messages to a generic legacy reply ("não encontrei agendamento
-  //    pendente…"), bypassing the agent.
+  //    messages to a generic legacy reply, bypassing the agent.
   //
-  //    Fix: only fire LEGACY_CONFIRMATION when the lead has an actual
-  //    pending appointment to confirm. Otherwise fall through — steps
-  //    4–7 below will dispatch correctly (Client → CLIENT_LIFECYCLE,
-  //    active Lead → IA_LEAD, no lead → IA_LEAD NEW_PHONE_CAPTURE).
+  //    Guards that preserve that fix: fire only when hasPendingAppointment
+  //    is true, never mid-IA-conversation, and for existing Clients only on
+  //    a short (≤2 words) reply. Otherwise fall through to steps 3–7.
   //
   //    See docs/testes-ia/05-sessao-2026-05-19-bugs.md §1 for the two
   //    E2E sessions (Jasmin, Joana) where this manifested.
   const { existingLead, existingClient } = persistedState;
   const isConfirmation = CONFIRMATION_KINDS.includes(classified?.kind);
 
-  // 3) Confirmation routing — short confirmation ("sim", "ok", "pode")
-  //    with pending appointment. For existing clients this ONLY fires when
-  //    the entire message is the confirmation keyword (reply to a reminder).
-  //    Longer messages like "pode ser a sexta?" go to the IA agent so the
-  //    mid-conversation reschedule is not hijacked.
   if (isConfirmation && persistedState.hasPendingAppointment) {
     const words = (classified?.normalized || '').trim().split(/\s+/);
     const isShortReply = words.length <= 2;
@@ -182,6 +177,24 @@ export function decide(input) {
         reason: Reason.CONFIRMATION_WITH_PENDING_APPOINTMENT,
       };
     }
+  }
+
+  // 3) IA availability guards — both env-level and tenant-level. Reached
+  //    only for non-confirmation messages (or confirmations that fell
+  //    through the guards above), so turning the IA off never silences a
+  //    deterministic reminder confirmation.
+  if (!env?.IA_SERVICE_ENABLED || !env?.IA_SERVICE_URL_CONFIGURED) {
+    return { route: Route.LEGACY_FALLBACK, reason: Reason.IA_SERVICE_DISABLED };
+  }
+  // Master switch da clínica — desligado pela Laura no inbox. Silêncio total
+  // para conversas: a IA não responde a ninguém (cliente ou lead). NÃO afecta
+  // a confirmação determinística de lembretes (tratada no passo 2 acima).
+  // Default é ON: só dispara quando o campo é explicitamente false.
+  if (tenant.configuracoes?.iaGlobalAtiva === false) {
+    return { route: Route.MANUAL_SILENT, reason: Reason.IA_GLOBAL_DISABLED };
+  }
+  if (tenant.limites?.leadsAtivo === false) {
+    return { route: Route.LEGACY_FALLBACK, reason: Reason.LEADS_DISABLED_ON_TENANT };
   }
 
   // 4) Client lifecycle — existing clients go to the IA agent, A NÃO SER
