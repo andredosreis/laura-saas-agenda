@@ -5,6 +5,45 @@ import { sendWhatsAppMessage } from "../../utils/evolutionClient.js";
 import { scheduleNotifications } from "../../utils/scheduleNotifications.js";
 import { scopeAgendamentoQuery } from "./agendamentoScope.js";
 
+const ZONA = 'Europe/Lisbon';
+const STATUS_CANCELADO_CLIENTE = 'Cancelado Pelo Cliente';
+const STATUS_CANCELADO_SALAO = 'Cancelado Pelo Salão';
+
+const nowLisbonDate = () => DateTime.now().setZone(ZONA).toJSDate();
+
+const getStatusForConfirmacao = (confirmacao, respondidoPor) => {
+  if (confirmacao === 'confirmado') return 'Confirmado';
+  return respondidoPor === 'cliente' ? STATUS_CANCELADO_CLIENTE : STATUS_CANCELADO_SALAO;
+};
+
+const getConfirmacaoPatchForStatus = (status, respondidoPor = 'laura') => {
+  if (status === 'Confirmado') {
+    return {
+      'confirmacao.tipo': 'confirmado',
+      'confirmacao.respondidoEm': nowLisbonDate(),
+      'confirmacao.respondidoPor': respondidoPor,
+    };
+  }
+
+  if (status === STATUS_CANCELADO_CLIENTE || status === STATUS_CANCELADO_SALAO) {
+    return {
+      'confirmacao.tipo': 'rejeitado',
+      'confirmacao.respondidoEm': nowLisbonDate(),
+      'confirmacao.respondidoPor': respondidoPor,
+    };
+  }
+
+  if (status === 'Agendado') {
+    return {
+      'confirmacao.tipo': 'pendente',
+      'confirmacao.respondidoEm': null,
+      'confirmacao.respondidoPor': null,
+    };
+  }
+
+  return {};
+};
+
 // Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
 const timeToMinutes = (timeString) => {
   if (!timeString) return null;
@@ -16,7 +55,18 @@ const timeToMinutes = (timeString) => {
 export const createAgendamento = async (req, res) => {
   try {
     const { Agendamento } = req.models; // Schedule desactivado — ver bloco comentado abaixo
-    const { tipo = 'Sessao', cliente, lead, dataHora, pacote, compraPacote, servicoAvulsoNome, servicoAvulsoValor } = req.body;
+    const {
+      tipo = 'Sessao',
+      cliente,
+      lead,
+      dataHora,
+      pacote,
+      compraPacote,
+      servicoAvulsoNome,
+      servicoAvulsoValor,
+      profissional,
+      observacoes,
+    } = req.body;
 
     // Validação contextual que não dá para expressar no Zod sem discriminated union mais complexa
     if (tipo === 'Avaliacao') {
@@ -27,11 +77,11 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ success: false, error: 'cliente é obrigatório para agendamentos do tipo Sessao ou Retorno' });
     }
 
-    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: "Europe/Lisbon" });
+    const agendamentoDateTime = DateTime.fromISO(dataHora, { zone: ZONA });
     if (!agendamentoDateTime.isValid) {
       return res.status(400).json({ message: "Data e hora do agendamento inválidas." });
     }
-    if (agendamentoDateTime < DateTime.now().setZone("Europe/Lisbon")) {
+    if (agendamentoDateTime < DateTime.now().setZone(ZONA)) {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
 
@@ -66,13 +116,36 @@ export const createAgendamento = async (req, res) => {
     // }
 
     const agendamentoDurationMinutes = 60;
+    const conflictWindow = {
+      $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
+      $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
+    };
+
+    // Auto-heal de slots antigos: se um documento foi cancelado/rejeitado antes
+    // de `ocupaSlot` ser sincronizado, liberta a reserva antes de validar conflito.
+    await Agendamento.updateMany(
+      {
+        tenantId: req.tenantId,
+        dataHora: conflictWindow,
+        ocupaSlot: true,
+        $or: [
+          { status: { $in: [STATUS_CANCELADO_CLIENTE, STATUS_CANCELADO_SALAO] } },
+          { 'confirmacao.tipo': 'rejeitado' },
+        ],
+      },
+      { $set: { ocupaSlot: false } }
+    );
+
     const conflictingAgendamento = await Agendamento.findOne({
       tenantId: req.tenantId,
-      dataHora: {
-        $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
-        $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
-      },
-      status: { $in: ["Agendado", "Confirmado"] },
+      dataHora: conflictWindow,
+      $or: [
+        { ocupaSlot: true },
+        {
+          status: { $nin: [STATUS_CANCELADO_CLIENTE, STATUS_CANCELADO_SALAO] },
+          'confirmacao.tipo': { $ne: 'rejeitado' },
+        },
+      ],
     });
 
     if (conflictingAgendamento) {
@@ -90,6 +163,8 @@ export const createAgendamento = async (req, res) => {
       compraPacote,
       servicoAvulsoNome,
       servicoAvulsoValor,
+      profissional,
+      observacoes,
       tenantId: req.tenantId
     });
     await novoAgendamento.save();
@@ -241,6 +316,17 @@ export const updateAgendamento = async (req, res) => {
     if (pacote !== undefined) update.pacote = pacote || null;
     if (compraPacote !== undefined) update.compraPacote = compraPacote || null;
     if (lead !== undefined) update.lead = lead || undefined;
+    if (status !== undefined) {
+      const agendamentoAtual = await Agendamento.findOne({ _id: req.params.id, tenantId: req.tenantId })
+        .select('status')
+        .lean();
+      if (!agendamentoAtual) {
+        return res.status(404).json({ message: "Agendamento não encontrado." });
+      }
+      if (status !== agendamentoAtual.status) {
+        Object.assign(update, getConfirmacaoPatchForStatus(status, 'laura'));
+      }
+    }
 
     const agendamento = await Agendamento.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
@@ -322,7 +408,10 @@ export const updateStatusAgendamento = async (req, res) => {
 
     const agendamento = await Agendamento.findOneAndUpdate(
       scopeAgendamentoQuery(req, { _id: req.params.id }),
-      { status },
+      {
+        status,
+        ...getConfirmacaoPatchForStatus(status, 'laura'),
+      },
       { new: true, runValidators: true }
     ).populate('compraPacote cliente');
 
@@ -370,16 +459,19 @@ export const confirmarAgendamento = async (req, res) => {
       return res.status(404).json({ message: "Agendamento não encontrado." });
     }
 
+    const novoStatus = getStatusForConfirmacao(confirmacao, respondidoPor);
+
     agendamento.confirmacao = {
       tipo: confirmacao,
-      respondidoEm: new Date(),
+      respondidoEm: nowLisbonDate(),
       respondidoPor: respondidoPor
     };
+    agendamento.status = novoStatus;
 
     await agendamento.save();
 
     try {
-      if (respondidoPor === 'laura') {
+      if (respondidoPor === 'laura' && agendamento.cliente?._id) {
         const subscriptionCliente = await UserSubscription.findOne({
           userId: agendamento.cliente._id.toString(),
           active: true,

@@ -180,7 +180,7 @@ function Agendamentos() {
   const marcarPresencaCliente = async (id, compareceu) => {
     try {
       setMarcandoPresenca(id);
-      await api.put(`/agendamentos/${id}/status`, { status: compareceu ? 'Compareceu' : 'Não Compareceu' });
+      await api.patch(`/agendamentos/${id}/comparecimento`, { compareceu });
       toast.success(compareceu ? 'Presença marcada!' : 'Ausência registada.');
       carregarAgendamentos();
     } catch (error) {

@@ -73,7 +73,11 @@ async function processJob(job) {
     }
 
     // Se o cliente cancelou, não envia nenhuma mensagem
-    if (agendamento.confirmacao?.tipo === 'rejeitado' || agendamento.status === 'Cancelado Pelo Cliente') {
+    if (
+      agendamento.confirmacao?.tipo === 'rejeitado' ||
+      agendamento.status === 'Cancelado Pelo Cliente' ||
+      agendamento.status === 'Cancelado Pelo Salão'
+    ) {
       logger.info({ jobId: job.id, agendamentoId }, '[Worker] Agendamento cancelado — lembrete 1h ignorado');
       return;
     }
@@ -108,7 +112,12 @@ async function processJob(job) {
   if (tipo === 'alerta-admin-pendente') {
     const agendamento = await Agendamento.findById(agendamentoId).lean();
 
-    if (!agendamento || agendamento.confirmacao?.tipo !== 'pendente') {
+    if (
+      !agendamento ||
+      agendamento.confirmacao?.tipo !== 'pendente' ||
+      agendamento.status === 'Cancelado Pelo Cliente' ||
+      agendamento.status === 'Cancelado Pelo Salão'
+    ) {
       logger.info({ jobId: job.id, agendamentoId }, '[Worker] Cliente já confirmou — alerta ao admin cancelado');
       return;
     }

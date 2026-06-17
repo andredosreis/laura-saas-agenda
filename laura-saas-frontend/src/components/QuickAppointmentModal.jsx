@@ -76,8 +76,7 @@ function QuickAppointmentModal({
             const submitData = {
                 cliente: formData.cliente,
                 dataHora: formData.dataHora,
-                observacoes: formData.observacoes,
-                status: 'Agendado'
+                observacoes: formData.observacoes
             };
 
             if (useAvulso) {

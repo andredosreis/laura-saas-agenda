@@ -29,13 +29,17 @@ import QuickAppointmentModal from '../components/QuickAppointmentModal';
 
 // Status color mapping
 const STATUS_COLORS = {
-    'Agendado': { bg: '#3b82f6', border: '#2563eb', text: 'Agendado' },      // Blue
-    'Confirmado': { bg: '#14b8a6', border: '#0d9488', text: 'Confirmado' },  // Teal
-    'Realizado': { bg: '#22c55e', border: '#16a34a', text: 'Realizado' },    // Green
-    'Cancelado': { bg: '#ef4444', border: '#dc2626', text: 'Cancelado' },    // Red
-    'Não Compareceu': { bg: '#f59e0b', border: '#d97706', text: 'No-Show' }, // Amber
-    'Remarcado': { bg: '#8b5cf6', border: '#7c3aed', text: 'Remarcado' }     // Purple
+    'Agendado': { bg: '#3b82f6', border: '#2563eb', text: 'Agendado' },
+    'Confirmado': { bg: '#14b8a6', border: '#0d9488', text: 'Confirmado' },
+    'Compareceu': { bg: '#8b5cf6', border: '#7c3aed', text: 'Compareceu' },
+    'Realizado': { bg: '#22c55e', border: '#16a34a', text: 'Realizado' },
+    'Fechado': { bg: '#16a34a', border: '#15803d', text: 'Fechado' },
+    'Cancelado Pelo Cliente': { bg: '#ef4444', border: '#dc2626', text: 'Cancelado pelo Cliente' },
+    'Cancelado Pelo Salão': { bg: '#ef4444', border: '#dc2626', text: 'Cancelado pelo Salão' },
+    'Não Compareceu': { bg: '#f59e0b', border: '#d97706', text: 'No-Show' }
 };
+
+const CANCELLED_STATUSES = new Set(['Cancelado Pelo Cliente', 'Cancelado Pelo Salão']);
 
 // Business hours config
 // Janela visual do calendário: 06:00 → 23:59 para acomodar horários alargados.
@@ -165,7 +169,7 @@ function CalendarView() {
 
         return agendamentos.filter(ag => {
             if (excludeId && ag._id === excludeId) return false;
-            if (ag.status === 'Cancelado' || ag.status === 'Não Compareceu') return false;
+            if (CANCELLED_STATUSES.has(ag.status)) return false;
 
             const agStart = DateTime.fromISO(ag.dataHora, { zone: 'Europe/Lisbon' });
             const agEnd = agStart.plus({ hours: 1 });
@@ -276,10 +280,15 @@ function CalendarView() {
     // Update appointment status
     const handleUpdateStatus = async (appointmentId, newStatus) => {
         try {
-            // ✅ Enviar apenas o campo status em vez do objeto completo
-            await api.put(`/agendamentos/${appointmentId}`, {
-                status: newStatus
-            });
+            if (newStatus === 'Compareceu' || newStatus === 'Não Compareceu') {
+                await api.patch(`/agendamentos/${appointmentId}/comparecimento`, {
+                    compareceu: newStatus === 'Compareceu'
+                });
+            } else {
+                await api.patch(`/agendamentos/${appointmentId}/status`, {
+                    status: newStatus
+                });
+            }
             toast.success(`Status atualizado para "${newStatus}"`);
             fetchData();
             setDetailModalOpen(false);

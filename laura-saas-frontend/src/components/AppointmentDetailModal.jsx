@@ -5,10 +5,12 @@ import { useTheme } from '../contexts/ThemeContext';
 const STATUS_OPTIONS = [
     { value: 'Agendado', label: 'Agendado', color: 'blue' },
     { value: 'Confirmado', label: 'Confirmado', color: 'teal' },
+    { value: 'Compareceu', label: 'Compareceu', color: 'purple' },
     { value: 'Realizado', label: 'Realizado', color: 'green' },
-    { value: 'Cancelado', label: 'Cancelado', color: 'red' },
-    { value: 'Não Compareceu', label: 'Não Compareceu', color: 'amber' },
-    { value: 'Remarcado', label: 'Remarcado', color: 'purple' }
+    { value: 'Fechado', label: 'Fechado', color: 'green' },
+    { value: 'Cancelado Pelo Cliente', label: 'Cancelado pelo Cliente', color: 'red' },
+    { value: 'Cancelado Pelo Salão', label: 'Cancelado pelo Salão', color: 'red' },
+    { value: 'Não Compareceu', label: 'Não Compareceu', color: 'amber' }
 ];
 
 function AppointmentDetailModal({

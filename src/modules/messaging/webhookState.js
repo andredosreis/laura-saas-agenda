@@ -105,6 +105,7 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
   const doisDias = agora.plus({ days: 2 }).toJSDate();
   const janelaQuery = { $gte: duasHorasAtras, $lte: doisDias };
   const trintaMinAtras = agora.minus({ minutes: 30 }).toJSDate();
+  const cancelledStatus = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
 
   const [existingClient, existingLeadRaw, pendingApptLeadSide, lastMessage] = await Promise.all([
     models.Cliente
@@ -121,6 +122,7 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
       tenantId,
       'lead.telefone': { $in: variants },
       'confirmacao.tipo': 'pendente',
+      status: { $nin: cancelledStatus },
       dataHora: janelaQuery,
     })
       .select('_id')
@@ -153,6 +155,7 @@ export async function fetchRoutingState({ instanceName, telefoneNormalizado }) {
       tenantId,
       cliente: existingClient._id,
       'confirmacao.tipo': 'pendente',
+      status: { $nin: cancelledStatus },
       dataHora: janelaQuery,
     })
       .select('_id')

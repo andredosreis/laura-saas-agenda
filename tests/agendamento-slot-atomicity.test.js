@@ -113,6 +113,39 @@ describe('GAP-01: Slot conflict atomicity (Agendamento)', () => {
     expect(novo.ocupaSlot).toBe(true);
   });
 
+  it('liberta o slot quando a confirmação é rejeitada', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    const dataHora = futureDate();
+
+    const original = await Agendamento.create({
+      tenantId,
+      tipo: 'Avaliacao',
+      lead: { nome: 'X', telefone: '910000001' },
+      dataHora,
+      status: 'Agendado',
+    });
+
+    original.confirmacao = {
+      tipo: 'rejeitado',
+      respondidoEm: new Date(),
+      respondidoPor: 'cliente',
+    };
+    original.markModified('confirmacao');
+    await original.save();
+
+    expect(original.status).toBe('Agendado');
+    expect(original.ocupaSlot).toBe(false);
+
+    const novo = await Agendamento.create({
+      tenantId,
+      tipo: 'Avaliacao',
+      lead: { nome: 'Y', telefone: '910000002' },
+      dataHora,
+      status: 'Agendado',
+    });
+    expect(novo.ocupaSlot).toBe(true);
+  });
+
   it('actualiza ocupaSlot quando status é alterado via findOneAndUpdate', async () => {
     const tenantId = new mongoose.Types.ObjectId();
     const dataHora = futureDate();
