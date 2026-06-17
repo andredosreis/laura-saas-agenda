@@ -15,7 +15,7 @@ function EditarAgendamento() {
     dataHora: '',
     observacoes: '',
     status: 'Agendado',
-    tipoServico: 'pacote', // 'pacote' ou 'avulso'
+    tipoServico: 'pacote', // 'pacote' | 'avulso' | 'oferta'
     tipoAgendamento: 'Sessao', // 'Sessao' | 'Retorno' | 'Avaliacao'
     leadNome: '',
     leadTelefone: '',
@@ -46,6 +46,7 @@ function EditarAgendamento() {
 
         // Determinar o tipo de serviço
         const isAvulso = agendamentoData.servicoAvulsoNome && agendamentoData.servicoAvulsoNome.trim() !== '';
+        const tipoServico = agendamentoData.servicoTipo || (isAvulso ? 'avulso' : 'pacote');
         const tipoAgendamento = agendamentoData.tipo || 'Sessao';
 
         setFormData({
@@ -56,7 +57,7 @@ function EditarAgendamento() {
           dataHora: agendamentoData.dataHora ? agendamentoData.dataHora.substring(0, 16) : '',
           observacoes: agendamentoData.observacoes || '',
           status: agendamentoData.status || 'Agendado',
-          tipoServico: isAvulso ? 'avulso' : 'pacote',
+          tipoServico,
           tipoAgendamento,
           leadNome: agendamentoData.lead?.nome || '',
           leadTelefone: agendamentoData.lead?.telefone || '',
@@ -112,7 +113,7 @@ function EditarAgendamento() {
         ...prev,
         clienteId: '',
         pacoteId: '',
-        tipoServico: 'avulso'
+        tipoServico: 'oferta'
       }));
       return;
     }
@@ -141,7 +142,7 @@ function EditarAgendamento() {
           ...prev,
           clienteId: clienteId,
           pacoteId: '',
-          tipoServico: 'avulso'
+          tipoServico: 'oferta'
         }));
       }
     } catch (error) {
@@ -152,12 +153,10 @@ function EditarAgendamento() {
     }
   };
 
-  // Alternar entre pacote e serviço avulso
+  // Alternar entre pacote, serviço avulso e oferta
   const handleTipoServicoChange = (tipo) => {
-    // Se o cliente já tem pacote e está tentando mudar para 'pacote', não permitimos
-    // O cliente só pode usar o pacote que já tem contratado
     if (tipo === 'pacote' && clienteSelecionado && !clienteSelecionado.pacote) {
-      toast.warning('Este cliente não possui pacote ativo. Selecione Serviço Avulso.');
+      toast.warning('Este cliente não possui pacote ativo. Use serviço avulso ou oferta.');
       return;
     }
 
@@ -172,11 +171,12 @@ function EditarAgendamento() {
         };
       }
       
-      // Se está mudando para 'avulso', limpa o pacote
+      // Se está mudando para avulso/oferta, limpa o pacote
       return {
         ...prev,
         tipoServico: tipo,
-        pacoteId: ''
+        pacoteId: '',
+        servicoAvulsoValor: tipo === 'oferta' ? '0' : prev.servicoAvulsoValor
       };
     });
   };
@@ -225,6 +225,17 @@ function EditarAgendamento() {
 
     if (!formData.status || formData.status.trim() === '') {
       newErrors.status = 'Por favor, selecione um status para o agendamento.';
+    }
+
+    if (formData.tipoAgendamento !== 'Avaliacao' && formData.tipoServico === 'oferta' && !formData.servicoAvulsoNome.trim()) {
+      newErrors.servicoAvulsoNome = 'Informe o serviço ofertado.';
+    }
+
+    if (formData.tipoAgendamento !== 'Avaliacao' && formData.tipoServico === 'avulso') {
+      const servicoSelecionado = pacotes.find(p => p._id === formData.pacoteId);
+      if (!servicoSelecionado && !formData.servicoAvulsoNome.trim()) {
+        newErrors.servicoAvulsoNome = 'Informe ou selecione o serviço avulso.';
+      }
     }
 
     setFieldErrors(newErrors);
@@ -306,14 +317,19 @@ function EditarAgendamento() {
       };
     } else {
       // Fluxo cliente: Sessao/Retorno
+      const servicoSelecionado = pacotes.find(p => p._id === formData.pacoteId);
       dadosParaEnviar = {
         cliente: formData.clienteId,
         pacote: formData.tipoServico === 'pacote' ? (formData.pacoteId || null) : null,
-        servicoAvulsoNome: formData.tipoServico === 'avulso'
-          ? (pacotes.find(p => p._id === formData.pacoteId)?.nome || formData.servicoAvulsoNome || '')
+        compraPacote: null,
+        servicoTipo: formData.tipoServico,
+        servicoAvulsoNome: formData.tipoServico === 'avulso' || formData.tipoServico === 'oferta'
+          ? (servicoSelecionado?.nome || formData.servicoAvulsoNome || '')
           : '',
-        servicoAvulsoValor: formData.tipoServico === 'avulso'
-          ? (pacotes.find(p => p._id === formData.pacoteId)?.valor ||
+        servicoAvulsoValor: formData.tipoServico === 'oferta'
+          ? 0
+          : formData.tipoServico === 'avulso'
+          ? (servicoSelecionado?.valor ||
              (formData.servicoAvulsoValor !== '' && !isNaN(parseFloat(formData.servicoAvulsoValor))
                ? parseFloat(formData.servicoAvulsoValor) : null))
           : null,
@@ -544,7 +560,7 @@ function EditarAgendamento() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tipo de Serviço
                 </label>
-                <div className="flex space-x-4">
+                <div className="flex flex-wrap gap-4">
                   <div className="flex items-center">
                     <input
                       type="radio"
@@ -579,13 +595,32 @@ function EditarAgendamento() {
                       Serviço Avulso
                     </label>
                   </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="tipoOferta"
+                      name="tipoServico"
+                      value="oferta"
+                      checked={formData.tipoServico === 'oferta'}
+                      onChange={() => handleTipoServicoChange('oferta')}
+                      disabled={isSubmitting}
+                      className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                    />
+                    <label htmlFor="tipoOferta" className="ml-2 text-sm text-gray-700">
+                      Oferta sem cobrança
+                    </label>
+                  </div>
                 </div>
               </div>
 
               {/* Campo Pacote/Serviço */}
               <div>
                 <label htmlFor="pacoteId" className="block text-sm font-medium text-gray-700 mb-1">
-                  {formData.tipoServico === 'pacote' ? 'Pacote Contratado' : 'Serviço (opcional)'}
+                  {formData.tipoServico === 'pacote'
+                    ? 'Pacote Contratado'
+                    : formData.tipoServico === 'oferta'
+                      ? 'Serviço ofertado'
+                      : 'Serviço (opcional)'}
                 </label>
 
                 {/* Se for pacote e o cliente tem pacote, mostramos o pacote fixo */}
@@ -593,6 +628,22 @@ function EditarAgendamento() {
                   <div className="p-2 bg-gray-100 border border-gray-300 rounded-sm text-gray-700">
                     {clienteSelecionado.pacote.nome}
                   </div>
+                ) : formData.tipoServico === 'oferta' ? (
+                  <>
+                    <input
+                      type="text"
+                      name="servicoAvulsoNome"
+                      id="servicoAvulsoNome"
+                      value={formData.servicoAvulsoNome}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      placeholder="Ex: Sessão cortesia"
+                      className={`block w-full rounded-md p-3 shadow-xs focus:border-emerald-500 focus:ring-3 focus:ring-emerald-200 ${fieldErrors.servicoAvulsoNome ? 'border-red-500' : 'border-gray-300'}`}
+                    />
+                    <p className="mt-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg p-2">
+                      Esta oferta fica no agendamento e no histórico, mas não entra no faturamento.
+                    </p>
+                  </>
                 ) : (
                   /* Se for serviço avulso ou cliente sem pacote, mostramos seleção de serviços */
                   <select
@@ -613,6 +664,7 @@ function EditarAgendamento() {
                 )}
 
                 {fieldErrors.pacoteId && <p className="mt-1 text-sm text-red-500">{fieldErrors.pacoteId}</p>}
+                {fieldErrors.servicoAvulsoNome && <p className="mt-1 text-sm text-red-500">{fieldErrors.servicoAvulsoNome}</p>}
               </div>
             </div>
             )}
@@ -681,4 +733,3 @@ function EditarAgendamento() {
 }
 
 export default EditarAgendamento;
-

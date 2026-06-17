@@ -262,6 +262,7 @@ function CalendarView() {
                 dataHora: newDate,
                 status: 'Agendado', // Keep as 'Agendado' since 'Remarcado' is not in the enum
                 observacoes: notes ? `${appointment.observacoes || ''}\n[Remarcado em ${DateTime.now().setZone('Europe/Lisbon').toFormat('dd/MM/yyyy HH:mm')}] ${notes}`.trim() : appointment.observacoes,
+                servicoTipo: appointment.servicoTipo || (appointment.servicoAvulsoNome ? 'avulso' : 'pacote'),
                 servicoAvulsoNome: appointment.servicoAvulsoNome || null,
                 servicoAvulsoValor: appointment.servicoAvulsoValor || null,
             };

@@ -11,12 +11,13 @@
 import request from 'supertest';
 import { jest } from '@jest/globals';
 
+const sendWhatsAppMessageMock = jest.fn().mockResolvedValue({ success: true });
+
 jest.unstable_mockModule('../src/utils/evolutionClient.js', () => ({
-  sendWhatsAppMessage: jest.fn().mockResolvedValue({ success: true }),
+  sendWhatsAppMessage: sendWhatsAppMessageMock,
 }));
 
 const { default: app } = await import('../src/app.js');
-const { sendWhatsAppMessage } = await import('../src/utils/evolutionClient.js');
 const { setupTestDB, teardownTestDB, clearDB } = await import('./setup.js');
 const { default: Tenant } = await import('../src/models/Tenant.js');
 const { default: User } = await import('../src/models/User.js');
@@ -29,6 +30,7 @@ afterAll(teardownTestDB);
 beforeEach(async () => {
   await clearDB();
   jest.clearAllMocks();
+  sendWhatsAppMessageMock.mockResolvedValue({ success: true });
 });
 
 async function criarTenantEToken(slug = 'inbox-salon') {
@@ -152,7 +154,7 @@ describe('POST /api/conversas/:telefone/reply', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.enviado).toBe(true);
-    expect(sendWhatsAppMessage).toHaveBeenCalledTimes(1);
+    expect(sendWhatsAppMessageMock).toHaveBeenCalledTimes(1);
 
     const outbound = await models.Mensagem.findOne({ geradoPor: 'humano' }).lean();
     expect(outbound).not.toBeNull();

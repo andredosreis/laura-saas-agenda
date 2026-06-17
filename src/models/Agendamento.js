@@ -72,6 +72,12 @@ const agendamentoSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  servicoTipo: {
+    type: String,
+    enum: ['pacote', 'avulso', 'oferta'],
+    default: 'pacote',
+    index: true
+  },
   confirmacao: {
     tipo: {
       type: String,
@@ -110,7 +116,7 @@ const agendamentoSchema = new mongoose.Schema({
   },
   statusPagamento: {
     type: String,
-    enum: ['Pendente', 'Pago', 'Cancelado'],
+    enum: ['Pendente', 'Pago', 'Cancelado', 'Isento'],
     default: 'Pendente'
   },
 

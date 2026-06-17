@@ -213,3 +213,63 @@ describe('Agendamento: confirmação e liberação de slot', () => {
     expect(novoRes.body._id).toBeDefined();
   });
 });
+
+describe('Agendamento: oferta sem faturamento', () => {
+  it('cria oferta para cliente sem pacote e realiza sem gerar pagamento pendente', async () => {
+    const { token } = await criarTenantEToken('salon-oferta-servico');
+    await activarSchedule(token);
+    const clienteId = await criarCliente(token, '916000001');
+
+    const criarRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        cliente: clienteId,
+        dataHora: dataFutura(),
+        servicoTipo: 'oferta',
+        servicoAvulsoNome: 'Sessão cortesia',
+      });
+
+    expect(criarRes.status).toBe(201);
+    expect(criarRes.body.servicoTipo).toBe('oferta');
+    expect(criarRes.body.servicoAvulsoNome).toBe('Sessão cortesia');
+    expect(criarRes.body.servicoAvulsoValor).toBe(0);
+    expect(criarRes.body.statusPagamento).toBe('Isento');
+
+    const realizadoRes = await request(app)
+      .patch(`/api/agendamentos/${criarRes.body._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'Realizado' });
+
+    expect(realizadoRes.status).toBe(200);
+    expect(realizadoRes.body.status).toBe('Realizado');
+    expect(realizadoRes.body.statusPagamento).toBe('Isento');
+    expect(realizadoRes.body.valorCobrado).toBe(0);
+  });
+
+  it('não permite registrar pagamento em uma oferta', async () => {
+    const { token } = await criarTenantEToken('salon-oferta-sem-pagamento');
+    await activarSchedule(token);
+    const clienteId = await criarCliente(token, '917000001');
+
+    const criarRes = await request(app)
+      .post('/api/agendamentos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        cliente: clienteId,
+        dataHora: dataFutura(),
+        servicoTipo: 'oferta',
+        servicoAvulsoNome: 'Oferta de retorno',
+      });
+
+    expect(criarRes.status).toBe(201);
+
+    const pagamentoRes = await request(app)
+      .post(`/api/agendamentos/${criarRes.body._id}/pagamento`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ valor: 1, formaPagamento: 'Dinheiro' });
+
+    expect(pagamentoRes.status).toBe(400);
+    expect(pagamentoRes.body.message).toMatch(/oferta/i);
+  });
+});

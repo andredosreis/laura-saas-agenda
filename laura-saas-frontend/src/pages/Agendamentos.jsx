@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { DateTime } from 'luxon';
 import {
   Calendar, Clock, User, CheckCircle2, XCircle, MessageSquare, Edit, Trash2,
-  Loader2, Plus, Bell, BellOff, ChevronRight, AlertCircle, Sparkles, UserCheck, UserX
+  Loader2, Plus, Bell, BellOff, ChevronRight, AlertCircle, Sparkles, UserCheck, UserX, Gift
 } from 'lucide-react';
 import api from '../services/api';
 import { nomeServicoAgendamento } from '../utils/agendamento';
@@ -441,6 +441,7 @@ function Agendamentos() {
             const servico = nomeServicoAgendamento(ag);
             const isLead = ag.tipo === 'Avaliacao' && !ag.clienteConvertido;
             const conf = ag.confirmacao?.tipo || 'pendente';
+            const isOferta = ag.servicoTipo === 'oferta' || ag.statusPagamento === 'Isento';
 
             return (
               <div key={ag._id} className={`${cardClass} rounded-2xl p-4 hover:shadow-lg transition-all`}>
@@ -460,10 +461,16 @@ function Agendamentos() {
                       {isLead && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium">lead</span>
                       )}
-                      {ag.clienteConvertido && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">cliente</span>
-                      )}
-                    </div>
+                  {ag.clienteConvertido && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">cliente</span>
+                  )}
+                  {isOferta && (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">
+                      <Gift className="w-3 h-3" />
+                      oferta
+                    </span>
+                  )}
+                </div>
                     <p className={`text-sm truncate mt-0.5 ${subTextClass}`}>{servico}</p>
                   </div>
                 </div>

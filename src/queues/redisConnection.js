@@ -17,7 +17,7 @@ export function getRedisConnection() {
     tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined,
   });
 
-  redisConnection.on('connect', () => logger.info('[Redis] Ligado ao Upstash Redis'));
+  redisConnection.on('connect', () => logger.info('[Redis] Ligação estabelecida'));
   redisConnection.on('error', (err) => logger.error({ err }, '[Redis] Erro de ligação'));
 
   return redisConnection;
