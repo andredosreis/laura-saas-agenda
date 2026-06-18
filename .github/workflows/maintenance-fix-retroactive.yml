@@ -45,7 +45,7 @@ jobs:
              rm -rf /tmp/md-maint; \
              git clone --depth 1 https://github.com/andredosreis/laura-saas-agenda.git /tmp/md-maint; \
              cd /opt/marcai; \
-             docker compose -f docker-compose.prod.yml cp /tmp/md-maint/scripts/maintenance/fix-retroactive-expired-packages.js backend:/tmp/fix-retro.js; \
-             docker compose -f docker-compose.prod.yml exec -T backend node /tmp/fix-retro.js $FLAG; \
-             docker compose -f docker-compose.prod.yml exec -T backend rm -f /tmp/fix-retro.js; \
+             docker compose -f docker-compose.prod.yml cp /tmp/md-maint/scripts/maintenance/fix-retroactive-expired-packages.js backend:/app/fix-retro.js; \
+             docker compose -f docker-compose.prod.yml exec -T -w /app backend node /app/fix-retro.js $FLAG; \
+             docker compose -f docker-compose.prod.yml exec -T backend rm -f /app/fix-retro.js; \
              rm -rf /tmp/md-maint"
