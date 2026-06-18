@@ -61,6 +61,17 @@ export function descreverMidia(msgData) {
   return null;
 }
 
+// ⚠️ DIAGNÓSTICO TEMPORÁRIO — Fase 3 do plano de inbox (docs/plano-inbox-completo.md).
+// Captura o payload COMPLETO de uma mensagem @lid para descobrir onde o Evolution v2
+// põe o número real (a doc não o documenta). Remover assim que a resolução de @lid
+// estiver implementada. Frequência: grep '"motivo":"lid"'. Payload: grep 'lidPayload'.
+function logLidParaFase3(direcao, msgData) {
+  logger.info(
+    { direcao, motivo: 'lid', lidPayload: msgData },
+    '[webhook] @lid capturado para Fase 3',
+  );
+}
+
 /**
  * Express handler — POST /webhook/evolution.
  *
@@ -101,7 +112,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
       // @lid: ainda não resolvemos o número real (Fase 3 do plano de inbox).
       if (remoteJidRaw.endsWith('@lid')) {
-        logger.info({ ...logBase, motivo: 'lid' }, '[webhook] saída descartada');
+        logLidParaFase3('saida', msgData);
         return res.status(200).json({ message: 'Saída @lid ignorada' });
       }
 
@@ -150,7 +161,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     }
 
     if (remoteJidRaw.endsWith('@lid')) {
-      logger.warn({ remoteJid: remoteJidRaw }, '[webhook] @lid payload — aguardando resolução');
+      logLidParaFase3('entrada', msgData);
       return res.status(200).json({ message: 'LID ignorado, aguardando resolução' });
     }
 
