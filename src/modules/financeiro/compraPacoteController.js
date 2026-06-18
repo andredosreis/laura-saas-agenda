@@ -82,6 +82,11 @@ export const venderPacote = async (req, res) => {
         ? valorPendente / numParcelas
         : valorTotal / numParcelas;
 
+    // Vendas retroactivas nunca expiram (decisão de negócio): a validade só conta para
+    // vendas correntes. Numa venda retroactiva, dataExpiracao = dataCompra + diasValidade
+    // cairia no passado e o pacote nasceria "Expirado" — invisível em Vendas e Agendamentos.
+    const diasValidadeEfetivo = isRetroactivo ? null : (diasValidade || null);
+
     const compraPacote = await CompraPacote.create({
       tenantId: req.tenantId,
       cliente: clienteId,
@@ -97,7 +102,7 @@ export const venderPacote = async (req, res) => {
       // Em fluxo lead a entrada não conta como parcela; no fluxo VenderPacote o valorPago representa a 1ª parcela
       parcelasPagas: (parcelado && temEntrada) ? 0 : (valorPagoFinal > 0 ? 1 : 0),
       valorParcela: valorParcelaCalc,
-      diasValidade: diasValidade || null,
+      diasValidade: diasValidadeEfetivo,
       // dataProximaParcela só faz sentido se há saldo pendente após este registo
       dataProximaParcela: (parcelado && (valorTotal - valorPagoFinal) > 0.001 && dataProximaParcela)
         ? new Date(dataProximaParcela)
@@ -118,7 +123,7 @@ export const venderPacote = async (req, res) => {
       compraPacote: compraPacote._id,
       parcelado: parcelado || false,
       numeroParcelas: numParcelas,
-      parcelaAtual: (parcelado && temEntrada) ? 1 : (valorPagoFinal > 0 ? 2 : 1),
+      parcelaAtual: parcelado ? ((!temEntrada && valorPagoFinal > 0) ? 2 : 1) : 1,
       statusPagamento: !valorPagoFinal ? 'Pendente' : (valorPagoFinal >= valorTotal ? 'Pago' : 'Parcial'),
       formaPagamento: formaPagamento || null,
       dataPagamento: valorPagoFinal >= valorTotal ? dataEfetiva : null,
@@ -286,9 +291,9 @@ export const estenderPrazo = async (req, res) => {
   try {
     const { CompraPacote } = req.models;
     const { id } = req.params;
-    const { novosDias, motivo } = req.body;
+    const { dias, motivo } = req.body;
 
-    if (!novosDias || novosDias <= 0) {
+    if (!dias || dias <= 0) {
       return res.status(400).json({ message: 'Número de dias deve ser maior que zero' });
     }
 
@@ -306,14 +311,14 @@ export const estenderPrazo = async (req, res) => {
       return res.status(400).json({ message: 'Não é possível estender prazo de pacote cancelado' });
     }
 
-    await compraPacote.estenderPrazo(novosDias, motivo, req.userId);
+    await compraPacote.estenderPrazo(dias, motivo, req.user.userId);
 
     await compraPacote.populate([
       { path: 'cliente', select: 'nome telefone' },
       { path: 'pacote' }
     ]);
 
-    res.status(200).json({ message: `Prazo estendido por ${novosDias} dias`, compraPacote });
+    res.status(200).json({ message: `Prazo estendido por ${dias} dias`, compraPacote });
 
   } catch (error) {
     console.error('Erro ao estender prazo:', error);

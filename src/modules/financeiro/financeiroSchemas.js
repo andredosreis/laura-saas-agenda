@@ -160,18 +160,20 @@ export const registrarPagamentoParcelaSchema = z
     dataProximaParcela: z.coerce.date().optional().nullable(),
   });
 
+// Sem .strict(): as rotas de compra-pacote correm sob injectTenant, que injecta
+// req.body.tenantId — um schema strict rejeitá-lo-ia ("Unrecognized key: tenantId").
 export const estenderPrazoSchema = z
   .object({
-    novoPrazo: z.coerce.date(),
+    // Número de dias a acrescentar à validade (alinhado com o frontend e o controller).
+    dias: z.number().int().positive('Número de dias deve ser maior que zero'),
     motivo: z.string().trim().max(500).optional(),
-  })
-  .strict();
+  });
 
+// Sem .strict() — ver nota em estenderPrazoSchema (injectTenant adiciona tenantId ao body).
 export const cancelarPacoteSchema = z
   .object({
     motivo: z.string().trim().min(1).max(500),
-  })
-  .strict();
+  });
 
 // ─── Caixa ──────────────────────────────────────────────────────────
 

@@ -189,3 +189,98 @@ describe('GET /api/transacoes/relatorio/periodo', () => {
     expect(res.status).toBe(200);
   });
 });
+
+// ──────────────────────────────────────────────
+// POST /api/transacoes/:id/pagamento — estado por soma cumulativa
+// ──────────────────────────────────────────────
+
+describe('POST /api/transacoes/:id/pagamento — estado cumulativo', () => {
+  it('marca Pago quando os pagamentos parciais somam o total', async () => {
+    const { token } = await criarTenantEToken('trans-cumul');
+    const auth = `Bearer ${token}`;
+
+    const criar = await request(app)
+      .post('/api/transacoes')
+      .set('Authorization', auth)
+      .send({ ...transacaoValida, valor: 100 });
+    const id = criar.body.transacao._id;
+
+    const p1 = await request(app)
+      .post(`/api/transacoes/${id}/pagamento`)
+      .set('Authorization', auth)
+      .send({ valor: 40, formaPagamento: 'Dinheiro' });
+    expect(p1.status).toBe(201);
+    expect(p1.body.transacao.statusPagamento).toBe('Parcial');
+
+    const p2 = await request(app)
+      .post(`/api/transacoes/${id}/pagamento`)
+      .set('Authorization', auth)
+      .send({ valor: 60, formaPagamento: 'Dinheiro' });
+    expect(p2.status).toBe(201);
+    expect(p2.body.transacao.statusPagamento).toBe('Pago');
+  });
+});
+
+// ──────────────────────────────────────────────
+// DELETE /api/pagamentos/:id — estorno baixa o estado da transação
+// ──────────────────────────────────────────────
+
+describe('DELETE /api/pagamentos/:id — estorno', () => {
+  it('transação volta a Pendente após estornar o único pagamento', async () => {
+    const { token } = await criarTenantEToken('trans-estorno');
+    const auth = `Bearer ${token}`;
+
+    const criar = await request(app)
+      .post('/api/transacoes')
+      .set('Authorization', auth)
+      .send({ ...transacaoValida, valor: 100 });
+    const id = criar.body.transacao._id;
+
+    const pag = await request(app)
+      .post(`/api/transacoes/${id}/pagamento`)
+      .set('Authorization', auth)
+      .send({ valor: 100, formaPagamento: 'Dinheiro' });
+    expect(pag.body.transacao.statusPagamento).toBe('Pago');
+    const pagamentoId = pag.body.pagamento._id;
+
+    const estorno = await request(app)
+      .delete(`/api/pagamentos/${pagamentoId}`)
+      .set('Authorization', auth)
+      .send({ motivo: 'erro de lançamento' });
+    expect(estorno.status).toBe(200);
+
+    const get = await request(app)
+      .get(`/api/transacoes/${id}`)
+      .set('Authorization', auth);
+    expect(get.body.transacao.statusPagamento).toBe('Pendente');
+  });
+});
+
+// ──────────────────────────────────────────────
+// GET /api/transacoes/pendentes — total pendente real
+// ──────────────────────────────────────────────
+
+describe('GET /api/transacoes/pendentes', () => {
+  it('soma o restante REAL (não metade) para transações parciais', async () => {
+    const { token } = await criarTenantEToken('trans-pend');
+    const auth = `Bearer ${token}`;
+
+    const criar = await request(app)
+      .post('/api/transacoes')
+      .set('Authorization', auth)
+      .send({ ...transacaoValida, valor: 100 });
+    const id = criar.body.transacao._id;
+
+    await request(app)
+      .post(`/api/transacoes/${id}/pagamento`)
+      .set('Authorization', auth)
+      .send({ valor: 30, formaPagamento: 'Dinheiro' });
+
+    const res = await request(app)
+      .get('/api/transacoes/pendentes')
+      .set('Authorization', auth);
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalPendente).toBe(70); // 100 - 30, não 50
+  });
+});

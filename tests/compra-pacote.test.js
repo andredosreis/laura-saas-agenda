@@ -258,3 +258,145 @@ describe('POST /api/compras-pacotes — isolamento multi-tenant', () => {
     expect(res.body.message).toMatch(/cliente/i);
   });
 });
+
+// ──────────────────────────────────────────────
+// Venda retroactiva NUNCA expira (regra de negócio) — fix da "Tina"
+// ──────────────────────────────────────────────
+
+describe('POST /api/compras-pacotes — venda retroactiva nasce Ativo e nunca expira', () => {
+  it('ignora diasValidade em venda retroactiva: status Ativo e dataExpiracao nula', async () => {
+    const { token, cliente, pacote } = await criarTenantEToken('retro-ativo');
+    // 90 dias atrás + 30 dias de validade => com a lógica antiga expiraria há 60 dias (Expirado).
+    const dataAntiga = DateTime.now().setZone('Europe/Lisbon').minus({ days: 90 }).startOf('day').toISO();
+
+    const res = await request(app)
+      .post('/api/compras-pacotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        clienteId: cliente._id.toString(),
+        pacoteId: pacote._id.toString(),
+        dataCompra: dataAntiga,
+        motivoRetroactivo: 'Migração de cliente antigo',
+        diasValidade: 30,
+        valorPago: 500,
+        formaPagamento: 'Dinheiro',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.compraPacote.status).toBe('Ativo');
+    expect(res.body.compraPacote.dataExpiracao ?? null).toBeNull();
+    expect(res.body.compraPacote.diasValidade ?? null).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────
+// valorParcela respeita a entrada (pre-save não sobrescreve)
+// ──────────────────────────────────────────────
+
+describe('POST /api/compras-pacotes — valorParcela com entrada', () => {
+  it('parcela = (total - entrada) / nº parcelas, não total / nº parcelas', async () => {
+    const { token, cliente, pacote, models } = await criarTenantEToken('parcela-entrada');
+
+    const res = await request(app)
+      .post('/api/compras-pacotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        clienteId: cliente._id.toString(),
+        pacoteId: pacote._id.toString(),
+        valorTotal: 1000,
+        parcelado: true,
+        numeroParcelas: 4,
+        valorEntrada: 200,
+        formaPagamento: 'Dinheiro',
+      });
+
+    expect(res.status).toBe(201);
+    // (1000 - 200) / 4 = 200  (não 1000/4 = 250)
+    expect(res.body.compraPacote.valorParcela).toBe(200);
+
+    // Persistido na DB (o pre-save não voltou a sobrescrever)
+    const cp = await models.CompraPacote.findById(res.body.compraPacote._id);
+    expect(cp.valorParcela).toBe(200);
+    expect(cp.valorPendente).toBe(800);
+  });
+});
+
+// ──────────────────────────────────────────────
+// Estender prazo (campo `dias`) — alinhamento FE/schema/controller
+// ──────────────────────────────────────────────
+
+describe('PUT /api/compras-pacotes/:id/estender-prazo', () => {
+  it('estende a validade com { dias } e devolve 200', async () => {
+    const { token, cliente, pacote } = await criarTenantEToken('estender');
+
+    const venda = await request(app)
+      .post('/api/compras-pacotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        clienteId: cliente._id.toString(),
+        pacoteId: pacote._id.toString(),
+        diasValidade: 30,
+        valorPago: 500,
+        formaPagamento: 'Dinheiro',
+      });
+    expect(venda.status).toBe(201);
+    const expiracaoAntes = new Date(venda.body.compraPacote.dataExpiracao).getTime();
+
+    const res = await request(app)
+      .put(`/api/compras-pacotes/${venda.body.compraPacote._id}/estender-prazo`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dias: 30, motivo: 'Cliente de férias' });
+
+    expect(res.status).toBe(200);
+    const expiracaoDepois = new Date(res.body.compraPacote.dataExpiracao).getTime();
+    expect(expiracaoDepois).toBeGreaterThan(expiracaoAntes);
+  });
+
+  it('rejeita dias inválido (<= 0) com 400', async () => {
+    const { token, cliente, pacote } = await criarTenantEToken('estender-bad');
+    const venda = await request(app)
+      .post('/api/compras-pacotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        clienteId: cliente._id.toString(),
+        pacoteId: pacote._id.toString(),
+        diasValidade: 30,
+        valorPago: 500,
+        formaPagamento: 'Dinheiro',
+      });
+
+    const res = await request(app)
+      .put(`/api/compras-pacotes/${venda.body.compraPacote._id}/estender-prazo`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dias: 0 });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ──────────────────────────────────────────────
+// Cancelar pacote — não rejeitado pelo tenantId injectado
+// ──────────────────────────────────────────────
+
+describe('PUT /api/compras-pacotes/:id/cancelar', () => {
+  it('cancela com { motivo } e devolve 200 (não 400 por tenantId)', async () => {
+    const { token, cliente, pacote } = await criarTenantEToken('cancelar');
+    const venda = await request(app)
+      .post('/api/compras-pacotes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        clienteId: cliente._id.toString(),
+        pacoteId: pacote._id.toString(),
+        valorPago: 500,
+        formaPagamento: 'Dinheiro',
+      });
+
+    const res = await request(app)
+      .put(`/api/compras-pacotes/${venda.body.compraPacote._id}/cancelar`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ motivo: 'Cliente desistiu' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.compraPacote.status).toBe('Cancelado');
+  });
+});

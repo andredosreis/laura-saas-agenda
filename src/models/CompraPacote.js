@@ -191,10 +191,10 @@ compraPacoteSchema.pre('save', function() {
   // Calcular valor pendente
   this.valorPendente = this.valorTotal - this.valorPago;
 
-  // Calcular valor da parcela se parcelado
-  if (this.parcelado && this.numeroParcelas > 0) {
-    this.valorParcela = this.valorTotal / this.numeroParcelas;
-  }
+  // NÃO recalcular valorParcela aqui. Os controllers (venderPacote/editarVenda) são donos
+  // deste campo e calculam-no com a entrada descontada (valorPendente/numParcelas no fluxo
+  // de leads). Recalcular como valorTotal/numParcelas sobrescrevia esse valor e fazia os
+  // lembretes de parcela e a UI mostrarem montantes errados.
 
   // Calcular data de expiração se for nova compra e tiver dias de validade
   if (this.isNew && this.diasValidade && !this.dataExpiracao) {
@@ -299,11 +299,14 @@ compraPacoteSchema.methods.registrarPagamento = function(valorPago) {
 compraPacoteSchema.methods.cancelar = function(motivo = '') {
   this.status = 'Cancelado';
 
-  // Adicionar motivo às extensões (reutilizando a estrutura)
+  // Adicionar motivo às extensões (reutilizando a estrutura). dataAnterior/novaData são
+  // obrigatórios no schema; pacotes sem validade (ou retroactivos) têm dataExpiracao=null,
+  // por isso usamos a data actual como referência para não falhar a validação.
   if (motivo) {
+    const ref = this.dataExpiracao || new Date();
     this.extensoes.push({
-      dataAnterior: this.dataExpiracao,
-      novaData: this.dataExpiracao,
+      dataAnterior: ref,
+      novaData: ref,
       motivo: `[CANCELAMENTO] ${motivo}`,
       realizadoPor: null
     });
