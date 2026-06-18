@@ -9,6 +9,38 @@ import logger from '../utils/logger.js';
 
 const ZONA = 'Europe/Lisbon';
 
+const STATUS_CANCELADOS = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
+
+/**
+ * Um lembrete fica obsoleto se, na hora de disparar, o agendamento já não existe,
+ * foi cancelado/rejeitado, OU foi remarcado (a dataHora pretendida pelo job já não
+ * bate com a actual). Torna os jobs auto-validáveis: um job órfão (deixado para
+ * trás por uma remarcação/cancelamento) dispara e ignora-se sozinho, em vez de
+ * mandar um lembrete para a hora errada → evita lembretes desordenados.
+ *
+ * @param {object|null} agendamento  doc lean do Agendamento (ou null se não existe)
+ * @param {{ data?: { dataHora?: string } }} job
+ * @returns {boolean}
+ */
+export function lembreteObsoleto(agendamento, job) {
+  if (!agendamento) return true;
+  if (
+    STATUS_CANCELADOS.includes(agendamento.status) ||
+    agendamento.confirmacao?.tipo === 'rejeitado'
+  ) {
+    return true;
+  }
+  const intendedISO = job?.data?.dataHora;
+  if (intendedISO && agendamento.dataHora) {
+    const intended = DateTime.fromISO(intendedISO, { zone: ZONA }).toMillis();
+    const atual = DateTime.fromJSDate(new Date(agendamento.dataHora)).toMillis();
+    if (Number.isFinite(intended) && Number.isFinite(atual) && intended !== atual) {
+      return true; // remarcado desde que o job foi agendado
+    }
+  }
+  return false;
+}
+
 function buildMensagem(job) {
   const { tipo, clienteNome, dataHora, diasAntes, servicoNome } = job.data;
   const dt = DateTime.fromISO(dataHora, { zone: ZONA });
@@ -68,18 +100,11 @@ async function processJob(job) {
     }
     const agendamento = await Agendamento.findById(agendamentoId).lean();
 
-    if (!agendamento) {
-      logger.warn({ jobId: job.id, agendamentoId }, '[Worker] Agendamento não encontrado — job ignorado');
-      return;
-    }
-
-    // Se o cliente cancelou, não envia nenhuma mensagem
-    if (
-      agendamento.confirmacao?.tipo === 'rejeitado' ||
-      agendamento.status === 'Cancelado Pelo Cliente' ||
-      agendamento.status === 'Cancelado Pelo Salão'
-    ) {
-      logger.info({ jobId: job.id, agendamentoId }, '[Worker] Agendamento cancelado — lembrete 1h ignorado');
+    if (lembreteObsoleto(agendamento, job)) {
+      logger.info(
+        { jobId: job.id, agendamentoId },
+        '[Worker] lembrete-1h ignorado (inexistente/cancelado/remarcado)'
+      );
       return;
     }
 
@@ -141,6 +166,17 @@ async function processJob(job) {
   // Todos os outros tipos (confirmacao, lembrete-antecipado)
   if (!clienteTelefone) {
     logger.warn({ jobId: job.id, tipo }, '[Worker] Sem telefone — job ignorado');
+    return;
+  }
+
+  // Auto-validação: não disparar um lembrete de um agendamento que foi
+  // cancelado/remarcado depois de o job ter sido agendado.
+  const agendamentoActual = await Agendamento.findById(agendamentoId).lean();
+  if (lembreteObsoleto(agendamentoActual, job)) {
+    logger.info(
+      { jobId: job.id, tipo, agendamentoId },
+      '[Worker] lembrete ignorado (inexistente/cancelado/remarcado)'
+    );
     return;
   }
 

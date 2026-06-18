@@ -71,8 +71,22 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
     return { queued: false, immediateSent: true, reason: 'redis_unavailable' };
   }
 
+  // IDs determinísticos por agendamento+tipo. Permitem que, ao remarcar (re-chamar
+  // esta função), os lembretes antigos sejam removidos e recriados limpos — em vez
+  // de ficarem jobs órfãos a disparar para a hora antiga (lembretes desordenados).
+  const jobIdConfirmacao = `${baseData.agendamentoId}:confirmacao`;
+  const jobIdAntecipado = `${baseData.agendamentoId}:lembrete-antecipado`;
+  const jobId1h = `${baseData.agendamentoId}:lembrete-1h`;
+
+  // Remove lembretes anteriores deste agendamento (remarcação/recriação limpa).
+  await Promise.all(
+    [jobIdConfirmacao, jobIdAntecipado, jobId1h].map((jid) =>
+      queue.remove(jid).catch(() => {})
+    )
+  );
+
   // 1. Confirmação imediata (sem delay)
-  await queue.add('confirmacao', { ...baseData, tipo: 'confirmacao' });
+  await queue.add('confirmacao', { ...baseData, tipo: 'confirmacao' }, { jobId: jobIdConfirmacao });
 
   // 2. Lembrete antecipado
   if (diasAte > 7) {
@@ -81,7 +95,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
       await queue.add(
         'lembrete-antecipado',
         { ...baseData, tipo: 'lembrete-antecipado', diasAntes: 2 },
-        { delay }
+        { delay, jobId: jobIdAntecipado }
       );
     }
   } else if (diasAte >= 2) {
@@ -90,7 +104,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
       await queue.add(
         'lembrete-antecipado',
         { ...baseData, tipo: 'lembrete-antecipado', diasAntes: 1 },
-        { delay }
+        { delay, jobId: jobIdAntecipado }
       );
     }
   }
@@ -101,7 +115,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
     await queue.add(
       'lembrete-1h',
       { ...baseData, tipo: 'lembrete-1h' },
-      { delay: delay1h }
+      { delay: delay1h, jobId: jobId1h }
     );
   }
 
