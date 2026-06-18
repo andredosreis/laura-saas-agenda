@@ -3,6 +3,7 @@ import { sendPushNotification } from "../../services/pushService.js";
 import UserSubscription from "../../models/UserSubscription.js";
 import { sendWhatsAppMessage } from "../../utils/evolutionClient.js";
 import { scheduleNotifications } from "../../utils/scheduleNotifications.js";
+import { formatarDataLembrete } from "../../utils/lembreteFormat.js";
 import { scopeAgendamentoQuery } from "./agendamentoScope.js";
 
 const ZONA = 'Europe/Lisbon';
@@ -724,9 +725,7 @@ export const enviarLembreteManual = async (req, res) => {
       });
     }
 
-    const dataAgendamento = DateTime.fromJSDate(new Date(agendamento.dataHora));
-    const dataFormatada = dataAgendamento.toFormat('dd/MM/yyyy');
-    const horaFormatada = dataAgendamento.toFormat('HH:mm');
+    const dataExtenso = formatarDataLembrete(agendamento.dataHora);
     const servicoNome = formatServicoNomeLembrete(
       agendamento.servicoTipo,
       agendamento.compraPacote?.pacote?.nome || agendamento.pacote?.nome || agendamento.servicoAvulsoNome
@@ -735,17 +734,12 @@ export const enviarLembreteManual = async (req, res) => {
 
     const mensagem = `🔔 *Lembrete de Agendamento*
 
-Olá ${nome}!
-
-Você tem um agendamento marcado:
-${servicoLinha}📅 Data: ${dataFormatada}
-🕐 Horário: ${horaFormatada}
-
-Por favor, confirme sua presença respondendo:
-✅ *SIM* - para confirmar
-❌ *NÃO* - para cancelar
-
-Aguardamos por ti! 💆‍♀️✨
+Olá ${nome}! Tem uma sessão marcada para:
+📅 *${dataExtenso}*
+${servicoLinha}
+Confirma a sua presença?
+✅ *SIM* — confirmar
+❌ *NÃO* — cancelar
 
 _La Estética Avançada_`;
 

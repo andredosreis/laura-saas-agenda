@@ -5,6 +5,7 @@ import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
 import Tenant from '../models/Tenant.js';
 import { getTenantDB } from '../config/tenantDB.js';
 import { getModels } from '../models/registry.js';
+import { formatarDataLembrete } from '../utils/lembreteFormat.js';
 import logger from '../utils/logger.js';
 
 const ZONA = 'Europe/Lisbon';
@@ -41,24 +42,21 @@ export function lembreteObsoleto(agendamento, job) {
   return false;
 }
 
-function buildMensagem(job) {
-  const { tipo, clienteNome, dataHora, diasAntes, servicoNome } = job.data;
-  const dt = DateTime.fromISO(dataHora, { zone: ZONA });
-  const dataFormatada = dt.toFormat('dd/MM/yyyy');
-  const horaFormatada = dt.toFormat('HH:mm');
+export function buildMensagem(job) {
+  const { tipo, clienteNome, dataHora, servicoNome } = job.data;
+  const dataExtenso = formatarDataLembrete(dataHora);
   const servicoLinha = servicoNome ? `💆 Serviço: ${servicoNome}\n` : '';
 
   if (tipo === 'confirmacao') {
-    return `✅ *Agendamento Confirmado!*\n\nOlá ${clienteNome}!\n\nO seu agendamento foi marcado com sucesso:\n${servicoLinha}📅 Data: ${dataFormatada}\n🕐 Horário: ${horaFormatada}\n\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
+    return `✅ *Agendamento Confirmado!*\n\nOlá ${clienteNome}! A sua sessão ficou marcada para:\n📅 *${dataExtenso}*\n${servicoLinha}\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
   }
 
   if (tipo === 'lembrete-antecipado') {
-    const quando = diasAntes === 1 ? 'AMANHÃ' : `daqui a ${diasAntes} dias`;
-    return `🔔 *Lembrete de Agendamento*\n\nOlá ${clienteNome}!\n\nLembramos que tem uma sessão marcada para *${quando}*:\n${servicoLinha}📅 Data: ${dataFormatada}\n🕐 Horário: ${horaFormatada}\n\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
+    return `🔔 *Lembrete de Agendamento*\n\nOlá ${clienteNome}! Tem uma sessão marcada para:\n📅 *${dataExtenso}*\n${servicoLinha}\nConfirma a sua presença?\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
   }
 
   if (tipo === 'lembrete-1h') {
-    return `⏰ *Sessão em 1 hora!*\n\nOlá ${clienteNome}!\n\nA sua sessão começa às *${horaFormatada}* de hoje.\n${servicoLinha ? `\n${servicoLinha}` : ''}\nEstá confirmada? Por favor responda:\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
+    return `⏰ *A sua sessão é já a seguir!*\n\nOlá ${clienteNome}! Lembrete da sua sessão:\n📅 *${dataExtenso}*\n${servicoLinha}\nConfirma a sua presença?\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
   }
 
   return null;

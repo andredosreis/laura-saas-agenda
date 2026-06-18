@@ -31,9 +31,41 @@ jest.unstable_mockModule('../src/utils/evolutionClient.js', () => ({
 }));
 
 const { scheduleNotifications } = await import('../src/utils/scheduleNotifications.js');
-const { lembreteObsoleto } = await import('../src/workers/notificationWorker.js');
+const { lembreteObsoleto, buildMensagem } = await import('../src/workers/notificationWorker.js');
+const { formatarDataLembrete } = await import('../src/utils/lembreteFormat.js');
 
 const ZONA = 'Europe/Lisbon';
+
+describe('lembretes — cópia baseada na data absoluta (não tempo relativo)', () => {
+  const dataHora = '2026-06-19T14:00:00+01:00'; // sexta-feira, 14:00 Lisboa
+  const esperado = 'sexta-feira, 19/06 às 14:00';
+
+  it('formatarDataLembrete: dia da semana + data + hora (ISO e Date)', () => {
+    expect(formatarDataLembrete(dataHora)).toBe(esperado);
+    expect(formatarDataLembrete(new Date('2026-06-19T13:00:00Z'))).toBe(esperado); // 13:00 UTC = 14:00 Lisboa
+  });
+
+  const job = (tipo) => ({ id: 'j', data: { tipo, clienteNome: 'Ana', dataHora, servicoNome: 'Massagem' } });
+
+  it('confirmacao usa data absoluta e não tempo relativo', () => {
+    const m = buildMensagem(job('confirmacao'));
+    expect(m).toContain(esperado);
+    expect(m).not.toMatch(/AMANHÃ|de hoje|daqui a|em 1 hora|Data:/);
+  });
+
+  it('lembrete-antecipado usa data absoluta + pede SIM/NÃO', () => {
+    const m = buildMensagem(job('lembrete-antecipado'));
+    expect(m).toContain(esperado);
+    expect(m).not.toMatch(/AMANHÃ|daqui a/);
+    expect(m).toContain('SIM');
+  });
+
+  it('lembrete-1h usa data absoluta, sem "1 hora"/"de hoje"', () => {
+    const m = buildMensagem(job('lembrete-1h'));
+    expect(m).toContain(esperado);
+    expect(m).not.toMatch(/de hoje|1 hora/);
+  });
+});
 
 describe('lembreteObsoleto — auto-validação na hora de disparar', () => {
   const dataHora = DateTime.fromISO('2026-06-20T14:00:00', { zone: ZONA });

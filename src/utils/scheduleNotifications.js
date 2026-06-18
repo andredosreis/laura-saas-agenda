@@ -1,24 +1,20 @@
 import { DateTime } from 'luxon';
 import { getNotificationQueue } from '../queues/notificationQueue.js';
 import { sendWhatsAppMessage } from './evolutionClient.js';
+import { formatarDataLembrete } from './lembreteFormat.js';
 import logger from './logger.js';
 
 const ZONA = 'Europe/Lisbon';
 
 function buildConfirmacaoMessage({ clienteNome, dataHora, servicoNome }) {
-  const dt = DateTime.fromISO(dataHora, { zone: ZONA });
-  const dataFormatada = dt.toFormat('dd/MM/yyyy');
-  const horaFormatada = dt.toFormat('HH:mm');
+  const dataExtenso = formatarDataLembrete(dataHora);
   const servicoLinha = servicoNome ? `💆 Serviço: ${servicoNome}\n` : '';
 
   return `✅ *Agendamento Confirmado!*
 
-Olá ${clienteNome}!
-
-O seu agendamento foi marcado com sucesso:
-${servicoLinha}📅 Data: ${dataFormatada}
-🕐 Horário: ${horaFormatada}
-
+Olá ${clienteNome}! A sua sessão ficou marcada para:
+📅 *${dataExtenso}*
+${servicoLinha}
 Até breve! 💆‍♀️✨
 
 _LA Estética Avançada_`;
