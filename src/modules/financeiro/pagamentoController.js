@@ -141,42 +141,55 @@ export const deletarPagamento = async (req, res) => {
       return res.status(404).json({ message: 'Transação relacionada não encontrada' });
     }
 
-    transacao.valorPago -= pagamento.valor;
-    transacao.valorPendente = transacao.valorFinal - transacao.valorPago;
+    // Apagar primeiro e recalcular a partir dos Pagamentos que SOBRAM.
+    // A Transacao não tem campo valorPago — o estado tem de ser derivado sempre da soma
+    // real dos Pagamentos, nunca de subtrair a um campo inexistente (que dava NaN e deixava
+    // a transação eternamente "Pago" após um estorno).
+    const valorEstornado = pagamento.valor;
+    await pagamento.deleteOne();
 
-    if (transacao.valorPago <= 0) {
+    const pagamentosRestantes = await Pagamento.find({
+      transacao: transacao._id,
+      tenantId: req.tenantId
+    });
+    const totalPago = pagamentosRestantes.reduce((sum, p) => sum + (p.valor || 0), 0);
+
+    if (totalPago <= 0.001) {
       transacao.statusPagamento = 'Pendente';
       transacao.dataPagamento = null;
-    } else if (transacao.valorPago < transacao.valorFinal) {
+    } else if (totalPago < transacao.valorFinal - 0.001) {
       transacao.statusPagamento = 'Parcial';
+      transacao.dataPagamento = null;
+    } else {
+      transacao.statusPagamento = 'Pago';
     }
 
-    if (transacao.parcelado && transacao.valorParcela > 0) {
-      const parcelasPagas = Math.floor(transacao.valorPago / transacao.valorParcela);
-      transacao.parcelaAtual = parcelasPagas + 1;
+    if (transacao.parcelado && transacao.numeroParcelas > 0) {
+      const valorParcela = transacao.valorFinal / transacao.numeroParcelas;
+      transacao.parcelaAtual = valorParcela > 0
+        ? Math.min(transacao.numeroParcelas, Math.floor(totalPago / valorParcela) + 1)
+        : 1;
     }
 
     await transacao.save();
 
+    // CompraPacote é a fonte de verdade do valorPago para vendas de pacote — realinhar
+    // com a soma real dos pagamentos (o estado Concluído/sessões não é afectado por estornos).
     if (transacao.compraPacote) {
       const compraPacote = await CompraPacote.findOne({ _id: transacao.compraPacote, tenantId: req.tenantId });
       if (compraPacote) {
-        compraPacote.valorPago -= pagamento.valor;
-        compraPacote.valorPendente = compraPacote.valorTotal - compraPacote.valorPago;
-
+        compraPacote.valorPago = totalPago;
+        compraPacote.valorPendente = Math.max(0, compraPacote.valorTotal - totalPago);
         if (compraPacote.parcelado && compraPacote.valorParcela > 0) {
-          compraPacote.parcelasPagas = Math.floor(compraPacote.valorPago / compraPacote.valorParcela);
+          compraPacote.parcelasPagas = Math.floor(totalPago / compraPacote.valorParcela);
         }
-
         await compraPacote.save();
       }
     }
 
-    await pagamento.deleteOne();
-
     res.status(200).json({
       message: `Pagamento estornado com sucesso${motivo ? `: ${motivo}` : ''}`,
-      valorEstornado: pagamento.valor
+      valorEstornado
     });
 
   } catch (error) {

@@ -353,7 +353,7 @@ export const cancelarTransacao = async (req, res) => {
 // @route   GET /api/transacoes/pendentes
 export const listarTransacoesPendentes = async (req, res) => {
   try {
-    const { Transacao } = req.models;
+    const { Transacao, Pagamento } = req.models;
     const { tipo = 'Receita' } = req.query;
 
     const transacoes = await Transacao.find({
@@ -365,9 +365,29 @@ export const listarTransacoesPendentes = async (req, res) => {
       .populate('compraPacote')
       .sort('createdAt');
 
+    // Pendente REAL = valorFinal - pago. Fonte do "pago":
+    //  • transações de pacote → CompraPacote.valorPago (fonte de verdade, já populada)
+    //  • restantes → soma dos Pagamentos da transação
+    // (antes assumia-se metade do valor para "Parcial", o que dava totais errados)
+    const idsSemPacote = transacoes.filter(t => !t.compraPacote).map(t => t._id);
+    const pagamentosAgg = idsSemPacote.length > 0
+      ? await Pagamento.aggregate([
+          {
+            $match: {
+              tenantId: new mongoose.Types.ObjectId(req.tenantId),
+              transacao: { $in: idsSemPacote }
+            }
+          },
+          { $group: { _id: '$transacao', total: { $sum: '$valor' } } }
+        ])
+      : [];
+    const pagoPorTransacao = new Map(pagamentosAgg.map(p => [String(p._id), p.total]));
+
     const totalPendente = transacoes.reduce((sum, t) => {
-      if (t.statusPagamento === 'Pendente') return sum + t.valorFinal;
-      return sum + (t.valorFinal / 2);
+      const pago = t.compraPacote
+        ? (t.compraPacote.valorPago || 0)
+        : (pagoPorTransacao.get(String(t._id)) || 0);
+      return sum + Math.max(0, (t.valorFinal || 0) - pago);
     }, 0);
 
     res.status(200).json({ transacoes, totalPendente, quantidade: transacoes.length });
@@ -422,7 +442,26 @@ export const registrarPagamento = async (req, res) => {
       observacoes: observacoes || ''
     });
 
-    await transacao.registrarPagamento(valor, formaPagamento, dataPagamento);
+    // Estado da transação pela soma REAL de todos os pagamentos (não o pagamento único vs
+    // valorFinal). Sem isto, uma transação parcelada paga em várias parcelas nunca chegava
+    // a "Pago" — cada parcela isolada é sempre < valorFinal.
+    const pagamentos = await Pagamento.find({ transacao: id, tenantId: req.tenantId });
+    const totalPago = pagamentos.reduce((sum, p) => sum + (p.valor || 0), 0);
+
+    if (totalPago >= transacao.valorFinal - 0.001) {
+      transacao.statusPagamento = 'Pago';
+      if (!transacao.dataPagamento) transacao.dataPagamento = dataPagamento || new Date();
+    } else {
+      transacao.statusPagamento = 'Parcial';
+    }
+    transacao.formaPagamento = formaPagamento;
+    if (transacao.parcelado && transacao.numeroParcelas > 0) {
+      const valorParcela = transacao.valorFinal / transacao.numeroParcelas;
+      if (valorParcela > 0) {
+        transacao.parcelaAtual = Math.min(transacao.numeroParcelas, Math.floor(totalPago / valorParcela) + 1);
+      }
+    }
+    await transacao.save();
 
     if (transacao.compraPacote) {
       const compraPacote = await CompraPacote.findOne({ _id: transacao.compraPacote, tenantId: req.tenantId });
