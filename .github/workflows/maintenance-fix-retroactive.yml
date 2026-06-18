@@ -1,0 +1,51 @@
+name: Maintenance — fix retroactive packages (Contabo)
+
+# Corre scripts/maintenance/fix-retroactive-expired-packages.js DENTRO do container
+# `backend` no Contabo (que tem node + deps + MONGODB_URI via env_file .env).
+#
+# Por defeito é DRY-RUN (não escreve nada). Para aplicar, accionar com apply=true.
+#
+# Como: separador Actions → este workflow → "Run workflow" → escolher apply.
+# Reaproveita os mesmos secrets do deploy: CONTABO_HOST / CONTABO_USER / CONTABO_SSH_KEY.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Aplicar alterações? (desligado = dry-run)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: maintenance-contabo
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar chave SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          HOST=$(printf '%s' "${{ secrets.CONTABO_HOST }}" | tr -d '[:space:]')
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Correr manutenção no servidor
+        run: |
+          SSH_HOST=$(printf '%s' "${{ secrets.CONTABO_HOST }}" | tr -d '[:space:]')
+          SSH_USER=$(printf '%s' "${{ secrets.CONTABO_USER }}" | tr -d '[:space:]')
+          FLAG=""
+          if [ "${{ inputs.apply }}" = "true" ]; then FLAG="--apply"; fi
+          echo "Modo: ${FLAG:-dry-run}"
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new \
+            "$SSH_USER@$SSH_HOST" \
+            "set -e; \
+             rm -rf /tmp/md-maint; \
+             git clone --depth 1 https://github.com/andredosreis/laura-saas-agenda.git /tmp/md-maint; \
+             cd /opt/marcai; \
+             docker compose -f docker-compose.prod.yml cp /tmp/md-maint/scripts/maintenance/fix-retroactive-expired-packages.js backend:/tmp/fix-retro.js; \
+             docker compose -f docker-compose.prod.yml exec -T backend node /tmp/fix-retro.js $FLAG; \
+             docker compose -f docker-compose.prod.yml exec -T backend rm -f /tmp/fix-retro.js; \
+             rm -rf /tmp/md-maint"
