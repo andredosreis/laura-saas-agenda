@@ -53,10 +53,10 @@ describe('Webhook Evolution API', () => {
       expect(response.body.message).toBe('Evento ignorado');
     });
 
-    // fromMe COM texto passou a ser gravado como saída humana (resposta da
-    // profissional pelo telemóvel) — ver tests/webhook-manual-outbound.test.js.
-    // Um fromMe SEM texto (media/vazio) continua a ser ignorado.
-    it('ignores fromMe messages without text (media/empty)', async () => {
+    // fromMe COM texto (ou media) passou a ser gravado na thread — ver
+    // tests/webhook-manual-outbound.test.js. Um fromMe SEM texto e SEM media
+    // (payload vazio) continua a ser ignorado.
+    it('ignores fromMe messages without text or media (empty)', async () => {
       const response = await request(app)
         .post(WEBHOOK_URL)
         .set('apikey', VALID_API_KEY)
@@ -68,7 +68,7 @@ describe('Webhook Evolution API', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Saída sem texto/lid ignorada');
+      expect(response.body.message).toBe('Saída sem conteúdo ignorada');
     });
 
     it('defensively falls back and ignores @lid identifiers (ADR-016)', async () => {

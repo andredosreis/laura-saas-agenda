@@ -169,7 +169,7 @@ describe('Webhook — registo de saídas manuais (fromMe)', () => {
     expect(clienteAtual.iaAtiva).toBe(true);
   });
 
-  test('fromMe sem texto (media) é ignorado', async () => {
+  test('fromMe sem texto e sem media (vazio) é ignorado', async () => {
     const tenant = await createTenant();
     const tenantId = tenant._id.toString();
     const { Mensagem } = getModels(getTenantDB(tenantId));
@@ -177,12 +177,73 @@ describe('Webhook — registo de saídas manuais (fromMe)', () => {
     const res = await request(app)
       .post(WEBHOOK_URL)
       .set('apikey', VALID_API_KEY)
-      .send(buildFromMePayload({ messageId: 'out-media', phone: '351912345678', text: '' }));
+      .send(buildFromMePayload({ messageId: 'out-vazio', phone: '351912345678', text: '' }));
 
     expect(res.status).toBe(200);
     await flushAsync();
 
     const msgs = await Mensagem.find({ direcao: 'saida' });
     expect(msgs).toHaveLength(0);
+  });
+
+  function buildFromMeMediaPayload({ messageId, phone, message, messageType, instance = 'marcai' }) {
+    return {
+      event: 'messages.upsert',
+      instance,
+      data: {
+        key: { id: messageId, remoteJid: `${phone}@s.whatsapp.net`, fromMe: true },
+        messageTimestamp: Math.floor(Date.now() / 1000),
+        messageType,
+        message,
+      },
+    };
+  }
+
+  test('fromMe com áudio (sem texto) → grava placeholder 🎤 [áudio] na thread', async () => {
+    const tenant = await createTenant();
+    const tenantId = tenant._id.toString();
+    const { Mensagem } = getModels(getTenantDB(tenantId));
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildFromMeMediaPayload({
+        messageId: 'out-audio',
+        phone: '351912345678',
+        messageType: 'audioMessage',
+        message: { audioMessage: { mimetype: 'audio/ogg' } },
+      }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const msgs = await Mensagem.find({ direcao: 'saida' });
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0].mensagem).toBe('🎤 [áudio]');
+    expect(msgs[0].origem).toBe('laura');
+    expect(msgs[0].geradoPor).toBe('humano');
+  });
+
+  test('fromMe com imagem (sem texto) → grava placeholder 🖼️ [imagem]', async () => {
+    const tenant = await createTenant();
+    const tenantId = tenant._id.toString();
+    const { Mensagem } = getModels(getTenantDB(tenantId));
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send(buildFromMeMediaPayload({
+        messageId: 'out-img',
+        phone: '351912345678',
+        messageType: 'imageMessage',
+        message: { imageMessage: { mimetype: 'image/jpeg' } },
+      }));
+
+    expect(res.status).toBe(200);
+    await flushAsync();
+
+    const msgs = await Mensagem.find({ direcao: 'saida' });
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0].mensagem).toBe('🖼️ [imagem]');
   });
 });

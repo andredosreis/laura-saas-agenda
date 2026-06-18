@@ -44,6 +44,24 @@ import { persistManualOutbound } from '../handlers/manualOutbound.js';
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
 /**
+ * Descrição curta de uma mensagem não-texto (media), para aparecer na thread do
+ * inbox como placeholder em vez de a conversa "saltar" o momento. Devolve null se
+ * não for media reconhecida.
+ */
+export function descreverMidia(msgData) {
+  const m = msgData?.message || {};
+  const t = msgData?.messageType || '';
+  if (m.audioMessage || m.pttMessage || t === 'audioMessage') return '🎤 [áudio]';
+  if (m.imageMessage || t === 'imageMessage') return '🖼️ [imagem]';
+  if (m.videoMessage || t === 'videoMessage') return '🎥 [vídeo]';
+  if (m.documentMessage || m.documentWithCaptionMessage || t === 'documentMessage') return '📎 [documento]';
+  if (m.stickerMessage || t === 'stickerMessage') return '🩷 [sticker]';
+  if (m.locationMessage || t === 'locationMessage') return '📍 [localização]';
+  if (m.contactMessage || m.contactsArrayMessage || t === 'contactMessage') return '👤 [contacto]';
+  return null;
+}
+
+/**
  * Express handler — POST /webhook/evolution.
  *
  * Returns HTTP 200 to Evolution within the 500ms PRD F01 budget.
@@ -74,30 +92,41 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
         msgData?.message?.conversation || msgData?.message?.extendedTextMessage?.text || '';
       const idSaida = msgData?.key?.id;
       const tsSaidaMs = (msgData?.messageTimestamp || 0) * 1000 || Date.now();
-
-      // Só texto, não-@lid, recente e não-duplicada (Evolution faz retry).
-      if (remoteJidRaw.endsWith('@lid') || !textoSaida.trim()) {
-        return res.status(200).json({ message: 'Saída sem texto/lid ignorada' });
-      }
-      if (Date.now() - tsSaidaMs > FIVE_MIN_MS) {
-        return res.status(200).json({ message: 'Saída antiga ignorada' });
-      }
-      if (!(await markMessageSeen(idSaida))) {
-        return res.status(200).json({ message: 'Saída duplicada ignorada' });
-      }
-
       const telSaida = remoteJidRaw
         .replace('@s.whatsapp.net', '')
         .replace('@c.us', '')
         .replace(/[^\d]/g, '');
       const instanceSaida = req.body?.instance ? String(req.body.instance) : null;
+      const logBase = { direcao: 'saida', telefone_hash: telefoneHash(telSaida), instance: instanceSaida };
+
+      // @lid: ainda não resolvemos o número real (Fase 3 do plano de inbox).
+      if (remoteJidRaw.endsWith('@lid')) {
+        logger.info({ ...logBase, motivo: 'lid' }, '[webhook] saída descartada');
+        return res.status(200).json({ message: 'Saída @lid ignorada' });
+      }
+
+      // Texto OU descrição da media (áudio/imagem/...) — para a thread não saltar
+      // momentos quando a Laura responde com uma nota de voz/foto pelo telemóvel.
+      const conteudoSaida = textoSaida.trim() || descreverMidia(msgData);
+      if (!conteudoSaida) {
+        logger.info({ ...logBase, motivo: 'sem-conteudo' }, '[webhook] saída descartada');
+        return res.status(200).json({ message: 'Saída sem conteúdo ignorada' });
+      }
+      if (Date.now() - tsSaidaMs > FIVE_MIN_MS) {
+        logger.info({ ...logBase, motivo: 'antiga' }, '[webhook] saída descartada');
+        return res.status(200).json({ message: 'Saída antiga ignorada' });
+      }
+      if (!(await markMessageSeen(idSaida))) {
+        logger.info({ ...logBase, motivo: 'duplicada' }, '[webhook] saída descartada');
+        return res.status(200).json({ message: 'Saída duplicada ignorada' });
+      }
 
       res.status(200).json({ success: true, message: 'Saída registada' });
 
       persistManualOutbound({
         instanceName: instanceSaida,
         telefoneNormalizado: telSaida,
-        mensagem: textoSaida,
+        mensagem: conteudoSaida,
         timestamp: new Date(tsSaidaMs),
       }).catch((err) =>
         logger.error(
@@ -110,6 +139,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     const timestampMensagem = (msgData?.messageTimestamp || 0) * 1000 || Date.now();
     if (Date.now() - timestampMensagem > FIVE_MIN_MS) {
+      logger.info({ direcao: 'entrada', motivo: 'antiga' }, '[webhook] entrada descartada');
       return res.status(200).json({ message: 'Mensagem antiga ignorada' });
     }
 
@@ -165,7 +195,13 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       msgData?.message?.conversation || msgData?.message?.extendedTextMessage?.text || '';
 
     if (!telefone || !mensagem) {
-      logger.warn({ telefone, mensagemPresent: Boolean(mensagem) }, '[webhook] dados incompletos');
+      // Entrada não-texto (imagem/documento/sticker do cliente). Por agora é
+      // descartada — logamos a media para medir frequência (placeholder de
+      // entrada fica para a Fase 2b do plano de inbox).
+      logger.info(
+        { direcao: 'entrada', motivo: 'sem-texto', midia: descreverMidia(msgData) || 'desconhecida' },
+        '[webhook] entrada descartada (não-texto)',
+      );
       return res.status(400).json({ error: 'Dados incompletos' });
     }
 
