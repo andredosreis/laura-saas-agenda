@@ -6,17 +6,17 @@ export const createPacote = async (req, res) => {
     const { nome, categoria, sessoes, valor, descricao, ativo } = req.body;
     const novoPacote = new Pacote({ nome, categoria, sessoes, valor, descricao, ativo, tenantId: req.tenantId });
     await novoPacote.save();
-    res.status(201).json(novoPacote);
+    res.status(201).json({ success: true, data: novoPacote });
   } catch (error) {
     console.error('Erro ao criar pacote:', error);
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ message: 'Dados inválidos.', details: messages });
+      return res.status(400).json({ success: false, error: messages.join(' ') || 'Dados inválidos.' });
     }
     if (error.code === 11000) {
-      return res.status(400).json({ message: `O pacote com nome '${req.body.nome}' já existe.` });
+      return res.status(409).json({ success: false, error: `Já existe um serviço com o nome '${req.body.nome}'.` });
     }
-    res.status(500).json({ message: 'Erro interno ao criar pacote.' });
+    res.status(500).json({ success: false, error: 'Erro interno ao criar serviço.' });
   }
 };
 
@@ -30,7 +30,7 @@ export const getAllPacotes = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const [pacotes, total] = await Promise.all([
-      Pacote.find(filter).skip(skip).limit(limit),
+      Pacote.find(filter).sort({ ativo: -1, nome: 1 }).skip(skip).limit(limit),
       Pacote.countDocuments(filter),
     ]);
 
@@ -46,7 +46,7 @@ export const getAllPacotes = async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao buscar pacotes:', error.message);
-    res.status(500).json({ message: 'Erro interno ao buscar todos os pacotes.' });
+    res.status(500).json({ success: false, error: 'Erro interno ao buscar serviços.' });
   }
 };
 
@@ -56,15 +56,15 @@ export const getPacote = async (req, res) => {
     const { Pacote } = req.models;
     const pacote = await Pacote.findOne({ _id: req.params.id, tenantId: req.tenantId });
     if (!pacote) {
-      return res.status(404).json({ message: 'Pacote não encontrado.' });
+      return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
     }
-    res.status(200).json(pacote);
+    res.status(200).json({ success: true, data: pacote });
   } catch (error) {
     console.error('Erro ao buscar pacote por ID:', error.message);
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'ID do pacote inválido.' });
+      return res.status(400).json({ success: false, error: 'ID do serviço inválido.' });
     }
-    res.status(500).json({ message: 'Erro interno ao buscar o pacote.' });
+    res.status(500).json({ success: false, error: 'Erro interno ao buscar o serviço.' });
   }
 };
 
@@ -84,19 +84,19 @@ export const updatePacote = async (req, res) => {
       { new: true, runValidators: true }
     );
     if (!pacote) {
-      return res.status(404).json({ message: 'Pacote não encontrado para atualização.' });
+      return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
     }
-    res.status(200).json(pacote);
+    res.status(200).json({ success: true, data: pacote });
   } catch (error) {
     console.error('Erro ao atualizar pacote:', error);
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ message: 'Dados inválidos.', details: messages });
+      return res.status(400).json({ success: false, error: messages.join(' ') || 'Dados inválidos.' });
     }
     if (error.code === 11000) {
-      return res.status(400).json({ message: `O nome de pacote '${req.body.nome}' já está em uso.` });
+      return res.status(409).json({ success: false, error: `Já existe um serviço com o nome '${req.body.nome}'.` });
     }
-    res.status(500).json({ message: 'Erro interno ao atualizar o pacote.' });
+    res.status(500).json({ success: false, error: 'Erro interno ao atualizar o serviço.' });
   }
 };
 
@@ -106,14 +106,14 @@ export const deletePacote = async (req, res) => {
     const { Pacote } = req.models;
     const pacote = await Pacote.findOneAndDelete({ _id: req.params.id, tenantId: req.tenantId });
     if (!pacote) {
-      return res.status(404).json({ message: 'Pacote não encontrado para deleção.' });
+      return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
     }
-    res.status(200).json({ message: 'Pacote removido com sucesso.' });
+    res.status(200).json({ success: true, data: { _id: pacote._id } });
   } catch (error) {
     console.error('Erro ao deletar pacote:', error.message);
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'ID do pacote inválido.' });
+      return res.status(400).json({ success: false, error: 'ID do serviço inválido.' });
     }
-    res.status(500).json({ message: 'Erro interno ao deletar o pacote.' });
+    res.status(500).json({ success: false, error: 'Erro interno ao remover o serviço.' });
   }
 };

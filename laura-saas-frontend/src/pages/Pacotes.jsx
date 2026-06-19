@@ -1,59 +1,108 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Package,
+  Loader2,
+  AlertTriangle,
+  X,
+  Power,
+} from "lucide-react";
 import api from "../services/api";
 import { toast } from "react-toastify";
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from "../contexts/ThemeContext";
 
-// Subcomponente para o Card de cada Serviço
-const PacoteCard = ({ pacote, onEdit, onDelete, isDarkMode }) => {
-  // Função para formatar o valor como moeda
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number') {
-      // Tenta converter para número se for string e parecer um número
-      const numValue = parseFloat(value);
-      if (isNaN(numValue)) {
-        return 'N/A';
-      }
-      return numValue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
-    }
-    return value.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
-  };
+const formatCurrency = (value) => {
+  const num = typeof value === "number" ? value : parseFloat(value);
+  if (isNaN(num)) return "N/A";
+  return num.toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
+};
+
+const normalizar = (value = "") =>
+  value
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+// Subcomponente: card de cada serviço
+const ServicoCard = ({ pacote, onEdit, onToggle, onDelete, isDarkMode, isToggling }) => {
+  const cardClass = isDarkMode ? "bg-slate-800/50 border-white/10" : "bg-white border-slate-200";
+  const textClass = isDarkMode ? "text-white" : "text-slate-900";
+  const subtextClass = isDarkMode ? "text-slate-400" : "text-slate-600";
 
   return (
-    <div className={`rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 ease-in-out flex flex-col justify-between ${
-      isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
-    }`}>
+    <div className={`rounded-2xl border ${cardClass} p-5 shadow-lg hover:shadow-xl transition-shadow flex flex-col justify-between ${!pacote.ativo ? "opacity-70" : ""}`}>
       <div>
-        <h2 className="text-xl font-semibold text-amber-500 mb-2" title={pacote.nome}>
-          {pacote.nome}
-        </h2>
-        <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h2 className={`text-lg font-semibold ${textClass} truncate`} title={pacote.nome}>
+            {pacote.nome}
+          </h2>
+          <span
+            className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${
+              pacote.ativo
+                ? isDarkMode
+                  ? "bg-emerald-400/15 text-emerald-300"
+                  : "bg-emerald-50 text-emerald-700"
+                : isDarkMode
+                ? "bg-white/10 text-slate-400"
+                : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            {pacote.ativo ? "Ativo" : "Inativo"}
+          </span>
+        </div>
+
+        <p className={`text-sm mb-1 ${subtextClass}`}>
           <span className="font-medium">Categoria:</span> {pacote.categoria || "Não informada"}
         </p>
-        <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-          <span className="font-medium">Sessões:</span> {pacote.sessoes !== undefined ? pacote.sessoes : "N/A"}
+        <p className={`text-sm mb-1 ${subtextClass}`}>
+          <span className="font-medium">Sessões:</span> {pacote.sessoes ?? "N/A"}
         </p>
-        <p className={`text-lg font-bold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-          {formatCurrency(pacote.valor)} {/* Assumindo que tens um campo 'valor' */}
-        </p>
+        <p className={`text-xl font-bold mb-3 ${textClass}`}>{formatCurrency(pacote.valor)}</p>
+
         {pacote.descricao && (
-          <p className={`text-xs mb-3 italic max-h-20 overflow-y-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p className={`text-xs mb-1 italic max-h-20 overflow-y-auto ${subtextClass}`}>
             {pacote.descricao}
           </p>
         )}
       </div>
-      <div className="mt-4 flex flex-col sm:flex-row gap-3"> {/* Ajuste para responsividade dos botões */}
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
         <button
           onClick={() => onEdit(pacote._id)}
-          className="flex-1 bg-gray-700 hover:bg-black text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors duration-150 ease-in-out text-sm"
+          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-sm font-medium border ${
+            isDarkMode
+              ? "border-white/10 text-slate-200 hover:bg-white/10"
+              : "border-slate-200 text-slate-700 hover:bg-slate-50"
+          } transition-colors`}
         >
+          <Pencil className="w-4 h-4" />
           Editar
         </button>
         <button
-          onClick={() => onDelete(pacote._id)}
-          className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors duration-150 ease-in-out text-sm"
+          onClick={() => onToggle(pacote)}
+          disabled={isToggling}
+          title={pacote.ativo ? "Desativar serviço" : "Ativar serviço"}
+          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-sm font-medium border ${
+            isDarkMode
+              ? "border-white/10 text-slate-200 hover:bg-white/10"
+              : "border-slate-200 text-slate-700 hover:bg-slate-50"
+          } transition-colors disabled:opacity-50`}
         >
-          Deletar
+          {isToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
+          {pacote.ativo ? "Desativar" : "Ativar"}
+        </button>
+        <button
+          onClick={() => onDelete(pacote)}
+          className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-sm font-medium bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          Eliminar
         </button>
       </div>
     </div>
@@ -63,6 +112,11 @@ const PacoteCard = ({ pacote, onEdit, onDelete, isDarkMode }) => {
 function Pacotes() {
   const [pacotes, setPacotes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState("todos"); // todos | ativos | inativos
+  const [togglingId, setTogglingId] = useState(null);
+  const [confirmar, setConfirmar] = useState(null); // pacote a eliminar
+  const [eliminando, setEliminando] = useState(false);
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
 
@@ -70,11 +124,27 @@ function Pacotes() {
     async function fetchPacotes() {
       setIsLoading(true);
       try {
-        const response = await api.get("/pacotes");
-        setPacotes(response.data?.data || []); // Garante que pacotes seja sempre um array
+        // Paginação completa — segue pagination.pages para trazer todos os serviços.
+        const primeira = await api.get("/pacotes", { params: { limit: 100, page: 1 } });
+        const lista = primeira.data?.data || [];
+        const totalPaginas = primeira.data?.pagination?.pages || 1;
+
+        let todos = lista;
+        if (totalPaginas > 1) {
+          const outras = await Promise.all(
+            Array.from({ length: totalPaginas - 1 }, (_, i) =>
+              api.get("/pacotes", { params: { limit: 100, page: i + 2 } })
+            )
+          );
+          todos = [...lista, ...outras.flatMap((res) => res.data?.data || [])];
+        }
+
+        setPacotes(
+          todos.slice().sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-PT", { sensitivity: "base" }))
+        );
       } catch (error) {
         console.error("Erro ao buscar serviços:", error);
-        toast.error("Não foi possível carregar os serviços. Tente novamente mais tarde.");
+        toast.error(error.response?.data?.error || "Não foi possível carregar os serviços.");
       } finally {
         setIsLoading(false);
       }
@@ -82,75 +152,189 @@ function Pacotes() {
     fetchPacotes();
   }, []);
 
-  const handleNavigateToCriarPacote = () => {
-    navigate("/criar-pacote"); // Certifica-te que esta rota existe no teu App.jsx
-  };
+  const pacotesFiltrados = useMemo(() => {
+    const termo = normalizar(busca);
+    return pacotes.filter((p) => {
+      if (filtro === "ativos" && !p.ativo) return false;
+      if (filtro === "inativos" && p.ativo) return false;
+      if (!termo) return true;
+      return normalizar(p.nome).includes(termo) || normalizar(p.categoria).includes(termo);
+    });
+  }, [pacotes, busca, filtro]);
 
-  const handleEditPacote = (id) => {
-    // Navega para a página de edição do pacote
-    // Certifica-te que esta rota existe no teu App.jsx
-    navigate(`/pacotes/editar/${id}`);
-  };
-
-  const handleDeletePacote = async (id) => {
-    if (window.confirm("Tem a certeza que deseja deletar este serviço? Esta ação não pode ser desfeita.")) {
-      try {
-        await api.delete(`/pacotes/${id}`);
-        toast.success("Serviço deletado com sucesso!");
-        setPacotes(prevPacotes => prevPacotes.filter(p => p._id !== id));
-      } catch (err) {
-        console.error("Erro ao deletar serviço:", err);
-        toast.error(err.response?.data?.message || "Erro ao deletar serviço.");
-      }
+  const handleToggle = async (pacote) => {
+    setTogglingId(pacote._id);
+    try {
+      const res = await api.put(`/pacotes/${pacote._id}`, { ativo: !pacote.ativo });
+      const atualizado = res.data?.data ?? { ...pacote, ativo: !pacote.ativo };
+      setPacotes((prev) => prev.map((p) => (p._id === pacote._id ? { ...p, ...atualizado } : p)));
+      toast.success(atualizado.ativo ? "Serviço ativado." : "Serviço desativado.");
+    } catch (err) {
+      console.error("Erro ao alterar estado do serviço:", err);
+      toast.error(err.response?.data?.error || "Erro ao alterar o estado do serviço.");
+    } finally {
+      setTogglingId(null);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className={`flex flex-col justify-center items-center h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
-        <p className={`ml-3 mt-3 text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>A carregar serviços...</p>
-      </div>
-    );
-  }
+  const handleConfirmarEliminar = async () => {
+    if (!confirmar) return;
+    setEliminando(true);
+    try {
+      await api.delete(`/pacotes/${confirmar._id}`);
+      setPacotes((prev) => prev.filter((p) => p._id !== confirmar._id));
+      toast.success("Serviço eliminado com sucesso.");
+      setConfirmar(null);
+    } catch (err) {
+      console.error("Erro ao eliminar serviço:", err);
+      toast.error(err.response?.data?.error || "Erro ao eliminar o serviço.");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const pageBg = isDarkMode ? "bg-slate-900" : "bg-slate-50";
+  const textClass = isDarkMode ? "text-white" : "text-slate-900";
+  const subtextClass = isDarkMode ? "text-slate-400" : "text-slate-600";
+  const inputBg = isDarkMode ? "bg-white/5 border-white/10" : "bg-white border-slate-200";
+
+  const filtros = [
+    { key: "todos", label: "Todos" },
+    { key: "ativos", label: "Ativos" },
+    { key: "inativos", label: "Inativos" },
+  ];
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} py-8`}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-20">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-          <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Gestão de Serviços</h1>
-        <button
-          onClick={handleNavigateToCriarPacote}
-          className="bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out"
-        >
-          Novo Serviço
-        </button>
-      </div>
-
-        {pacotes.length === 0 && !isLoading ? (
-          <div className={`text-center py-10 rounded-lg shadow-md ${
-            isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
-          }`}>
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-          </svg>
-            <h3 className={`mt-2 text-xl font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nenhum serviço encontrado</h3>
-            <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Clica em "Novo Serviço" para começar a adicionar.</p>
+    <div className={`min-h-screen pt-20 pb-8 px-4 ${pageBg}`}>
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className={`text-2xl sm:text-3xl font-bold ${textClass}`}>Serviços</h1>
+            <p className={`text-sm ${subtextClass}`}>Faz a gestão dos serviços e pacotes do teu salão.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {pacotes.map((pacote) => (
-              <PacoteCard
-                key={pacote._id}
-                pacote={pacote}
-                onEdit={handleEditPacote}
-                onDelete={handleDeletePacote}
-                isDarkMode={isDarkMode}
-              />
+          <button
+            onClick={() => navigate("/criar-pacote")}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-semibold shadow-lg hover:from-indigo-600 hover:to-purple-700 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            Novo Serviço
+          </button>
+        </div>
+
+        {/* Toolbar: busca + filtro */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${subtextClass}`} />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Procurar por nome ou categoria"
+              className={`w-full pl-9 pr-3 py-2.5 rounded-xl border ${inputBg} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
+            />
+          </div>
+          <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl ${isDarkMode ? "bg-white/5" : "bg-slate-100"}`}>
+            {filtros.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFiltro(key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  filtro === key
+                    ? "bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow"
+                    : subtextClass
+                }`}
+              >
+                {label}
+              </button>
             ))}
           </div>
+        </div>
+
+        {/* Conteúdo */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            <p className={`mt-3 ${subtextClass}`}>A carregar serviços...</p>
+          </div>
+        ) : pacotes.length === 0 ? (
+          <div className={`text-center py-16 rounded-2xl border ${isDarkMode ? "border-white/10 bg-slate-800/50" : "border-slate-200 bg-white"}`}>
+            <Package className={`mx-auto h-12 w-12 ${subtextClass}`} />
+            <h3 className={`mt-3 text-lg font-medium ${textClass}`}>Nenhum serviço criado</h3>
+            <p className={`mt-1 text-sm ${subtextClass}`}>Clica em "Novo Serviço" para começar.</p>
+          </div>
+        ) : pacotesFiltrados.length === 0 ? (
+          <div className={`text-center py-16 rounded-2xl border ${isDarkMode ? "border-white/10 bg-slate-800/50" : "border-slate-200 bg-white"}`}>
+            <Search className={`mx-auto h-10 w-10 ${subtextClass}`} />
+            <p className={`mt-3 text-sm ${subtextClass}`}>Nenhum serviço corresponde à procura.</p>
+          </div>
+        ) : (
+          <>
+            <p className={`text-sm mb-3 ${subtextClass}`}>
+              {pacotesFiltrados.length} {pacotesFiltrados.length === 1 ? "serviço" : "serviços"}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {pacotesFiltrados.map((pacote) => (
+                <ServicoCard
+                  key={pacote._id}
+                  pacote={pacote}
+                  onEdit={(id) => navigate(`/pacotes/editar/${id}`)}
+                  onToggle={handleToggle}
+                  onDelete={(p) => setConfirmar(p)}
+                  isDarkMode={isDarkMode}
+                  isToggling={togglingId === pacote._id}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
+
+      {/* Modal de confirmação de eliminação */}
+      {confirmar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !eliminando && setConfirmar(null)} />
+          <div className={`relative w-full max-w-sm rounded-2xl border shadow-2xl ${isDarkMode ? "bg-slate-800 border-white/10" : "bg-white border-slate-200"}`}>
+            <div className="p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-red-500/15 text-red-500 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </span>
+                <div className="flex-1">
+                  <h3 className={`text-base font-semibold ${textClass}`}>Eliminar serviço</h3>
+                  <p className={`mt-1 text-sm ${subtextClass}`}>
+                    Tens a certeza que queres eliminar <span className={`font-medium ${textClass}`}>{confirmar.nome}</span>? Esta ação não pode ser desfeita.
+                  </p>
+                </div>
+                <button
+                  onClick={() => !eliminando && setConfirmar(null)}
+                  className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-white/10" : "hover:bg-slate-100"} ${subtextClass}`}
+                  aria-label="Fechar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={() => setConfirmar(null)}
+                  disabled={eliminando}
+                  className={`flex-1 py-2.5 rounded-xl border font-medium ${isDarkMode ? "border-white/10 text-slate-200 hover:bg-white/10" : "border-slate-200 text-slate-700 hover:bg-slate-50"} transition-colors disabled:opacity-50`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmarEliminar}
+                  disabled={eliminando}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors disabled:opacity-50"
+                >
+                  {eliminando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

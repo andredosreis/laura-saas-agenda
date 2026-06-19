@@ -1,302 +1,198 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import api from '../services/api';
-import { toast } from "react-toastify";
-import { ArrowLeft } from 'lucide-react';
+import { toast } from 'react-toastify';
+import { pacoteSchema } from '../schemas/validationSchemas';
 import { useTheme } from '../contexts/ThemeContext';
 
 function EditarPacote() {
- const { id } = useParams(); // Obter o ID do serviço da URL
- const navigate = useNavigate(); // Hook para navegação
- const { isDarkMode } = useTheme();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
+  const [isLoading, setIsLoading] = useState(true);
+  const [categorias, setCategorias] = useState([]);
 
-  const [formData, setFormData] = useState({
-    nome: '',
-    categoria: '',
-    sessoes: '', // Será preenchido com o valor do serviço
-    valor: '',   // Será preenchido com o valor do serviço
-    descricao: '',
-    ativo: true,
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(pacoteSchema),
+    defaultValues: { nome: '', categoria: '', sessoes: 1, valor: '', descricao: '', ativo: true },
   });
 
-const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial dos dados
-  const [isSubmitting, setIsSubmitting] = useState(false); // Para o estado de submissão do formulário
-  const [fieldErrors, setFieldErrors] = useState({});
+  const watchDescricao = watch('descricao');
 
-
-
- useEffect(() => {
-    async function fetchPacoteData() {
+  useEffect(() => {
+    async function carregar() {
       setIsLoading(true);
-      setFieldErrors({});
       try {
-        const response = await api.get(`/pacotes/${id}`);
-        const pacoteData = response.data;
-        setFormData({
-          nome: pacoteData.nome || '',
-          categoria: pacoteData.categoria || '',
-          sessoes: pacoteData.sessoes !== undefined ? String(pacoteData.sessoes) : '', // Inputs esperam string
-          valor: pacoteData.valor !== undefined ? String(pacoteData.valor) : '',     // Inputs esperam string
-          descricao: pacoteData.descricao || '',
-          ativo: pacoteData.ativo !== undefined ? pacoteData.ativo : true,
+        const [pacoteRes, listaRes] = await Promise.all([
+          api.get(`/pacotes/${id}`),
+          api.get('/pacotes', { params: { limit: 100 } }),
+        ]);
+        // Novo contrato { success, data }; tolera o formato antigo.
+        const p = pacoteRes.data?.data ?? pacoteRes.data;
+        reset({
+          nome: p.nome || '',
+          categoria: p.categoria || '',
+          sessoes: p.sessoes ?? 1,
+          valor: p.valor ?? '',
+          descricao: p.descricao || '',
+          ativo: p.ativo ?? true,
         });
+        const cats = [...new Set((listaRes.data?.data || []).map((x) => x.categoria).filter(Boolean))].sort(
+          (a, b) => a.localeCompare(b, 'pt-PT', { sensitivity: 'base' })
+        );
+        setCategorias(cats);
       } catch (error) {
-        console.error('Erro ao carregar dados do serviço:', error);
-        toast.error('Erro ao carregar dados do serviço.');
-        if (error.response && error.response.status === 404) {
-          toast.error('Serviço não encontrado.');
-          navigate('/pacotes'); // Volta para a lista se o serviço não existir
-        }
+        console.error('Erro ao carregar serviço:', error);
+        toast.error(error.response?.data?.error || 'Erro ao carregar o serviço.');
+        if (error.response?.status === 404) navigate('/pacotes');
       } finally {
         setIsLoading(false);
       }
     }
-    if (id) {
-      fetchPacoteData();
-    }
-  }, [id, navigate]);
+    if (id) carregar();
+  }, [id, navigate, reset]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prevData => ({
-      ...prevData,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-    if (fieldErrors[name]) {
-      setFieldErrors(prevErrors => ({
-        ...prevErrors,
-        [name]: null,
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.nome.trim()) newErrors.nome = 'O nome do serviço é obrigatório.';
-    if (!formData.categoria.trim()) newErrors.categoria = 'A categoria é obrigatória.';
-    
-    const sessoesNum = parseInt(formData.sessoes, 10);
-    if (isNaN(sessoesNum) || sessoesNum < 1) {
-      newErrors.sessoes = 'O número de sessões deve ser pelo menos 1.';
-    }
-
-    if (formData.valor === '') {
-        newErrors.valor = 'O valor do serviço é obrigatório.';
-    } else {
-        const valorNum = parseFloat(formData.valor);
-        if (isNaN(valorNum)) {
-            newErrors.valor = 'O valor deve ser um número válido.';
-        } else if (valorNum < 0) {
-            newErrors.valor = 'O valor não pode ser negativo.';
-        }
-    }
-    setFieldErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.error('Por favor, corrija os erros no formulário.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    const dadosParaEnviar = {
-      nome: formData.nome.trim(),
-      categoria: formData.categoria.trim(),
-      sessoes: parseInt(formData.sessoes, 10),
-      valor: parseFloat(formData.valor),
-      descricao: formData.descricao.trim(),
-      ativo: formData.ativo,
-    };
-
+  const onSubmit = async (data) => {
     try {
-      await api.put(`/pacotes/${id}`, dadosParaEnviar); // Usa o ID da URL para a rota PUT
+      await api.put(`/pacotes/${id}`, {
+        nome: data.nome.trim(),
+        categoria: data.categoria.trim(),
+        sessoes: parseInt(data.sessoes, 10),
+        valor: parseFloat(data.valor),
+        descricao: data.descricao?.trim() || '',
+        ativo: data.ativo,
+      });
       toast.success('Serviço atualizado com sucesso! ✨');
-      navigate('/pacotes'); // Redireciona para a lista de serviços
+      navigate('/pacotes');
     } catch (error) {
       console.error('Erro ao atualizar serviço:', error.response?.data || error.message);
-      const errorData = error.response?.data;
-      if (errorData?.details && Array.isArray(errorData.details)) {
-        const backendErrors = {};
-        errorData.details.forEach(detail => {
-          backendErrors[detail.field] = detail.message;
-        });
-        setFieldErrors(prevErrors => ({ ...prevErrors, ...backendErrors }));
-        toast.error(errorData.message || 'Erro de validação do servidor ao atualizar.');
-      } else {
-        toast.error(errorData?.error || errorData?.message || 'Erro ao atualizar serviço. Tente novamente.');
-      }
-    } finally {
-      setIsSubmitting(false);
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao atualizar serviço. Tente novamente.');
     }
   };
+
+  const pageBg = isDarkMode ? 'bg-slate-900' : 'bg-slate-50';
+  const textClass = isDarkMode ? 'text-white' : 'text-slate-900';
+  const subtextClass = isDarkMode ? 'text-slate-400' : 'text-slate-600';
+  const inputBg = isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200';
+  const inputClass = (field) =>
+    `w-full px-3 py-2.5 rounded-xl border ${inputBg} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 ${
+      errors[field] ? 'border-red-500' : ''
+    }`;
 
   if (isLoading) {
     return (
-      <div className={`flex flex-col justify-center items-center h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
-        <p className={`ml-3 mt-3 text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>A carregar dados do serviço...</p>
+      <div className={`min-h-screen flex flex-col items-center justify-center ${pageBg}`}>
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+        <p className={`mt-3 ${subtextClass}`}>A carregar dados do serviço...</p>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} py-8`}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-20">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={() => navigate('/pacotes')}
-            className={`mb-6 inline-flex items-center gap-2 px-4 py-2 border rounded-lg shadow-xs text-sm font-medium transition-colors ${
-              isDarkMode 
-                ? 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700' 
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <ArrowLeft size={18} />
-            Voltar para Serviços
-          </button>
-          
-          <div className={`shadow-xl rounded-lg p-6 ${
-            isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
-          }`}>
-            <h1 className={`text-2xl font-bold text-center mb-6 ${
-              isDarkMode ? 'text-gray-100' : 'text-gray-800'
-            }`}>
-              Editar Serviço
-            </h1>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Campo Nome */}
+    <div className={`min-h-screen pt-20 pb-8 px-4 ${pageBg}`}>
+      <div className="max-w-2xl mx-auto">
+        <button
+          onClick={() => navigate('/pacotes')}
+          className={`mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
+            isDarkMode ? 'border-white/10 text-slate-200 hover:bg-white/10' : 'border-slate-200 text-slate-700 hover:bg-white'
+          }`}
+        >
+          <ArrowLeft size={18} />
+          Voltar para Serviços
+        </button>
+
+        <div className={`rounded-2xl border shadow-xl p-6 ${isDarkMode ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'}`}>
+          <h1 className={`text-2xl font-bold mb-6 ${textClass}`}>Editar Serviço</h1>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Nome */}
+            <div>
+              <label htmlFor="nome" className={`block text-sm font-medium ${subtextClass} mb-1`}>
+                Nome do Serviço <span className="text-red-500">*</span>
+              </label>
+              <input id="nome" type="text" {...register('nome')} placeholder="Ex: Massagem Relaxante" className={inputClass('nome')} />
+              {errors.nome && <p className="mt-1 text-sm text-red-400">{errors.nome.message}</p>}
+            </div>
+
+            {/* Categoria com datalist */}
+            <div>
+              <label htmlFor="categoria" className={`block text-sm font-medium ${subtextClass} mb-1`}>
+                Categoria <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="categoria"
+                type="text"
+                list="categorias-existentes"
+                {...register('categoria')}
+                placeholder="Ex: Estética, Bem-estar"
+                className={inputClass('categoria')}
+              />
+              <datalist id="categorias-existentes">
+                {categorias.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+              {errors.categoria && <p className="mt-1 text-sm text-red-400">{errors.categoria.message}</p>}
+            </div>
+
+            {/* Sessões + Valor */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label htmlFor="nome" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Nome do Serviço
+                <label htmlFor="sessoes" className={`block text-sm font-medium ${subtextClass} mb-1`}>
+                  Número de Sessões <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  name="nome"
-                  id="nome"
-                  value={formData.nome}
-                  onChange={handleChange}
-                  className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  } ${fieldErrors.nome ? 'border-red-500' : ''}`}
-                />
-                {fieldErrors.nome && <p className="mt-1 text-sm text-red-500">{fieldErrors.nome}</p>}
+                <input id="sessoes" type="number" min="1" {...register('sessoes')} className={inputClass('sessoes')} />
+                {errors.sessoes && <p className="mt-1 text-sm text-red-400">{errors.sessoes.message}</p>}
               </div>
-
-              {/* Campo Categoria */}
               <div>
-                <label htmlFor="categoria" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Categoria
+                <label htmlFor="valor" className={`block text-sm font-medium ${subtextClass} mb-1`}>
+                  Valor (€) <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  name="categoria"
-                  id="categoria"
-                  value={formData.categoria}
-                  onChange={handleChange}
-                  className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  } ${fieldErrors.categoria ? 'border-red-500' : ''}`}
-                />
-                {fieldErrors.categoria && <p className="mt-1 text-sm text-red-500">{fieldErrors.categoria}</p>}
+                <input id="valor" type="number" min="0" step="0.01" {...register('valor')} placeholder="Ex: 50.00" className={inputClass('valor')} />
+                {errors.valor && <p className="mt-1 text-sm text-red-400">{errors.valor.message}</p>}
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {/* Campo Sessões */}
-                <div>
-                  <label htmlFor="sessoes" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Número de Sessões
-                  </label>
-                  <input
-                    type="number"
-                    name="sessoes"
-                    id="sessoes"
-                    min="1"
-                    value={formData.sessoes}
-                    onChange={handleChange}
-                    className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    } ${fieldErrors.sessoes ? 'border-red-500' : ''}`}
-                  />
-                  {fieldErrors.sessoes && <p className="mt-1 text-sm text-red-500">{fieldErrors.sessoes}</p>}
-                </div>
-
-                {/* Campo Valor */}
-                <div>
-                  <label htmlFor="valor" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Valor do Serviço (€)
-                  </label>
-                  <input
-                    type="number"
-                    name="valor"
-                    id="valor"
-                    value={formData.valor}
-                    onChange={handleChange}
-                    min="0"
-                    step="0.01"
-                    placeholder="Ex: 50.00"
-                    className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    } ${fieldErrors.valor ? 'border-red-500' : ''}`}
-                  />
-                  {fieldErrors.valor && <p className="mt-1 text-sm text-red-500">{fieldErrors.valor}</p>}
-                </div>
+            {/* Descrição */}
+            <div>
+              <label htmlFor="descricao" className={`block text-sm font-medium ${subtextClass} mb-1`}>
+                Descrição (Opcional)
+              </label>
+              <textarea id="descricao" rows="3" {...register('descricao')} placeholder="Descrição do serviço..." className={inputClass('descricao')} />
+              <div className="flex justify-between mt-1">
+                {errors.descricao ? (
+                  <p className="text-sm text-red-400">{errors.descricao.message}</p>
+                ) : (
+                  <span />
+                )}
+                <p className={`text-xs ${subtextClass}`}>{watchDescricao?.length || 0}/500</p>
               </div>
+            </div>
 
-              {/* Campo Descrição */}
-              <div>
-                <label htmlFor="descricao" className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Descrição (Opcional)
-                </label>
-                <textarea
-                  name="descricao"
-                  id="descricao"
-                  rows="3"
-                  value={formData.descricao}
-                  onChange={handleChange}
-                  className={`mt-1 block w-full rounded-md p-2 shadow-xs focus:border-amber-500 focus:ring-amber-500 ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
-                ></textarea>
-              </div>
+            {/* Ativo */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" {...register('ativo')} className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500" />
+              <span className={`text-sm ${textClass}`}>Serviço Ativo</span>
+            </label>
 
-              {/* Campo Ativo (Checkbox) */}
-              <div className="flex items-center">
-                <input
-                  id="ativo"
-                  name="ativo"
-                  type="checkbox"
-                  checked={formData.ativo}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-amber-600 border-gray-300 rounded-sm focus:ring-amber-500"
-                />
-                <label htmlFor="ativo" className={`ml-2 block text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                  Serviço Ativo
-                </label>
-              </div>
-
-              {/* Botão */}
-              <button
-                type="submit"
-                disabled={isSubmitting || isLoading}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-all duration-150 ease-in-out disabled:opacity-70"
-              >
-                {isSubmitting ? 'A guardar alterações...' : 'Salvar Alterações'}
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-linear-to-r from-indigo-500 to-purple-600 text-white font-semibold shadow-lg hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-60"
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {isSubmitting ? 'A guardar...' : 'Salvar Alterações'}
+            </button>
+          </form>
         </div>
       </div>
     </div>
@@ -304,4 +200,3 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
 }
 
 export default EditarPacote;
-//
