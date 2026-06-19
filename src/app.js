@@ -19,7 +19,6 @@ import agendamentoRoutes from './modules/agendamento/agendamentoRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import whatsappRoutes from './modules/ia/whatsappRoutes.js';
-import agenteRoutes from './modules/ia/agenteRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import notificationRoutes from './modules/notificacoes/notificationRoutes.js';
 import webhookRoutes from './modules/messaging/webhookRoutes.js';
@@ -98,7 +97,6 @@ const apiResources = [
   ['/dashboard', dashboardRoutes],
   ['/analytics', analyticsRoutes],
   ['/whatsapp', whatsappRoutes],
-  ['/agente', agenteRoutes],
   ['/schedules', scheduleRoutes],
   ['/notifications', notificationRoutes],
   ['/migration', migrationRoutes],
