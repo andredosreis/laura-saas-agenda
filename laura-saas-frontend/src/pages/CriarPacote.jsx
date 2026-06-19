@@ -51,7 +51,7 @@ function CriarPacote() {
       navigate('/pacotes');
     } catch (error) {
       console.error('Erro ao criar serviço:', error.response?.data || error.message);
-      toast.error(error.response?.data?.message || 'Erro ao criar serviço. Tente novamente.');
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao criar serviço. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }

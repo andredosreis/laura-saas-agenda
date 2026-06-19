@@ -126,7 +126,7 @@ const [isLoading, setIsLoading] = useState(true); // Para o carregamento inicial
         setFieldErrors(prevErrors => ({ ...prevErrors, ...backendErrors }));
         toast.error(errorData.message || 'Erro de validação do servidor ao atualizar.');
       } else {
-        toast.error(errorData?.message || 'Erro ao atualizar serviço. Tente novamente.');
+        toast.error(errorData?.error || errorData?.message || 'Erro ao atualizar serviço. Tente novamente.');
       }
     } finally {
       setIsSubmitting(false);

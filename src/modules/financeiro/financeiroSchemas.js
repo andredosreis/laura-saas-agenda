@@ -205,14 +205,19 @@ export const criarPacoteSchema = z
     nome: z.string().trim().min(1).max(200),
     categoria: z.string().trim().min(1, 'Categoria é obrigatória').max(50),
     descricao: z.string().trim().max(1000).optional(),
-    valor: dinheiroPositivo,
-    sessoes: z.number().int().min(1).max(100),
-    validadeDias: z.number().int().min(1).max(3650).optional(),
+    // coerce: inputs de formulário (e bundles antigos em cache) podem enviar
+    // números como string — aceitar "50"/"10" além de 50/10.
+    valor: z.coerce.number().positive('Valor deve ser maior que zero'),
+    sessoes: z.coerce.number().int().min(1).max(100),
+    validadeDias: z.coerce.number().int().min(1).max(3650).optional(),
     ativo: z.boolean().optional(),
   })
-  .strict();
+  // .strip() (default do Zod): ignora chaves não-reconhecidas que clientes/PWA
+  // em cache reenviam (ex.: tenantId, _id, __v, createdAt) em vez de rejeitar o
+  // pedido. O controller lê apenas campos explícitos, logo sem mass-assignment.
+  .strip();
 
-export const atualizarPacoteSchema = criarPacoteSchema.partial().strict();
+export const atualizarPacoteSchema = criarPacoteSchema.partial().strip();
 
 // ─── Params comuns ──────────────────────────────────────────────────
 
