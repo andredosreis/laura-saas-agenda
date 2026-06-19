@@ -70,9 +70,10 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
   // IDs determinísticos por agendamento+tipo. Permitem que, ao remarcar (re-chamar
   // esta função), os lembretes antigos sejam removidos e recriados limpos — em vez
   // de ficarem jobs órfãos a disparar para a hora antiga (lembretes desordenados).
-  const jobIdConfirmacao = `${baseData.agendamentoId}:confirmacao`;
-  const jobIdAntecipado = `${baseData.agendamentoId}:lembrete-antecipado`;
-  const jobId1h = `${baseData.agendamentoId}:lembrete-1h`;
+  // Separador '-' (NÃO ':' — o BullMQ rejeita jobIds customizados com ':').
+  const jobIdConfirmacao = `${baseData.agendamentoId}-confirmacao`;
+  const jobIdAntecipado = `${baseData.agendamentoId}-lembrete-antecipado`;
+  const jobId1h = `${baseData.agendamentoId}-lembrete-1h`;
 
   // Remove lembretes anteriores deste agendamento (remarcação/recriação limpa).
   await Promise.all(

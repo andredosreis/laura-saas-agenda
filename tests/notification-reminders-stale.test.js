@@ -119,16 +119,25 @@ describe('scheduleNotifications — jobIds determinísticos + remoção dos anti
     // Remove dos 3 jobIds determinísticos (limpa o que existisse de uma remarcação)
     expect(removeCalls).toEqual(
       expect.arrayContaining([
-        `${agId}:confirmacao`,
-        `${agId}:lembrete-antecipado`,
-        `${agId}:lembrete-1h`,
+        `${agId}-confirmacao`,
+        `${agId}-lembrete-antecipado`,
+        `${agId}-lembrete-1h`,
       ]),
     );
 
     // E agenda com esses mesmos jobIds determinísticos
     const jobIds = addCalls.map((c) => c.opts?.jobId);
-    expect(jobIds).toContain(`${agId}:confirmacao`);
-    expect(jobIds).toContain(`${agId}:lembrete-antecipado`);
-    expect(jobIds).toContain(`${agId}:lembrete-1h`);
+    expect(jobIds).toContain(`${agId}-confirmacao`);
+    expect(jobIds).toContain(`${agId}-lembrete-antecipado`);
+    expect(jobIds).toContain(`${agId}-lembrete-1h`);
+
+    // Regressão: o BullMQ rejeita jobIds customizados com ':' (split !== 3) e
+    // jobIds que são inteiros puros. Garante que nenhum jobId os viola — foi o
+    // bug que parou TODOS os lembretes em produção (Error: Custom Id cannot
+    // contain :), não apanhado por a queue ser mockada.
+    for (const jid of [...removeCalls, ...jobIds]) {
+      expect(jid).not.toContain(':');
+      expect(`${parseInt(jid, 10)}`).not.toBe(jid);
+    }
   });
 });
