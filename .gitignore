@@ -32,3 +32,6 @@ seeds/
 
 # Documentação de revisão local
 Revisação de md/
+
+# Playwright CLI session artefacts
+.playwright-cli/

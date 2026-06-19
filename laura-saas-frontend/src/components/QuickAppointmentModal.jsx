@@ -1,18 +1,24 @@
-import { useState, useEffect } from 'react';
-import { X, User, Package, Calendar, FileText, Loader2, Gift } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { X, User, Package, Calendar, FileText, Loader2, Gift, Search, ChevronDown } from 'lucide-react';
 import { DateTime } from 'luxon';
+import { toast } from 'react-toastify';
 import { useTheme } from '../contexts/ThemeContext';
+import api from '../services/api';
 
 function QuickAppointmentModal({
     isOpen,
     onClose,
     selectedDate,
     clientes,
-    pacotes,
     onSubmit
 }) {
     const { isDarkMode } = useTheme();
     const [loading, setLoading] = useState(false);
+    const [loadingPacotes, setLoadingPacotes] = useState(false);
+    const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
+    const [clientSearch, setClientSearch] = useState('');
+    const [isClientSearchOpen, setIsClientSearchOpen] = useState(false);
+    const searchRef = useRef(null);
     const [formData, setFormData] = useState({
         cliente: '',
         pacote: '',
@@ -48,14 +54,136 @@ function QuickAppointmentModal({
                 servicoOfertaNome: ''
             });
             setServiceMode('pacote');
+            setPacotesDoCliente([]);
+            setLoadingPacotes(false);
+            setClientSearch('');
+            setIsClientSearchOpen(false);
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchPacotesDoCliente() {
+            if (!isOpen || !formData.cliente) {
+                setPacotesDoCliente([]);
+                setFormData(prev => ({ ...prev, pacote: '' }));
+                return;
+            }
+
+            setLoadingPacotes(true);
+            setFormData(prev => ({ ...prev, pacote: '' }));
+
+            try {
+                const res = await api.get(`/compras-pacotes/cliente/${formData.cliente}`);
+                if (cancelled) return;
+
+                const pacotesAtivos = (res.data || []).filter(
+                    (cp) => cp.status === 'Ativo' && cp.sessoesRestantes > 0
+                );
+
+                setPacotesDoCliente(pacotesAtivos);
+
+                if (pacotesAtivos.length === 1) {
+                    setFormData(prev => ({ ...prev, pacote: pacotesAtivos[0]._id }));
+                    setServiceMode('pacote');
+                } else if (pacotesAtivos.length === 0) {
+                    setServiceMode(prev => (prev === 'pacote' ? 'oferta' : prev));
+                    toast.info('Cliente sem pacotes ativos. Pode agendar uma oferta ou serviço avulso.', { autoClose: 5000 });
+                }
+            } catch {
+                if (!cancelled) {
+                    setPacotesDoCliente([]);
+                    toast.error('Erro ao carregar pacotes do cliente');
+                }
+            } finally {
+                if (!cancelled) setLoadingPacotes(false);
+            }
+        }
+
+        fetchPacotesDoCliente();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [formData.cliente, isOpen]);
+
+    const normalizeSearch = (value = '') =>
+        value
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+
+    const selectedCliente = clientes.find((cliente) => cliente._id === formData.cliente);
+    const normalizedClientSearch = normalizeSearch(clientSearch);
+    const filteredClientes = useMemo(() => {
+        // Campo vazio: lista todos os clientes (já ordenados a montante) para
+        // permitir navegar/escolher sem precisar de escrever — comportamento combobox.
+        if (!normalizedClientSearch) return clientes;
+
+        return clientes
+            .map((cliente) => {
+                const nome = normalizeSearch(cliente.nome);
+                const telefone = normalizeSearch(cliente.telefone);
+                const email = normalizeSearch(cliente.email);
+                const startsWithName = nome.startsWith(normalizedClientSearch);
+                const matches = startsWithName
+                    || nome.includes(normalizedClientSearch)
+                    || telefone.includes(normalizedClientSearch)
+                    || email.includes(normalizedClientSearch);
+
+                return { cliente, matches, startsWithName };
+            })
+            .filter(({ matches }) => matches)
+            .sort((a, b) => {
+                if (a.startsWithName !== b.startsWithName) return a.startsWithName ? -1 : 1;
+                return (a.cliente.nome || '').localeCompare(b.cliente.nome || '', 'pt-PT', { sensitivity: 'base' });
+            })
+            .map(({ cliente }) => cliente);
+    }, [clientes, normalizedClientSearch]);
+
+    // Fechar a lista de resultados ao tocar/clicar fora (essencial em mobile).
+    useEffect(() => {
+        if (!isClientSearchOpen) return;
+        const handleOutside = (event) => {
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setIsClientSearchOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [isClientSearchOpen]);
 
     if (!isOpen) return null;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleClientSearchChange = (e) => {
+        setClientSearch(e.target.value);
+        setIsClientSearchOpen(true);
+
+        if (formData.cliente) {
+            setFormData(prev => ({ ...prev, cliente: '', pacote: '' }));
+            setPacotesDoCliente([]);
+        }
+    };
+
+    const handleSelectCliente = (cliente) => {
+        setFormData(prev => ({ ...prev, cliente: cliente._id, pacote: '' }));
+        setClientSearch(cliente.nome || '');
+        setIsClientSearchOpen(false);
+    };
+
+    const handleClearCliente = () => {
+        setFormData(prev => ({ ...prev, cliente: '', pacote: '' }));
+        setClientSearch('');
+        setPacotesDoCliente([]);
+        setIsClientSearchOpen(false);
     };
 
     const handleSubmit = async (e) => {
@@ -95,7 +223,7 @@ function QuickAppointmentModal({
                 submitData.servicoAvulsoValor = 0;
             } else {
                 submitData.servicoTipo = 'pacote';
-                submitData.pacote = formData.pacote;
+                submitData.compraPacote = formData.pacote;
             }
 
             await onSubmit(submitData);
@@ -119,9 +247,9 @@ function QuickAppointmentModal({
             />
 
             {/* Modal */}
-            <div className={`relative w-full max-w-md rounded-2xl ${bgClass} border ${borderClass} shadow-2xl overflow-hidden`}>
+            <div className={`relative w-full max-w-md max-h-[90dvh] flex flex-col rounded-2xl ${bgClass} border ${borderClass} shadow-2xl overflow-hidden`}>
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
                     <h2 className={`text-lg font-semibold ${textClass}`}>Novo Agendamento Rápido</h2>
                     <button
                         onClick={onClose}
@@ -132,27 +260,82 @@ function QuickAppointmentModal({
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                    {/* Client Select */}
-                    <div>
-                        <label className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
+                <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto min-h-0">
+                    {/* Client Search */}
+                    <div ref={searchRef}>
+                        <label htmlFor="quick-client-search" className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
                             <User className="w-4 h-4" />
                             Cliente *
                         </label>
-                        <select
-                            name="cliente"
-                            value={formData.cliente}
-                            onChange={handleChange}
-                            required
-                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
-                        >
-                            <option value="">Selecione um cliente</option>
-                            {clientes.map(cliente => (
-                                <option key={cliente._id} value={cliente._id}>
-                                    {cliente.nome}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="relative">
+                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${subtextClass}`} />
+                            <input
+                                id="quick-client-search"
+                                type="text"
+                                value={clientSearch}
+                                onChange={handleClientSearchChange}
+                                onFocus={() => setIsClientSearchOpen(true)}
+                                placeholder="Digite nome, telefone ou email"
+                                autoComplete="off"
+                                aria-expanded={isClientSearchOpen}
+                                aria-controls="quick-client-results"
+                                className={`w-full pl-9 pr-11 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
+                            />
+                            {clientSearch ? (
+                                <button
+                                    type="button"
+                                    onClick={handleClearCliente}
+                                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'} transition-colors`}
+                                    aria-label="Limpar cliente selecionado"
+                                >
+                                    <X className={`w-4 h-4 ${subtextClass}`} />
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsClientSearchOpen(prev => !prev)}
+                                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'} transition-colors`}
+                                    aria-label="Mostrar todos os clientes"
+                                >
+                                    <ChevronDown className={`w-4 h-4 ${subtextClass} transition-transform ${isClientSearchOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                            )}
+                        </div>
+
+                        {formData.cliente && selectedCliente && (
+                            <p className={`mt-2 text-xs ${subtextClass}`}>
+                                Selecionado: <span className={textClass}>{selectedCliente.nome}</span>
+                            </p>
+                        )}
+
+                        {isClientSearchOpen && !formData.cliente && (
+                            <div
+                                id="quick-client-results"
+                                className={`mt-2 max-h-56 overflow-y-auto rounded-xl border ${borderClass} ${isDarkMode ? 'bg-slate-900' : 'bg-white'} shadow-lg`}
+                            >
+                                {filteredClientes.length > 0 ? (
+                                    filteredClientes.map(cliente => (
+                                        <button
+                                            type="button"
+                                            key={cliente._id}
+                                            onClick={() => handleSelectCliente(cliente)}
+                                            className={`w-full text-left px-3 py-3 border-b last:border-b-0 ${borderClass} ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-slate-50'} transition-colors`}
+                                        >
+                                            <span className={`block text-sm font-semibold ${textClass}`}>
+                                                {cliente.nome}
+                                            </span>
+                                            <span className={`block text-xs ${subtextClass} mt-0.5`}>
+                                                {[cliente.telefone, cliente.email].filter(Boolean).join(' · ') || 'Sem contacto registado'}
+                                            </span>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className={`px-3 py-3 text-sm ${subtextClass}`}>
+                                        {clientSearch ? 'Nenhum cliente encontrado.' : 'Sem clientes registados.'}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Service Type Toggle */}
@@ -160,9 +343,10 @@ function QuickAppointmentModal({
                         <button
                             type="button"
                             onClick={() => setServiceMode('pacote')}
+                            disabled={!formData.cliente || loadingPacotes || pacotesDoCliente.length === 0}
                             className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${serviceMode === 'pacote'
                                 ? 'bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                                : `${subtextClass}`
+                                : `${subtextClass} disabled:opacity-50 disabled:cursor-not-allowed`
                                 }`}
                         >
                             <Package className="w-4 h-4" />
@@ -191,24 +375,40 @@ function QuickAppointmentModal({
                         </button>
                     </div>
 
+                    {formData.cliente && loadingPacotes && (
+                        <div className={`flex items-center gap-2 text-sm ${subtextClass}`}>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Carregando pacotes do cliente...
+                        </div>
+                    )}
+
+                    {formData.cliente && !loadingPacotes && pacotesDoCliente.length === 0 && (
+                        <div className={`rounded-xl border ${isDarkMode ? 'border-amber-400/30 bg-amber-400/10 text-amber-100' : 'border-amber-200 bg-amber-50 text-amber-800'} px-3 py-2 text-sm`}>
+                            Cliente sem pacote ativo com sessões disponíveis.
+                        </div>
+                    )}
+
                     {/* Package Select or Avulso Fields */}
                     {serviceMode === 'pacote' ? (
                         <div>
                             <label className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
                                 <Package className="w-4 h-4" />
-                                Pacote *
+                                Pacote contratado *
                             </label>
                             <select
                                 name="pacote"
                                 value={formData.pacote}
                                 onChange={handleChange}
                                 required={serviceMode === 'pacote'}
+                                disabled={!formData.cliente || loadingPacotes || pacotesDoCliente.length === 0}
                                 className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                             >
-                                <option value="">Selecione um pacote</option>
-                                {pacotes.map(pacote => (
-                                    <option key={pacote._id} value={pacote._id}>
-                                        {pacote.nome} - €{pacote.valor?.toFixed(2)}
+                                <option value="">
+                                    {formData.cliente ? 'Selecione o pacote contratado' : 'Selecione primeiro um cliente'}
+                                </option>
+                                {pacotesDoCliente.map(compra => (
+                                    <option key={compra._id} value={compra._id}>
+                                        {compra.pacote?.nome || 'Pacote'} - {compra.sessoesRestantes} sessões restantes
                                     </option>
                                 ))}
                             </select>
@@ -227,7 +427,7 @@ function QuickAppointmentModal({
                                     onChange={handleChange}
                                     placeholder="Ex: Massagem Relaxante"
                                     required={serviceMode === 'avulso'}
-                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
+                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                                 />
                             </div>
                             <div className="col-span-2">
@@ -243,7 +443,7 @@ function QuickAppointmentModal({
                                     step="0.01"
                                     min="0"
                                     required={serviceMode === 'avulso'}
-                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
+                                    className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                                 />
                             </div>
                         </div>
@@ -260,7 +460,7 @@ function QuickAppointmentModal({
                                 onChange={handleChange}
                                 placeholder="Ex: Sessão cortesia"
                                 required={serviceMode === 'oferta'}
-                                className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-emerald-500`}
+                                className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500`}
                             />
                             <p className={`mt-2 text-xs ${subtextClass}`}>
                                 Oferta sem cobrança. O atendimento fica registado, mas não entra no faturamento.
@@ -296,7 +496,7 @@ function QuickAppointmentModal({
                             onChange={handleChange}
                             placeholder="Observações adicionais..."
                             rows={2}
-                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder:${subtextClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none`}
+                            className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none`}
                         />
                     </div>
 

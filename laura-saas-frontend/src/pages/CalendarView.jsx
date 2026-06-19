@@ -60,7 +60,6 @@ function CalendarView() {
     // State
     const [agendamentos, setAgendamentos] = useState([]);
     const [clientes, setClientes] = useState([]);
-    const [pacotes, setPacotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentView, setCurrentView] = useState(isMobile ? 'timeGridDay' : 'dayGridMonth');
     const [calendarApi, setCalendarApi] = useState(null);
@@ -102,7 +101,7 @@ function CalendarView() {
     // vazio nas vistas actuais. Buscamos sempre a janela visível (datesSet).
     const dateRangeRef = useRef({ start: null, end: null });
 
-    // Fetch data — agendamentos da janela visível + clientes + pacotes
+    // Fetch data — agendamentos da janela visível + clientes
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
@@ -111,10 +110,28 @@ function CalendarView() {
             if (start) params.dataInicio = start.toISOString();
             if (end) params.dataFim = end.toISOString();
 
-            const [agendamentosRes, clientesRes, pacotesRes] = await Promise.all([
+            const fetchTodosClientes = async () => {
+                const primeiraPagina = await api.get('/clientes', { params: { limit: 100, page: 1 } });
+                const clientesPagina = primeiraPagina.data?.data || [];
+                const totalPaginas = primeiraPagina.data?.pagination?.pages || 1;
+
+                if (totalPaginas <= 1) return clientesPagina;
+
+                const outrasPaginas = await Promise.all(
+                    Array.from({ length: totalPaginas - 1 }, (_, index) => (
+                        api.get('/clientes', { params: { limit: 100, page: index + 2 } })
+                    ))
+                );
+
+                return [
+                    ...clientesPagina,
+                    ...outrasPaginas.flatMap((res) => res.data?.data || [])
+                ];
+            };
+
+            const [agendamentosRes, clientesRes] = await Promise.all([
                 api.get('/agendamentos', { params }),
-                api.get('/clientes'),
-                api.get('/pacotes')
+                fetchTodosClientes()
             ]);
 
             const ags = agendamentosRes.data?.data || [];
@@ -122,8 +139,11 @@ function CalendarView() {
                 console.warn('[CalendarView] janela com ≥100 agendamentos — alguns podem não aparecer (limite do backend).');
             }
             setAgendamentos(ags);
-            setClientes(clientesRes.data?.data || []);
-            setPacotes(pacotesRes.data?.data || []);
+            setClientes(
+                clientesRes.slice().sort((a, b) => (
+                    (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' })
+                ))
+            );
         } catch (error) {
             console.error('Erro ao carregar dados:', error);
             toast.error('Erro ao carregar agendamentos');
@@ -216,6 +236,15 @@ function CalendarView() {
 
     // Date click handler (create new appointment)
     const handleDateClick = useCallback((info) => {
+        // Vista Mês: clicar num dia faz drill-down para a vista Dia desse dia,
+        // onde se vê a grelha de horas e se escolhe o slot livre — em vez de
+        // abrir o modal às 00:00 (a vista Mês não tem hora).
+        if (info.view.type === 'dayGridMonth') {
+            info.view.calendar.changeView('timeGridDay', info.dateStr);
+            return;
+        }
+        // Vista Dia/Semana: o clique traz a hora exacta do slot livre →
+        // pré-preenche a data/hora no modal de marcação.
         setQuickModal({
             open: true,
             selectedDate: info.dateStr
@@ -477,6 +506,14 @@ function CalendarView() {
                             <Loader2 className={`w-8 h-8 animate-spin ${subtextClass}`} />
                         </div>
                     )}
+                    {currentView !== 'dayGridMonth' && (
+                        <div className={`flex items-center gap-2 mb-3 text-sm ${subtextClass}`}>
+                            <span className="flex items-center justify-center w-5 h-5 rounded-md bg-indigo-500/15 text-indigo-400">
+                                <Plus className="w-3.5 h-3.5" />
+                            </span>
+                            Toca numa hora livre para marcar nesse horário.
+                        </div>
+                    )}
                     <div className={`calendar-container ${isDarkMode ? 'dark-calendar' : 'light-calendar'} ${currentView === 'timeGridWeek' ? 'min-w-[1000px]' : ''}`}>
                             <FullCalendar
                                 ref={handleCalendarRef}
@@ -596,7 +633,6 @@ function CalendarView() {
                 onClose={() => setQuickModal({ open: false, selectedDate: null })}
                 selectedDate={quickModal.selectedDate}
                 clientes={clientes}
-                pacotes={pacotes}
                 onSubmit={handleCreateAppointment}
             />
 
@@ -676,6 +712,12 @@ function CalendarView() {
         .fc-timegrid-slot {
           height: 48px;
         }
+
+        /* Slots livres clicáveis: cursor de "marcar" na grelha de horas
+           (vistas Dia/Semana). A zona ocupada por um agendamento mantém o
+           cursor normal, pois o clique abre o detalhe, não a marcação. */
+        .fc-timegrid-col { cursor: pointer; }
+        .fc-timegrid-event { cursor: default; }
 
         /* Week view: guarantee minimum column width so names are readable */
         .fc-timeGridWeek-view .fc-timegrid-col {

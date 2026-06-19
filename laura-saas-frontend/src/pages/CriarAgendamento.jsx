@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CheckCircle2, XCircle, ArrowLeft, UserPlus, Users, Gift, Package } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowLeft, UserPlus, Users, Gift, Package, Search, X, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -83,6 +83,9 @@ function CriarAgendamento() {
   const [clientes, setClientes] = useState([]);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
+  const [clienteBusca, setClienteBusca] = useState('');
+  const [clienteBuscaAberta, setClienteBuscaAberta] = useState(false);
+  const clienteBuscaRef = useRef(null);
 
   const formatDateForInput = (date) => date.toISOString().slice(0, 16);
 
@@ -112,6 +115,51 @@ function CriarAgendamento() {
   const watchObsSessao = sessaoForm.watch('observacoes');
   const watchObsAval = avaliacaoForm.watch('observacoes');
   const servicoTipoSessao = sessaoForm.watch('servicoTipo');
+  const clienteSessao = sessaoForm.watch('cliente');
+
+  const normalizarBusca = (value = '') =>
+    value
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const clientesFiltrados = useMemo(() => {
+    const termo = normalizarBusca(clienteBusca);
+    // Campo vazio: lista todos os clientes (já ordenados) para navegar/escolher
+    // sem precisar de escrever — comportamento combobox.
+    if (!termo) return clientes;
+
+    return clientes
+      .map((cliente) => {
+        const nome = normalizarBusca(cliente.nome);
+        const telefone = normalizarBusca(cliente.telefone);
+        const email = normalizarBusca(cliente.email);
+        const comecaComNome = nome.startsWith(termo);
+        const corresponde = comecaComNome || nome.includes(termo) || telefone.includes(termo) || email.includes(termo);
+
+        return { cliente, corresponde, comecaComNome };
+      })
+      .filter(({ corresponde }) => corresponde)
+      .sort((a, b) => {
+        if (a.comecaComNome !== b.comecaComNome) return a.comecaComNome ? -1 : 1;
+        return (a.cliente.nome || '').localeCompare(b.cliente.nome || '', 'pt-PT', { sensitivity: 'base' });
+      })
+      .map(({ cliente }) => cliente);
+  }, [clientes, clienteBusca]);
+
+  // Fechar a lista de resultados ao tocar/clicar fora (essencial em mobile).
+  useEffect(() => {
+    if (!clienteBuscaAberta) return;
+    const handleOutside = (event) => {
+      if (clienteBuscaRef.current && !clienteBuscaRef.current.contains(event.target)) {
+        setClienteBuscaAberta(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [clienteBuscaAberta]);
 
   useEffect(() => {
     if (dataSelecionada) {
@@ -123,8 +171,20 @@ function CriarAgendamento() {
     async function fetchClientes() {
       setIsLoadingData(true);
       try {
-        const res = await api.get('/clientes?limit=100');
-        const lista = (res.data?.data || []).slice()
+        const primeiraPagina = await api.get('/clientes', { params: { limit: 100, page: 1 } });
+        const totalPaginas = primeiraPagina.data?.pagination?.pages || 1;
+        const primeiraLista = primeiraPagina.data?.data || [];
+        const outrasPaginas = totalPaginas > 1
+          ? await Promise.all(
+            Array.from({ length: totalPaginas - 1 }, (_, index) => (
+              api.get('/clientes', { params: { limit: 100, page: index + 2 } })
+            ))
+          )
+          : [];
+        const lista = [
+          ...primeiraLista,
+          ...outrasPaginas.flatMap((res) => res.data?.data || [])
+        ].slice()
           .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-PT', { sensitivity: 'base' }));
         setClientes(lista);
       } catch {
@@ -151,14 +211,19 @@ function CriarAgendamento() {
 
   async function handleClienteChange(clienteId) {
     if (!clienteId) {
-      setClienteSelecionado(null);
-      setPacotesDoCliente([]);
-      sessaoForm.setValue('cliente', '', { shouldValidate: true });
-      sessaoForm.setValue('pacote', '', { shouldValidate: true });
+      resetClienteSelecionado();
+      setClienteBusca('');
+      setClienteBuscaAberta(false);
       return;
     }
     try {
       setIsLoadingData(true);
+      const clienteNaLista = clientes.find((c) => c._id === clienteId);
+      if (clienteNaLista) {
+        setClienteBusca(clienteNaLista.nome || '');
+        setClienteBuscaAberta(false);
+      }
+
       const [clienteRes, pacotesRes] = await Promise.all([
         api.get(`/clientes/${clienteId}`),
         api.get(`/compras-pacotes/cliente/${clienteId}`),
@@ -189,6 +254,34 @@ function CriarAgendamento() {
     } finally {
       setIsLoadingData(false);
     }
+  }
+
+  function resetClienteSelecionado() {
+    setClienteSelecionado(null);
+    setPacotesDoCliente([]);
+    sessaoForm.setValue('cliente', '', { shouldValidate: true });
+    sessaoForm.setValue('pacote', '', { shouldValidate: true });
+  }
+
+  function handleClienteBuscaChange(e) {
+    setClienteBusca(e.target.value);
+    setClienteBuscaAberta(true);
+
+    if (clienteSessao) {
+      resetClienteSelecionado();
+    }
+  }
+
+  function handleSelecionarCliente(cliente) {
+    setClienteBusca(cliente.nome || '');
+    setClienteBuscaAberta(false);
+    handleClienteChange(cliente._id);
+  }
+
+  function handleLimparCliente() {
+    resetClienteSelecionado();
+    setClienteBusca('');
+    setClienteBuscaAberta(false);
   }
 
   const onSubmitSessao = async (data) => {
@@ -339,27 +432,80 @@ function CriarAgendamento() {
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h2 className="text-lg font-medium text-gray-700 mb-3">Informações Básicas</h2>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="mb-4" ref={clienteBuscaRef}>
+                <label htmlFor="cliente-busca" className="block text-sm font-medium text-gray-700 mb-1">
                   Cliente <span className="text-red-500">*</span>
                 </label>
-                <Controller
-                  name="cliente"
-                  control={sessaoForm.control}
-                  render={({ field }) => (
-                    <select
-                      {...field}
-                      onChange={(e) => { field.onChange(e); handleClienteChange(e.target.value); }}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    id="cliente-busca"
+                    type="text"
+                    value={clienteBusca}
+                    onChange={handleClienteBuscaChange}
+                    onFocus={() => setClienteBuscaAberta(true)}
+                    disabled={isSubmitting}
+                    autoComplete="off"
+                    aria-expanded={clienteBuscaAberta}
+                    aria-controls="cliente-busca-resultados"
+                    className={`${getInputClasses(sessaoForm, 'cliente')} pl-9 pr-11`}
+                    placeholder="Digite nome, telefone ou email"
+                  />
+                  {clienteBusca ? (
+                    <button
+                      type="button"
+                      onClick={handleLimparCliente}
                       disabled={isSubmitting}
-                      className={getInputClasses(sessaoForm, 'cliente')}
+                      aria-label="Limpar cliente selecionado"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
                     >
-                      <option value="">Selecione um cliente</option>
-                      {clientes.map((c) => (
-                        <option key={c._id} value={c._id}>{c.nome}</option>
-                      ))}
-                    </select>
+                      <X className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setClienteBuscaAberta((prev) => !prev)}
+                      disabled={isSubmitting}
+                      aria-label="Mostrar todos os clientes"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                    >
+                      <ChevronDown className={`w-4 h-4 transition-transform ${clienteBuscaAberta ? 'rotate-180' : ''}`} />
+                    </button>
                   )}
-                />
+                </div>
+
+                {clienteSelecionado && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Selecionado: <span className="font-medium text-gray-900">{clienteSelecionado.nome}</span>
+                  </p>
+                )}
+
+                {clienteBuscaAberta && !clienteSessao && (
+                  <div
+                    id="cliente-busca-resultados"
+                    className="mt-2 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                  >
+                    {clientesFiltrados.length > 0 ? (
+                      clientesFiltrados.map((cliente) => (
+                        <button
+                          type="button"
+                          key={cliente._id}
+                          onClick={() => handleSelecionarCliente(cliente)}
+                          className="w-full text-left px-3 py-3 border-b border-gray-100 last:border-b-0 hover:bg-amber-50 transition-colors"
+                        >
+                          <span className="block text-sm font-semibold text-gray-900">{cliente.nome}</span>
+                          <span className="block text-xs text-gray-500 mt-0.5">
+                            {[cliente.telefone, cliente.email].filter(Boolean).join(' · ') || 'Sem contacto registado'}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-3 text-sm text-gray-500">
+                        {clienteBusca ? 'Nenhum cliente encontrado.' : 'Sem clientes registados.'}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <ErrorMsg form={sessaoForm} name="cliente" />
               </div>
 
