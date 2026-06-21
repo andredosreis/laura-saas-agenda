@@ -1,6 +1,8 @@
 import request from 'supertest';
 import app from '../src/app.js';
 import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
+import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 
 beforeAll(setupTestDB);
 afterAll(teardownTestDB);
@@ -23,12 +25,33 @@ describe('Zod validation — POST /api/auth/register (defesa em profundidade)', 
     expect(res.body.success).toBe(false);
   });
 
-  it('rejeita tentativa de injectar tenantId via body', async () => {
+  // tenantId é um SERVER_MANAGED_KEY: o middleware `validate` remove-o do body
+  // antes de validar (tolera PWAs com cache antiga que reenviam o doc Mongo
+  // inteiro) e o controller só destrutura 5 campos. O que importa é o isolamento
+  // — afirmamo-lo directamente, não o status HTTP: um tenantId injectado não tem
+  // efeito nenhum (é neutralizado em duas camadas, não rejeitado ruidosamente).
+  it('ignora tenantId injectado — user nasce em tenant fresco, não no injectado', async () => {
+    const vitima = await Tenant.create({
+      nome: 'Vítima SA',
+      slug: 'vitima-sa',
+      plano: { tipo: 'pro', status: 'ativo' },
+    });
+
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ ...validRegister, tenantId: '507f1f77bcf86cd799439011' });
+      .send({ ...validRegister, tenantId: vitima._id.toString() });
 
-    expect(res.status).toBe(400);
+    // Sucede (o tenantId é descartado em silêncio, não rejeitado) ...
+    expect(res.status).toBe(201);
+
+    // ... e o isolamento é preservado: o user fica num tenant NOVO, não no da vítima.
+    const user = await User.findOne({ email: validRegister.email });
+    expect(user).not.toBeNull();
+    expect(user.tenantId.toString()).not.toBe(vitima._id.toString());
+
+    // Nenhuma membership nasceu no tenant da vítima.
+    const intrusos = await User.countDocuments({ tenantId: vitima._id });
+    expect(intrusos).toBe(0);
   });
 
   it('rejeita tentativa de injectar emailVerificado via body', async () => {
