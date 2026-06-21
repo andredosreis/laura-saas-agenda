@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import Tenant from '../../models/Tenant.js';
 import User from '../../models/User.js';
+import { getModels } from '../../models/registry.js';
+import { getTenantDBAdmin } from './getTenantDBAdmin.js';
 
 /**
  * GET /admin/tenants — lista todos os tenants.
@@ -58,4 +60,35 @@ export const obterTenant = async (req, res) => {
   req.audit.set({ action: 'tenant.view', targetTenantId: id });
 
   res.json({ success: true, data: { tenant, totalUsuarios } });
+};
+
+/**
+ * GET /admin/tenants/:id/uso — métricas de uso de um tenant (cross-tenant).
+ *
+ * Lê a DB do tenant via `getTenantDBAdmin` — conexão SEPARADA read-only (Gate 4b):
+ * o painel não consegue escrever em dados de tenant, imposto pelo Mongo. Dentro
+ * de `tenant_<id>` não há filtro `tenantId` (a DB é o próprio tenant). Contagens
+ * em paralelo (Promise.all bounded — 3 contagens).
+ */
+export const usoTenant = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'ID inválido' });
+  }
+
+  const tenant = await Tenant.findById(id);
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+  }
+
+  const { Cliente, Agendamento, Mensagem } = getModels(getTenantDBAdmin(id));
+  const [clientes, agendamentos, mensagens] = await Promise.all([
+    Cliente.countDocuments({}),
+    Agendamento.countDocuments({}),
+    Mensagem.countDocuments({}),
+  ]);
+
+  req.audit.set({ action: 'tenant.uso', targetTenantId: id, metadata: { clientes, agendamentos, mensagens } });
+
+  res.json({ success: true, data: { clientes, agendamentos, mensagens } });
 };
