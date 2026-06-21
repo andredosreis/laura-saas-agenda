@@ -72,8 +72,31 @@ os 2 accessors, credenciais restritas, sweep test) já existem e estão provados
         └── SIM  → vai direto ao BLOCO B (por cada rota nova)
 ```
 
-Estado conhecido (2026-06): `requireSuperadmin.js` existe mas **devolve 403** —
-ver ⚠ no passo A1. Os restantes primitivos **ainda não existem**.
+---
+
+## Estado de implementação (reconciliação com o código real)
+
+A Fase 1 das fundações está **implementada e testada** (ADR-024). Este doc foi
+escrito antes de ler o código committado — onde divergir nos **nomes**, vale o
+código:
+
+| Este doc diz | Lê no código |
+|---|---|
+| `admin/auditLog.model.js` | **`src/models/AuditLog.js`** (control-plane, junto de Tenant/User) |
+| `AuditLog.create([...],{session})` | leitura/negação via **`AuditLog.record({...})`**; só a Fase 3 transacional usa `create([...],{session})` |
+| `actorId` | **`actorUserId`** |
+| `sharedConnection` | **`mongoose.connection`** (default = `laura-saas`); transação via `mongoose.startSession()` |
+| `userAgent` / `requestId` / `before`/`after` (campos) | não existem no model; `before/after` vão em **`metadata`** (Mixed). A Fase 3 decide se promove a campos |
+
+**Construído e verde (Fase 1):** `src/models/AuditLog.js` (+ campo `status`),
+`requireSuperadmin` (404 + audita negação), `auditMiddleware`, `adminRouter`
+montado no `apiResources`, sweep test. **Fase 2 (em curso):** `GET /admin/tenants`.
+
+**Realidade de conexão:** `getTenantDB` usa `mongoose.connection.useDb()` — mesma
+conexão/pool RW. Logo a justificação "tenant é outra conexão → sem atomicidade" é
+imprecisa para o `getTenantDB` de produto; a *decisão* (mutações só control-plane)
+mantém-se. O `getTenantDBAdmin` read-only (A5) precisa de uma **conexão separada**
+(`createConnection(MONGO_TENANT_RO_URI)`), não de `useDb`.
 
 ---
 
@@ -146,14 +169,14 @@ nada commitado a proteger).
 
 ```js
 // src/modules/admin/adminMutation.js  (ESM — extensão .js obrigatória)
-import { sharedConnection } from '../../config/db.js';   // laura-saas
-import { AuditLog } from './auditLog.model.js';          // ⬅ registado NA sharedConnection (A2)
+import mongoose from 'mongoose';
+import AuditLog from '../../models/AuditLog.js';         // default connection = laura-saas (control-plane)
 
 // Envolve um handler de mutação: transação na sharedConnection, trabalho + audit
 // na MESMA session, commit atómico. work() devolve
 // { data, targetTenantId, targetResourceId?, before?, after? } e contém SÓ ops de DB.
 export const adminMutation = (action, work) => async (req, res, next) => {
-  const session = await sharedConnection.startSession();
+  const session = await mongoose.startSession();
   const base = {
     actorId: req.user.userId, actorEmail: req.user.email, action,
     ip: req.ip, userAgent: req.get('user-agent'), requestId: req.id,

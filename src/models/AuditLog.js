@@ -29,6 +29,9 @@ const AuditLogSchema = new Schema(
 
     // Origem do pedido
     ip: { type: String, default: null },
+
+    // Resultado da acção — distingue acessos concedidos, negados e erros (ADR-024)
+    status: { type: String, enum: ['ok', 'denied', 'error'], default: 'ok' },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
@@ -53,8 +56,9 @@ AuditLogSchema.statics.record = function record({
   targetTenantId = null,
   metadata = {},
   ip = null,
+  status = 'ok',
 }) {
-  return this.create({ actorUserId, actorEmail, action, targetTenantId, metadata, ip });
+  return this.create({ actorUserId, actorEmail, action, targetTenantId, metadata, ip, status });
 };
 
 export default mongoose.model('AuditLog', AuditLogSchema);
