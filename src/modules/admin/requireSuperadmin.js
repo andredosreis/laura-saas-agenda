@@ -10,12 +10,18 @@
  *
  *   router.use(authenticate, requireSuperadmin);
  *
- * - Sem `req.user` (não autenticado)  → 401
- * - `req.user.role !== 'superadmin'`  → 403 (sem permissão por role)
+ * - Sem `req.user` (não autenticado)  → 401 (comportamento global do
+ *   `authenticate`; não revela nada específico do painel)
+ * - `req.user.role !== 'superadmin'`  → 404 + entrada de auditoria
+ *   `status: 'denied'`. 404 e não 403 para não revelar a existência da
+ *   superfície mais perigosa do sistema — "403 entregaria um mapa ao atacante".
+ *   A negação é auditada AQUI porque este é o único componente que a vê: o
+ *   `auditMiddleware` corre depois e nunca chega a executar (short-circuit).
  */
 import logger from '../../utils/logger.js';
+import AuditLog from '../../models/AuditLog.js';
 
-export const requireSuperadmin = (req, res, next) => {
+export const requireSuperadmin = async (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ success: false, error: 'Não autenticado' });
   }
@@ -30,7 +36,18 @@ export const requireSuperadmin = (req, res, next) => {
       },
       '[admin] Acesso ao painel super-admin negado'
     );
-    return res.status(403).json({ success: false, error: 'Acesso restrito a super-administradores' });
+
+    // Negação auditada (best-effort): responde 404 mesmo que o audit falhe.
+    await AuditLog.record({
+      actorUserId: req.user.userId || req.user._id,
+      actorEmail: req.user.email,
+      action: 'admin.access.denied',
+      status: 'denied',
+      ip: req.ip,
+      metadata: { path: req.originalUrl, method: req.method, role: req.user.role },
+    }).catch(() => {});
+
+    return res.status(404).json({ success: false, error: 'Recurso não encontrado' });
   }
 
   next();

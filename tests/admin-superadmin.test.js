@@ -43,20 +43,20 @@ describe('Middleware: requireSuperadmin', () => {
     expect(res.body.success).toBe(false);
   });
 
-  it('rejeita user admin (não superadmin) com 403', async () => {
+  it('rejeita user admin (não superadmin) com 404 — não revela a superfície', async () => {
     const res = await request(app)
       .get('/api/admin/ping')
       .set('Authorization', `Bearer ${tokenComRole('admin', { tenantId: new mongoose.Types.ObjectId().toString() })}`);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
 
-  it('rejeita todas as roles de tenant com 403', async () => {
+  it('rejeita todas as roles de tenant com 404', async () => {
     for (const role of ['admin', 'gerente', 'recepcionista', 'terapeuta']) {
       const res = await request(app)
         .get('/api/admin/ping')
         .set('Authorization', `Bearer ${tokenComRole(role, { tenantId: new mongoose.Types.ObjectId().toString() })}`);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     }
   });
 
@@ -66,6 +66,18 @@ describe('Middleware: requireSuperadmin', () => {
       .set('Authorization', `Bearer ${tokenComRole('superadmin')}`);
     expect(res.status).toBe(200);
     expect(res.body.data.pong).toBe(true);
+  });
+
+  it('audita a negação no AuditLog com status "denied"', async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    await request(app)
+      .get('/api/admin/ping')
+      .set('Authorization', `Bearer ${tokenComRole('gerente', { tenantId: new mongoose.Types.ObjectId().toString(), userId })}`);
+
+    const entries = await AuditLog.find({ status: 'denied' });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].actorUserId.toString()).toBe(userId);
+    expect(entries[0].metadata.path).toBe('/api/admin/ping');
   });
 });
 
@@ -106,6 +118,39 @@ describe('Model: AuditLog', () => {
     ).rejects.toThrow();
     await expect(
       AuditLog.create({ actorUserId: new mongoose.Types.ObjectId() })
+    ).rejects.toThrow();
+  });
+});
+
+// ──────────────────────────────────────────────
+// AuditLog.status — distingue ok / denied / error (grilling ALTO 2)
+// ──────────────────────────────────────────────
+
+describe('Model: AuditLog — status', () => {
+  it('record() usa status "ok" por defeito', async () => {
+    const entry = await AuditLog.record({
+      actorUserId: new mongoose.Types.ObjectId(),
+      action: 'tenant.view',
+    });
+    expect(entry.status).toBe('ok');
+  });
+
+  it('record() aceita status explícito (ex: denied)', async () => {
+    const entry = await AuditLog.record({
+      actorUserId: new mongoose.Types.ObjectId(),
+      action: 'admin.denied',
+      status: 'denied',
+    });
+    expect(entry.status).toBe('denied');
+  });
+
+  it('rejeita status fora do enum', async () => {
+    await expect(
+      AuditLog.create({
+        actorUserId: new mongoose.Types.ObjectId(),
+        action: 'tenant.view',
+        status: 'bogus',
+      })
     ).rejects.toThrow();
   });
 });

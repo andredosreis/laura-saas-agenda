@@ -35,6 +35,7 @@ import leadRoutes from './modules/leads/leadRoutes.js';
 import conversasRoutes from './modules/messaging/conversas/conversasRoutes.js';
 import leadInternalRoutes from './modules/leads/leadInternalRoutes.js';
 import clienteInternalRoutes from './modules/clientes/clienteInternalRoutes.js';
+import adminRoutes from './modules/admin/adminRoutes.js'; // 🆕 Painel super-admin (ADR-024)
 
 const app = express();
 
@@ -109,6 +110,7 @@ const apiResources = [
   ['/fechamentos-mensais', fechamentoMensalRoutes],
   ['/leads', leadRoutes],
   ['/conversas', conversasRoutes],
+  ['/admin', adminRoutes],
 ];
 
 for (const [path, router] of apiResources) {
