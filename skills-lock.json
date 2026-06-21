@@ -6,6 +6,12 @@
       "sourceType": "github",
       "computedHash": "c14acc9d6b8f6073015530f9c5f382abd45cc30efb960a687f4bfbc2c32ee88c"
     },
+    "grill-me": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grill-me/SKILL.md",
+      "computedHash": "f321507f77702a54af1db66549ec1685fc625390d06c57d7949cdcda8eb1b5c7"
+    },
     "nodejs-backend-patterns": {
       "source": "wshobson/agents",
       "sourceType": "github",

@@ -40,6 +40,7 @@ import { handle as handleManualSilent } from '../handlers/manualSilent.js';
 import { handle as handleNoPendingAppointmentReply } from '../handlers/noPendingAppointmentReply.js';
 import { handle as handleClientLifecycle } from '../handlers/iaClientLifecycle.js';
 import { persistManualOutbound } from '../handlers/manualOutbound.js';
+import LidCapture from '../../../models/LidCapture.js';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
@@ -65,11 +66,19 @@ export function descreverMidia(msgData) {
 // Captura o payload COMPLETO de uma mensagem @lid para descobrir onde o Evolution v2
 // põe o número real (a doc não o documenta). Remover assim que a resolução de @lid
 // estiver implementada. Frequência: grep '"motivo":"lid"'. Payload: grep 'lidPayload'.
-function logLidParaFase3(direcao, msgData) {
+function logLidParaFase3(direcao, msgData, instance) {
   logger.info(
     { direcao, motivo: 'lid', lidPayload: msgData },
     '[webhook] @lid capturado para Fase 3',
   );
+  // Persistência DURÁVEL (sobrevive a restarts/deploys, ao contrário dos docker
+  // logs). Best-effort — uma falha aqui nunca quebra o webhook.
+  LidCapture.create({
+    direcao,
+    remoteJid: msgData?.key?.remoteJid,
+    instance,
+    payload: msgData,
+  }).catch((err) => logger.warn({ err: err.message }, '[webhook] @lid capture persist falhou'));
 }
 
 /**
@@ -90,6 +99,8 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
 
     const msgData = req.body.data;
     const remoteJidRaw = msgData?.key?.remoteJid || '';
+    // instância Evolution — constante para todo o request; usada em vários ramos.
+    const instance = req.body?.instance ? String(req.body.instance) : null;
 
     if (remoteJidRaw.endsWith('@g.us') || msgData?.messageType === 'reactionMessage') {
       return res.status(200).json({ message: 'Grupo ou reação ignorada' });
@@ -107,12 +118,11 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
         .replace('@s.whatsapp.net', '')
         .replace('@c.us', '')
         .replace(/[^\d]/g, '');
-      const instanceSaida = req.body?.instance ? String(req.body.instance) : null;
-      const logBase = { direcao: 'saida', telefone_hash: telefoneHash(telSaida), instance: instanceSaida };
+      const logBase = { direcao: 'saida', telefone_hash: telefoneHash(telSaida), instance };
 
       // @lid: ainda não resolvemos o número real (Fase 3 do plano de inbox).
       if (remoteJidRaw.endsWith('@lid')) {
-        logLidParaFase3('saida', msgData);
+        logLidParaFase3('saida', msgData, instance);
         return res.status(200).json({ message: 'Saída @lid ignorada' });
       }
 
@@ -135,7 +145,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       res.status(200).json({ success: true, message: 'Saída registada' });
 
       persistManualOutbound({
-        instanceName: instanceSaida,
+        instanceName: instance,
         telefoneNormalizado: telSaida,
         mensagem: conteudoSaida,
         timestamp: new Date(tsSaidaMs),
@@ -161,7 +171,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     }
 
     if (remoteJidRaw.endsWith('@lid')) {
-      logLidParaFase3('entrada', msgData);
+      logLidParaFase3('entrada', msgData, instance);
       return res.status(200).json({ message: 'LID ignorado, aguardando resolução' });
     }
 
@@ -181,8 +191,6 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
       if (!telefoneAudio) {
         return res.status(200).json({ message: 'Áudio sem telefone ignorado' });
       }
-      const instanceAudio = req.body?.instance ? String(req.body.instance) : null;
-
       res.status(200).json({ success: true, message: 'Áudio recebido, a transcrever' });
 
       withPhoneLock(telefoneAudio, () =>
@@ -192,7 +200,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
           telefoneNormalizado: telefoneAudio,
           messageId,
           timestamp: new Date(timestampMensagem),
-          instanceName: instanceAudio,
+          instanceName: instance,
           startMs,
         }),
       ).catch((err) =>
@@ -222,7 +230,6 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
     }
 
     const telefoneNormalizado = telefone.replace(/[^\d]/g, '');
-    const instanceName = req.body?.instance ? String(req.body.instance) : null;
 
     // ── Anti-duplicação semântica ──────────────────────────────────
     // O Evolution pode emitir 2 eventos da MESMA mensagem com messageId
@@ -254,7 +261,7 @@ export const processarConfirmacaoWhatsapp = async (req, res) => {
         mensagem,
         messageId,
         timestamp: new Date(timestampMensagem),
-        instanceName,
+        instanceName: instance,
         startMs,
       }),
     ).catch((err) => {
