@@ -104,10 +104,9 @@ laura-saas-agenda/
 │   ├── maintenance/             # Scripts de correcção de dados (execução manual)
 │   └── tools/                   # Scripts utilitários e de teste manual
 ├── docs/
-│   ├── adrs/generated/          # Architecture Decision Records (ADR-001 a ADR-026)
+│   ├── adrs/generated/          # Architecture Decision Records (ADR-001+)
 │   └── guidelines/              # Guias de desenvolvimento JS e TS
 └── .claude/
-    ├── CLAUDE.md                # Este ficheiro — regras universais + triggers
     ├── rules/                   # Regras por tópico (multi-tenant, express, mongoose, react...)
     ├── guidelines/              # Contexto específico por tipo de tarefa
     ├── agents/                  # Definições de subagentes especializados
@@ -121,6 +120,7 @@ laura-saas-agenda/
 # Backend
 npm test                                     # Jest — todos os testes
 npm test -- --testPathPattern=auth           # Ficheiro específico
+# Testes em tests/ (Jest ESM, NODE_OPTIONS=--experimental-vm-modules). Nunca src/__tests__/.
 
 # Frontend
 cd laura-saas-frontend
