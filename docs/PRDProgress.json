@@ -67,8 +67,9 @@
       "name": "Audit Log Viewer",
       "priority": 2,
       "wave": 2,
-      "status": "pending",
-      "spec": "docs/F09-audit-log-viewer/"
+      "status": "done",
+      "spec": "docs/F09-audit-log-viewer/",
+      "eval_report": "docs/F09-audit-log-viewer/eval-report.md"
     },
     "F10": {
       "name": "Panel Frontend — List, Detail & Usage",
