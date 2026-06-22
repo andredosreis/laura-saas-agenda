@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="width:100%;height:100%;display:flex;flex-direction:column;background:#ffffff;font-family:'Hanken Grotesk',system-ui,sans-serif;color:#221f1d;overflow:hidden">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e7e1d8;flex:none;background:#fbf9f6">
+    <button onClick="{{ onClose }}" style-hover="background:#f1ece4" style="display:flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #ddd5ca;border-radius:2px;padding:7px 12px;font-family:inherit;font-size:13px;color:#534c45;cursor:pointer;letter-spacing:.01em;transition:background .15s">Fechar &#10005;</button>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#a59d93">Detalhe do tenant</span>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:22px 22px 32px">
+
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:54px;height:54px;border-radius:50%;background:#f0ddcf;color:#a14d27;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;flex:none;letter-spacing:.02em">{{ initials }}</div>
+      <div style="min-width:0">
+        <div style="font-size:21px;font-weight:600;letter-spacing:-.01em;line-height:1.1">{{ name }}</div>
+        <div style="font-size:13.5px;color:#6f6862;margin-top:3px">{{ owner }} &middot; cliente desde {{ joined }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:2px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:{{ planBg }};color:{{ planColor }}">{{ plan }} &middot; &euro;{{ price }}</span>
+      <span style="display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:2px;font-size:12.5px;font-weight:600;background:{{ statusBg }};color:{{ statusColor }}"><span style="width:8px;height:8px;border-radius:1px;background:{{ statusColor }};display:inline-block"></span>{{ statusLabel }}</span>
+      <span style="font-size:12.5px;color:#8a827a;font-family:'IBM Plex Mono',monospace">{{ renewalText }}</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px">
+      <button style-hover="border-color:#bd5d33;color:#a14d27" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;background:#ffffff;border:1px solid #ddd5ca;border-radius:2px;font-family:inherit;font-size:13px;color:#3f3a34;cursor:pointer;transition:all .15s">Mudar plano</button>
+      <button style-hover="border-color:#bd5d33;color:#a14d27" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;background:#ffffff;border:1px solid #ddd5ca;border-radius:2px;font-family:inherit;font-size:13px;color:#3f3a34;cursor:pointer;transition:all .15s">Marcar pago</button>
+      <button style-hover="border-color:#bd5d33;color:#a14d27" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;background:#ffffff;border:1px solid #ddd5ca;border-radius:2px;font-family:inherit;font-size:13px;color:#3f3a34;cursor:pointer;transition:all .15s">Contactar</button>
+      <button style-hover="background:#f7e7e2;border-color:#cf9b90" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;background:#ffffff;border:1px solid #ddd5ca;border-radius:2px;font-family:inherit;font-size:13px;color:#9e2f22;cursor:pointer;transition:all .15s">Suspender</button>
+    </div>
+
+    <div style="margin-top:26px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a827a">Evolução de leads</span>
+        <span style="font-size:12px;color:#a59d93">últimas 8 semanas</span>
+      </div>
+      <svg viewBox="0 0 360 116" width="100%" height="120" preserveAspectRatio="none" style="display:block">
+        <line x1="4" y1="112" x2="356" y2="112" stroke="#ece6dd" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+        <path d="{{ areaPath }}" fill="#f3e1d5"></path>
+        <polyline points="{{ linePoints }}" fill="none" stroke="#bd5d33" stroke-width="2" vector-effect="non-scaling-stroke"></polyline>
+        <circle cx="{{ lastX }}" cy="{{ lastY }}" r="3.5" fill="#bd5d33"></circle>
+      </svg>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px">
+      <div style="border:1px solid #e7e1d8;border-radius:3px;padding:14px 15px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Total de leads</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:25px;font-weight:600;margin-top:7px">{{ leads }}</div>
+      </div>
+      <div style="border:1px solid #e7e1d8;border-radius:3px;padding:14px 15px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Conversão lead&rarr;cliente</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:25px;font-weight:600;margin-top:7px">{{ conversion }}%</div>
+      </div>
+      <div style="grid-column:span 2;border:1px solid #e7e1d8;border-radius:3px;padding:14px 15px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Agendamentos &middot; IA vs manual</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#534c45">{{ totalBookings }} total</span>
+        </div>
+        <div style="display:flex;height:10px;border-radius:2px;overflow:hidden;margin-top:11px;border:1px solid #e7e1d8">
+          <div style="width:{{ aiPct }}%;background:#bd5d33"></div>
+          <div style="flex:1;background:#d9d2ca"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:9px;font-size:12px">
+          <span style="display:flex;align-items:center;gap:6px;color:#534c45"><span style="width:8px;height:8px;background:#bd5d33;border-radius:1px"></span>IA &middot; {{ aiBookings }} ({{ aiPct }}%)</span>
+          <span style="display:flex;align-items:center;gap:6px;color:#534c45"><span style="width:8px;height:8px;background:#d9d2ca;border-radius:1px"></span>Manual &middot; {{ manualBookings }} ({{ manualPct }}%)</span>
+        </div>
+      </div>
+      <div style="grid-column:span 2;border:1px solid #e8cdba;background:#fbf1ea;border-radius:3px;padding:15px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#a14d27">Custo de IA &middot; mês</div>
+          <div style="font-size:12px;color:#8a827a;margin-top:4px">acumulado: {{ aiCostTotal }}</div>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:27px;font-weight:600;color:#a14d27">{{ aiCostMonth }}</div>
+      </div>
+    </div>
+
+    <div style="margin-top:26px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a827a;margin-bottom:6px">Histórico de pagamentos</div>
+      <sc-for list="{{ invoiceRows }}" as="inv" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #efeae3">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#534c45">{{ inv.date }}</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600">{{ inv.amount }}</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;min-width:96px;justify-content:flex-end;font-size:12px;font-weight:600;color:{{ inv.color }}"><span style="width:7px;height:7px;border-radius:1px;background:{{ inv.color }}"></span>{{ inv.label }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:760},&quot;tenant&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null},&quot;onClose&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null}}">
+class Component extends DCLogic {
+  fmt(n) { return '\u20ac' + Number(n).toFixed(2).replace('.', ','); }
+
+  renderVals() {
+    const t = this.props.tenant || {};
+    const series = (t.leadSeries && t.leadSeries.length) ? t.leadSeries : [0];
+
+    // chart geometry
+    const W = 360, H = 116, pad = 6, base = 112;
+    const max = Math.max.apply(null, series.concat([1]));
+    const stepX = series.length > 1 ? (W - pad * 2) / (series.length - 1) : 0;
+    const pts = series.map((v, i) => {
+      const x = pad + i * stepX;
+      const y = base - (v / max) * (base - pad * 2);
+      return [x, y];
+    });
+    const linePoints = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    const areaPath = pts.length
+      ? 'M ' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ') +
+        ' L ' + pts[pts.length - 1][0].toFixed(1) + ' ' + base + ' L ' + pts[0][0].toFixed(1) + ' ' + base + ' Z'
+      : '';
+    const last = pts[pts.length - 1];
+
+    // bookings split
+    const ai = t.aiBookings || 0, manual = t.manualBookings || 0, totalB = ai + manual;
+    const aiPct = totalB ? Math.round((ai / totalB) * 100) : 0;
+
+    // status styling
+    const statusMap = {
+      'Pago':   { bg: '#e7eee4', color: '#3f6b3c', label: 'Pago' },
+      'Trial':  { bg: '#f4ebd7', color: '#8a610f', label: 'Trial' },
+      'Atraso': { bg: '#f4e0db', color: '#9e2f22', label: 'Em atraso' }
+    };
+    const planMap = {
+      'Básico': { bg: '#efece7', color: '#6f6862' },
+      'Pro':    { bg: '#2a2723', color: '#f4f1ec' },
+      'Elite':  { bg: '#f0ddcf', color: '#a14d27' }
+    };
+    const s = statusMap[t.status] || statusMap['Pago'];
+    const p = planMap[t.plan] || planMap['Básico'];
+
+    let renewalText = '';
+    if (t.status === 'Trial') renewalText = 'Trial expira em ' + (t.trialDaysLeft || 0) + ' dias';
+    else if (t.status === 'Atraso') renewalText = 'Venceu ' + (t.renewal || '');
+    else renewalText = 'Renova a ' + (t.renewal || '');
+
+    const invColor = { 'Pago': '#3f6b3c', 'Em atraso': '#9e2f22', 'Pendente': '#8a610f' };
+    const invoiceRows = (t.invoices || []).map(inv => ({
+      date: inv.date,
+      amount: inv.amount ? this.fmt(inv.amount) : '—',
+      label: inv.status,
+      color: invColor[inv.status] || '#6f6862'
+    }));
+
+    return {
+      name: t.name, owner: t.owner, initials: t.initials, plan: t.plan, price: t.price,
+      joined: t.joined, leads: t.leads, conversion: t.conversion,
+      planBg: p.bg, planColor: p.color,
+      statusBg: s.bg, statusColor: s.color, statusLabel: s.label, renewalText,
+      linePoints, areaPath, lastX: last[0].toFixed(1), lastY: last[1].toFixed(1),
+      aiPct, manualPct: 100 - aiPct, aiBookings: ai, manualBookings: manual, totalBookings: totalB,
+      aiCostMonth: this.fmt(t.aiCost || 0), aiCostTotal: this.fmt((t.aiCost || 0) * (t.aiMonths || 4)),
+      invoiceRows,
+      onClose: this.props.onClose || (() => {})
+    };
+  }
+}
+</script>
+</body>
+</html>
