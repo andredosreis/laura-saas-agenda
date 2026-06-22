@@ -42,6 +42,7 @@ export interface TenantDetail {
     preco: number;
     moeda: string;
     ciclo: 'mensal' | 'anual';
+    dataExpiracao?: string | null;
   };
   limites: TenantLimites;
   createdAt: string;
@@ -83,3 +84,24 @@ export interface SingleResponse<T> {
   success: boolean;
   data: T;
 }
+
+// F11 — payloads de mutação (mirroring src/modules/admin/adminSchemas.js)
+export interface CreateTenantInput {
+  nomeEmpresa: string;
+  slug?: string;
+  planoTipo?: PlanoTipo;
+  adminNome: string;
+  adminEmail: string;
+}
+
+export interface CreateTenantResult {
+  tenantId: string;
+  adminUserId: string;
+}
+
+export interface UpdatePlanoInput {
+  tipo?: PlanoTipo;
+  dataExpiracao?: string;
+}
+
+export type UpdateLimitesInput = Partial<TenantLimites>;
