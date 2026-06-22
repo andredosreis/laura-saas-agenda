@@ -6,7 +6,6 @@ import AuditLog from '../../models/AuditLog.js';
 import { getModels } from '../../models/registry.js';
 import { getTenantDBAdmin } from './getTenantDBAdmin.js';
 import { sendEmailVerificationEmail } from '../../services/emailService.js';
-import logger from '../../utils/logger.js';
 
 /**
  * GET /admin/tenants — lista todos os tenants.
@@ -53,7 +52,10 @@ export const obterTenant = async (req, res) => {
   }
 
   const [tenant, totalUsuarios] = await Promise.all([
-    Tenant.findById(id),
+    // Excluir credenciais WhatsApp — secrets que nunca devem chegar ao cliente.
+    Tenant.findById(id).select(
+      '-whatsapp.instanceToken -whatsapp.zapiToken -whatsapp.zapiClientToken'
+    ),
     User.countDocuments({ tenantId: id }),
   ]);
 
@@ -170,22 +172,17 @@ export const criarTenant = async (req, { session }) => {
   // 7. Configurar status 201 no response
   req.res.status(201);
 
-  // 8. Agendar o envio do e-mail de verificação fora da transação
-  setImmediate(async () => {
-    try {
-      await sendEmailVerificationEmail(adminEmail, verificationToken, adminNome);
-    } catch (emailError) {
-      logger.error('Aviso: Falha ao enviar email de verificação:', emailError.message);
-    }
-  });
-
-  // 9. Retornar dados estruturados para a resposta da API e logs de auditoria
+  // 8. Retornar dados estruturados + side-effect pós-commit.
+  // O envio do email NÃO corre dentro da transação (withTransaction pode
+  // re-executar este callback em erros transientes — enviaria emails duplicados).
+  // adminMutation dispara `afterCommit` uma só vez, depois do commit.
   return {
     data: {
       tenantId: tenant._id,
       adminUserId: user._id,
     },
     targetTenantId: tenant._id,
+    afterCommit: () => sendEmailVerificationEmail(adminEmail, verificationToken, adminNome),
     before: null,
     after: {
       tenant: {
