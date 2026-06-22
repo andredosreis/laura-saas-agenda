@@ -1,6 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap')
 layer(base);
 
+/* Painel Super-Admin (F10) — identidade visual própria, ver .claude/.../F10 */
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap')
+layer(base);
+
 @import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
@@ -46,6 +50,8 @@ layer(base);
   --color-error: #ef4444;
 
   --font-sans: Inter, system-ui, sans-serif;
+  --font-console: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-console-mono: 'IBM Plex Mono', monospace;
 
   --backdrop-blur-xs: 2px;
 

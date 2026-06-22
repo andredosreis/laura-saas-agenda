@@ -75,7 +75,7 @@
       "name": "Panel Frontend — List, Detail & Usage",
       "priority": 2,
       "wave": 3,
-      "status": "pending",
+      "status": "Implemented",
       "spec": "docs/F10-frontend-list-detail-usage/"
     },
     "F11": {

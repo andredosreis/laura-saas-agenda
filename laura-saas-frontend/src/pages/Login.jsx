@@ -41,7 +41,12 @@ function Login() {
             const result = await login(data.email, data.password);
 
             if (result.success) {
-                navigate(from, { replace: true });
+                // Superadmin sem destino explícito (acesso directo a /login) vai para a consola
+                if (result.user?.role === 'superadmin' && from === '/dashboard') {
+                    navigate('/admin/tenants', { replace: true });
+                } else {
+                    navigate(from, { replace: true });
+                }
             } else {
                 setError(result.error || 'Erro ao fazer login');
             }

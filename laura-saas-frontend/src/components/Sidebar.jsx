@@ -72,10 +72,9 @@ function Sidebar() {
 
   const closeMobileMenu = () => setIsMobileOpen(false);
 
-  // Helper: verifica se o user tem uma permissão específica.
-  // superadmin/admin têm acesso a tudo (bypass).
   const hasPermissao = (key) => {
     if (!user) return false;
+    if (key === 'superadmin_only') return user.role === 'superadmin';
     if (user.role === 'superadmin' || user.role === 'admin') return true;
     return Boolean(user?.permissoes?.[key]);
   };
@@ -125,6 +124,14 @@ function Sidebar() {
         { to: "/pacotes", text: "Serviços", icon: Package, perm: 'verPacotes' },
         // Configurações: só admin/superadmin (gerem colaboradores) — gated por editarConfiguracoes
         { to: "/configuracoes", text: "Configurações", icon: Settings, perm: 'editarConfiguracoes' }
+      ]
+    },
+    {
+      id: 'superadmin',
+      label: 'PAINEL MARCAÍ',
+      items: [
+        { to: "/admin/tenants", text: "Tenants", icon: LayoutDashboard, perm: 'superadmin_only' },
+        { to: "/admin/audit", text: "Audit Logs", icon: ListChecks, perm: 'superadmin_only' }
       ]
     }
   ];

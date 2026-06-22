@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import InstallPrompt from './components/InstallPrompt';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
+import { ConsoleChrome } from './components/admin/ConsoleChrome';
 
 // Login eager: rota de entrada, precisa pintar imediatamente
 import Login from './pages/Login';
@@ -46,6 +47,11 @@ const LeadsKanban = lazy(() => import('./pages/LeadsKanban'));
 const LeadDetalhe = lazy(() => import('./pages/LeadDetalhe'));
 const Conversas = lazy(() => import('./pages/Conversas'));
 
+// Super Admin Pages (F10)
+const TenantsListPage = lazy(() => import('./pages/admin/TenantsListPage'));
+const TenantDetailPage = lazy(() => import('./pages/admin/TenantDetailPage'));
+const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
+
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <ProtectedRoute>
@@ -58,6 +64,22 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
       <Sidebar />
       <main id="main-content" className="lg:pl-72">
         {children}
+      </main>
+    </ProtectedRoute>
+  );
+};
+
+const AdminLayout = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <ProtectedRoute allowedRoles={['superadmin']}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:bg-white focus:text-slate-900 focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+      >
+        Saltar para o conteúdo principal
+      </a>
+      <main id="main-content">
+        <ConsoleChrome>{children}</ConsoleChrome>
       </main>
     </ProtectedRoute>
   );
@@ -166,6 +188,17 @@ const App = () => {
             {/* ⚙️ Configurações */}
             <Route path="/configuracoes" element={
               <ProtectedLayout><Configuracoes /></ProtectedLayout>
+            } />
+
+            {/* 👑 Painel Super-Admin (F10) */}
+            <Route path="/admin/tenants" element={
+              <AdminLayout><TenantsListPage /></AdminLayout>
+            } />
+            <Route path="/admin/tenants/:id" element={
+              <AdminLayout><TenantDetailPage /></AdminLayout>
+            } />
+            <Route path="/admin/audit" element={
+              <AdminLayout><AuditLogPage /></AdminLayout>
             } />
           </Routes>
           </Suspense>
