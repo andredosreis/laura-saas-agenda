@@ -66,3 +66,17 @@ export const atualizarLimitesSchema = z
   .refine((d) => Object.values(d).some((v) => v !== undefined), {
     message: 'Pelo menos um campo de limites/flags é obrigatório',
   });
+
+// ---------------------------------------------------------------------------
+// F08 — Suspend / Reactivate Tenant
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /admin/tenants/:id/suspender
+ * Body: { motivo? } — razão opcional da suspensão (auditada em metadata).
+ * Reactivar não precisa de schema (body vazio).
+ */
+export const suspenderTenantSchema = z
+  .object({
+    motivo: z.string().trim().max(500, 'Motivo deve ter no máximo 500 caracteres').optional(),
+  });

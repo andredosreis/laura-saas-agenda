@@ -59,8 +59,9 @@
       "name": "Suspend / Reactivate Tenant",
       "priority": 1,
       "wave": 3,
-      "status": "pending",
-      "spec": "docs/F08-suspend-reactivate-tenant/"
+      "status": "done",
+      "spec": "docs/F08-suspend-reactivate-tenant/",
+      "eval_report": "docs/F08-suspend-reactivate-tenant/eval-report.md"
     },
     "F09": {
       "name": "Audit Log Viewer",
