@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    @keyframes mc-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes mc-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  </style>
+</helmet>
+
+<div style="min-height:100vh;background:#211f1c;padding:38px 34px 90px;font-family:'Hanken Grotesk',system-ui,sans-serif">
+
+  <!-- ===== GALLERY HEADER ===== -->
+  <div style="max-width:1160px;margin:0 auto 8px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:32px;height:32px;background:#f4f1ec;border-radius:4px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:13px;height:13px;border-radius:50%;background:#bd5d33"></div></div>
+      <div>
+        <div style="color:#f4f1ec;font-size:19px;font-weight:600;letter-spacing:-.01em">Marcaí &middot; Consola de Operador</div>
+        <div style="color:#8f877d;font-size:13px;margin-top:2px">Back-office multi-tenant &middot; visão do fundador</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8f877d;letter-spacing:.06em">Clique numa linha para abrir o detalhe &rarr;</span>
+    </div>
+  </div>
+
+  <!-- ===== VARIAÇÃO A — DESKTOP ===== -->
+  <div style="max-width:1160px;margin:44px auto 0">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#bd5d33;font-weight:600">Variação A</span>
+      <span style="color:#c8c0b6;font-size:13.5px">Lista completa &middot; desktop</span>
+      <div style="flex:1;height:1px;background:#383531"></div>
+    </div>
+
+    <div style="background:#f4f1ec;border:1px solid #34302b;border-radius:5px;overflow:hidden">
+      <!-- chrome -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 22px;background:#fbf9f6;border-bottom:1px solid #e8e2da">
+        <div style="display:flex;align-items:center;gap:11px">
+          <div style="width:26px;height:26px;background:#221f1d;border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:11px;height:11px;border-radius:50%;background:#bd5d33"></div></div>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-.01em">Marcaí</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#a59d93;border-left:1px solid #ddd5ca;padding-left:11px">Consola</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6f6862">Junho 2026</span>
+          <div style="width:30px;height:30px;border-radius:50%;background:#221f1d;color:#f4f1ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">MF</div>
+        </div>
+      </div>
+
+      <div style="padding:22px 22px 24px">
+        <!-- KPI row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:16px 17px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">MRR</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:29px;font-weight:600;margin-top:8px;letter-spacing:-.01em">{{ kpiMrr }}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:#3f6b3c"><span style="font-family:'IBM Plex Mono',monospace">&#9650; {{ kpiDelta }}</span><span style="color:#9a938c">vs mês anterior</span></div>
+          </div>
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:16px 17px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Tenants activos</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:29px;font-weight:600;margin-top:8px">{{ kpiActivos }}<span style="font-size:18px;color:#b3aba1">/{{ kpiTotal }}</span></div>
+            <div style="margin-top:6px;font-size:12.5px;color:#9a938c">subscrições recorrentes</div>
+          </div>
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:16px 17px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Em trial</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:29px;font-weight:600;margin-top:8px">{{ kpiTrials }}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:#8a610f"><span style="width:7px;height:7px;border-radius:1px;background:#b5862f"></span>1 expira em 3 dias</div>
+          </div>
+          <div style="background:#ffffff;border:1px solid #e8cdba;border-radius:3px;padding:16px 17px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#a14d27">Valor por receber</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:29px;font-weight:600;margin-top:8px;color:#a14d27">{{ kpiPorReceber }}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:#9e2f22"><span style="width:7px;height:7px;border-radius:1px;background:#9e2f22"></span>{{ kpiOverdue }} tenants em atraso</div>
+          </div>
+        </div>
+
+        <!-- plan dist + quick actions -->
+        <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-top:14px">
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:16px 18px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Distribuição por plano</span>
+              <span style="font-size:12.5px;color:#9a938c">{{ kpiTotal }} tenants</span>
+            </div>
+            <div style="display:flex;height:14px;border-radius:2px;overflow:hidden;margin-top:13px;gap:2px">
+              <div style="width:31%;background:#d2cabf"></div>
+              <div style="width:44%;background:#221f1d"></div>
+              <div style="width:25%;background:#bd5d33"></div>
+            </div>
+            <div style="display:flex;gap:22px;margin-top:13px">
+              <span style="display:flex;align-items:center;gap:7px;font-size:13px;color:#534c45"><span style="width:9px;height:9px;background:#d2cabf;border-radius:1px"></span>Básico &middot; <b style="font-family:'IBM Plex Mono',monospace">{{ kpiBasico }}</b></span>
+              <span style="display:flex;align-items:center;gap:7px;font-size:13px;color:#534c45"><span style="width:9px;height:9px;background:#221f1d;border-radius:1px"></span>Pro &middot; <b style="font-family:'IBM Plex Mono',monospace">{{ kpiPro }}</b></span>
+              <span style="display:flex;align-items:center;gap:7px;font-size:13px;color:#534c45"><span style="width:9px;height:9px;background:#bd5d33;border-radius:1px"></span>Elite &middot; <b style="font-family:'IBM Plex Mono',monospace">{{ kpiElite }}</b></span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button style-hover="background:#f7e7e2" style="display:flex;align-items:center;justify-content:space-between;flex:1;background:#ffffff;border:1px solid #e0c4b9;border-radius:3px;padding:0 16px;font-family:inherit;font-size:14px;color:#9e2f22;font-weight:600;cursor:pointer;transition:background .15s"><span style="display:flex;align-items:center;gap:9px"><span style="width:8px;height:8px;border-radius:1px;background:#9e2f22"></span>Ver quem não pagou</span><span style="font-family:'IBM Plex Mono',monospace">{{ kpiOverdue }}</span></button>
+            <button style-hover="background:#f6efde" style="display:flex;align-items:center;justify-content:space-between;flex:1;background:#ffffff;border:1px solid #e2d4af;border-radius:3px;padding:0 16px;font-family:inherit;font-size:14px;color:#8a610f;font-weight:600;cursor:pointer;transition:background .15s"><span style="display:flex;align-items:center;gap:9px"><span style="width:8px;height:8px;border-radius:1px;background:#b5862f"></span>Trials a expirar</span><span style="font-family:'IBM Plex Mono',monospace">1</span></button>
+          </div>
+        </div>
+
+        <!-- table -->
+        <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;margin-top:14px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:2.5fr 1fr 0.75fr 0.8fr 0.95fr 1.15fr 1.1fr;gap:12px;padding:11px 18px;background:#faf8f4;border-bottom:1px solid #e8e2da;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9a938c">
+            <span>Negócio</span><span>Plano</span><span style="text-align:right">Leads</span><span style="text-align:right">Agend.</span><span style="text-align:right">Custo IA</span><span>Estado</span><span>Renovação</span>
+          </div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+            <div onClick="{{ r.open }}" style-hover="background:#faf6f1" style="display:grid;grid-template-columns:2.5fr 1fr 0.75fr 0.8fr 0.95fr 1.15fr 1.1fr;gap:12px;padding:13px 18px;border-bottom:1px solid #f1ece4;align-items:center;cursor:pointer;transition:background .12s">
+              <div style="display:flex;align-items:center;gap:11px;min-width:0">
+                <div style="width:34px;height:34px;border-radius:50%;background:#f0ddcf;color:#a14d27;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;flex:none">{{ r.initials }}</div>
+                <div style="min-width:0">
+                  <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+                  <div style="font-size:12px;color:#8a827a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.owner }}</div>
+                </div>
+              </div>
+              <div><span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:2px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;background:{{ r.planBg }};color:{{ r.planColor }}">{{ r.plan }}</span></div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:14px">{{ r.leads }}</div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:14px">{{ r.bookings }}</div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:#a14d27">{{ r.aiCostStr }}</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 9px;border-radius:2px;font-size:12.5px;font-weight:600;background:{{ r.statusBg }};color:{{ r.statusColor }}"><span style="width:7px;height:7px;border-radius:1px;background:{{ r.statusColor }}"></span>{{ r.statusLabel }}</span></div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ r.renewalColor }}">{{ r.renewalShort }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VARIAÇÃO B — DESKTOP ===== -->
+  <div style="max-width:1160px;margin:56px auto 0">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#bd5d33;font-weight:600">Variação B</span>
+      <span style="color:#c8c0b6;font-size:13.5px">Triagem por estado &middot; desktop</span>
+      <div style="flex:1;height:1px;background:#383531"></div>
+    </div>
+
+    <div style="background:#f4f1ec;border:1px solid #34302b;border-radius:5px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 22px;background:#fbf9f6;border-bottom:1px solid #e8e2da">
+        <div style="display:flex;align-items:center;gap:11px">
+          <div style="width:26px;height:26px;background:#221f1d;border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:11px;height:11px;border-radius:50%;background:#bd5d33"></div></div>
+          <span style="font-size:16px;font-weight:600;letter-spacing:-.01em">Marcaí</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#a59d93;border-left:1px solid #ddd5ca;padding-left:11px">Triagem</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6f6862">Junho 2026</span>
+          <div style="width:30px;height:30px;border-radius:50%;background:#221f1d;color:#f4f1ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">MF</div>
+        </div>
+      </div>
+
+      <div style="padding:22px 22px 24px">
+        <!-- KPI strip (condensed) -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:13px 16px;display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">MRR</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:3px">{{ kpiMrr }}</div></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#3f6b3c">&#9650; {{ kpiDelta }}</span>
+          </div>
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:13px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Activos</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:3px">{{ kpiActivos }}<span style="font-size:15px;color:#b3aba1">/{{ kpiTotal }}</span></div></div>
+          <div style="background:#ffffff;border:1px solid #e8e2da;border-radius:3px;padding:13px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a938c">Trials</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:3px">{{ kpiTrials }}</div></div>
+          <div style="background:#fbf1ea;border:1px solid #e8cdba;border-radius:3px;padding:13px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#a14d27">Por receber</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:3px;color:#a14d27">{{ kpiPorReceber }}</div></div>
+        </div>
+
+        <!-- triage board -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+
+          <!-- column: atraso -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px 11px">
+              <span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:#9e2f22"><span style="width:9px;height:9px;border-radius:1px;background:#b23a2c"></span>A precisar de atenção</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#9e2f22;background:#f4e0db;padding:2px 7px;border-radius:2px">{{ kpiOverdue }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ groupAtraso }}" as="r" hint-placeholder-count="4">
+                <dc-import name="MarcaiCard" r="{{ r }}" accent="#b23a2c" hint-size="100%,118px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- column: trial -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px 11px">
+              <span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:#8a610f"><span style="width:9px;height:9px;border-radius:1px;background:#b5862f"></span>Trials a expirar</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8a610f;background:#f4ebd7;padding:2px 7px;border-radius:2px">{{ kpiTrials }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ groupTrial }}" as="r" hint-placeholder-count="3">
+                <dc-import name="MarcaiCard" r="{{ r }}" accent="#b5862f" hint-size="100%,118px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- column: pago -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px 11px">
+              <span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:#3f6b3c"><span style="width:9px;height:9px;border-radius:1px;background:#5b7f57"></span>Saudáveis</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#3f6b3c;background:#e7eee4;padding:2px 7px;border-radius:2px">{{ kpiActivosPago }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ groupPago }}" as="r" hint-placeholder-count="6">
+                <dc-import name="MarcaiCard" r="{{ r }}" accent="#5b7f57" hint-size="100%,118px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MOBILE ===== -->
+  <div style="max-width:1160px;margin:56px auto 0">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#bd5d33;font-weight:600">Mobile</span>
+      <span style="color:#c8c0b6;font-size:13.5px">Vista de telemóvel &middot; A (lista), B (triagem) e detalhe</span>
+      <div style="flex:1;height:1px;background:#383531"></div>
+    </div>
+
+    <div style="display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start">
+
+      <!-- phone A -->
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8f877d;margin-bottom:10px">A &middot; Lista</div>
+        <div style="width:330px;background:#f4f1ec;border:8px solid #161412;border-radius:34px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.35)">
+          <div style="height:30px;background:#fbf9f6;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:5px;border-radius:3px;background:#d6cfc5"></div></div>
+          <div style="padding:14px 14px 22px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;background:#221f1d;border-radius:3px;display:flex;align-items:center;justify-content:center"><div style="width:9px;height:9px;border-radius:50%;background:#bd5d33"></div></div><span style="font-size:15px;font-weight:600">Marcaí</span></div>
+              <div style="width:26px;height:26px;border-radius:50%;background:#221f1d;color:#f4f1ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600">MF</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:#fff;border:1px solid #e8e2da;border-radius:3px;padding:11px 12px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#9a938c">MRR</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;margin-top:4px">{{ kpiMrr }}</div><div style="font-size:11px;color:#3f6b3c;margin-top:2px">&#9650; {{ kpiDelta }}</div></div>
+              <div style="background:#fbf1ea;border:1px solid #e8cdba;border-radius:3px;padding:11px 12px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#a14d27">Por receber</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;margin-top:4px;color:#a14d27">{{ kpiPorReceber }}</div><div style="font-size:11px;color:#9e2f22;margin-top:2px">{{ kpiOverdue }} em atraso</div></div>
+              <div style="background:#fff;border:1px solid #e8e2da;border-radius:3px;padding:11px 12px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#9a938c">Activos</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;margin-top:4px">{{ kpiActivos }}<span style="font-size:13px;color:#b3aba1">/{{ kpiTotal }}</span></div></div>
+              <div style="background:#fff;border:1px solid #e8e2da;border-radius:3px;padding:11px 12px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#9a938c">Trials</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;margin-top:4px">{{ kpiTrials }}</div></div>
+            </div>
+            <button style="width:100%;margin-top:10px;display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e0c4b9;border-radius:3px;padding:11px 14px;font-family:inherit;font-size:13px;color:#9e2f22;font-weight:600;cursor:pointer"><span style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:1px;background:#9e2f22"></span>Ver quem não pagou</span><span style="font-family:'IBM Plex Mono',monospace">{{ kpiOverdue }}</span></button>
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <dc-import name="MarcaiMobileRow" r="{{ r }}" hint-size="100%,96px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- phone B -->
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8f877d;margin-bottom:10px">B &middot; Triagem</div>
+        <div style="width:330px;background:#f4f1ec;border:8px solid #161412;border-radius:34px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.35)">
+          <div style="height:30px;background:#fbf9f6;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:5px;border-radius:3px;background:#d6cfc5"></div></div>
+          <div style="padding:14px 14px 22px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;background:#221f1d;border-radius:3px;display:flex;align-items:center;justify-content:center"><div style="width:9px;height:9px;border-radius:50%;background:#bd5d33"></div></div><span style="font-size:15px;font-weight:600">Triagem</span></div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6862">Junho</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin:2px 0 9px"><span style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#9e2f22"><span style="width:8px;height:8px;border-radius:1px;background:#b23a2c"></span>A precisar de atenção</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9e2f22;background:#f4e0db;padding:1px 6px;border-radius:2px">{{ kpiOverdue }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ groupAtraso }}" as="r" hint-placeholder-count="4"><dc-import name="MarcaiMobileRow" r="{{ r }}" accent="#b23a2c" hint-size="100%,96px"></dc-import></sc-for>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin:16px 0 9px"><span style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#8a610f"><span style="width:8px;height:8px;border-radius:1px;background:#b5862f"></span>Trials a expirar</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a610f;background:#f4ebd7;padding:1px 6px;border-radius:2px">{{ kpiTrials }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ groupTrial }}" as="r" hint-placeholder-count="3"><dc-import name="MarcaiMobileRow" r="{{ r }}" accent="#b5862f" hint-size="100%,96px"></dc-import></sc-for>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin:16px 0 9px"><span style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#3f6b3c"><span style="width:8px;height:8px;border-radius:1px;background:#5b7f57"></span>Saudáveis</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#3f6b3c;background:#e7eee4;padding:1px 6px;border-radius:2px">{{ kpiActivosPago }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ groupPago }}" as="r" hint-placeholder-count="3"><dc-import name="MarcaiMobileRow" r="{{ r }}" accent="#5b7f57" hint-size="100%,96px"></dc-import></sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- phone detail sheet -->
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8f877d;margin-bottom:10px">Detalhe &middot; sheet</div>
+        <div style="width:330px;height:686px;background:#fff;border:8px solid #161412;border-radius:34px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.35)">
+          <dc-import name="TenantDetail" tenant="{{ sampleTenant }}" on-close="{{ noop }}" hint-size="100%,100%"></dc-import>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== DETAIL DESKTOP FRAME ===== -->
+  <div style="max-width:1160px;margin:56px auto 0">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#bd5d33;font-weight:600">Detalhe</span>
+      <span style="color:#c8c0b6;font-size:13.5px">Drawer deslizante do tenant &middot; desktop</span>
+      <div style="flex:1;height:1px;background:#383531"></div>
+    </div>
+    <div style="width:462px;height:760px;background:#fff;border:1px solid #34302b;border-radius:5px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.3)">
+      <dc-import name="TenantDetail" tenant="{{ sampleTenant }}" on-close="{{ noop }}" hint-size="100%,100%"></dc-import>
+    </div>
+  </div>
+
+  <!-- ===== LIVE DRAWER OVERLAY ===== -->
+  <sc-if value="{{ openTenant }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDrawer }}" style="position:fixed;inset:0;background:rgba(24,21,18,.5);z-index:90;animation:mc-fade .2s ease"></div>
+    <div style="position:fixed;top:0;right:0;bottom:0;width:min(462px,100%);z-index:91;background:#fff;box-shadow:-14px 0 44px rgba(0,0,0,.3);animation:mc-slide .3s cubic-bezier(.2,.8,.2,1)">
+      <dc-import name="TenantDetail" tenant="{{ openTenant }}" on-close="{{ closeDrawer }}" hint-size="100%,100%"></dc-import>
+    </div>
+  </sc-if>
+
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" fill="#211f1c"/>
+      <rect x="30" y="30" width="40" height="40" rx="6" fill="#f4f1ec"/>
+      <circle cx="50" cy="50" r="11" fill="#bd5d33"/>
+    </svg>
+  </template>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#bd5d33&quot;}}">
+class Component extends DCLogic {
+  fmt(n) { return '\u20ac' + Number(n).toFixed(2).replace('.', ','); }
+  eur(n) { return '\u20ac' + n; }
+
+  get tenants() {
+    return [
+      { id: 1, name: 'Clínica Serena', owner: 'Ana Marques', initials: 'AM', plan: 'Pro', price: 35, status: 'Pago', leads: 48, bookings: 31, aiCost: 5.20, conversion: 42, aiBookings: 19, manualBookings: 12, joined: 'mar 2025', renewal: '28 jun', leadSeries: [12, 18, 16, 22, 25, 24, 29, 33] },
+      { id: 2, name: 'Estúdio Lumen', owner: 'Beatriz Costa', initials: 'BC', plan: 'Elite', price: 60, status: 'Pago', leads: 96, bookings: 64, aiCost: 9.40, conversion: 38, aiBookings: 41, manualBookings: 23, joined: 'jan 2025', renewal: '02 jul', leadSeries: [30, 34, 41, 38, 47, 52, 58, 61] },
+      { id: 3, name: 'Fisio Atlântico', owner: 'Carlos Pinto', initials: 'CP', plan: 'Pro', price: 35, status: 'Atraso', leads: 34, bookings: 19, aiCost: 4.10, conversion: 29, aiBookings: 9, manualBookings: 10, joined: 'ago 2025', renewal: '02 jun', leadSeries: [20, 18, 22, 17, 21, 16, 19, 15] },
+      { id: 4, name: 'Bem-Estar Aurora', owner: 'Diana Sousa', initials: 'DS', plan: 'Básico', price: 15, status: 'Trial', leads: 11, bookings: 6, aiCost: 1.60, conversion: 22, aiBookings: 2, manualBookings: 4, joined: 'jun 2026', trialDaysLeft: 3, leadSeries: [0, 2, 4, 5, 7, 9, 10, 11] },
+      { id: 5, name: 'NutriVida', owner: 'Eduardo Faria', initials: 'EF', plan: 'Pro', price: 35, status: 'Pago', leads: 57, bookings: 38, aiCost: 6.30, conversion: 44, aiBookings: 25, manualBookings: 13, joined: 'fev 2025', renewal: '05 jul', leadSeries: [18, 22, 27, 31, 29, 34, 39, 44] },
+      { id: 6, name: 'Pele & Pose', owner: 'Filipa Reis', initials: 'FR', plan: 'Elite', price: 60, status: 'Pago', leads: 82, bookings: 55, aiCost: 8.10, conversion: 40, aiBookings: 36, manualBookings: 19, joined: 'nov 2024', renewal: '12 jul', leadSeries: [40, 38, 44, 49, 46, 53, 57, 60] },
+      { id: 7, name: 'Corpo Pleno', owner: 'Gonçalo Dias', initials: 'GD', plan: 'Básico', price: 15, status: 'Atraso', leads: 19, bookings: 9, aiCost: 2.30, conversion: 24, aiBookings: 3, manualBookings: 6, joined: 'set 2025', renewal: '29 mai', leadSeries: [10, 12, 9, 11, 8, 10, 7, 9] },
+      { id: 8, name: 'Equilíbrio Studio', owner: 'Helena Matos', initials: 'HM', plan: 'Pro', price: 35, status: 'Trial', leads: 23, bookings: 14, aiCost: 3.00, conversion: 31, aiBookings: 7, manualBookings: 7, joined: 'jun 2026', trialDaysLeft: 9, leadSeries: [3, 5, 8, 10, 13, 16, 19, 23] },
+      { id: 9, name: 'Toque Essencial', owner: 'Inês Carvalho', initials: 'IC', plan: 'Básico', price: 15, status: 'Pago', leads: 28, bookings: 17, aiCost: 2.80, conversion: 36, aiBookings: 8, manualBookings: 9, joined: 'abr 2025', renewal: '20 jun', leadSeries: [9, 11, 14, 12, 16, 18, 17, 20] },
+      { id: 10, name: 'Movimento Vital', owner: 'João Nunes', initials: 'JN', plan: 'Elite', price: 60, status: 'Pago', leads: 71, bookings: 49, aiCost: 7.60, conversion: 41, aiBookings: 31, manualBookings: 18, joined: 'dez 2024', renewal: '08 jul', leadSeries: [28, 33, 30, 37, 42, 40, 46, 51] },
+      { id: 11, name: 'Derma Pura', owner: 'Sofia Lopes', initials: 'SL', plan: 'Pro', price: 35, status: 'Atraso', leads: 41, bookings: 23, aiCost: 4.90, conversion: 33, aiBookings: 12, manualBookings: 11, joined: 'jul 2025', renewal: '31 mai', leadSeries: [22, 25, 21, 24, 19, 22, 18, 20] },
+      { id: 12, name: 'Recomeço Fisioterapia', owner: 'Tiago Ramos', initials: 'TR', plan: 'Pro', price: 35, status: 'Pago', leads: 53, bookings: 35, aiCost: 5.70, conversion: 39, aiBookings: 21, manualBookings: 14, joined: 'mar 2025', renewal: '26 jun', leadSeries: [16, 20, 24, 22, 28, 31, 34, 38] },
+      { id: 13, name: 'Glow Estética', owner: 'Mariana Antunes', initials: 'MA', plan: 'Básico', price: 15, status: 'Trial', leads: 14, bookings: 8, aiCost: 1.90, conversion: 26, aiBookings: 3, manualBookings: 5, joined: 'jun 2026', trialDaysLeft: 5, leadSeries: [1, 3, 4, 6, 8, 10, 12, 14] },
+      { id: 14, name: 'Núcleo Saúde', owner: 'Pedro Tavares', initials: 'PT', plan: 'Elite', price: 60, status: 'Pago', leads: 88, bookings: 59, aiCost: 8.70, conversion: 43, aiBookings: 38, manualBookings: 21, joined: 'out 2024', renewal: '15 jul', leadSeries: [35, 40, 44, 48, 45, 52, 56, 62] },
+      { id: 15, name: 'Vita Nutrição', owner: 'Rita Fernandes', initials: 'RF', plan: 'Básico', price: 15, status: 'Pago', leads: 31, bookings: 19, aiCost: 3.10, conversion: 37, aiBookings: 9, manualBookings: 10, joined: 'mai 2025', renewal: '23 jun', leadSeries: [11, 13, 12, 16, 15, 18, 20, 22] },
+      { id: 16, name: 'Zen Fisio', owner: 'Bruno Almeida', initials: 'BA', plan: 'Pro', price: 35, status: 'Atraso', leads: 37, bookings: 21, aiCost: 4.50, conversion: 30, aiBookings: 10, manualBookings: 11, joined: 'ago 2025', renewal: '28 mai', leadSeries: [21, 19, 23, 20, 18, 21, 17, 19] }
+    ];
+  }
+
+  buildInvoices(t) {
+    if (t.status === 'Trial') {
+      return [{ date: '1ª fatura ao fim do trial', amount: t.price, status: 'Pendente' }];
+    }
+    if (t.status === 'Atraso') {
+      return [
+        { date: 'jun 2026', amount: t.price, status: 'Em atraso' },
+        { date: 'mai 2026', amount: t.price, status: 'Pago' },
+        { date: 'abr 2026', amount: t.price, status: 'Pago' }
+      ];
+    }
+    return [
+      { date: 'mai 2026', amount: t.price, status: 'Pago' },
+      { date: 'abr 2026', amount: t.price, status: 'Pago' },
+      { date: 'mar 2026', amount: t.price, status: 'Pago' }
+    ];
+  }
+
+  decorate(t) {
+    const statusMap = {
+      'Pago':   { bg: '#e7eee4', color: '#3f6b3c', label: 'Pago' },
+      'Trial':  { bg: '#f4ebd7', color: '#8a610f', label: 'Trial' },
+      'Atraso': { bg: '#f4e0db', color: '#9e2f22', label: 'Em atraso' }
+    };
+    const planMap = {
+      'Básico': { bg: '#efece7', color: '#6f6862' },
+      'Pro':    { bg: '#2a2723', color: '#f4f1ec' },
+      'Elite':  { bg: '#f0ddcf', color: '#a14d27' }
+    };
+    const s = statusMap[t.status], p = planMap[t.plan];
+    let renewalShort, renewalColor;
+    if (t.status === 'Trial') { renewalShort = 'expira em ' + t.trialDaysLeft + 'd'; renewalColor = '#8a610f'; }
+    else if (t.status === 'Atraso') { renewalShort = 'venceu ' + t.renewal; renewalColor = '#9e2f22'; }
+    else { renewalShort = t.renewal; renewalColor = '#8a827a'; }
+
+    return Object.assign({}, t, {
+      invoices: this.buildInvoices(t),
+      statusBg: s.bg, statusColor: s.color, statusLabel: s.label,
+      planBg: p.bg, planColor: p.color,
+      aiCostStr: this.fmt(t.aiCost),
+      renewalShort, renewalColor,
+      open: () => this.setState({ openTenant: this.decorate(t) })
+    });
+  }
+
+  renderVals() {
+    const rows = this.tenants.map(t => this.decorate(t));
+    const by = st => rows.filter(r => r.status === st);
+    const active = this.tenants.filter(t => t.status !== 'Trial');
+    const mrr = active.reduce((a, t) => a + t.price, 0);
+    const porReceber = this.tenants.filter(t => t.status === 'Atraso').reduce((a, t) => a + t.price, 0);
+    const count = pl => this.tenants.filter(t => t.plan === pl).length;
+
+    return {
+      rows,
+      groupAtraso: by('Atraso'),
+      groupTrial: by('Trial'),
+      groupPago: by('Pago'),
+      sampleTenant: this.decorate(this.tenants[2]),
+      kpiMrr: this.eur(mrr),
+      kpiDelta: '6,4%',
+      kpiActivos: active.length,
+      kpiActivosPago: by('Pago').length,
+      kpiTotal: this.tenants.length,
+      kpiTrials: by('Trial').length,
+      kpiPorReceber: this.eur(porReceber),
+      kpiOverdue: by('Atraso').length,
+      kpiBasico: count('Básico'),
+      kpiPro: count('Pro'),
+      kpiElite: count('Elite'),
+      openTenant: this.state.openTenant || null,
+      closeDrawer: () => this.setState({ openTenant: null }),
+      noop: () => {}
+    };
+  }
+}
+</script>
+</body>
+</html>
