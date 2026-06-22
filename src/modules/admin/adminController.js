@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import crypto from 'crypto';
 import Tenant from '../../models/Tenant.js';
 import User from '../../models/User.js';
+import AuditLog from '../../models/AuditLog.js';
 import { getModels } from '../../models/registry.js';
 import { getTenantDBAdmin } from './getTenantDBAdmin.js';
 import { sendEmailVerificationEmail } from '../../services/emailService.js';
@@ -377,4 +378,49 @@ export const reactivarTenant = async (req, { session }) => {
     before: { status: previousStatus },
     after: { status: 'ativo' },
   };
+};
+
+// ---------------------------------------------------------------------------
+// F09 — Audit Log Viewer
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /admin/audit — lista entradas de auditoria (F09).
+ *
+ * Filtros suportados: targetTenantId, actorUserId, action, status, from, to.
+ * Paginação: page, limit. Ordenação fixa: createdAt DESC.
+ */
+export const listarAudit = async (req, res) => {
+  const { targetTenantId, actorUserId, action, status, from, to } = req.query;
+  const page = Number(req.query.page);
+  const limit = Number(req.query.limit);
+
+  const filter = {};
+  if (targetTenantId) filter.targetTenantId = targetTenantId;
+  if (actorUserId) filter.actorUserId = actorUserId;
+  if (action) filter.action = action;
+  if (status) filter.status = status;
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from);
+    if (to) filter.createdAt.$lte = new Date(to);
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [data, total] = await Promise.all([
+    AuditLog.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    AuditLog.countDocuments(filter),
+  ]);
+
+  req.audit.set({ action: 'audit.view', metadata: { filters: req.query, returned: data.length } });
+
+  res.json({
+    success: true,
+    data,
+    pagination: { total, page, pages: Math.ceil(total / limit), limit },
+  });
 };

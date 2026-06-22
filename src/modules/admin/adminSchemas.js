@@ -34,7 +34,7 @@ export const criarTenantSchema = z
 export const atualizarPlanoSchema = z
   .object({
     tipo: z.enum(['basico', 'pro', 'elite', 'custom']).optional(),
-    dataExpiracao: z.string().datetime({ message: 'dataExpiracao deve ser uma data ISO válida' }).optional(),
+    dataExpiracao: z.iso.datetime({ message: 'dataExpiracao deve ser uma data ISO válida' }).optional(),
   })
   .refine((d) => d.tipo !== undefined || d.dataExpiracao !== undefined, {
     message: 'Pelo menos um campo (tipo ou dataExpiracao) é obrigatório',
@@ -80,3 +80,23 @@ export const suspenderTenantSchema = z
   .object({
     motivo: z.string().trim().max(500, 'Motivo deve ter no máximo 500 caracteres').optional(),
   });
+// ---------------------------------------------------------------------------
+// F09 — Audit Log Viewer
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /admin/audit
+ * Validate query parameters for filtering and pagination.
+ */
+const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'ID inválido');
+
+export const listarAuditSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  targetTenantId: objectId.optional(),
+  actorUserId: objectId.optional(),
+  action: z.string().optional(),
+  status: z.enum(['ok', 'denied', 'error']).optional(),
+  from: z.iso.datetime({ message: 'from deve ser uma data ISO válida' }).optional(),
+  to: z.iso.datetime({ message: 'to deve ser uma data ISO válida' }).optional(),
+});

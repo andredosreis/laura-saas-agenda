@@ -12,6 +12,7 @@ scripts/
 │   └── fix-subscriptions.js
 └── tools/                # Utilitários de configuração e teste
     ├── generate-vapid.js
+    ├── seedSuperAdmin.js
     ├── test-notification.js
     └── test-push.js
 ```
@@ -50,6 +51,15 @@ Gera um par de chaves VAPID para Web Push. Executar uma vez durante o setup inic
 
 ```bash
 node scripts/tools/generate-vapid.js
+```
+
+### `seedSuperAdmin.js`
+Cria (ou actualiza a password de) um utilizador `role: 'superadmin'`, sem `tenantId`, para acesso ao painel `/admin` (F10). A password vem de argumento CLI ou de env var — nunca hardcoded.
+
+```bash
+SUPERADMIN_EMAIL=... SUPERADMIN_PASSWORD=... node scripts/tools/seedSuperAdmin.js
+# ou
+node scripts/tools/seedSuperAdmin.js email@marcai.pt "Password123!" "Nome"
 ```
 
 ### `test-notification.js`

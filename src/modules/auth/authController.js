@@ -60,6 +60,21 @@ const generateRefreshToken = (user) => {
     return token;
 };
 
+/**
+ * Tenant virtual do superadmin — não pertence a nenhuma empresa real
+ * (User.tenantId é opcional para role==='superadmin').
+ */
+const getSuperadminMockTenant = () => ({
+    _id: 'superadmin_tenant_id',
+    nome: 'Painel Marcaí',
+    slug: 'admin',
+    plano: { tipo: 'elite', status: 'ativo' },
+    limites: {},
+    configuracoes: {},
+    diasRestantesTrial: 0,
+    ativo: true
+});
+
 // =============================================
 // CONTROLLERS
 // =============================================
@@ -268,22 +283,27 @@ export const login = async (req, res) => {
         }
 
         // Buscar tenant
-        const tenant = await Tenant.findById(user.tenantId);
+        let tenant = null;
+        if (user.role !== 'superadmin') {
+            tenant = await Tenant.findById(user.tenantId);
 
-        if (!tenant || !tenant.ativo) {
-            return res.status(403).json({
-                success: false,
-                error: 'Empresa não encontrada ou desativada'
-            });
-        }
+            if (!tenant || !tenant.ativo) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Empresa não encontrada ou desativada'
+                });
+            }
 
-        // Verificar status do plano
-        if (tenant.plano.status === 'cancelado' || tenant.plano.status === 'expirado') {
-            return res.status(403).json({
-                success: false,
-                error: 'Plano expirado. Por favor, renove sua assinatura.',
-                planoStatus: tenant.plano.status
-            });
+            // Verificar status do plano
+            if (tenant.plano.status === 'cancelado' || tenant.plano.status === 'expirado') {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Plano expirado. Por favor, renove sua assinatura.',
+                    planoStatus: tenant.plano.status
+                });
+            }
+        } else {
+            tenant = getSuperadminMockTenant();
         }
 
         // Resetar tentativas de login e atualizar último login
@@ -388,13 +408,18 @@ export const refreshToken = async (req, res) => {
         }
 
         // Buscar tenant
-        const tenant = await Tenant.findById(user.tenantId);
+        let tenant = null;
+        if (user.role !== 'superadmin') {
+            tenant = await Tenant.findById(user.tenantId);
 
-        if (!tenant || !tenant.ativo) {
-            return res.status(403).json({
-                success: false,
-                error: 'Empresa não encontrada ou desativada'
-            });
+            if (!tenant || !tenant.ativo) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Empresa não encontrada ou desativada'
+                });
+            }
+        } else {
+            tenant = getSuperadminMockTenant();
         }
 
         // Gerar novos tokens
@@ -496,13 +521,24 @@ export const logoutAll = async (req, res) => {
 export const me = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
-        const tenant = await Tenant.findById(req.user.tenantId);
-
-        if (!user || !tenant) {
+        if (!user) {
             return res.status(404).json({
                 success: false,
-                error: 'Usuário ou empresa não encontrados'
+                error: 'Usuário não encontrado'
             });
+        }
+
+        let tenant;
+        if (user.role === 'superadmin') {
+            tenant = getSuperadminMockTenant();
+        } else {
+            tenant = await Tenant.findById(req.user.tenantId);
+            if (!tenant) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Usuário ou empresa não encontrados'
+                });
+            }
         }
 
         res.json({

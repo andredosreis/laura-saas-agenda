@@ -14,7 +14,7 @@ const UserSchema = new Schema({
     tenantId: {
         type: Schema.Types.ObjectId,
         ref: 'Tenant',
-        required: [true, 'Tenant é obrigatório'],
+        required: function() { return this.role !== 'superadmin'; },
         index: true
     },
 
