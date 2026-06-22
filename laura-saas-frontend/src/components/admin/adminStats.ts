@@ -18,7 +18,9 @@ export function computeTenantStats(tenants: TenantSummary[]): TenantStats {
   for (const t of tenants) {
     if (t.plano.status === 'trial') stats.trial++;
     else if (t.plano.status === 'ativo') stats.ativos++;
-    else if (t.plano.status === 'suspenso') stats.suspensos++;
+    // expirado conta como suspenso (ambos = tenant sem acesso). cancelado (churn)
+    // não entra em nenhum card de estado — só no total e na distribuição por plano.
+    else if (t.plano.status === 'suspenso' || t.plano.status === 'expirado') stats.suspensos++;
     stats.distribution[t.plano.tipo]++;
   }
   return stats;

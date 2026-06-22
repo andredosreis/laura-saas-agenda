@@ -19,6 +19,16 @@ describe('computeTenantStats', () => {
     expect(r.distribution).toEqual({ basico: 1, pro: 2, elite: 1, custom: 1 });
   });
 
+  it('dobra "expirado" em suspensos; "cancelado" só conta no total/distribuição', () => {
+    const r = computeTenantStats([
+      mk('suspenso', 'pro', 1), mk('expirado', 'pro', 2), mk('cancelado', 'basico', 3),
+    ]);
+    expect(r.suspensos).toBe(2); // suspenso + expirado
+    expect(r.trial).toBe(0);
+    expect(r.ativos).toBe(0);
+    expect(r.distribution).toEqual({ basico: 1, pro: 2, elite: 0, custom: 0 });
+  });
+
   it('devolve zeros para lista vazia', () => {
     expect(computeTenantStats([])).toEqual({
       trial: 0, ativos: 0, suspensos: 0,
