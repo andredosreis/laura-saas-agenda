@@ -43,8 +43,9 @@
       "name": "Create Tenant + Admin User",
       "priority": 1,
       "wave": 3,
-      "status": "pending",
-      "spec": "docs/F06-create-tenant-admin-user/"
+      "status": "done",
+      "spec": "docs/F06-create-tenant-admin-user/",
+      "eval_report": "docs/F06-create-tenant-admin-user/eval-report.md"
     },
     "F07": {
       "name": "Configure Tenant Plan, Limits & Feature Flags",

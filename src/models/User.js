@@ -309,14 +309,15 @@ UserSchema.statics.findByEmail = function (tenantId, email) {
 /**
  * Criar usuário com senha hasheada
  */
-UserSchema.statics.createWithPassword = async function (userData) {
+UserSchema.statics.createWithPassword = async function (userData, options = {}) {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(userData.password, salt);
 
     delete userData.password;
     userData.passwordHash = passwordHash;
 
-    return this.create(userData);
+    const [user] = await this.create([userData], options);
+    return user;
 };
 
 /**
