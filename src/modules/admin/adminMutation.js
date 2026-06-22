@@ -48,7 +48,10 @@ export const adminMutation = (action, work) => async (req, res, next) => {
             targetTenantId,
             before: ctx.before ?? null,
             after: ctx.after ?? null,
-            metadata: ctx.targetResourceId ? { targetResourceId: ctx.targetResourceId } : {},
+            metadata: {
+              ...(ctx.targetResourceId ? { targetResourceId: ctx.targetResourceId } : {}),
+              ...(ctx.metadata ?? {}),
+            },
           },
         ],
         { session }

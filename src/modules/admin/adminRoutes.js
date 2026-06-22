@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites } from './adminController.js';
+import { listarTenants, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant } from './adminController.js';
 import { validate } from '../../middlewares/validate.js';
-import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema } from './adminSchemas.js';
+import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema } from './adminSchemas.js';
 import { adminMutation } from './adminMutation.js';
 
 /**
@@ -38,5 +38,11 @@ router.post('/tenants', validate(criarTenantSchema), adminMutation('tenant.creat
 router.put('/tenants/:id/plano', validate(atualizarPlanoSchema), adminMutation('tenant.plano.update', atualizarPlano));
 // eslint-disable-next-line no-restricted-syntax
 router.put('/tenants/:id/limites', validate(atualizarLimitesSchema), adminMutation('tenant.limites.update', atualizarLimites));
+
+// F08 — Suspend / Reactivate Tenant
+// eslint-disable-next-line no-restricted-syntax
+router.post('/tenants/:id/suspender', validate(suspenderTenantSchema), adminMutation('tenant.suspend', suspenderTenant));
+// eslint-disable-next-line no-restricted-syntax
+router.post('/tenants/:id/reactivar', adminMutation('tenant.reactivate', reactivarTenant));
 
 export default router;

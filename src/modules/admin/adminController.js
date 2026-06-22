@@ -302,3 +302,79 @@ export const atualizarLimites = async (req, { session }) => {
     after,
   };
 };
+
+// ---------------------------------------------------------------------------
+// F08 — Suspend / Reactivate Tenant
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /admin/tenants/:id/suspender — suspende um tenant (F08).
+ *
+ * Seta plano.status = 'suspenso'. O `requirePlan` existente já bloqueia o acesso
+ * do staff (status ∉ {ativo, trial} → 403). Idempotente: suspender um já-suspenso
+ * sucede e é auditado.
+ */
+export const suspenderTenant = async (req, { session }) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    req.res.status(400);
+    throw new Error('ID inválido');
+  }
+
+  const tenant = await Tenant.findById(id).session(session);
+  if (!tenant) {
+    req.res.status(404);
+    throw new Error('Tenant não encontrado');
+  }
+
+  const previousStatus = tenant.plano.status;
+
+  await Tenant.findOneAndUpdate(
+    { _id: id },
+    { $set: { 'plano.status': 'suspenso' } },
+    { returnDocument: 'after', session }
+  );
+
+  return {
+    data: { status: 'suspenso' },
+    targetTenantId: id,
+    before: { status: previousStatus },
+    after: { status: 'suspenso' },
+    metadata: req.body.motivo ? { motivo: req.body.motivo } : {},
+  };
+};
+
+/**
+ * POST /admin/tenants/:id/reactivar — reativa um tenant suspenso (F08).
+ *
+ * Seta plano.status = 'ativo'. Staff volta a ter acesso via `requirePlan`.
+ * Idempotente: reactivar um já-ativo sucede e é auditado.
+ */
+export const reactivarTenant = async (req, { session }) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    req.res.status(400);
+    throw new Error('ID inválido');
+  }
+
+  const tenant = await Tenant.findById(id).session(session);
+  if (!tenant) {
+    req.res.status(404);
+    throw new Error('Tenant não encontrado');
+  }
+
+  const previousStatus = tenant.plano.status;
+
+  await Tenant.findOneAndUpdate(
+    { _id: id },
+    { $set: { 'plano.status': 'ativo' } },
+    { returnDocument: 'after', session }
+  );
+
+  return {
+    data: { status: 'ativo' },
+    targetTenantId: id,
+    before: { status: previousStatus },
+    after: { status: 'ativo' },
+  };
+};

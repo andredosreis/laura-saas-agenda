@@ -59,7 +59,7 @@
       "name": "Suspend / Reactivate Tenant",
       "priority": 1,
       "wave": 3,
-      "status": "pending",
+      "status": "Implemented",
       "spec": "docs/F08-suspend-reactivate-tenant/"
     },
     "F09": {
