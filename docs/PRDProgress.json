@@ -51,7 +51,7 @@
       "name": "Configure Tenant Plan, Limits & Feature Flags",
       "priority": 1,
       "wave": 3,
-      "status": "pending",
+      "status": "Implemented",
       "spec": "docs/F07-configure-tenant-plan-limits/"
     },
     "F08": {

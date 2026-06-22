@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenant, usoTenant, criarTenant } from './adminController.js';
+import { listarTenants, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites } from './adminController.js';
 import { validate } from '../../middlewares/validate.js';
-import { criarTenantSchema } from './adminSchemas.js';
+import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema } from './adminSchemas.js';
 import { adminMutation } from './adminMutation.js';
 
 /**
@@ -32,5 +32,11 @@ router.get('/tenants/:id/uso', usoTenant); // métricas cross-tenant via getTena
 // Fase 3 — escrita
 // eslint-disable-next-line no-restricted-syntax
 router.post('/tenants', validate(criarTenantSchema), adminMutation('tenant.create', criarTenant));
+
+// F07 — Configure Tenant Plan, Limits & Feature Flags
+// eslint-disable-next-line no-restricted-syntax
+router.put('/tenants/:id/plano', validate(atualizarPlanoSchema), adminMutation('tenant.plano.update', atualizarPlano));
+// eslint-disable-next-line no-restricted-syntax
+router.put('/tenants/:id/limites', validate(atualizarLimitesSchema), adminMutation('tenant.limites.update', atualizarLimites));
 
 export default router;
