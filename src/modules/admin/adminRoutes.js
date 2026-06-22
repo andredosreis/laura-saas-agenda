@@ -2,7 +2,10 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenant, usoTenant } from './adminController.js';
+import { listarTenants, obterTenant, usoTenant, criarTenant } from './adminController.js';
+import { validate } from '../../middlewares/validate.js';
+import { criarTenantSchema } from './adminSchemas.js';
+import { adminMutation } from './adminMutation.js';
 
 /**
  * adminRouter — painel super-admin (ADR-024).
@@ -25,5 +28,9 @@ router.use(auditMiddleware);
 router.get('/tenants', listarTenants);
 router.get('/tenants/:id', obterTenant);
 router.get('/tenants/:id/uso', usoTenant); // métricas cross-tenant via getTenantDBAdmin (RO)
+
+// Fase 3 — escrita
+// eslint-disable-next-line no-restricted-syntax
+router.post('/tenants', validate(criarTenantSchema), adminMutation('tenant.create', criarTenant));
 
 export default router;
