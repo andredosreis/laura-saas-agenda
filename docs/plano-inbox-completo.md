@@ -28,21 +28,22 @@ O WhatsApp/Evolution v2 identifica alguns contactos por um **`@lid`** (*Linked I
 
 A doc oficial da Evolution (consultada via context7) **não documenta** onde fica o número real num payload `@lid`. Implementar sem saber = adivinhar o campo. O número real ou vem **noutro campo do payload** (a confirmar) ou tem de ser resolvido pela **mapping `@lid`↔número no Postgres do Evolution** (`marcai-postgres`).
 
-### Recolha de dados (em curso desde o deploy desta nota)
+### Recolha de dados (em curso)
 
-Foi adicionado um **log de captura temporário** no `webhookController` (`logLidParaFase3`) que, sempre que chega uma mensagem `@lid` (fromMe ou entrada), regista o **payload completo** (`lidPayload`). Assim descobrimos onde está o número real, sem adivinhar.
+A captura é feita pelo `logLidParaFase3` no `webhookController`, sempre que chega uma mensagem `@lid` (fromMe ou entrada). Faz **duas** coisas:
+1. **Log** (`lidPayload`) — útil enquanto o container não reiniciar.
+2. **Persistência DURÁVEL** numa coleção Mongo `lidcaptures` (model `LidCapture`, TTL 7 dias) — **sobrevive a restarts/deploys** (os docker logs NÃO, são apagados a cada `docker compose up --build`).
 
-**Daqui a 2-3 dias**, correr em produção:
+> Lição: a captura só-por-logs perde-se a cada deploy. Por isso a fonte de verdade é o Mongo.
+
+**Daqui a 2-3 dias** (ou quando aparecer pelo menos 1 `@lid`), ler do Mongo via `docker exec` (a imagem não inclui `scripts/`, por isso usa-se node inline):
 
 ```bash
-# Frequência do @lid (vale a pena fazer a Fase 3?)
-ssh root@80.241.222.235 "docker logs --since 72h marcai-backend 2>&1 | grep -c '\"motivo\":\"lid\"'"
-
-# Payload(s) @lid capturado(s) — procurar o campo com o número real
-ssh root@80.241.222.235 "docker logs --since 72h marcai-backend 2>&1 | grep 'lidPayload' | tail -3"
+# Quantos @lid foram capturados + os payloads (procurar o número real)
+ssh root@80.241.222.235 "docker exec marcai-backend node --input-type=module -e \"import mongoose from 'mongoose'; await mongoose.connect(process.env.MONGODB_URI); const c = mongoose.connection.collection('lidcaptures'); console.log('total:', await c.countDocuments()); const docs = await c.find().sort({createdAt:-1}).limit(5).toArray(); console.log(JSON.stringify(docs, null, 2)); await mongoose.disconnect();\""
 ```
 
-No payload, procurar campos candidatos ao número real: `key.senderPn`, `key.participantPn`, `key.remoteJidAlt`, `participant`, ou um número em `@s.whatsapp.net` em qualquer campo.
+No payload (`docs[].payload`), procurar o campo com o número real: `key.senderPn`, `key.participantPn`, `key.remoteJidAlt`, `participant`, ou um número em `@s.whatsapp.net` em qualquer campo.
 
 ### Decisão
 
@@ -52,4 +53,6 @@ No payload, procurar campos candidatos ao número real: `key.senderPn`, `key.par
 
 ### Limpeza
 
-Quando a Fase 3 for decidida/implementada, **remover o `logLidParaFase3`** (diagnóstico temporário) do `webhookController`.
+Quando a Fase 3 for decidida/implementada, remover o diagnóstico temporário:
+- `logLidParaFase3` + o import de `LidCapture` no `webhookController`;
+- o model `src/models/LidCapture.js` (a coleção `lidcaptures` auto-expira em 7 dias via TTL).

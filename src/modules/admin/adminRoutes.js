@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenant } from './adminController.js';
+import { listarTenants, obterTenant, usoTenant } from './adminController.js';
 
 /**
  * adminRouter — painel super-admin (ADR-024).
@@ -24,5 +24,6 @@ router.use(auditMiddleware);
 // Fase 2 — leitura
 router.get('/tenants', listarTenants);
 router.get('/tenants/:id', obterTenant);
+router.get('/tenants/:id/uso', usoTenant); // métricas cross-tenant via getTenantDBAdmin (RO)
 
 export default router;

@@ -7,16 +7,35 @@
  * formatting and we don't want this commit to spawn a thousand stylistic
  * warnings. Formatting can be addressed separately if/when adopted.
  *
- * The single architectural rule active today:
- *   no-restricted-imports on src/modules/<domain>/** blocking imports
- *   from src/modules/messaging/**. Codifies ADR-022 ("Messaging Module
- *   as Cross-Cutting Orchestrator") as an executable invariant.
+ * Architectural rules active today:
+ *   1. no-restricted-imports on domain modules blocking imports from
+ *      src/modules/messaging/** (ADR-022 — Messaging as Cross-Cutting Orchestrator).
+ *   2. no-restricted-imports blocking getTenantDBAdmin outside src/modules/admin/
+ *      (ADR-024 Gate 4b — the read-only cross-tenant accessor is admin-only).
+ *   3. no-restricted-syntax forbidding raw router.<verb> mutations inside
+ *      src/modules/admin/ (ADR-024 Gate 4 — mutations must go through the
+ *      adminMutation factory; Phase 3).
  *
  * Run with: npm run lint
  */
 
 import js from '@eslint/js';
 import globals from 'globals';
+
+// Domain modules (subset of src/modules/) — listed explicitly so adding a new
+// one surfaces this file as something to update. Reused by the messaging and
+// admin-RO rules so their scopes don't clobber each other.
+const DOMAIN_MODULE_GLOBS = [
+  'src/modules/agendamento/**/*.js',
+  'src/modules/leads/**/*.js',
+  'src/modules/clientes/**/*.js',
+  'src/modules/financeiro/**/*.js',
+  'src/modules/notificacoes/**/*.js',
+  'src/modules/ia/**/*.js',
+  'src/modules/historico/**/*.js',
+  'src/modules/auth/**/*.js',
+  'src/modules/users/**/*.js',
+];
 
 // Path patterns blocked when imported FROM a domain module.
 // Covers both relative ('../messaging/...', '../../messaging/...') and
@@ -41,6 +60,25 @@ const ADR_022_MESSAGE =
   'expose it via a service in your own module, or via the internal API ' +
   'bridge (F05). See docs/adrs/generated/ADR-022-messaging-module-cross-cutting-orchestrator.md.';
 
+// Gate 4b (ADR-024): getTenantDBAdmin — o acessor read-only cross-tenant do
+// painel super-admin — só pode ser importado dentro de src/modules/admin/.
+const ADMIN_RO_BLOCKED_PATTERNS = [
+  '**/modules/admin/getTenantDBAdmin',
+  '**/modules/admin/getTenantDBAdmin.js',
+  '../admin/getTenantDBAdmin',
+  '../admin/getTenantDBAdmin.js',
+  '../../modules/admin/getTenantDBAdmin',
+  '../../modules/admin/getTenantDBAdmin.js',
+];
+
+const ADMIN_RO_MESSAGE =
+  'getTenantDBAdmin (acessor read-only cross-tenant do painel super-admin) só ' +
+  'pode ser importado dentro de src/modules/admin/ (ADR-024, Gate 4b). É a ' +
+  'única superfície sancionada a atravessar tenants — fora de admin/, usa o ' +
+  'isolamento normal { tenantId }. Ver .claude/skills/marcai-superadmin-route.';
+
+const adminRoPattern = { group: ADMIN_RO_BLOCKED_PATTERNS, message: ADMIN_RO_MESSAGE };
+
 export default [
   // Default language options for all JS files
   {
@@ -55,30 +93,53 @@ export default [
     },
   },
 
-  // ADR-022 enforcement: domain modules cannot import from messaging/
-  // Listed explicitly per domain so the rule's intent is obvious from the
-  // config alone (and so adding a new domain module surfaces this file
-  // as something to update).
+  // ADR-022 + Gate 4b for domain modules: cannot import from messaging/, nor
+  // getTenantDBAdmin. Both restrictions live in one rule so neither clobbers
+  // the other (flat config: last matching config wins per rule).
   {
-    files: [
-      'src/modules/agendamento/**/*.js',
-      'src/modules/leads/**/*.js',
-      'src/modules/clientes/**/*.js',
-      'src/modules/financeiro/**/*.js',
-      'src/modules/notificacoes/**/*.js',
-      'src/modules/ia/**/*.js',
-      'src/modules/historico/**/*.js',
-      'src/modules/auth/**/*.js',
-      'src/modules/users/**/*.js',
-    ],
+    files: DOMAIN_MODULE_GLOBS,
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          patterns: MESSAGING_BLOCKED_PATTERNS.map((pattern) => ({
-            group: [pattern],
-            message: ADR_022_MESSAGE,
-          })),
+          patterns: [
+            ...MESSAGING_BLOCKED_PATTERNS.map((pattern) => ({
+              group: [pattern],
+              message: ADR_022_MESSAGE,
+            })),
+            adminRoPattern,
+          ],
+        },
+      ],
+    },
+  },
+
+  // Gate 4b for the REST of src (non-domain-module, non-admin): getTenantDBAdmin
+  // is admin-only. Domain modules are covered above; admin/ is exempt.
+  {
+    files: ['src/**/*.js'],
+    ignores: ['src/modules/admin/**/*.js', ...DOMAIN_MODULE_GLOBS],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [adminRoPattern] }],
+    },
+  },
+
+  // Gate 4 (ADR-024): inside src/modules/admin/, no raw router.<verb> mutations —
+  // every mutation must go through the adminMutation factory (transactional
+  // audit, Phase 3). Today this blocks all mutation routes, which is correct:
+  // Phase 3 (escrita) is not yet authorized.
+  {
+    files: ['src/modules/admin/**/*.js'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='router'][callee.property.name=/^(post|put|patch|delete)$/]",
+          message:
+            'Em src/modules/admin/ nenhuma mutação usa router.post/put/patch/delete cru — ' +
+            'passa pela factory adminMutation (audit transacional, Fase 3). ' +
+            'Ver .claude/skills/marcai-superadmin-route.',
         },
       ],
     },

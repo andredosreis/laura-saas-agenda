@@ -246,4 +246,32 @@ describe('Webhook — registo de saídas manuais (fromMe)', () => {
     expect(msgs).toHaveLength(1);
     expect(msgs[0].mensagem).toBe('🖼️ [imagem]');
   });
+
+  test('fromMe @lid → captura durável em LidCapture (Fase 3)', async () => {
+    const { default: LidCapture } = await import('../src/models/LidCapture.js');
+    await createTenant();
+
+    const res = await request(app)
+      .post(WEBHOOK_URL)
+      .set('apikey', VALID_API_KEY)
+      .send({
+        event: 'messages.upsert',
+        instance: 'marcai',
+        data: {
+          key: { id: 'lid-out-1', remoteJid: '123456789@lid', fromMe: true },
+          messageTimestamp: Math.floor(Date.now() / 1000),
+          message: { conversation: 'olá' },
+        },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Saída @lid ignorada');
+    await flushAsync();
+
+    const caps = await LidCapture.find({ direcao: 'saida' });
+    expect(caps.length).toBeGreaterThanOrEqual(1);
+    expect(caps[0].remoteJid).toBe('123456789@lid');
+    expect(caps[0].instance).toBe('marcai');
+    expect(caps[0].payload?.key?.remoteJid).toBe('123456789@lid');
+  });
 });

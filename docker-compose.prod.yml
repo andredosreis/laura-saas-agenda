@@ -61,6 +61,9 @@ services:
         BUILT_AT: ${BUILT_AT:-}
     container_name: marcai-backend
     restart: unless-stopped
+    # Segredos vêm TODOS do .env via env_file: MONGODB_URI, MONGO_TENANT_RO_URI
+    # (painel super-admin read-only, ADR-024 Gate 4b), JWT_*, EVOLUTION_API_KEY, …
+    # NÃO os repetir abaixo — o bloco `environment` é só topologia não-secreta.
     env_file: .env
     environment:
       - NODE_ENV=production
