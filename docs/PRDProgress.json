@@ -1,0 +1,84 @@
+{
+  "project": "Marcai Super-Admin Panel (ADR-024)",
+  "prd": "docs/PRD-painel-superadmin.md",
+  "as_of": "2026-06-21",
+  "features": {
+    "F01": {
+      "name": "Super-Admin Access Control & Audit Foundation",
+      "priority": 1,
+      "wave": 1,
+      "status": "done",
+      "note": "built + tested + merged pre-harness (PRs #33/#34); not formally evaluated"
+    },
+    "F02": {
+      "name": "Tenant Listing",
+      "priority": 1,
+      "wave": 2,
+      "status": "done",
+      "note": "PR #34"
+    },
+    "F03": {
+      "name": "Tenant Detail",
+      "priority": 1,
+      "wave": 2,
+      "status": "done",
+      "note": "PR #34"
+    },
+    "F04": {
+      "name": "Tenant Usage Metrics",
+      "priority": 2,
+      "wave": 2,
+      "status": "done",
+      "note": "PR #35"
+    },
+    "F05": {
+      "name": "Audited Mutation Foundation",
+      "priority": 1,
+      "wave": 2,
+      "status": "pending",
+      "spec": "docs/F05-audited-mutation-foundation/"
+    },
+    "F06": {
+      "name": "Create Tenant + Admin User",
+      "priority": 1,
+      "wave": 3,
+      "status": "pending",
+      "spec": "docs/F06-create-tenant-admin-user/"
+    },
+    "F07": {
+      "name": "Configure Tenant Plan, Limits & Feature Flags",
+      "priority": 1,
+      "wave": 3,
+      "status": "pending",
+      "spec": "docs/F07-configure-tenant-plan-limits/"
+    },
+    "F08": {
+      "name": "Suspend / Reactivate Tenant",
+      "priority": 1,
+      "wave": 3,
+      "status": "pending",
+      "spec": "docs/F08-suspend-reactivate-tenant/"
+    },
+    "F09": {
+      "name": "Audit Log Viewer",
+      "priority": 2,
+      "wave": 2,
+      "status": "pending",
+      "spec": "docs/F09-audit-log-viewer/"
+    },
+    "F10": {
+      "name": "Panel Frontend — List, Detail & Usage",
+      "priority": 2,
+      "wave": 3,
+      "status": "pending",
+      "spec": "docs/F10-frontend-list-detail-usage/"
+    },
+    "F11": {
+      "name": "Panel Frontend — Tenant Management UI",
+      "priority": 2,
+      "wave": 4,
+      "status": "pending",
+      "spec": "docs/F11-frontend-tenant-management/"
+    }
+  }
+}
