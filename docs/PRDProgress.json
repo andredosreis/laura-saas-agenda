@@ -35,8 +35,9 @@
       "name": "Audited Mutation Foundation",
       "priority": 1,
       "wave": 2,
-      "status": "pending",
-      "spec": "docs/F05-audited-mutation-foundation/"
+      "status": "done",
+      "spec": "docs/F05-audited-mutation-foundation/",
+      "eval_report": "docs/F05-audited-mutation-foundation/eval-report.md"
     },
     "F06": {
       "name": "Create Tenant + Admin User",

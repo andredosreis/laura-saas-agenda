@@ -24,7 +24,11 @@ const AuditLogSchema = new Schema(
     // Sobre que tenant (opcional — algumas acções são globais)
     targetTenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', default: null },
 
-    // Contexto adicional (campos alterados, valores anteriores/novos, etc.)
+    // Diff GDPR-minimal de uma mutação (só campos alterados / resumo do doc criado)
+    before: { type: Schema.Types.Mixed, default: null },
+    after: { type: Schema.Types.Mixed, default: null },
+
+    // Contexto adicional (ex: targetResourceId, mensagem de erro)
     metadata: { type: Schema.Types.Mixed, default: {} },
 
     // Origem do pedido
