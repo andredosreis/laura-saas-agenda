@@ -51,8 +51,9 @@
       "name": "Configure Tenant Plan, Limits & Feature Flags",
       "priority": 1,
       "wave": 3,
-      "status": "pending",
-      "spec": "docs/F07-configure-tenant-plan-limits/"
+      "status": "done",
+      "spec": "docs/F07-configure-tenant-plan-limits/",
+      "eval_report": "docs/F07-configure-tenant-plan-limits/eval-report.md"
     },
     "F08": {
       "name": "Suspend / Reactivate Tenant",

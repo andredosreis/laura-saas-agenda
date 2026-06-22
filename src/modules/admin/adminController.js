@@ -198,3 +198,107 @@ export const criarTenant = async (req, { session }) => {
     },
   };
 };
+
+// ---------------------------------------------------------------------------
+// F07 — Configure Tenant Plan, Limits & Feature Flags
+// ---------------------------------------------------------------------------
+
+/**
+ * PUT /admin/tenants/:id/plano — atualiza tipo e/ou dataExpiracao do plano (F07).
+ *
+ * Whitelisted $set — NUNCA altera plano.status (reservado para F08).
+ * Devolve diff GDPR-minimal: só os campos que de facto mudaram.
+ */
+export const atualizarPlano = async (req, { session }) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    req.res.status(400);
+    throw new Error('ID inválido');
+  }
+
+  const tenant = await Tenant.findById(id).session(session);
+  if (!tenant) {
+    req.res.status(404);
+    throw new Error('Tenant não encontrado');
+  }
+
+  // Whitelist: só tipo e dataExpiracao — Zod já validou
+  const $set = {};
+  const before = {};
+  const after = {};
+
+  if (req.body.tipo !== undefined) {
+    before.tipo = tenant.plano.tipo;
+    $set['plano.tipo'] = req.body.tipo;
+    after.tipo = req.body.tipo;
+  }
+  if (req.body.dataExpiracao !== undefined) {
+    before.dataExpiracao = tenant.plano.dataExpiracao ?? null;
+    $set['plano.dataExpiracao'] = new Date(req.body.dataExpiracao);
+    after.dataExpiracao = req.body.dataExpiracao;
+  }
+
+  const updated = await Tenant.findOneAndUpdate(
+    { _id: id },
+    { $set },
+    { returnDocument: 'after', session }
+  );
+
+  return {
+    data: { plano: updated.plano },
+    targetTenantId: id,
+    before,
+    after,
+  };
+};
+
+/**
+ * PUT /admin/tenants/:id/limites — atualiza limites numéricos e feature flags (F07).
+ *
+ * Whitelisted $set — campos não reconhecidos são ignorados (mass-assignment safe).
+ * Devolve diff GDPR-minimal: só os campos efectivamente alterados.
+ */
+const LIMITES_WHITELIST = [
+  'maxUsuarios', 'maxClientes', 'maxAgendamentosMes', 'maxLeads',
+  'iaAtiva', 'leadsAtivo', 'whatsappAutomacao', 'lembretesWhatsapp',
+  'analytics', 'relatorios', 'exportPdf', 'brandingPersonalizado',
+];
+
+export const atualizarLimites = async (req, { session }) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    req.res.status(400);
+    throw new Error('ID inválido');
+  }
+
+  const tenant = await Tenant.findById(id).session(session);
+  if (!tenant) {
+    req.res.status(404);
+    throw new Error('Tenant não encontrado');
+  }
+
+  const $set = {};
+  const before = {};
+  const after = {};
+
+  for (const key of LIMITES_WHITELIST) {
+    if (req.body[key] !== undefined) {
+      before[key] = tenant.limites[key];
+      $set[`limites.${key}`] = req.body[key];
+      after[key] = req.body[key];
+    }
+  }
+
+  const updated = await Tenant.findOneAndUpdate(
+    { _id: id },
+    { $set },
+    { returnDocument: 'after', session }
+  );
+
+  return {
+    data: { limites: updated.limites },
+    targetTenantId: id,
+    before,
+    after,
+  };
+};
