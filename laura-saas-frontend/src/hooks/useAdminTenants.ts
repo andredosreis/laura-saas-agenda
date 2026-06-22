@@ -3,16 +3,17 @@ import { apiHelpers } from '../services/api';
 import { PaginatedResponse, TenantSummary, TenantDetail, TenantUsage } from '../types/admin';
 import { toast } from 'react-toastify';
 
-export function useAdminTenants(initialPage = 1, initialLimit = 20) {
+export function useAdminTenants() {
   const [data, setData] = useState<PaginatedResponse<TenantSummary> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTenants = useCallback(async (page: number, limit: number) => {
+  const fetchTenants = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiHelpers.get(`/v1/admin/tenants?page=${page}&limit=${limit}`);
+      // Fetch único (limit=100, o máximo do backend) — alimenta KPIs + distribuição + tabela.
+      const response = await apiHelpers.get('/v1/admin/tenants?page=1&limit=100');
       setData(response as PaginatedResponse<TenantSummary>);
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar tenants';
@@ -24,15 +25,15 @@ export function useAdminTenants(initialPage = 1, initialLimit = 20) {
   }, []);
 
   useEffect(() => {
-    fetchTenants(initialPage, initialLimit);
-  }, [fetchTenants, initialPage, initialLimit]);
+    fetchTenants();
+  }, [fetchTenants]);
 
   return {
-    data: data?.data || [],
-    pagination: data?.pagination,
+    tenants: data?.data || [],
+    total: data?.pagination?.total ?? 0,
     loading,
     error,
-    refetch: (page: number, limit: number) => fetchTenants(page, limit)
+    refetch: fetchTenants,
   };
 }
 
