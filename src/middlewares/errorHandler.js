@@ -68,9 +68,15 @@ const errorHandler = (err, req, res, next) => {
   }
 
   const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+  // 4xx são erros do cliente, com mensagens deliberadamente expostas (ex: handlers
+  // que fazem `res.status(409); throw new Error('Email já registado')`). Só 5xx
+  // (bugs reais de servidor) são mascarados em produção para não vazar internals.
+  const isServerError = statusCode >= 500;
   res.status(statusCode).json({
     success: false,
-    error: process.env.NODE_ENV === 'production' ? 'Erro interno do servidor' : err.message,
+    error: isServerError && process.env.NODE_ENV === 'production'
+      ? 'Erro interno do servidor'
+      : err.message,
   });
 };
 
