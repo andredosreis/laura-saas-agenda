@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { initialsFromName } from './ConsoleUI';
 
@@ -11,7 +11,13 @@ const NAV_ITEMS = [
 const mesAno = new Date().toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
 
 export function ConsoleChrome({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-dark-900 p-5 sm:p-9">
@@ -68,6 +74,12 @@ export function ConsoleChrome({ children }: { children: React.ReactNode }) {
                   {initialsFromName(user?.nome)}
                 </span>
               </div>
+              <button
+                onClick={handleLogout}
+                className="bg-dark-900 border border-white/10 hover:border-primary-500 text-dark-200 px-3 py-1.5 rounded-[2px] text-[12px] font-medium transition-colors"
+              >
+                Sair
+              </button>
             </div>
           </div>
 
