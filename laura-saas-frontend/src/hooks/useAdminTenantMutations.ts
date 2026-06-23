@@ -20,7 +20,7 @@ export function useAdminTenantMutations() {
   const createTenant = async (input: CreateTenantInput): Promise<CreateTenantResult> => {
     setSubmitting(true);
     try {
-      const res = await apiHelpers.post('/v1/admin/tenants', input);
+      const res = await apiHelpers.post('/admin/tenants', input);
       return res.data as CreateTenantResult;
     } finally {
       setSubmitting(false);
@@ -30,7 +30,7 @@ export function useAdminTenantMutations() {
   const updatePlano = async (tenantId: string, input: UpdatePlanoInput): Promise<TenantDetail['plano']> => {
     setSubmitting(true);
     try {
-      const res = await apiHelpers.put(`/v1/admin/tenants/${tenantId}/plano`, input);
+      const res = await apiHelpers.put(`/admin/tenants/${tenantId}/plano`, input);
       return res.data.plano as TenantDetail['plano'];
     } finally {
       setSubmitting(false);
@@ -40,7 +40,7 @@ export function useAdminTenantMutations() {
   const updateLimites = async (tenantId: string, input: UpdateLimitesInput): Promise<TenantLimites> => {
     setSubmitting(true);
     try {
-      const res = await apiHelpers.put(`/v1/admin/tenants/${tenantId}/limites`, input);
+      const res = await apiHelpers.put(`/admin/tenants/${tenantId}/limites`, input);
       return res.data.limites as TenantLimites;
     } finally {
       setSubmitting(false);
@@ -50,7 +50,7 @@ export function useAdminTenantMutations() {
   const suspendTenant = async (tenantId: string, motivo?: string): Promise<void> => {
     setSubmitting(true);
     try {
-      await apiHelpers.post(`/v1/admin/tenants/${tenantId}/suspender`, motivo ? { motivo } : {});
+      await apiHelpers.post(`/admin/tenants/${tenantId}/suspender`, motivo ? { motivo } : {});
     } finally {
       setSubmitting(false);
     }
@@ -59,7 +59,7 @@ export function useAdminTenantMutations() {
   const reactivateTenant = async (tenantId: string): Promise<void> => {
     setSubmitting(true);
     try {
-      await apiHelpers.post(`/v1/admin/tenants/${tenantId}/reactivar`, {});
+      await apiHelpers.post(`/admin/tenants/${tenantId}/reactivar`, {});
     } finally {
       setSubmitting(false);
     }

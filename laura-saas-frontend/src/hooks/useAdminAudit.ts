@@ -32,7 +32,7 @@ export function useAdminAudit(initialPage = 1, initialLimit = 20, initialFilters
       if (filters.from) query.append('from', filters.from);
       if (filters.to) query.append('to', filters.to);
 
-      const response = await apiHelpers.get(`/v1/admin/audit?${query.toString()}`);
+      const response = await apiHelpers.get(`/admin/audit?${query.toString()}`);
       setData(response as PaginatedResponse<AuditLogEntry>);
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar logs de auditoria';

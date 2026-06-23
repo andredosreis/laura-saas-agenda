@@ -21,7 +21,7 @@ describe('useAdminTenants', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(apiHelpers.get).toHaveBeenCalledTimes(1);
-    expect(apiHelpers.get).toHaveBeenCalledWith('/v1/admin/tenants?page=1&limit=100');
+    expect(apiHelpers.get).toHaveBeenCalledWith('/admin/tenants?page=1&limit=100');
     expect(result.current.tenants).toHaveLength(1);
     expect(result.current.total).toBe(1);
     expect(result.current.error).toBeNull();

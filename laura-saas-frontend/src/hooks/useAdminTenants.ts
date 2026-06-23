@@ -12,7 +12,7 @@ export function useAdminTenants() {
     setError(null);
     try {
       // Fetch único (limit=100, o máximo do backend) — alimenta KPIs + distribuição + tabela.
-      const response = await apiHelpers.get('/v1/admin/tenants?page=1&limit=100');
+      const response = await apiHelpers.get('/admin/tenants?page=1&limit=100');
       setData(response as PaginatedResponse<TenantSummary>);
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar tenants';
@@ -47,8 +47,8 @@ export function useAdminTenantDetail(tenantId: string | undefined) {
     setError(null);
     try {
       const [detailRes, usageRes] = await Promise.all([
-        apiHelpers.get(`/v1/admin/tenants/${tenantId}`),
-        apiHelpers.get(`/v1/admin/tenants/${tenantId}/uso`).catch(() => ({ data: { clientes: 0, agendamentos: 0, mensagens: 0 } }))
+        apiHelpers.get(`/admin/tenants/${tenantId}`),
+        apiHelpers.get(`/admin/tenants/${tenantId}/uso`).catch(() => ({ data: { clientes: 0, agendamentos: 0, mensagens: 0 } }))
       ]);
       setDetail(detailRes.data);
       setUsage(usageRes.data);
