@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiHelpers } from '../services/api';
 import { PaginatedResponse, TenantSummary, TenantDetail, TenantUsage } from '../types/admin';
-import { toast } from 'react-toastify';
 
 export function useAdminTenants() {
   const [data, setData] = useState<PaginatedResponse<TenantSummary> | null>(null);
@@ -17,8 +16,7 @@ export function useAdminTenants() {
       setData(response as PaginatedResponse<TenantSummary>);
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar tenants';
-      setError(msg);
-      toast.error(msg);
+      setError(msg); // toast tratado pelo interceptor central de api.js
     } finally {
       setLoading(false);
     }
@@ -56,8 +54,7 @@ export function useAdminTenantDetail(tenantId: string | undefined) {
       setUsage(usageRes.data);
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar detalhes do tenant';
-      setError(msg);
-      toast.error(msg);
+      setError(msg); // toast tratado pelo interceptor central de api.js
     } finally {
       setLoading(false);
     }

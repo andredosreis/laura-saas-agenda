@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
-import { useAdminTenantMutations, extractApiError } from '../../hooks/useAdminTenantMutations';
+import { useAdminTenantMutations } from '../../hooks/useAdminTenantMutations';
 import { TenantDetail } from '../../types/admin';
 
 interface SuspendReactivateControlsProps {
@@ -84,8 +84,8 @@ export function SuspendReactivateControls({ tenant, onChanged }: SuspendReactiva
       toast.success(`${tenant.nome} suspenso.`);
       setDialog(null);
       onChanged();
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, 'Erro ao suspender tenant.'));
+    } catch {
+      // O interceptor de api.js já mostra o toast de erro; mantém o diálogo aberto para retry.
     }
   };
 
@@ -95,8 +95,8 @@ export function SuspendReactivateControls({ tenant, onChanged }: SuspendReactiva
       toast.success(`${tenant.nome} reactivado.`);
       setDialog(null);
       onChanged();
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, 'Erro ao reactivar tenant.'));
+    } catch {
+      // O interceptor de api.js já mostra o toast de erro; mantém o diálogo aberto para retry.
     }
   };
 
