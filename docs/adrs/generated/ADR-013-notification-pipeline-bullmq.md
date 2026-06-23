@@ -1,6 +1,6 @@
 # ADR-013: Notification Pipeline com BullMQ + Redis
 
-**Status:** Accepted — Implementação planeada Fase 2  
+**Status:** Accepted — Implementado (BullMQ activo em produção desde 2026-05-29, Redis self-hosted no VPS)  
 **Data:** 2026-04-12  
 **Módulo:** NOTIF  
 **Autor:** André dos Reis  

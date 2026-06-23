@@ -1,6 +1,6 @@
 # ADR-024: Painel Super-Admin para Gestão Multi-Tenant
 
-**Status:** Proposed
+**Status:** Accepted — Implementado (módulo `src/modules/admin/`, PR #43)
 **Data:** 2026-05-29
 **Módulo:** ADMIN
 **Autor:** André dos Reis

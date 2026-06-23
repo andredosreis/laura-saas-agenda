@@ -1,6 +1,6 @@
 # ADR-017: Lembretes Automáticos de Parcelas via WhatsApp (Evolution API)
 
-**Status:** Proposed
+**Status:** Accepted — Implementado (`src/jobs/lembreteParcelaJob.js`)
 **Data:** 2026-04-23
 **Módulo:** NOTIF (secundário: FIN/PKG, WA, INFRA)
 **Autor:** André dos Reis

@@ -1,6 +1,6 @@
 # ADR-006: Z-API como Gateway WhatsApp para Notificações e Automação
 
-**Status:** Accepted — Migração para Evolution API planeada (ADR pendente)  
+**Status:** Deprecated — Substituído pela migração para Evolution API ([ADR-014](./ADR-014-evolution-api-whatsapp-migration.md), [ADR-016](./ADR-016-evolution-api-v2-upgrade.md))  
 **Data:** 2025-06-09  
 **Módulo:** WA  
 **Autor:** André dos Reis  

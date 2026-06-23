@@ -1,6 +1,6 @@
 # ADR-023: Consolidação da Infraestrutura num VPS Único (Contabo)
 
-**Status:** Proposed
+**Status:** Accepted — Executado (2026-06-01, stack Docker a correr em 80.241.222.235)
 **Data:** 2026-05-29
 **Módulo:** INFRA
 **Autor:** André dos Reis

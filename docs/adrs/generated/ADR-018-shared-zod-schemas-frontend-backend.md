@@ -1,6 +1,6 @@
 # ADR-018: Partilha de Schemas Zod entre Frontend e Backend
 
-**Status:** Proposed — Implementação adiada
+**Status:** Deferred — Pilot em `clientes/` (2026-04-24); restante adiado conscientemente
 **Data:** 2026-04-24
 **Módulo:** ARCH
 **Autor:** André dos Reis
