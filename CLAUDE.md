@@ -40,9 +40,9 @@ If the documatation returned does not match the installed version, flag the disc
 
 ```bash
 # Backend
-npm run dev          # nodemon src/server.js (porta 5000)
+npm run dev          # nodemon src/server.js (porta 5001 em dev — PORT no .env; default do código é 5000)
 npm start            # node src/server.js (produção)
-# Verificar: GET http://localhost:5000/api/auth/me → 401 (API activa)
+# Verificar: GET http://localhost:5001/api/auth/me → 401 (API activa)
 
 # Frontend
 cd laura-saas-frontend && npm run dev   # Vite (porta 5173)
@@ -53,6 +53,18 @@ cd ia-service && uv sync                          # instala deps no .venv
 PYTHONPATH=src .venv/bin/uvicorn ia_service.main:app --port 8000
 # Verificar: GET http://localhost:8000/health → 200
 ```
+
+## Base de Dados — Acesso e Convenções
+
+Arquitectura **database-per-tenant** (ADR-001) num cluster **MongoDB Atlas**:
+
+- **BD partilhada `laura-saas`**: `Tenant`, `User`, `LidCapture` (crosscutting).
+- **BD por tenant `tenant_<tenantId>`**: todos os modelos de negócio, via `getModels(getTenantDB(id))` (`src/models/registry.js`, `src/config/tenantDB.js`).
+
+⚠️ **Nomes de coleção pluralizam à INGLESA** (Mongoose), não em português. Em queries/scripts manuais ao Mongo usar:
+`mensagems` (não `mensagens`), `transacaos`, `fechamentomensals`, `comprapacotes`, `historicoatendimentos`, `pagamentos`, `agendamentos`, `clientes`, `leads`, `conversas`, `pacotes`, `schedules`.
+
+⚠️ **O `.env` local aponta para o cluster Atlas de PRODUÇÃO** (o mesmo que o backend no Contabo usa). Qualquer script corrido com `MONGODB_URI` do `.env` lê/escreve **dados reais de produção** — usar só-leitura e confirmar o cluster antes. Backend de produção: container `marcai-backend` no VPS Contabo.
 
 ## Folder Structure
 

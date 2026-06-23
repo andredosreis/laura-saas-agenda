@@ -1,6 +1,6 @@
 # ADR-025: WhatsApp Business API Oficial vs Baileys para Tráfego Pago
 
-**Status:** Proposed
+**Status:** Accepted — Decisão tomada (híbrido por provider); implementação diferida até o tráfego pago arrancar
 **Data:** 2026-05-29
 **Módulo:** IA / MESSAGING / INFRA
 **Autor:** André dos Reis
