@@ -82,8 +82,9 @@
       "name": "Panel Frontend — Tenant Management UI",
       "priority": 2,
       "wave": 4,
-      "status": "pending",
-      "spec": "docs/F11-frontend-tenant-management/"
+      "status": "done",
+      "spec": "docs/F11-frontend-tenant-management/",
+      "eval_report": "docs/F11-frontend-tenant-management/eval-report.md"
     }
   }
 }
