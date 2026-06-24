@@ -21,7 +21,7 @@ O sistema comporta a topologia central de **Monolito em Camadas Modular**, o que
 
 Ambiente de implantação
 - Cloud (Misto arquitetural)
-- Deploy do cliente e Core API na **Vercel** acoplados a uma fonte Cloud Externa primária (**MongoDB Atlas**) e ao worker contêiner do Docker auto-hospedado para Gateway do WA (**Evolution APP**).
+- Frontend PWA na **Vercel**; Core API + microserviço IA Python + Gateway WhatsApp (**Evolution API**) + Redis num stack **Docker auto-hospedado no VPS Contabo** (nginx + TLS), tendo como fonte Cloud externa primária o **MongoDB Atlas**.
 
 Tecnologias principais
 - API & Back: Node.js (ESM), Express 4, MongoDB (Mongoose)
@@ -83,13 +83,13 @@ Fonte de verdade
 
 ### Considerações de escalabilidade e disponibilidade
 Abordagem geral
-- Para escala rápida, utilizaremos processamento paralelo horizontal da rede Vercel associado à distribuição do cluster da Atlas Mongo.
+- Frontend PWA escala na rede de borda da Vercel; o Core API escala verticalmente/horizontalmente no VPS Contabo (Docker), associado à distribuição do cluster da Atlas Mongo.
 
 Técnicas aplicadas
 - Limitadores ativos **express-rate-limit**.
 - Bloqueio transversal das invocações pelo **Helmet**.
 - Configurações pontuais do banco para índices da query.
-- Avaliação da introdução do conceito *Backpressure MQ* utilizando Redis / Bull quando o sistema crescer o escopo diário.
+- *Backpressure MQ* já em produção via **BullMQ + Redis** (self-hosted no VPS), processando lembretes e jobs assíncronos.
 
 Meta de disponibilidade
 - Uptime 99.9% / SLA limitante máximo tolerado < 48hs por erro da infra.
@@ -170,7 +170,7 @@ ADRs associados
 - [ADR 002 - Migração Z-API WebWpp Webhook Oficial para Stack auto-hospedada Evolution API pela eliminação total dos fee mensuráveis]
 
 Decisões pendentes
-- Aberta 1 — Queue para processamento assíncrono (BullMQ + Redis vs Serverless Queues. Relevante quando: volume de webhooks WhatsApp aumentar).
+- ~~Aberta 1 — Queue para processamento assíncrono~~ **RESOLVIDA:** BullMQ + Redis (self-hosted no VPS Contabo) em produção desde 2026-05.
 - Aberta 2 — Stack de pagamentos (Stripe vs MB Way vs outro. Relevante quando: planos Pro e Elite forem lançados).
 - Aberta 3 — Anonimização de dados PII/anamnese (Como tratar dados médicos sensíveis a longo prazo. Relevante quando: mais tenants activos, possível RGPD).
 

@@ -1,51 +1,72 @@
 # Testing Guidelines — Laura SaaS Agenda
 
-Lê este ficheiro ao escrever ou modificar testes em `src/__tests__/`.
+Lê este ficheiro ao escrever ou modificar testes em `tests/`.
+
+Os testes vivem em `tests/` (Jest ESM, `NODE_OPTIONS=--experimental-vm-modules`). **Nunca em `src/__tests__/`.**
 
 ---
 
 ## Stack de Testes
 
-- **Runner:** Jest
+- **Runner:** Jest (ESM)
 - **HTTP:** Supertest
 - **DB:** `mongodb-memory-server` — nunca usar MongoDB real em testes
-- **Mocks obrigatórios:** OpenAI, Z-API, SMTP (nodemailer), Web Push
+- **Mocks obrigatórios:** OpenAI, Evolution API, SMTP/Resend, Web Push
 
 ---
 
 ## Setup Padrão
 
+`tests/setup.js` exporta helpers; cada ficheiro de teste chama-os nos seus hooks (não há `globalSetup`/`setupFilesAfterEnv`):
+
 ```javascript
-// src/__tests__/setup.js
-import { MongoMemoryServer } from 'mongodb-memory-server';
+// tests/setup.js
 import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
-let mongod;
+let mongoServer;
 
-beforeAll(async () => {
-  mongod = await MongoMemoryServer.create();
-  await mongoose.connect(mongod.getUri());
-});
+export async function setupTestDB() {
+  mongoServer = await MongoMemoryServer.create();
+  const uri = mongoServer.getUri();
+  process.env.MONGODB_URI = uri;
+  process.env.JWT_SECRET = 'test-jwt-secret-key';
+  process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-key';
+  process.env.NODE_ENV = 'test';
+  await mongoose.connect(uri);
+}
 
-afterEach(async () => {
-  // limpar todas as collections entre testes
+export async function teardownTestDB() {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+}
+
+export async function clearDB() {
   const collections = mongoose.connection.collections;
   for (const key in collections) {
     await collections[key].deleteMany({});
   }
-});
-
-afterAll(async () => {
-  await mongoose.disconnect();
-  await mongod.stop();
-});
+}
 ```
 
-Configurar em `jest.config.js`:
+Uso num ficheiro de teste:
+```javascript
+import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
+
+beforeAll(setupTestDB);
+afterEach(clearDB);
+afterAll(teardownTestDB);
+```
+
+`jest.config.js` (ESM, corre com `NODE_OPTIONS=--experimental-vm-modules`):
 ```javascript
 export default {
-  globalSetup: './src/__tests__/setup.js',
   testEnvironment: 'node',
+  testTimeout: 30000,
+  testMatch: ['**/tests/**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', '/laura-saas-frontend/'],
+  clearMocks: true,
+  restoreMocks: true,
 };
 ```
 
@@ -54,9 +75,9 @@ export default {
 ## Estrutura de Teste
 
 ```javascript
-// src/__tests__/auth.test.js
+// tests/auth.test.js
 import request from 'supertest';
-import app from '../app.js';
+import app from '../src/app.js';
 
 describe('POST /api/auth/login', () => {
   it('rejeita credenciais inválidas com 401', async () => {
@@ -117,7 +138,7 @@ describe('Isolamento multi-tenant — Cliente', () => {
 - Testes são determinísticos — sem dependência de ordem ou timing
 - Cada teste começa com DB limpa (ver `afterEach` acima)
 - Cobrir obrigatoriamente cenários negativos: credenciais erradas, limites de plano, bloqueios
-- Mockar todos os serviços externos — nunca chamar OpenAI ou Z-API em testes
+- Mockar todos os serviços externos — nunca chamar OpenAI ou Evolution API em testes
 
 ```javascript
 // Mock de serviço externo
@@ -136,17 +157,16 @@ jest.mock('../services/openaiService.js', () => ({
 
 ---
 
-## CI — Correcção Pendente
+## CI
 
-O `.github/workflows/ci.yml` usa `MONGO_URI: mongodb://localhost:27017/test` mas não configura serviço MongoDB.
-Com `mongodb-memory-server` essa env var deixa de ser necessária — remover do CI ao implementar a suite de testes.
+Com `mongodb-memory-server` a suite não precisa de um serviço MongoDB no CI — não configurar `MONGO_URI` para apontar a um Mongo externo no `.github/workflows/ci.yml`.
 
 ---
 
 ## Checklist Antes de Commitar Testes
 
 - [ ] `mongodb-memory-server` usado (nunca MongoDB real)
-- [ ] Serviços externos mockados (OpenAI, Z-API, SMTP)
+- [ ] Serviços externos mockados (OpenAI, Evolution API, SMTP/Resend)
 - [ ] Teste de isolamento multi-tenant existe para cada recurso novo
 - [ ] Cenários negativos cobertos
 - [ ] `npm test` passa localmente

@@ -18,8 +18,7 @@ export const notificarCliente = async (req, res) => {
 
 export const enviarMensagemDireta = async (req, res) => {
   const { to, body } = req.body;
-  // Nota: Verifique se 'sendZapiWhatsAppMessage' é a função correta que você quer usar aqui.
-  const result = await sendZapiWhatsAppMessage(to, body);
+  const result = await sendWhatsAppMessage(to, body);
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {

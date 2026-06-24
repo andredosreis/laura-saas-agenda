@@ -1,19 +1,21 @@
 # API Patterns — Laura SaaS Agenda
 
-Lê este ficheiro ao adicionar ou modificar rotas em `src/routes/`.
+Lê este ficheiro ao adicionar ou modificar rotas em `src/routes/` ou `src/modules/<módulo>/`.
 
-Base URL: `http://localhost:5000/api`
+Base URL (dev): `http://localhost:5001/api/v1` (porta via `PORT` no `.env`; default do código é 5000).
+
+**Versionamento:** as rotas de recurso são montadas em dual-path em `src/app.js` — `/api/<recurso>` (alias legacy) e `/api/v1/<recurso>` (canónico). Ao adicionar um router, usar o array `apiResources` em `app.js` para obter o dual-mount automático; nunca `app.use('/api/foo', ...)` hardcoded fora desse loop. Webhooks (`/webhook/*`) ficam fora do versionamento. Novos deploys do frontend apontam `VITE_API_URL` para `/api/v1`.
 
 ---
 
 ## Estrutura de Rota
 
 ```javascript
-// routes/clienteRoutes.js — só routing, sem lógica
+// src/modules/clientes/clienteRoutes.js — só routing, sem lógica
 import { Router } from 'express';
-import { authenticate } from '../middlewares/auth.js';
-import { requirePlan } from '../middlewares/requirePlan.js';
-import * as ctrl from '../controllers/clienteController.js';
+import { authenticate } from '../../middlewares/auth.js';
+import { requirePlan } from '../../middlewares/requirePlan.js';
+import * as ctrl from './clienteController.js';
 
 const router = Router();
 router.use(authenticate);                    // todas as rotas protegidas
@@ -95,7 +97,7 @@ POST /api/auth/forgot-password
 POST /api/auth/reset-password
 GET  /api/auth/verify-reset-token/:token
 GET  /api/auth/verify-email/:token
-POST /api/webhook/whatsapp        ← protegido por x-api-token, não JWT
+POST /webhook/whatsapp            ← protegido por header `apikey` (Evolution API), não JWT
 ```
 
 Todas as outras rotas exigem `authenticate` middleware.

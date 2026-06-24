@@ -25,7 +25,7 @@ Lê este ficheiro ao criar commits ou pull requests.
 feat: adicionar banner de trial a expirar no dashboard
 fix: corrigir isolamento de tenant em agendamentosController
 test: adicionar testes de isolamento multi-tenant para clientes
-docs: actualizar ADR-006 com plano de migração Z-API
+docs: actualizar ADR-006 com plano de migração Evolution API
 chore: mover scripts de manutenção para scripts/maintenance/
 security: adicionar rate limiting nas rotas públicas de auth
 ```
