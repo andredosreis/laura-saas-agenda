@@ -30,6 +30,7 @@
 | 017 | [Lembretes Automáticos de Parcelas via WhatsApp (Evolution)](./ADR-017-lembretes-whatsapp-parcelas.md) | NOTIF | 🟡 Proposed | 2026-04-23 | 125 |
 | 020 | [Limite Explícito de 100 em Listagens de Clientes — Trajectória até Busca Server-Side](./ADR-020-listagem-paginacao-clientes-limit-100.md) | API | ✅ Accepted — Fase 1 | 2026-04-27 | 80 |
 | 026 | [Arquivamento de Mensagens para R2 (Cold Storage)](./ADR-026-arquivamento-mensagens-r2-cold-storage.md) | MESSAGING/INFRA | 🟡 Proposed | 2026-06-10 | 90 |
+| 029 | [Disaster Recovery do Stack Contabo — Backup Off-Site para R2](./ADR-029-disaster-recovery-stack-contabo-r2.md) | INFRA | 🟡 Proposed | 2026-06-23 | 120 |
 
 ---
 
