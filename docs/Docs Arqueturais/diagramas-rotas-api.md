@@ -19,21 +19,22 @@ Sistema de rotas da API com isolamento rigoroso de acesso via `tenantId` em arqu
 - Endpoints REST Transacionais (Agendamentos, Clientes, Pacotes, Financeiro)
 
 **Processos internos**
-- Middleware de Autenticação — verificação nativa de JWT
-- Middleware de Autorização — restrição cross-tenant por `tenantId`
+- Middleware de Autenticação — verificação de JWT, injecta `req.user` (`_id`, `tenantId`, `role`)
+- Middleware de Autorização (`authorize`) — RBAC por `role`/plano (403); **não** filtra por tenant
 - Middleware de Validação Zod — strip e limpeza de fields inválidos
+- Isolamento multi-tenant — garantido na camada de query dos controllers (`{ tenantId }`), não num middleware
 - Error Handler Global Central — oculta stack traces, propaga `requestId`
 - Controllers de Domínio — Agendamentos, Pacotes, Clientes, Financeiro
 
 **Contratos públicos**
-- Pasta `/shared/schemas` — fonte única de verdade para schemas Zod
-- Respostas padronizadas em JSON com códigos HTTP uniformes
+- Schemas Zod — no backend (`src/`) e no frontend (`laura-saas-frontend/src/schemas`); cada lado valida com o seu
+- Respostas padronizadas em JSON: `{ success: true, data }` / `{ success: false, error }`
 
 ---
 
 ## Diagrama 1 — Fluxo Principal e Validação Estrita
 
-Diagrama sequencial que explora a linha de barreiras que actuam antes do domínio transacional. Fundamental para QAs visualizarem em que momento as interceptações `401`, `403` e `400` deflectem do fluxo de persistência no MongoDB.
+Diagrama sequencial que explora a linha de barreiras que actuam antes do domínio transacional. Fundamental para QAs visualizarem em que momento as interceptações `401`, `404` (acesso cross-tenant) e `400` deflectem do fluxo de persistência no MongoDB.
 
 ```mermaid
 sequenceDiagram
@@ -51,14 +52,7 @@ sequenceDiagram
     alt JWT Ausente ou Expirado
         Auth-->>PWA: 401 Unauthorized
     else JWT Válido
-        Auth->>Ten: Injeta req.user + tenantId
-        Ten->>Ten: Checa target tenantId
-    end
-
-    alt Risco Cross-tenant
-        Ten-->>PWA: 403 Forbidden
-    else Tenant Autorizado
-        Ten->>Zod: Repassa body para validação
+        Auth->>Zod: Injeta req.user + tenantId, repassa body
         Zod->>Zod: Executa strip e valida schema
     end
 
@@ -66,14 +60,20 @@ sequenceDiagram
         Zod-->>PWA: 400 Bad Request + array de erros
     else Dados 100% válidos
         Zod->>Ctr: req.validatedBody + req.user.tenantId
-        Ctr->>DB: Mutação do documento
-        DB-->>Ctr: Result callback
-        Ctr-->>PWA: 201 Created + { data: {...} }
+        Ctr->>DB: Query/mutação SEMPRE com { tenantId }
+        alt Recurso de outro tenant (ou inexistente)
+            DB-->>Ctr: null
+            Ctr-->>PWA: 404 Not Found
+        else Pertence ao tenant
+            DB-->>Ctr: documento
+            Ctr-->>PWA: 201 Created + { success: true, data: {...} }
+        end
     end
 ```
 
 **Notas técnicas:**
 - O `tenantId` provém exclusivamente do JWT server-side — nunca do body da chamada
+- O isolamento cross-tenant **não** é um middleware dedicado: cada query do controller inclui `{ tenantId }`. Acesso a recurso de outro tenant devolve **`404`, nunca `403`** — não se revela que o recurso existe
 - O Zod executa `strip()` removendo campos não declarados no schema antes de passar ao controller
 - O controller recebe apenas `req.validatedBody` — nunca `req.body` directamente
 
@@ -88,15 +88,14 @@ flowchart TD
     Req[Request HTTP Endpoint] --> A{Valida JWT Auth}
 
     A -->|Inválido ou Ausente| E401[401 Unauthorized]
-    A -->|Válido| T{Valida Owner Tenant}
-
-    T -->|Não Pertence| E403[403 Forbidden]
-    T -->|Pertence| Z{Valida Via Zod}
+    A -->|Válido| Z{Valida Via Zod}
 
     Z -->|Formatação Inválida| E400[400 Bad Request + Array de Erros]
     Z -->|Válido e Limpo| C[Controller de Transacção]
 
-    C --> DB[(MongoDB Collections)]
+    C --> DB[(MongoDB — query SEMPRE com tenantId)]
+
+    DB -->|Recurso de outro tenant ou inexistente| E404[404 Not Found]
 
     DB -->|ValidationError Mongoose| EG[Error Global Handler]
     C -->|Exception de Lógica| EG
@@ -138,9 +137,11 @@ flowchart LR
 
 ---
 
-## Diagrama 4 — Sincronia Contratual Partilhada
+## Diagrama 4 — Sincronia Contratual Partilhada (PROPOSTA)
 
-Diagrama de classes que documenta a fonte única de verdade dos schemas Zod. Endereça o RISCO-03 — schemas desincronizados entre frontend e backend.
+> ⚠️ **Estado: proposta, não implementada.** Hoje os schemas Zod estão duplicados — backend em `src/` e frontend em `laura-saas-frontend/src/schemas`. O diagrama abaixo descreve o estado-alvo do RISCO-03 (pasta partilhada), ainda por implementar.
+
+Diagrama de classes que documenta a fonte única de verdade pretendida para os schemas Zod. Endereça o RISCO-03 — schemas desincronizados entre frontend e backend.
 
 ```mermaid
 classDiagram
@@ -165,8 +166,8 @@ classDiagram
     SharedSchemas <|-- BackendAPI
 ```
 
-**Notas técnicas:**
-- Ambos frontend e backend importam os schemas da pasta `/shared/schemas`
+**Notas técnicas (estado-alvo):**
+- Ambos frontend e backend importariam os schemas de uma pasta partilhada (ainda inexistente)
 - Uma alteração num schema propaga automaticamente nos dois lados
 - Elimina a classe de bugs onde o PWA envia payload válido para o frontend mas inválido para o backend
 - Testes de contrato devem comparar schemas de ambos os lados como critério de aceite
@@ -178,11 +179,11 @@ classDiagram
 | Camada | Código | Condição |
 |--------|--------|----------|
 | Middleware Auth | `401` | JWT ausente, expirado ou inválido |
-| Middleware Tenant | `403` | tenantId inválido ou cross-tenant |
+| Middleware Auth (`authorize`) | `403` | Sem permissão por role ou plano — **nunca** por tenant |
 | Middleware Zod | `400` | Payload malformado ou campos inválidos |
 | Controller | `201` | Recurso criado com sucesso |
 | Controller | `200` | Operação realizada com sucesso |
-| Controller | `404` | Recurso não encontrado no tenant |
+| Controller (query c/ `tenantId`) | `404` | Recurso inexistente **ou de outro tenant** (não se revela existência) |
 | Error Handler | `500` | Erro interno — stack trace ocultado |
 
 ---

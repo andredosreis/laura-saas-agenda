@@ -13,7 +13,7 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 
 ### 2. Objetivos técnicos
 - Atingir 100% de cobertura de validação com Zod bloqueando requests inválidos antes de atingir controllers (retorno 400 padronizado).
-- Garantir blindagem irrestrita cross-tenant defletindo falsificação e falha de tokens com resiliência 401/403.
+- Garantir blindagem irrestrita cross-tenant: falha/ausência de token → 401; acesso a recurso de outro tenant → **404** (nunca 403, para não revelar a existência do recurso).
 - Obter P95 das rotas transacionais medido rigorosamente < 500ms.
 - Zerar a incidência sistêmica de erros *ValidationErrors* causados por dados malformados na runtime do Mongoose, na produção.
 
@@ -34,16 +34,16 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 ### 4. Fluxos detalhados e diagramas
 **Fluxo principal**
 1. Request HTTP entra no Express.
-2. Middleware de Autenticação (Verifica JWT, Extrai `userId`/`tenantId` injetando no `req.user`, ou bloqueia 401).
-3. Middleware de Autorização (Confirma integridade/presença ativa do `tenantId` base, ou bloqueia 403).
+2. Middleware de Autenticação (Verifica JWT, Extrai `userId`/`tenantId`/`role` injetando no `req.user`, ou bloqueia 401).
+3. Middleware de Autorização `authorize` (RBAC por `role`/plano, ou bloqueia 403). Não filtra por tenant.
 4. Middleware de Validação Zod (Valida schema, aciona funcionalidade 'strip' e injeta a varíavel nativa protegida `req.validatedBody`, ou devolve array de logs em 400).
-5. Controller (Executa lógica do negócio sobre DB Mongoose estritamente com dados confiáveis).
+5. Controller (Executa lógica do negócio sobre DB Mongoose, **sempre com `{ tenantId }` na query**; recurso de outro tenant → 404).
 6. Error Handler Global (Garante a tratativa e muta o stack trace crítico de erros server-side não previstos numa mensagem padrão vazia).
-7. Resposta Transacional Padronizada ao PWA (Ex: `{ "data": ... }`).
+7. Resposta Transacional Padronizada ao PWA (`{ "success": true, "data": ... }`).
 
 **Fluxos alternativos e exceções**
 - Carga corrompida recusa a injeção do Zod, recuando fluxo para o Client antecipadamente como um HTTP 400 limpo da API, omitindo consumo fútil BD.
-- Cross-tenant forja a falha rebatida restritamente nos Middlewares paralelos, defletindo interceptações cruzadas como HTTP 403 limpo.
+- Acesso cross-tenant: a query do controller inclui sempre `{ tenantId }`, pelo que um recurso de outro tenant simplesmente não é encontrado → **HTTP 404 limpo** (nunca 403 — não se revela que o recurso existe).
 
 ---
 
@@ -51,11 +51,13 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 **Contratos da API Transacional**
 - Tipo: endpoint
 - Métodos e Rotas padrão:
-  - GET /api/{recurso} → 200 + { data: [...] }
-  - GET /api/{recurso}/:id → 200 + { data: {...} } | 404
-  - POST /api/{recurso} → 201 + { data: {...} }
-  - PUT /api/{recurso}/:id → 200 + { data: {...} } | 404
-  - DELETE /api/{recurso}/:id → 204 No Content | 404
+  - GET /api/{recurso} → 200 + { success: true, data: [...], pagination: {...} }
+  - GET /api/{recurso}/:id → 200 + { success: true, data: {...} } | 404
+  - POST /api/{recurso} → 201 + { success: true, data: {...} }
+  - PUT /api/{recurso}/:id → 200 + { success: true, data: {...} } | 404
+  - DELETE /api/{recurso}/:id → 200 + { success: true, data: {...} } | 404
+
+  > Rotas montadas em dual-path: `/api/<recurso>` (legacy) e `/api/v1/<recurso>` (canónico).
 - Semântica de status/headers:
   - `Authorization`: `Bearer <JWT>`
   - `Content-Type`: `application/json`
@@ -78,6 +80,7 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 **Exemplo de resposta (201 Created)**
 ```json
 {
+  "success": true,
   "data": {
     "id":        "string (ObjectId)",
     "tenantId":  "string (ObjectId)",
@@ -97,11 +100,12 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 
 ### 6. Erros, exceções e fallback
 
-- Matriz de erros previstos e tratamentos:
-  - 400: `{"erro": "payload_invalido", "detalhes": [{ "campo": "nome", "mensagem": "..."}]}`
-  - 401: `{"erro": "nao_autenticado", "mensagem": "token ausente ou expirado"}`
-  - 403: `{"erro": "acesso_negado", "mensagem": "sem permissão para este recurso"}`
-  - 500: `{"erro": "erro_interno", "mensagem": "erro interno do servidor"}`
+- Matriz de erros previstos e tratamentos (contrato fixo `{ success: false, error }`):
+  - 400: `{"success": false, "error": "Payload inválido", "detalhes": [{ "campo": "nome", "mensagem": "..."}]}`
+  - 401: `{"success": false, "error": "Token ausente ou expirado"}`
+  - 403: `{"success": false, "error": "Sem permissão"}` (por role/plano — nunca por tenant)
+  - 404: `{"success": false, "error": "Recurso não encontrado"}` (inclui acesso a recurso de outro tenant)
+  - 500: `{"success": false, "error": "Erro interno"}`
 - Estratégias de resiliência: Timeouts duplos e *Error Handler Global* absorvendo quebras de node não programadas (s/ expor *stack traces* em prop). 
 - Invariante estrutural Crítico: **`tenantId` deriva exclusivamente do lado da malha do Servidor atado pelo JWT. Não interage em input ou request.**
 
@@ -111,7 +115,7 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 
 **Métricas**
 - Volume quantificado da totalidade do código `5xx` nativo.
-- Cargas vertentes intensas de interceptações passivas `403` indicando agressividade exploratória de infra externa.
+- Cargas intensas de `401`/`404` indicando agressividade exploratória ou tentativas de acesso cross-tenant.
 
 **Logs**
 - Formato e campos essenciais: Log JSON processado via app pacote central `Pino` (filtrando info/warn/error). Presença injetada obrigatória e simultânea do pilar `tenantId` e `requestId`.
@@ -122,7 +126,7 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 - Correlação transversal da sessão linkada diretamente via header inserido programaticamente no express como `X-Request-Id`.
 
 **Dashboards e alertas**
-- Monitoramento do pipeline base enviando triggers e *Email/Slack* vinculando os contadores estritos de desvios (400, 401, 500 e 403 maliciosos concentrados).
+- Monitoramento do pipeline base enviando triggers e *Email/Slack* vinculando os contadores estritos de desvios (400, 401, 404 cross-tenant e 500 concentrados).
 
 ---
 
@@ -144,7 +148,7 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 ### 9. Critérios de aceite técnicos
 
 - `CA-01` — Unit Tests (Supertest) demonstram isolamento imediato da falha do `schema payload` (HTTP 400 + details JSON Array) provando ausência da chamada de mutação dos Controllers.
-- `CA-02` — Testes atestam total confiabiliadade defletira da API impedindo fluxos "cross-tenant" ilegítimos com restrição passiva forçada no (HTTP 403). Mero repasse ignorado do TenantId forjado.
+- `CA-02` — Testes atestam o isolamento multi-tenant: um tenant que tenta aceder a recurso de outro recebe **HTTP 404** (nunca 403 nem 200). `tenantId` do body é ignorado — só conta o do JWT.
 - `CA-03` — Obtenção em observabilidade contínua confirmando métrica final engessada do indicador latência real P95 rotineiramente em tempo de < 500ms.
 - `CA-04` — `requestId` provado vivo dentro das amarrações logadas JSON (Pino) unindo sua id ao painel/context estático trace do Sentry e header finalizado.
 - `CA-05` — Cessação de totalidade contável gerando falhas em Produção causadas em log por `ValidationErrors` nativo retornado nas threads sujas do Mongoose via input errado.
@@ -166,7 +170,7 @@ Este FDD formaliza os contratos técnicos das rotas transacionais internas da AP
 - **Impacto:** Médio — Travagem acidental contra redes atreladas/compras de Proxy dos clientes.
 - **Mitigação:**
     - Abordagem unificadora implementada rate limiter com base no ID único do `tenantId` ao invés da filtragem por IP padrão. Limitando falsos positivos na malha interna operando Web.
-    - Setup obrigatório do `trust proxy` e IP WhiteList na provedora Web (Vercel Node) visando os IPs fixos da Evolution API Gateway.
+    - Setup obrigatório do `trust proxy` (backend atrás do nginx no VPS Contabo) e IP WhiteList visando os IPs fixos da Evolution API Gateway.
 - **Plano de contingência:** Modulação passiva por ambiente relaxando limites nas engrenagens ativas por tenants/IDs específicos sob reclamação de instabilidade.
 
 #### RISCO-03 — Desincronização letal entre Schemas Zod PWA vs Backend

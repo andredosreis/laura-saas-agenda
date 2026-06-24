@@ -35,26 +35,40 @@ export const forgotPasswordLimiter = rateLimit({
 });
 ```
 
-Aplicar em `authRoutes.js`. Verificar que `app.set('trust proxy', 1)` está em `app.js` (necessário no Render).
+Aplicar em `authRoutes.js`. Verificar que `app.set('trust proxy', 1)` está em `app.js` (necessário atrás do nginx reverse proxy no VPS Contabo).
 
 ---
 
-## Validação de Webhook WhatsApp
+## Validação de Webhook WhatsApp (Evolution API)
 
 ```javascript
 // src/middlewares/webhookAuth.js
+import crypto from 'crypto';
+
+// Comparação timing-safe — evita timing attack a deduzir o token byte a byte.
+const safeEqual = (a, b) => {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+};
+
 export const validateWebhook = (req, res, next) => {
-  const token = req.headers['x-api-token'];
-  if (!token || token !== process.env.ZAPI_WEBHOOK_TOKEN) {
+  const token = req.headers['apikey'] || req.body?.apikey;
+  const expected = process.env.EVOLUTION_WEBHOOK_SECRET;
+  // Sem secret configurado, recusa sempre — nunca aceitar por omissão.
+  if (!expected || !token || !safeEqual(String(token), expected)) {
     return res.status(401).json({ success: false, error: 'Webhook não autorizado' });
   }
   next();
 };
 ```
 
-- Usar sempre header `x-api-token`, nunca query string
-- `ZAPI_WEBHOOK_TOKEN` vem exclusivamente de env var
-- Nunca aceitar token via `?token=` (query param é logado por proxies)
+- Token via header `apikey` (ou `req.body.apikey`) — formato da Evolution API
+- `EVOLUTION_WEBHOOK_SECRET` vem exclusivamente de env var
+- Comparação sempre timing-safe (`crypto.timingSafeEqual`), nunca `===` directo
+- Sem secret configurado → recusar sempre (fail-closed), nunca aceitar por omissão
 
 ---
 
@@ -86,7 +100,7 @@ const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
 import helmet from 'helmet';
 import cors from 'cors';
 
-app.set('trust proxy', 1);                       // necessário no Render
+app.set('trust proxy', 1);                       // necessário atrás do nginx (VPS Contabo)
 app.use(helmet());                               // headers de segurança
 app.use(cors({ origin: process.env.FRONTEND_URL })); // nunca '*' em produção
 app.use(express.json({ limit: '10kb' }));        // limitar payload
@@ -122,7 +136,7 @@ app.use(express.json({ limit: '10kb' }));        // limitar payload
 
 - [ ] Nenhuma rota privada ficou sem `authenticate` middleware
 - [ ] Rate limit em `register`, `login`, `forgot-password`
-- [ ] Webhook rejeita requests sem `x-api-token` válido
+- [ ] Webhook rejeita requests sem `apikey` válido (timing-safe, fail-closed)
 - [ ] JWT continua funcional (login, refresh, logout)
 - [ ] Nenhum segredo hardcoded
 - [ ] `helmet()` e CORS configurados

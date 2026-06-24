@@ -25,8 +25,8 @@
       "MongoDB",
       "React (Vite)",
       "Tailwind CSS",
-      "BullMQ (Futuro)",
-      "Redis (Futuro)"
+      "BullMQ (em produção)",
+      "Redis (em produção, self-hosted)"
     ],
     "deployment": "cloud",
     "patterns": [
@@ -129,7 +129,7 @@
   ],
   "scalability_availability": {
     "strategies": [
-      "Scaling horizontal com ambiente stateless Cloud na Vercel."
+      "Frontend PWA na rede de borda Vercel; Core API stateless no VPS Contabo (Docker), atrás de nginx."
     ],
     "caching": "React PWA Local state caching.",
     "partitioning": "Isolamento lógico pelo TenantId via NoSQL.",
@@ -138,7 +138,7 @@
   "security": {
     "authentication": "JWT Tokens via modelo Access/Refresh.",
     "authorization": "Isolamento lógico absoluto pelo tenantId nos fluxos.",
-    "secrets_management": "Variáveis de ambiante OS em nuvem Vercel.",
+    "secrets_management": "Env vars: dashboard Vercel (frontend) e .env no VPS Contabo (backend).",
     "encryption_in_transit": "End-to-End HTTPS/TLS.",
     "encryption_at_rest": "BCrypt de senhas. Criptografia transparente Atlas Db.",
     "pii_policy": "Fase 2 de proteção base tenant (Padrão); Phase 3 prevê plano de Anonimização estrita RGPD."
@@ -189,7 +189,7 @@
       "ADR 002 - Transpasso das Ideias Nativas Mobile p/ Stack Exclusiva em PWA (Rapidez/Custo)."
     ],
     "pending_decisions": [
-      "Aberta 1 — Queue (BullMQ vs Serverless)",
+      "RESOLVIDA — Queue: BullMQ + Redis (self-hosted VPS) em produção desde 2026-05",
       "Aberta 2 — Provedor Pago Padrão (Stripe V MBway)",
       "Aberta 3 — PDD Rules (Politíca de anonimização estrita pro RGPD)"
     ],

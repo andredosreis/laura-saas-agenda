@@ -10,8 +10,9 @@ Sistema de rotas da API com isolamento rigoroso de acesso via `tenantId` em arqu
 - Endpoints REST Transacionais
 
 ### Processos internos
-- Middleware de Autenticação (verificação nativa de JWT)
-- Middleware de Autorização (restrição base cross-tenant)
+- Middleware de Autenticação (verificação de JWT; injecta `_id`/`tenantId`/`role`)
+- Middleware de Autorização `authorize` (RBAC por `role`/plano → 403; **não** filtra por tenant)
+- Isolamento multi-tenant na camada de query dos controllers (`{ tenantId }`)
 - Middleware de Validação Zod (retirada de fields sujos)
 - Error Handler Global Central
 - Controllers de Domínio (Agendamentos, Pacotes, Clientes)
@@ -21,20 +22,19 @@ Sistema de rotas da API com isolamento rigoroso de acesso via `tenantId` em arqu
 - Limitações de Rate Limiting moldadas por permissões de rede (CGNAT / Whitelist)
 
 ### Contratos públicos
-- Pasta fonte agnóstica de Schemas `/shared/schemas`
-- Respostas tabuladas em Padrões JSON de Erro
+- Schemas Zod duplicados por lado (backend `src/`, frontend `laura-saas-frontend/src/schemas`); pasta partilhada `/shared/schemas` é proposta (RISCO-03), ainda não existe
+- Respostas padronizadas `{ success, data }` / `{ success, error }`
 
 ## Diagramas
 
 ### Fluxo Principal e Validação Estrita
-Este diagrama sequencial explora em detalhe a linha férrea das barreiras que atuam antes do domínio transacional. Fundamental para o raciocínio dos QAs visualizarem em que momento as interceptações `401`, `403` e `400` defletem do fluxo de persistência BD.
+Este diagrama sequencial explora em detalhe a linha de barreiras que atuam antes do domínio transacional. Fundamental para o raciocínio dos QAs visualizarem em que momento as interceptações `401`, `400` e `404` (cross-tenant) defletem do fluxo de persistência BD.
 
 ```mermaid
 sequenceDiagram
     participant PWA as Client PWA
     participant Exp as Express Route
     participant Auth as Middleware Auth
-    participant Ten as Middleware Tenant
     participant Zod as Middleware Zod
     participant Ctr as API Controller
     participant DB as MongoDB Atlas
@@ -45,14 +45,7 @@ sequenceDiagram
     alt JWT Ausente Expirado
         Auth-->>PWA: 401 Unauthorized
     else JWT Valido
-        Auth->>Ten: Injeta Contexto
-        Ten->>Ten: Checa target tenantId
-    end
-    
-    alt Risco Cross-tenant
-        Ten-->>PWA: 403 Forbidden
-    else Autorizado
-        Ten->>Zod: Repassa body limpo
+        Auth->>Zod: Injeta Contexto, repassa body
         Zod->>Zod: Executa Zod Strip
     end
 
@@ -60,15 +53,20 @@ sequenceDiagram
         Zod-->>PWA: 400 Bad Request
     else Dados 100% estritos
         Zod->>Ctr: req.validatedBody
-        Ctr->>DB: Mutacao do Documento
-        DB-->>Ctr: Result Callback
-        Ctr-->>PWA: 201 Created
+        Ctr->>DB: Query/mutacao SEMPRE com { tenantId }
+        alt Recurso de outro tenant ou inexistente
+            DB-->>Ctr: null
+            Ctr-->>PWA: 404 Not Found
+        else Pertence ao tenant
+            DB-->>Ctr: documento
+            Ctr-->>PWA: 201 Created
+        end
     end
 ```
 
 **Notas**:
 - Nenhuma validação depende de dados mascarados presentes ou declarados ativamente pelo 'Body' da chamada.
-- O campo vital `tenantId` provém do server-side via injeção.
+- O campo vital `tenantId` provém do server-side via injeção; acesso cross-tenant → 404, nunca 403.
 
 ---
 
@@ -80,15 +78,14 @@ flowchart TD
     Req[Req HTTP Endpoint] --> A{Valida JWT Auth}
     
     A -->|Invalido| E401[401 Unauthorized]
-    A -->|Valido| T{Valida Owner Tenant}
-    
-    T -->|Nao Pertence| E403[403 Forbidden]
-    T -->|Pertence| Z{Valida Via Zod}
+    A -->|Valido| Z{Valida Via Zod}
     
     Z -->|Formatacao Ruim| E400[400 Bad Request Payload]
     Z -->|Valido Completo| C[Controller de Transacao]
     
-    C --> DB[(MongoDB Colecoes)]
+    C --> DB[(MongoDB — query SEMPRE com tenantId)]
+    
+    DB -->|Recurso de outro tenant ou inexistente| E404[404 Not Found]
     
     DB -->|Surge Validation Error| EG[Erro Global Handler]
     C -->|Exception de Lógica| EG
@@ -121,8 +118,8 @@ flowchart LR
 
 ---
 
-### Sincronia Contratual Partilhada
-Ilustração referencial de onde as chaves base pre-formam blocos de confiança atrelados simultaneamente. Aborda o "Risco-03" relatado documentando a fonte da verdade da tipagem.
+### Sincronia Contratual Partilhada (PROPOSTA — não implementada)
+Ilustração referencial do estado-alvo do "Risco-03": hoje os schemas estão duplicados (backend `src/` e frontend `laura-saas-frontend/src/schemas`); a pasta partilhada abaixo ainda não existe.
 
 ```mermaid
 classDiagram

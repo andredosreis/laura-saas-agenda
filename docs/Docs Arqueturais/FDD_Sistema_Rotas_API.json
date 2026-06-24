@@ -29,7 +29,7 @@
     },
     {
       "objective": "Garantir Cross-Tenant Isolation absoluto (Leak free).",
-      "measure_or_invariant": "100% dos fluxos bloqueando acessos ilegais a vizinhos no sistema através de HTTP 403 e validação Auth no Middleware."
+      "measure_or_invariant": "100% dos fluxos bloqueando acessos ilegais a vizinhos: query sempre com { tenantId }, recurso de outro tenant retorna HTTP 404 (nunca 403)."
     },
     {
       "objective": "Afinação de Perfomance.",
@@ -48,10 +48,10 @@
   "detailed_flows": {
     "main_flow": [
       "1. Request HTTP entra no Express.",
-      "2. Middleware de Autenticação avalia o JWT e preenche var req.user com userId + tenantId.",
-      "3. Middleware de Autorização assegura validações cross-tenant ou emite um bloqueio precoce (HTTP 403).",
+      "2. Middleware de Autenticação avalia o JWT e preenche var req.user com userId + tenantId + role.",
+      "3. Middleware de Autorização (authorize) aplica RBAC por role/plano (HTTP 403 se negado); não filtra por tenant.",
       "4. Middleware de Validação do Zod testa conformidade dos payload body/queries, efetuando exclusão ('strip'), transpassando-os a 'req.validatedBody' em positivo, ou caindo a falha no erro paramétrico documentado arrays no erro 400 padronizado.",
-      "5. Controller aciona regras finais de modelagem operando mutações diretas com o provider Mongoose injetando informações.",
+      "5. Controller aciona regras finais operando queries/mutações Mongoose SEMPRE com { tenantId }; recurso de outro tenant não é encontrado e retorna HTTP 404.",
       "6. Error Handler globaliza os problemas colaterais (non-caught) da esteira silenciando o 'stack error native trace'.",
       "7. Callback formatado (201 ou 200 base) transmitido e encerrando pipeline."
     ],
@@ -113,17 +113,17 @@
       {
         "condition": "Zod Schema Mismatch / Missing Payload Keys",
         "treatment": "HTTP 400 Bad Request",
-        "notes": "Devolve formatado: { erro: \"payload_invalido\", detalhes: [ array de descrições dos campos do zod ] }"
+        "notes": "Devolve formatado: { success: false, error: \"Payload inválido\", detalhes: [ array de descrições dos campos do zod ] }"
       },
       {
         "condition": "Falta do Authentication/JWT Header Valido",
         "treatment": "HTTP 401 Unauthorized",
-        "notes": "Devolve: { erro: \"nao_autenticado\" }"
+        "notes": "Devolve: { success: false, error: \"Token ausente ou expirado\" }"
       },
       {
-        "condition": "Carga provada e tentada fora do isolamento 'Target' do JWT TenantID",
-        "treatment": "HTTP 403 Forbidden",
-        "notes": "Sinalizar possivel flag maliciosa. Acesso negado."
+        "condition": "Acesso a recurso de outro tenant (query com { tenantId } não encontra)",
+        "treatment": "HTTP 404 Not Found",
+        "notes": "Devolve: { success: false, error: \"Recurso não encontrado\" }. Nunca 403 — não se revela que o recurso existe."
       },
       {
         "condition": "Catching genérico colateral do Servidor",
@@ -143,7 +143,7 @@
   "observability": {
     "metrics": [
       "Taxa bruta / Volume da captação global 5xx (Server Fault).",
-      "Clusters repetidos e suspeitos da recusa 403 forçando cross-tenant.",
+      "Clusters repetidos e suspeitos de 404 forçando acesso cross-tenant.",
       "Volume da recusa de 400s (Desuso/Desalinhamento visual Front/Base)."
     ],
     "logs": {
@@ -166,7 +166,7 @@
       "sampling": "Vinculação via middleware header paramétrico dinâmico de sessão `requestId` atrelado no ambiente."
     },
     "dashboards_alerts": [
-      "Sentry Alertas acionáveis vinculando triggers (Disparo para Slack e Email Engineeer) em falhas concentradas de 403s."
+      "Sentry Alertas acionáveis vinculando triggers (Disparo para Slack e Email Engineer) em falhas concentradas de 500s e picos de 404 cross-tenant."
     ]
   },
   "dependencies_compatibility": {
@@ -208,7 +208,7 @@
   },
   "acceptance_criteria": [
     "CA-01: Unit Testing (Jest) prova payload falsificado barrado com matriz HTTP 400 prévia a injecção no controller.",
-    "CA-02: Barramento pleno (100% Coverage pass testing) negando com 403 todas interações mascaradas tentando isolamento entre cross-tenants.",
+    "CA-02: Teste de isolamento multi-tenant — acesso a recurso de outro tenant retorna HTTP 404 (nunca 403 nem 200); tenantId do body é ignorado.",
     "CA-03: Sub-Latência P95 das execuções monitorada em janela média abaixo da régua restritiva dos < 500 ms.",
     "CA-04: Transmissão rastreável fluida do `requestId` integrando logs passivos (Pino), Reposta e Error Context Spans (Sentry Cloud).",
     "CA-05: Fim da manifestação da label `ValidationErrors` nativas oriundas do DB Mongoose ocorridos nas esteiras ativas logadas."
@@ -239,7 +239,7 @@
       "probability": "high",
       "impact": "Alto. Ruptura de consistência. PWA passará a atestar envios seguros que colidem mudos na barreira API restritiva de back.",
       "mitigation": [
-        "Empregar monorepo partilhado atrelando instâncias e cópia única das keys no path master `/shared/schemas` validado aos dois lados universalmente."
+        "(PROPOSTA, ainda não implementada — hoje os schemas estão duplicados em src/ e laura-saas-frontend/src/schemas) Empregar pasta partilhada `/shared/schemas` com cópia única dos schemas validada aos dois lados."
       ],
       "contingency_plan": "Utilização e engate de automações com Contract Tests passivos comprovando paridades contínuas num Pipeline / CI Action."
     }
