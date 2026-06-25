@@ -22,13 +22,16 @@ const FILTROS: { key: Filtro; label: string }[] = [
   { key: 'clientes', label: '👤 Clientes' },
 ];
 
+// Apresentar sempre na hora da clínica (Europe/Lisbon), não no fuso do browser.
+const ZONA = 'Europe/Lisbon';
+const diaLisboa = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: ZONA });
+
 function formatHora(iso: string) {
   const d = new Date(iso);
-  const hoje = new Date();
-  if (d.toDateString() === hoje.toDateString()) {
-    return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  if (diaLisboa(d) === diaLisboa(new Date())) {
+    return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: ZONA });
   }
-  return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
+  return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', timeZone: ZONA });
 }
 
 function Conversas() {
