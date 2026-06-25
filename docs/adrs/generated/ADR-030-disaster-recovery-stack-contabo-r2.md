@@ -1,4 +1,6 @@
-# ADR-029: Disaster Recovery do Stack Contabo — Backup Off-Site para R2
+# ADR-030: Disaster Recovery do Stack Contabo — Backup Off-Site para R2
+
+> **Nota (2026-06-25):** renumerado de ADR-029 → ADR-030 para resolver duplicação de número (existiam dois ADR-029). O ADR-029 fica reservado para "Manter o Contabo como host único + backup próprio em R2" (Accepted, 2026-06-21).
 
 **Status:** Proposed
 **Data:** 2026-06-23
