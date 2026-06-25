@@ -12,7 +12,7 @@
 
 O Marcai integra WhatsApp via **Evolution API**, que por baixo usa **Baileys** — uma biblioteca **não-oficial** que faz engenharia reversa do WhatsApp Web (ver ADR-014, ADR-016, ADR-021). Funciona bem para o uso actual (clientes/leads orgânicos) e tem custo zero por mensagem.
 
-A estratégia de negócio (ver `docs/business-model.md`) aposta em **tráfego pago via Click-to-WhatsApp ads** (Meta): anúncios que abrem uma conversa de WhatsApp, onde a IA do Marcai qualifica e converte. Este é o go-to-market diferenciador.
+A estratégia de negócio (ver `docs/negocio/business-model.md`) aposta em **tráfego pago via Click-to-WhatsApp ads** (Meta): anúncios que abrem uma conversa de WhatsApp, onde a IA do Marcai qualifica e converte. Este é o go-to-market diferenciador.
 
 Esta ambição colide com limitações do Baileys:
 
@@ -90,14 +90,14 @@ A decisão de migrar **todos** os tenants para Cloud API (vs manter híbrido per
 2. **Onboarding Cloud API** — escolher BSP UE (ex: 360dialog), verificar Meta Business, registar número, aprovar templates base.
 3. **Webhook + atribuição** — receber `ctwa_clid`/referral no inbound; persistir origem (campanha/anúncio) na `Conversa`/`Lead`.
 4. **Piloto** — um tenant com anúncios reais; medir entregabilidade, atribuição e custo.
-5. **Dashboard de ROI** — anúncio → lead → qualificado → marcado → receita (liga ao `business-model.md` §4).
+5. **Dashboard de ROI** — anúncio → lead → qualificado → marcado → receita (liga ao `negocio/business-model.md` §4).
 6. **Decisão híbrido vs total** — reavaliar após piloto.
 
 ---
 
 ## Links e Referências
 
-- **Estratégia que motiva esta ADR:** `docs/business-model.md` (§3 loop de tráfego pago, §4 atribuição)
+- **Estratégia que motiva esta ADR:** `docs/negocio/business-model.md` (§3 loop de tráfego pago, §4 atribuição)
 - **ADRs relacionados:**
   - [ADR-014: Evolution API WhatsApp Migration](./ADR-014-evolution-api-whatsapp-migration.md)
   - [ADR-016: Evolution API v2 Upgrade](./ADR-016-evolution-api-v2-upgrade.md)

@@ -10,4 +10,4 @@
 2. Test + impl: `PUT /tenants/:id/limites` updates limits + flags, audited; negative limit / wrong flag type → 400; extra body keys ignored. Route via `adminMutation('tenant.limites.update', …)`.
 
 ## Phase 3 — verify
-3. Gates (`lint` + `test`) green; sweep test auto-covers the two new routes' 404. Set F07 `status: "Implemented"` in `docs/PRDProgress.json`.
+3. Gates (`lint` + `test`) green; sweep test auto-covers the two new routes' 404. Set F07 `status: "Implemented"` in `docs/produto/PRDProgress.json`.

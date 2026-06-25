@@ -95,7 +95,7 @@ No regressions detected in the full suite test run. **Gate: pass.**
 - `src/modules/admin/adminController.js` (modified - added `criarTenant` handler)
 - `src/modules/admin/adminRoutes.js` (modified - added `POST /tenants` endpoint)
 - `tests/admin-tenant-create.test.js` (new - unit tests for F06)
-- `docs/PRDProgress.json` (modified - updated F06 status to "Implemented")
+- `docs/produto/PRDProgress.json` (modified - updated F06 status to "Implemented")
 
 ## Pending manual checks
 

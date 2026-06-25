@@ -81,7 +81,7 @@ During the implementation, Zod's `z.string().datetime()` was flagged as deprecat
 | `src/modules/admin/adminController.js` | Service | +1 function (`listarAudit`) |
 | `src/modules/admin/adminRoutes.js` | API | +1 GET route |
 | `tests/admin-audit-log.test.js` | Test | [NEW] 12 tests (C1–C4) |
-| `docs/PRDProgress.json` | Tracking | F09 → done |
+| `docs/produto/PRDProgress.json` | Tracking | F09 → done |
 
 ---
 

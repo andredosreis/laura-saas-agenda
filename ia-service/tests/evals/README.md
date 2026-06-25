@@ -2,7 +2,7 @@
 
 Suite de avaliação automática do agente conversacional Python. Cada
 fixture é uma **conversa real** capturada na sessão de testes E2E
-(`docs/testes-ia/01-sessao-2026-05-18.md`) decomposta em turn-checkpoints
+(`docs/testes/ia/01-sessao-2026-05-18.md`) decomposta em turn-checkpoints
 com expectativas comportamentais.
 
 O objectivo é fechar o loop: mudaste o prompt? Corre o eval. Aparece

@@ -109,11 +109,13 @@ O produto **não impõe** um fluxo — adapta-se. (Ver `docs/fdd-conversas-inbox
 
 ## 7. Pricing e tiers
 
+> **ACTUALIZAÇÃO 2026-06-24 — o modelo de venda passou a CONSULTORIA done-for-you.** A fonte canónica de pricing e empacotamento é agora **`docs/oferta-consultoria.md`** (setup fee one-time + mensalidade gerida com optimização). Tiers oficiais: **Essencial / Pro / Custom** (largados o "Básico", já morto, e o "Elite"). A tabela abaixo fica como referência histórica do raciocínio self-serve original.
+
 **Decisão:** **sem tier Básico.** Competir com o grátis na comodidade não compensa o custo computacional. Entrar já pelo produto de IA.
 
-| | **Pro** ⭐ (entrada) | **Elite** | **Custom** |
+| | **Essencial** ⭐ (entrada) | **Pro** | **Custom** |
 |---|---|---|---|
-| Preço sugerido | **€99-129** | **€199-299** | negociado |
+| Preço sugerido | **€490 setup + €149/mês** | **€890 setup + €299/mês** | negociado |
 | Marcações + clientes + lembretes | ✅ | ✅ | ✅ |
 | IA WhatsApp (booking) | ✅ | ✅ | ✅ |
 | IA conversão de leads | ✅ | ✅ | ✅ |

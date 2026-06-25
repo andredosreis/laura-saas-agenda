@@ -8,4 +8,4 @@
 2. Test + impl: filters (`targetTenantId`, `actorUserId`, `action`, `status`, `from`/`to`); invalid filter → 400.
 
 ## Phase 2 — verify
-3. Gates (`lint` + `test`) green; sweep test auto-covers the route's 404; confirm no audit-mutation route. Set F09 `status: "Implemented"` in `docs/PRDProgress.json`.
+3. Gates (`lint` + `test`) green; sweep test auto-covers the route's 404; confirm no audit-mutation route. Set F09 `status: "Implemented"` in `docs/produto/PRDProgress.json`.
