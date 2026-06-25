@@ -13,4 +13,4 @@
 5. `AuditLogPage` — filterable table (F09).
 
 ## Phase 3 — verify
-6. `npm run build` + `npm run lint` green; Playwright happy path (list → detail → usage → audit). Set F10 `status: "Implemented"` in `docs/PRDProgress.json`.
+6. `npm run build` + `npm run lint` green; Playwright happy path (list → detail → usage → audit). Set F10 `status: "Implemented"` in `docs/produto/PRDProgress.json`.

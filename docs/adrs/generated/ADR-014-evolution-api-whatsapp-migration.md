@@ -114,7 +114,7 @@ EVOLUTION_WEBHOOK_SECRET=<chave>
 
 ## Documentação Operacional
 
-Criado `docs/evolution-api-operations.md` com procedimentos completos:
+Criado `docs/operacoes/evolution-api-operations.md` com procedimentos completos:
 - Verificar estado da conexão
 - Ligar/desligar WhatsApp (QR Code)
 - Trocar número
@@ -133,7 +133,7 @@ Criado `docs/evolution-api-operations.md` com procedimentos completos:
   - `src/utils/evolutionClient.js`
   - `src/middlewares/webhookAuth.js`
   - `src/controllers/webhookController.js`
-  - `docs/evolution-api-operations.md`
+  - `docs/operacoes/evolution-api-operations.md`
 - **ADRs relacionados:**
   - [ADR-006: Z-API WhatsApp Integration](./ADR-006-z-api-whatsapp-integration.md)
   - [ADR-013: Notification Pipeline BullMQ](./ADR-013-notification-pipeline-bullmq.md)

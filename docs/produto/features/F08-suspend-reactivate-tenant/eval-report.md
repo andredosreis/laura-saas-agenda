@@ -92,7 +92,7 @@
 | `src/modules/admin/adminRoutes.js` | API | +2 POST routes via `adminMutation` |
 | `src/modules/admin/adminMutation.js` | Infrastructure | Expanded to support `ctx.metadata` |
 | `tests/admin-tenant-suspend-reactivate.test.js` | Test | [NEW] 14 tests (C1–C5) |
-| `docs/PRDProgress.json` | Tracking | F08 → done |
+| `docs/produto/PRDProgress.json` | Tracking | F08 → done |
 
 ---
 

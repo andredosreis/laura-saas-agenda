@@ -93,7 +93,7 @@ The file was deleted immediately after the check (not committed). **Result: pass
 - `src/modules/admin/adminMutation.js` (new)
 - `src/models/AuditLog.js` (modified — added `before`/`after` fields)
 - `tests/admin-mutation.test.js` (new)
-- `docs/PRDProgress.json` (status update)
+- `docs/produto/PRDProgress.json` (status update)
 
 ## Pending manual checks
 

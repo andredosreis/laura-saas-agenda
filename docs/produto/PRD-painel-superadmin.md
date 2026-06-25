@@ -8,6 +8,11 @@ It is built for the **Marcai operator (super-admin)** only — the commercial ow
 
 Architecturally the panel is the **only** place in the system where the multi-tenant isolation boundary is crossed on purpose. Tenant data lives in per-tenant databases (`tenant_<id>`) on a shared Atlas cluster; the control plane (`Tenant`, `User`, `UserSubscription`, `AuditLog`) lives in the shared `laura-saas` database. The panel reaches across tenants under reinforced guards: a dedicated `requireSuperadmin` gate (returns 404 to everyone else), an append-only audit log of every action, a read-only database credential for cross-tenant reads, and a transactional mutation helper that writes the audit entry atomically with each change.
 
+> **Nota de modelo comercial (2026-06-24).** O Marcai vende-se como **consultoria done-for-you** (setup fee one-time + mensalidade gerida), **não** como planos self-serve. Ver `docs/oferta-consultoria.md` (fonte canónica) e `docs/guiao-pitch.md`. Implicações para este painel:
+> - **`plano.tipo` é a etiqueta do pacote de consultoria**, não uma assinatura auto-gerida pelo cliente. Tiers oficiais: **Essencial / Pro / Custom**. O enum no código ainda é `basico/pro/elite/custom` (`Tenant.js`, `adminSchemas.js`, `adminController.js`) — **renomear `basico`→`essencial` e largar `elite` é uma tarefa de follow-up** (model + schemas + migração dos tenants existentes). Onde este PRD escreve `basico/pro/elite/custom`, ler como o conjunto canónico Essencial/Pro/Custom após o rename.
+> - **O setup fee e a cobrança são feitos fora do sistema** (fatura/transferência) — billing continua fora de âmbito (§7). O painel define `plano.tipo`/`status`/`limites`; não processa pagamentos.
+> - O **mecanismo** do painel (criar/configurar/suspender tenant, limites, auditoria) mantém-se inalterado e serve igualmente o modelo de consultoria.
+
 ## 2. Problem and Opportunity
 
 ### The Problem

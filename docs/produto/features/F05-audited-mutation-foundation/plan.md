@@ -15,4 +15,4 @@
 
 ## Phase 3 — Verify
 5. **Gates** — `npm run lint` + `npm test` green; confirm the lint gate still rejects raw `router.<verb>` in `admin/`.
-6. **Track** — set F05 `status: "Implemented"` in `docs/PRDProgress.json`.
+6. **Track** — set F05 `status: "Implemented"` in `docs/produto/PRDProgress.json`.

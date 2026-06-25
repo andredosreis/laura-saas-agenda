@@ -12,4 +12,4 @@
 4. `SuspendReactivateControls` → confirmation dialog (suspend, optional motivo) → `POST .../suspender` / `.../reactivar`; status reflected.
 
 ## Phase 3 — verify
-5. `npm run build` + `npm run lint` green; Playwright flow (create → edit → suspend → reactivate). Set F11 `status: "Implemented"` in `docs/PRDProgress.json`.
+5. `npm run build` + `npm run lint` green; Playwright flow (create → edit → suspend → reactivate). Set F11 `status: "Implemented"` in `docs/produto/PRDProgress.json`.

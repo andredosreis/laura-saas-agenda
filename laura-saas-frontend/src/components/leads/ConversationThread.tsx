@@ -16,19 +16,28 @@ interface ConversationThreadProps {
   isDarkMode: boolean;
 }
 
+// Fuso da clínica. Os timestamps chegam em UTC (ISO com 'Z'); têm de ser
+// apresentados na hora de Lisboa, independentemente do fuso do browser de quem
+// está a ver o inbox — senão um lembrete enviado às 13:00 aparece às 14:00 (UTC+2).
+const ZONA = 'Europe/Lisbon';
+
+// Dia no fuso da clínica em formato comparável (YYYY-MM-DD).
+function diaLisboa(d: Date) {
+  return d.toLocaleDateString('en-CA', { timeZone: ZONA });
+}
+
 function formatHora(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: ZONA });
 }
 
 function formatDia(iso: string) {
   const d = new Date(iso);
-  const hoje = new Date();
   const ontem = new Date();
-  ontem.setDate(hoje.getDate() - 1);
-  if (d.toDateString() === hoje.toDateString()) return 'Hoje';
-  if (d.toDateString() === ontem.toDateString()) return 'Ontem';
-  return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
+  ontem.setDate(ontem.getDate() - 1);
+  if (diaLisboa(d) === diaLisboa(new Date())) return 'Hoje';
+  if (diaLisboa(d) === diaLisboa(ontem)) return 'Ontem';
+  return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', timeZone: ZONA });
 }
 
 export function ConversationThread({ messages, isDarkMode }: ConversationThreadProps) {

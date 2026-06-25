@@ -155,7 +155,7 @@ Se falhar em qualquer fase pós-deploy:
 | `src/middlewares/webhookAuth.js` | Remover logger de masking temporário |
 | `tests/webhook.test.js` | **Novo** — cobertura auth + fallback LID + fromMe (ADR-016) |
 | `.env` (local + Render) | Novas credenciais Evolution v2 |
-| `docs/evolution-api-operations.md` | Actualizar para v2 (Postgres, Redis, QR) |
+| `docs/operacoes/evolution-api-operations.md` | Actualizar para v2 (Postgres, Redis, QR) |
 | `.claude/rules/testing.md` | Corrigir path: `src/__tests__/` → `tests/` (regra desactualizada) |
 
 ---
@@ -292,7 +292,7 @@ Se falhar em qualquer fase pós-deploy:
 - [ ] Fluxo completo SIM → status `confirmado` + notificação admin funcional em produção
 - [ ] Fluxo com leads (tipo Avaliacao) funcional via `lead.telefone`
 - [x] Zero referências a `textMessage` no código
-- [x] `docs/evolution-api-operations.md` actualizado para v2
+- [x] `docs/operacoes/evolution-api-operations.md` actualizado para v2
 - [x] ADR-016 committed em `docs/adrs/generated/`
 - [x] ADR-014 com nota de depreciação
 - [x] `.claude/rules/testing.md` corrigida (path `src/__tests__/` → `tests/`)

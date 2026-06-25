@@ -119,7 +119,7 @@ This is architecturally correct: F08 (Suspend/Reactivate) owns status transition
 | `src/modules/admin/adminController.js` | Service | +2 functions (atualizarPlano, atualizarLimites) |
 | `src/modules/admin/adminRoutes.js` | API | +2 PUT routes via adminMutation |
 | `tests/admin-tenant-plan-limits.test.js` | Test | [NEW] 15 tests (C1–C5) |
-| `docs/PRDProgress.json` | Tracking | F07 → done |
+| `docs/produto/PRDProgress.json` | Tracking | F07 → done |
 
 ---
 

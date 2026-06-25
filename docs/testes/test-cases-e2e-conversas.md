@@ -5,7 +5,7 @@
 > Generated: 2026-05-31
 > Role: admin (tenant logado) — single role para este âmbito
 
-End-to-end acceptance tests para a nova página **/conversas** (Inbox de Conversas, FDD `fdd-conversas-inbox.md`).
+End-to-end acceptance tests para a nova página **/conversas** (Inbox de Conversas, FDD `docs/produto/fdd-conversas-inbox.md`).
 Tests ordenados por dependência — se um teste falha, os dependentes ficam **BLOCKED**.
 
 ## Prerequisites

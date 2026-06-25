@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { DateTime } from 'luxon';
 import api from '../services/api';
+
+// O backend devolve dataHora em UTC (ISO com 'Z'). O input datetime-local precisa
+// da hora de parede de Lisboa. `substring(0,16)` cortava o 'Z' e mostrava/regravava
+// a hora UTC — deslocando o agendamento 1h ao guardar a edição (no verão WEST).
+const toInputLisboa = (iso) =>
+  iso ? DateTime.fromISO(iso).setZone('Europe/Lisbon').toFormat("yyyy-MM-dd'T'HH:mm") : '';
 
 function EditarAgendamento() {
   const { id } = useParams();
@@ -54,7 +61,7 @@ function EditarAgendamento() {
           pacoteId: agendamentoData.pacote?._id || agendamentoData.pacote || '',
           servicoAvulsoNome: agendamentoData.servicoAvulsoNome || '',
           servicoAvulsoValor: agendamentoData.servicoAvulsoValor !== undefined ? String(agendamentoData.servicoAvulsoValor) : '',
-          dataHora: agendamentoData.dataHora ? agendamentoData.dataHora.substring(0, 16) : '',
+          dataHora: toInputLisboa(agendamentoData.dataHora),
           observacoes: agendamentoData.observacoes || '',
           status: agendamentoData.status || 'Agendado',
           tipoServico,

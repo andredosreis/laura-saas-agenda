@@ -1,6 +1,6 @@
 {
   "project": "Marcai Super-Admin Panel (ADR-024)",
-  "prd": "docs/PRD-painel-superadmin.md",
+  "prd": "docs/produto/PRD-painel-superadmin.md",
   "as_of": "2026-06-21",
   "features": {
     "F01": {

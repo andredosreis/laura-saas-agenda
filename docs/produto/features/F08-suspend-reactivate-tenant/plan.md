@@ -12,4 +12,4 @@
 4. Test: suspending an already-suspended tenant is idempotent and still audited.
 
 ## Phase 3 — verify
-5. Gates (`lint` + `test`) green; sweep test auto-covers the two new routes' 404. Set F08 `status: "Implemented"` in `docs/PRDProgress.json`.
+5. Gates (`lint` + `test`) green; sweep test auto-covers the two new routes' 404. Set F08 `status: "Implemented"` in `docs/produto/PRDProgress.json`.

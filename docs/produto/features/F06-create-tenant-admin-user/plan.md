@@ -14,4 +14,4 @@
 5. **Rollback** — test: a failure mid-creation leaves no orphan Tenant/User and writes a `status:'error'` entry.
 
 ## Phase 3 — verify
-6. **Gates** — `npm run lint` + `npm test` green; the sweep test auto-covers the new route's 404. Set F06 `status: "Implemented"` in `docs/PRDProgress.json`.
+6. **Gates** — `npm run lint` + `npm test` green; the sweep test auto-covers the new route's 404. Set F06 `status: "Implemented"` in `docs/produto/PRDProgress.json`.

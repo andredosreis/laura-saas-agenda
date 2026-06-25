@@ -9,7 +9,7 @@
 A consola super-admin (F10/F11) foi construída com uma paleta própria cream/rust/mono
 ("Consola de Operador"), deliberadamente distinta do design system da app. O André
 reavaliou essa decisão: **as cores fogem ao padrão** da app e ele prefere alinhamento.
-Além disso, gostou da **organização/layout** do mockup em `docs/exemplo do Dashboard/`
+Além disso, gostou da **organização/layout** do mockup em `docs/produto/exemplo-dashboard/`
 (strip de KPIs, distribuição por plano, cards) — quer essa riqueza de informação, mas
 nas cores certas.
 

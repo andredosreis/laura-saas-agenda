@@ -86,7 +86,7 @@ git push origin main
 | `laura-saas-frontend/src/components/Sidebar.jsx` | Modificado |
 | `laura-saas-frontend/src/components/FunilAvaliacaoModal.jsx` | Reescrito |
 | `laura-saas-frontend/src/pages/EditarCliente.jsx` | Modificado |
-| `docs/MELHORIAS.md` | Criado (este ficheiro) |
+| `docs/planeamento/MELHORIAS.md` | Criado (este ficheiro) |
 
 ---
 
