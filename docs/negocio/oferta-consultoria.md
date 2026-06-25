@@ -38,6 +38,32 @@ Quando se vende, vende-se **resultado**, não software: *"a IA responde em <5 se
 
 Referência de mercado (2026): agências de IA cobram €1.500–5.000 de setup + €500–5.000/mês de retainer; AI receptionists cobram €500–3.500 de onboarding "white-glove". O Marcai está acessível **e** com margem alta (custo/cliente ~€7–12).
 
+### Âmbito do serviço mensal (mini-SLA) — fechar antes de vender
+
+> Done-for-you mensal sem fronteira = margem morta por scope creep. O âmbito tem de ser explícito: o cliente sabe o que recebe; tu sabes o que não te afoga.
+
+**Incluído no €149/mês (Essencial):**
+- IA a responder 24/7 no WhatsApp + lembretes automáticos.
+- **1 revisão mensal** das conversas reais → afinação do prompt.
+- Até **2 alterações pequenas/mês** (ex: ajustar um serviço, um horário, uma resposta).
+- Inbox de handoff (IA↔humano) + relatório mensal de resultados.
+- Suporte por mensagem (resposta em dias úteis).
+
+**Não incluído (evita o "muda-me isto a toda a hora"):**
+- Reconfiguração grande de serviços/preços fora das 2 alterações → **em lote trimestral** ou taxa pontual.
+- Gestão de tráfego/anúncios → add-on à parte (decidido no diagnóstico).
+- Novo número WhatsApp / nova vertical → re-setup.
+
+*(Pro €299/mês escala estes limites: revisão quinzenal, mais alterações incluídas, suporte prioritário.)*
+
+**Compromisso e cancelamento:**
+- **Sem fidelização longa** — mensal, cancela com 30 dias de aviso. O setup fee é que protege o arranque.
+- (Opcional p/ proteger cashflow: 1.º ciclo mínimo de 3 meses, dado o trabalho de setup.)
+
+**Saída / portabilidade (constrói confiança + argumento GDPR):**
+- Os dados (clientes, marcações) são do cliente — exportáveis se sair.
+- O número de WhatsApp é dele e fica com ele. Sem reféns.
+
 ---
 
 ## 3. Limites de equipa por pacote (o cliente)

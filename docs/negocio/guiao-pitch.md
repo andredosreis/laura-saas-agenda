@@ -53,6 +53,7 @@ Deixa o cliente dizer o problema em voz alta:
 |---|---|
 | "É caro." | "Quantas marcações perde por mês por não responder? Uma ou duas pagam isto. E poupa o custo de uma rececionista." |
 | "Perco o toque humano." | "Não — a IA passa-lhe os casos importantes. Você ganha tempo, não perde clientes." |
+| **"E se a IA disser algo errado ao meu cliente?"** ⭐ | "A IA **não dá conselhos clínicos nem inventa preços** — responde ao básico e marca a avaliação. Tudo o resto aparece-lhe no painel e pode assumir quando quiser. E se precisar, **desliga a IA num botão**. Antes de ir para o ar, **testamo-la consigo** com conversas reais até estar à sua vontade." |
 | "Já tenho [Fresha/agenda]." | "Ótimo, isso é a agenda. Isto é quem **responde e converte** antes de chegar à agenda. Complementa-se." |
 | "A IA da Meta é grátis." | "É genérica e responde FAQ. A sua é montada para o seu negócio e gerida por nós. Grátis sai caro em marcações perdidas." |
 | "Tenho de pensar." | "Claro. Faço-lhe a sessão de configuração sem compromisso — vê a funcionar e depois decide. Quinta ou sexta?" |
