@@ -1,0 +1,70 @@
+{
+  "project": "Marcai Privacy & GDPR Consent (ADR-031)",
+  "prd": "docs/produto/PRD-privacidade-consentimento.md",
+  "as_of": "2026-06-25",
+  "features": {
+    "F01": {
+      "name": "Consent Logging Foundation",
+      "priority": 1,
+      "wave": 1,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F01-consent-logging-foundation/"
+    },
+    "F02": {
+      "name": "Need-to-Know Clinical Access Control",
+      "priority": 1,
+      "wave": 1,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F02-need-to-know-clinical-access/"
+    },
+    "F03": {
+      "name": "Clinical Tab in Client Record",
+      "priority": 2,
+      "wave": 2,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F03-clinical-tab/"
+    },
+    "F04": {
+      "name": "Self-Service Anamnesis & Consent Form",
+      "priority": 2,
+      "wave": 2,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F04-self-service-form/"
+    },
+    "F05": {
+      "name": "WhatsApp Form Link Delivery",
+      "priority": 2,
+      "wave": 3,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F05-whatsapp-form-link/"
+    },
+    "F06": {
+      "name": "Data Subject Export (Portability)",
+      "priority": 1,
+      "wave": 2,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F06-data-subject-export/"
+    },
+    "F07": {
+      "name": "Data Subject Erasure & Anonymization",
+      "priority": 1,
+      "wave": 2,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F07-erasure-anonymization/"
+    },
+    "F08": {
+      "name": "Automated Retention Anonymization",
+      "priority": 3,
+      "wave": 3,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F08-retention-job/"
+    },
+    "F09": {
+      "name": "Communications Consent Capture",
+      "priority": 1,
+      "wave": 2,
+      "status": "Not Started",
+      "spec": "docs/produto/features-rgpd/F09-communications-consent/"
+    }
+  }
+}
