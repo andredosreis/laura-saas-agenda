@@ -106,6 +106,11 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 - As a clinic admin, I want to capture a client's opt-in for WhatsApp/marketing communications (a non-pre-checked checkbox at booking or first contact) so that business-initiated messages have a legal basis.
 - As a clinic admin, I want to toggle a client's communications opt-out on their record so that I honor a withdrawal request immediately.
 
+### F10. Privacy Status & Note on Appointment
+- As clinic staff, I want each appointment to show whether the client's anamnesis form / consent is filled or pending (with an alert when missing), so that I know at a glance before the visit.
+- As a clinic admin, when I close a lead and schedule treatment, I want to add a free-text observation about the client and send the consent form link, so that the agreed procedures are noted and consent is requested at the right moment.
+- As a receptionist, I want to see the form/consent status and the note on an appointment without seeing any clinical detail, so that need-to-know is preserved.
+
 ## 6. Functionalities
 
 ### F01. Consent Logging Foundation
@@ -274,6 +279,21 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 - Invalid `clienteId` → 400; unknown client → 404.
 - Recording a withdrawal for a client with no prior opt-in is still accepted (additive log) and reflected as opted-out.
 
+### F10. Privacy Status & Note on Appointment
+
+**Consumes:**
+- Consent records — current health-consent status (from F01)
+- Anamnesis form status — filled / pending (from F04)
+- Form link send action (from F05)
+
+**Capabilities:**
+- On each appointment (agenda card / list and appointment detail) shows a **non-clinical** status badge: anamnesis form **✓ preenchida** / **⏳ pendente** (+ an alert "ficha por preencher" when missing) and the health-consent status, plus the client's short note. **No clinical content** is shown here — clinical detail stays in the gated tab (F03).
+- At the **lead-closing / treatment-scheduling** moment and on the client record: a free-text **observation** (reuses the existing `Cliente.observacoes` field) and a **"Enviar ficha de consentimento"** action (invokes F05).
+- The status reflects the same data the gated tab and consent log expose, but reduced to a yes/no/pending indicator safe for any staff role (including `recepcionista`).
+
+**Experience:**
+- Staff opens the agenda → each appointment shows the form/consent badge + note; a pending form shows an alert. When closing a lead, staff fill the observation and click "Enviar ficha de consentimento". Receptionist sees the badge and note but never clinical detail.
+
 ## 7. Out of Scope
 
 **Legal documents (handled organizationally, not as code)**
@@ -309,6 +329,7 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 | F07 | Data Subject Erasure & Anonymization | 1 | F01 |
 | F08 | Automated Retention Anonymization | 3 | F07 |
 | F09 | Communications Consent Capture | 1 | F01 |
+| F10 | Privacy Status & Note on Appointment | 2 | F01, F04, F05 |
 
 **Part 2: Foundation Features**
 
@@ -324,6 +345,7 @@ Features within the same wave can be built in parallel. A wave starts only after
 - **Wave 1**: F01, F02
 - **Wave 2**: F06, F07, F09, F03, F04
 - **Wave 3**: F05, F08
+- **Wave 4**: F10
 
 **Part 4: Priority Legend**
 
@@ -344,6 +366,9 @@ graph TD
   F01 --> F07[F07 Erasure]
   F07 --> F08[F08 Retention]
   F01 --> F09[F09 Comms Consent]
+  F01 --> F10[F10 Appt Status]
+  F04 --> F10
+  F05 --> F10
 ```
 
 ## 9. Acceptance Criteria
@@ -397,6 +422,11 @@ graph TD
 - An opt-out toggle records a `withdrawn` entry immediately and is reflected as opted-out.
 - Invalid `clienteId` → 400; unknown client → 404.
 
+### F10. Privacy Status & Note on Appointment
+- Each appointment shows a non-clinical badge for the anamnesis form (✓ preenchida / ⏳ pendente) and the health-consent status, plus the client's note; a missing form shows an alert.
+- The appointment view exposes **no clinical content** to any role (including `recepcionista`); clinical detail remains only in the gated tab (F03).
+- At lead-closing / the client record, staff can save an observation (persisted to `Cliente.observacoes`) and trigger the F05 send action.
+
 ### Cross-Feature Integration
 - F03 shows the exact consent status produced by F01 and is gated by the access decision from F02; opening it produces the F02 read audit.
 - F04 stamps the active policy version provided by F01 and, on submit, creates the F01 `ConsentLog` entry.
@@ -405,3 +435,4 @@ graph TD
 - F07 writes an F01 withdrawal entry and exposes the anonymization service that F08 consumes.
 - F08 anonymizes via F07's service, preserving fiscal records.
 - F09 stamps the active policy version provided by F01 on every communications-consent entry it creates.
+- F10 reflects the health-consent status from F01 and the anamnesis-form status from F04, and triggers the F05 send action — without exposing any clinical content.
