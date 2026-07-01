@@ -39,8 +39,8 @@
       "name": "Backend Availability Enforcement",
       "priority": 3,
       "wave": 4,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F05-availability-enforcement/"
+      "status": "Implemented",
+      "spec": "docs/produto/features/features-disponibilidade/F05-availability-enforcement/"
     }
   }
 }

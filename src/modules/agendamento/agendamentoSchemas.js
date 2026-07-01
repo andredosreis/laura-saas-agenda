@@ -51,6 +51,9 @@ export const createAgendamentoSchema = z
     servicoAvulsoValor: z.number().nonnegative().optional().nullable(),
     profissional: objectId.optional().nullable(),
     observacoes: z.string().trim().max(1000).optional(),
+    // F05 — override de encaixe fora de horas (honrado só para admin no handler)
+    forcarEncaixe: z.boolean().optional(),
+    motivoEncaixe: z.string().trim().max(280).optional(),
   })
   .strict();
 
