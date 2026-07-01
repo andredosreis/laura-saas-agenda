@@ -3,7 +3,9 @@ import { X, User, Package, Calendar, FileText, Loader2, Gift, Search, ChevronDow
 import { DateTime } from 'luxon';
 import { toast } from 'react-toastify';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import SlotPicker from './SlotPicker';
 
 function QuickAppointmentModal({
     isOpen,
@@ -13,11 +15,15 @@ function QuickAppointmentModal({
     onSubmit
 }) {
     const { isDarkMode } = useTheme();
+    const { isAdmin } = useAuth();
     const [loading, setLoading] = useState(false);
     const [loadingPacotes, setLoadingPacotes] = useState(false);
     const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
     const [clientSearch, setClientSearch] = useState('');
     const [isClientSearchOpen, setIsClientSearchOpen] = useState(false);
+    // F04 — data escolhida (o horário vem do SlotPicker) + toggle de força (admin).
+    const [dataDia, setDataDia] = useState('');
+    const [forcarEncaixe, setForcarEncaixe] = useState(false);
     const searchRef = useRef(null);
     const [formData, setFormData] = useState({
         cliente: '',
@@ -29,15 +35,16 @@ function QuickAppointmentModal({
         servicoOfertaNome: ''
     });
     const [serviceMode, setServiceMode] = useState('pacote');
+    // F04 — erro de validação client-side (o `required` nativo desapareceu com o
+    // SlotPicker; sem isto o submit falhava em silêncio, sem qualquer feedback).
+    const [formError, setFormError] = useState('');
 
-    // Update date when selectedDate changes
+    // F04 — semeia apenas a DATA a partir de selectedDate; o horário vem do SlotPicker.
     useEffect(() => {
         if (selectedDate) {
             const dt = DateTime.fromISO(selectedDate, { zone: 'Europe/Lisbon' });
-            setFormData(prev => ({
-                ...prev,
-                dataHora: dt.toFormat("yyyy-MM-dd'T'HH:mm")
-            }));
+            setDataDia(dt.toISODate() ?? '');
+            setFormData(prev => ({ ...prev, dataHora: '' }));
         }
     }, [selectedDate]);
 
@@ -58,6 +65,8 @@ function QuickAppointmentModal({
             setLoadingPacotes(false);
             setClientSearch('');
             setIsClientSearchOpen(false);
+            setDataDia('');
+            setForcarEncaixe(false);
         }
     }, [isOpen]);
 
@@ -156,11 +165,34 @@ function QuickAppointmentModal({
         return () => document.removeEventListener('mousedown', handleOutside);
     }, [isClientSearchOpen]);
 
+    // F04 — horário seleccionado ("HH:mm") derivado do dataHora composto.
+    const horaSelecionada = useMemo(() => {
+        if (!dataDia || !formData.dataHora) return null;
+        const [d, t] = formData.dataHora.split('T');
+        return d === dataDia && t ? t.slice(0, 5) : null;
+    }, [dataDia, formData.dataHora]);
+
+    const hojeISO = DateTime.now().setZone('Europe/Lisbon').toISODate();
+
     if (!isOpen) return null;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleDataDia = (nova) => {
+        setDataDia(nova);
+        setFormData(prev => ({ ...prev, dataHora: '' }));
+        setFormError('');
+    };
+
+    const handleSlot = (hora) => {
+        // `hora` pode vir vazio (input "Hora manual" limpo) — sem esta guarda,
+        // compunha-se "YYYY-MM-DDT" (truthy) que passava a validação e chegava
+        // malformado ao backend.
+        setFormData(prev => ({ ...prev, dataHora: dataDia && hora ? `${dataDia}T${hora}` : '' }));
+        setFormError('');
     };
 
     const handleClientSearchChange = (e) => {
@@ -189,22 +221,34 @@ function QuickAppointmentModal({
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Validação client-side com feedback inline (o `required` nativo
+        // desapareceu com o SlotPicker — nunca falhar em silêncio).
         if (!formData.cliente) {
+            setFormError('Selecione um cliente.');
+            return;
+        }
+
+        if (!formData.dataHora) {
+            setFormError(dataDia ? 'Escolha um horário disponível.' : 'Escolha a data e o horário.');
             return;
         }
 
         if (serviceMode === 'pacote' && !formData.pacote) {
+            setFormError('Selecione o pacote do cliente.');
             return;
         }
 
         if (serviceMode === 'avulso' && (!formData.servicoAvulsoNome || !formData.servicoAvulsoValor)) {
+            setFormError('Preencha o nome e o valor do serviço avulso.');
             return;
         }
 
         if (serviceMode === 'oferta' && !formData.servicoOfertaNome.trim()) {
+            setFormError('Preencha o nome da oferta.');
             return;
         }
 
+        setFormError('');
         setLoading(true);
         try {
             const submitData = {
@@ -468,20 +512,33 @@ function QuickAppointmentModal({
                         </div>
                     )}
 
-                    {/* Date & Time */}
+                    {/* Date & Slot Picker (F04) */}
                     <div>
                         <label className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
                             <Calendar className="w-4 h-4" />
-                            Data e Hora *
+                            Data *
                         </label>
                         <input
-                            type="datetime-local"
-                            name="dataHora"
-                            value={formData.dataHora}
-                            onChange={handleChange}
-                            required
+                            type="date"
+                            name="dataDia"
+                            value={dataDia}
+                            min={hojeISO}
+                            onChange={(e) => handleDataDia(e.target.value)}
                             className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} focus:outline-hidden focus:ring-2 focus:ring-indigo-500`}
                         />
+                        <div className="mt-3">
+                            <span className={`flex items-center gap-2 text-sm font-medium ${subtextClass} mb-2`}>
+                                Horário *
+                            </span>
+                            <SlotPicker
+                                date={dataDia}
+                                value={horaSelecionada}
+                                onChange={handleSlot}
+                                allowForce={forcarEncaixe}
+                                onForceToggle={isAdmin ? setForcarEncaixe : undefined}
+                                isDarkMode={isDarkMode}
+                            />
+                        </div>
                     </div>
 
                     {/* Notes */}
@@ -499,6 +556,13 @@ function QuickAppointmentModal({
                             className={`w-full px-3 py-2.5 rounded-xl border ${inputBgClass} ${textClass} placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none`}
                         />
                     </div>
+
+                    {/* Erro de validação client-side (inline, junto às ações) */}
+                    {formError && (
+                        <p role="alert" className="text-red-400 text-sm">
+                            {formError}
+                        </p>
+                    )}
 
                     {/* Actions */}
                     <div className="flex items-center gap-3 pt-2">

@@ -7,29 +7,33 @@
       "name": "Reopen Availability UI",
       "priority": 1,
       "wave": 1,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F01-reopen-availability-ui/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F01-reopen-availability-ui/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F01-reopen-availability-ui/eval-report.md"
     },
     "F02": {
       "name": "Date Exceptions & Note on Schedule",
       "priority": 1,
       "wave": 2,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F02-date-exceptions-note/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F02-date-exceptions-note/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F02-date-exceptions-note/eval-report.md"
     },
     "F03": {
       "name": "AI Reads Availability from Schedule",
       "priority": 1,
       "wave": 3,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F03-ai-reads-schedule/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F03-ai-reads-schedule/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F03-ai-reads-schedule/eval-report.md"
     },
     "F04": {
       "name": "Slot Picking in Manual Booking",
       "priority": 2,
       "wave": 3,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F04-slot-picking-booking/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F04-slot-picking-booking/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F04-slot-picking-booking/eval-report.md"
     },
     "F05": {
       "name": "Backend Availability Enforcement",

@@ -1,0 +1,9 @@
+===== ia-service ruff =====
+All checks passed!
+===== ia-service pytest — F03 suite =====
+tests/test_find_available_slots.py::test_reshapes_endpoint_slots_into_flat_chronological_list PASSED [ 20%]
+tests/test_find_available_slots.py::test_schedule_not_configured_returns_empty PASSED [ 40%]
+tests/test_find_available_slots.py::test_endpoint_500_returns_empty_no_exception PASSED [ 60%]
+tests/test_find_available_slots.py::test_endpoint_timeout_returns_empty_no_exception PASSED [ 80%]
+tests/test_find_available_slots.py::test_source_switch_does_not_use_agent_business_rules PASSED [100%]
+========================= 5 passed, 1 warning in 0.57s =========================

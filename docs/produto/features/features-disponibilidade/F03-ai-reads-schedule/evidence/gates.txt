@@ -1,0 +1,9 @@
+===== BACKEND ESLint (0 errors expected) =====
+
+/Users/andrereissilva/Documents/Projetos Pessoais/marcai-worktrees/F03-ai-reads-schedule/scripts/maintenance/fix-retroactive-expired-packages.js
+   38:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  158:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+✖ 4 problems (0 errors, 4 warnings)
+  0 errors and 4 warnings potentially fixable with the `--fix` option.
+

@@ -39,7 +39,18 @@ const scheduleSchema = new mongoose.Schema({
     type: String,
     default: '13:00',
   },
+  // Nota livre opcional sobre o horário base deste dia (F02)
+  observacao: {
+    type: String,
+    default: '',
+    maxlength: 280,
+  },
 }, { timestamps: true });
+
+// Único por tenant: no máximo um documento por dia da semana por tenant.
+// A migração F03 (seedScheduleFromAgentRules) depende desta unicidade para
+// fazer upserts idempotentes por (tenantId, dayOfWeek).
+scheduleSchema.index({ tenantId: 1, dayOfWeek: 1 }, { unique: true });
 
 // Exporta schema para uso no registry (database-per-tenant)
 export { scheduleSchema as ScheduleSchema };

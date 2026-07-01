@@ -21,6 +21,7 @@ import { HistoricoAtendimentoSchema } from './HistoricoAtendimento.js';
 import { ConversaSchema }             from './Conversa.js';
 import { MensagemSchema }             from './Mensagem.js';
 import { ScheduleSchema }             from './Schedule.js';
+import { ScheduleExceptionSchema }    from './ScheduleException.js';
 import { FechamentoMensalSchema }     from './FechamentoMensal.js';
 import { LeadSchema }                 from './Lead.js';
 
@@ -42,6 +43,7 @@ export function getModels(db) {
     Conversa:             db.model('Conversa',             ConversaSchema),
     Mensagem:             db.model('Mensagem',             MensagemSchema),
     Schedule:             db.model('Schedule',             ScheduleSchema),
+    ScheduleException:    db.model('ScheduleException',    ScheduleExceptionSchema),
     FechamentoMensal:     db.model('FechamentoMensal',     FechamentoMensalSchema),
     Lead:                 db.model('Lead',                 LeadSchema),
   };

@@ -1,6 +1,20 @@
 """Agent business rules — what the IA can propose to leads.
 
-⚠️ IMPORTANTE — Quando editar este ficheiro:
+🚫 DEPRECADO (F03 / ADR-028 Fase 2) — 2026-07-01
+================================================
+Este ficheiro DEIXOU de ser a fonte de disponibilidade da IA.
+`mongo_reader.find_available_slots` passou a ler do endpoint interno
+`/api/internal/disponibilidade` do backend Node, que calcula os slots a
+partir do painel (`Schedule` + `ScheduleException`, F01/F02). A partir de
+agora, mudanças de horário fazem-se NO PAINEL — não aqui.
+
+`RULES_PER_TENANT` / `DATE_OVERRIDES_PER_TENANT` já foram semeados para o
+painel pela migração `src/migrations/seedScheduleFromAgentRules.js`. O
+ficheiro é mantido apenas para não quebrar imports/testes existentes; a
+remoção física é um follow-up quando nada mais o referenciar. NÃO adicionar
+lógica nova aqui.
+
+⚠️ IMPORTANTE — histórico (pré-F03):
 ==============================================
 Estas regras controlam APENAS o que a IA conversacional propõe ao lead
 via WhatsApp. Não restringem agendamentos manuais — a Laura continua
