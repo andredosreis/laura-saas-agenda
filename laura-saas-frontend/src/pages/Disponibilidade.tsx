@@ -95,7 +95,8 @@ const EditScheduleModal = ({
       onClose();
       toast.success('✅ Horários atualizados com sucesso!');
     } catch (error) {
-      toast.error('❌ Erro ao atualizar horários');
+      // Toast de erro já é mostrado pelo interceptor global do api.js.
+      console.error('Erro ao atualizar horários:', error);
     }
   };
 
@@ -301,7 +302,8 @@ const ExcecaoModal = ({
       onSaved();
       onClose();
     } catch (error) {
-      toast.error('❌ Erro ao guardar a excepção');
+      // Toast de erro já é mostrado pelo interceptor global do api.js.
+      console.error('Erro ao guardar a excepção:', error);
     } finally {
       setSaving(false);
     }
@@ -316,7 +318,8 @@ const ExcecaoModal = ({
       onSaved();
       onClose();
     } catch (error) {
-      toast.error('❌ Erro ao remover a excepção');
+      // Toast de erro já é mostrado pelo interceptor global do api.js.
+      console.error('Erro ao remover a excepção:', error);
     } finally {
       setSaving(false);
     }

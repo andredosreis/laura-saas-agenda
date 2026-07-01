@@ -1,5 +1,4 @@
 import api from './api.js'; // Reutilizamos a sua instância configurada do Axios
-import { toast } from 'react-toastify';
 
 // 1. Primeiro, definimos a "forma" (o tipo) dos nossos dados de horário.
 // Esta interface deve corresponder ao seu Schema do Mongoose.
@@ -18,15 +17,22 @@ export interface Schedule {
 
 export type TipoExcecao = 'fechado' | 'horas-extra' | 'horario-especial';
 
-export interface ScheduleException {
+interface ScheduleExceptionBase {
   _id: string;
   data: string; // "YYYY-MM-DD"
-  tipo: TipoExcecao;
-  inicio: string | null; // "HH:mm"
-  fim: string | null;
   observacao: string;
   createdAt?: string;
 }
+
+/**
+ * Discriminated union em `tipo` (espelha a invariante do backend):
+ *  - `fechado` → sem janela (`inicio`/`fim` são `null`)
+ *  - `horas-extra` / `horario-especial` → janela obrigatória (`inicio`/`fim` são `string`)
+ * Dá narrowing automático: no ramo != 'fechado', `inicio`/`fim` são `string`, não `string | null`.
+ */
+export type ScheduleException =
+  | (ScheduleExceptionBase & { tipo: 'fechado'; inicio: null; fim: null })
+  | (ScheduleExceptionBase & { tipo: 'horas-extra' | 'horario-especial'; inicio: string; fim: string });
 
 export interface ExcecaoPayload {
   data: string;
@@ -124,8 +130,8 @@ export const getAvailableSlots = async (date: string, duration: number = 60): Pr
     // A API deve retornar um objeto { availableSlots: [...] }
     return response.data.availableSlots || [];
   } catch (error) {
+    // O interceptor global do api.js já mostra o toast de erro (URL != /auth/).
     console.error('Erro ao buscar slots disponíveis:', error);
-    toast.error('Não foi possível buscar os horários disponíveis.');
     throw error;
   }
 };

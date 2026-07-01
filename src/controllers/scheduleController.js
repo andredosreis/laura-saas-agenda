@@ -225,7 +225,9 @@ export const listarExcecoes = async (req, res) => {
       if (to) filtro.data.$lte = to;
     }
 
-    const excecoes = await ScheduleException.find(filtro).sort({ data: 'asc' });
+    // Máximo 100 por página (convenção do projecto). O frontend consulta sempre
+    // por janela from/to (~1 mês), pelo que na prática o limite nunca é atingido.
+    const excecoes = await ScheduleException.find(filtro).sort({ data: 'asc' }).limit(100);
     res.status(200).json({ success: true, data: excecoes });
   } catch (error) {
     console.error('Erro em listarExcecoes:', error);
