@@ -199,6 +199,16 @@ for (const id of ids) { await process(id); }
 Ficheiros existentes `.jsx` e `.js` não são convertidos a menos que a tarefa exija explicitamente.
 Novos ficheiros: `.tsx` para componentes React, `.ts` para lógica pura.
 
+### 7. TypeScript: tipos de domínio expressivos
+
+Em `.ts`/`.tsx`, preferir tipos que codificam invariantes em vez de `string | null` soltos:
+
+- **Discriminated unions** quando um campo discriminante determina a forma do resto (ex.: `ScheduleException.tipo`: `fechado` sem janela vs `horas-extra`/`horario-especial` com `inicio`/`fim`). Dá narrowing automático.
+- Union de literais + `Record<Union, …>` em vez de `string`; `unknown` em vez de `any`; evitar `as` (usar narrowing / type guards `x is T`).
+- **Não sobre-engenheirar:** para CRUD simples, tipos simples chegam. Evitar builders/generics pesados e conditional/mapped types complexos (a própria referência avisa que tipos demasiado complexos degradam a compilação).
+
+Referência aprofundada: skill `typescript-advanced-types` (`.claude/skills/typescript-advanced-types`).
+
 ---
 ## Segurança
 - Sempre validar isolamento de tenantId

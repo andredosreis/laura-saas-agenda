@@ -30,10 +30,10 @@
 - **WHEN** bookings are attempted at a time **in** that set and at a time **absent** from it (no override)
 - **THEN** the in-set time is accepted (201) and the absent time is rejected (400) — enforcement rejects exactly what the picker hides; a `horas-extra` exception window is accepted without override even when the base weekday would reject it.
 
-## C7 — Override forces out-of-hours, not double-booking
+## C7 — Override does not bypass slot-conflict protection
 - **GIVEN** an existing booking occupying an exact `dataHora`
 - **WHEN** an `admin` submits `forcarEncaixe: true` for that same exact `dataHora`
-- **THEN** it still returns **409** (`slot_taken`) — the override bypasses expediente, not the hard slot-conflict guarantee.
+- **THEN** it still returns **400** (`{ message }`) — the sequential pre-check catches the conflict before the DB write; the override bypasses expediente, not the slot-conflict guarantee. (The **409** `slot_taken` fires only on the rare concurrent-write race hitting the unique index — not reachable in standard sequential tests; the pre-check is what a normal seed-based test will hit.)
 
 ## C8 — Permissive when no Schedule is configured
 - **GIVEN** a tenant with no `Schedule` configured

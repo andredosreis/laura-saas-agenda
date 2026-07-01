@@ -1,5 +1,4 @@
 import api from './api.js'; // Reutilizamos a sua instância configurada do Axios
-import { toast } from 'react-toastify';
 
 // 1. Primeiro, definimos a "forma" (o tipo) dos nossos dados de horário.
 // Esta interface deve corresponder ao seu Schema do Mongoose.
@@ -12,7 +11,35 @@ export interface Schedule {
   endTime: string;
   breakStartTime: string;
   breakEndTime: string;
+  observacao?: string;
   updatedAt: string;
+}
+
+export type TipoExcecao = 'fechado' | 'horas-extra' | 'horario-especial';
+
+interface ScheduleExceptionBase {
+  _id: string;
+  data: string; // "YYYY-MM-DD"
+  observacao: string;
+  createdAt?: string;
+}
+
+/**
+ * Discriminated union em `tipo` (espelha a invariante do backend):
+ *  - `fechado` → sem janela (`inicio`/`fim` são `null`)
+ *  - `horas-extra` / `horario-especial` → janela obrigatória (`inicio`/`fim` são `string`)
+ * Dá narrowing automático: no ramo != 'fechado', `inicio`/`fim` são `string`, não `string | null`.
+ */
+export type ScheduleException =
+  | (ScheduleExceptionBase & { tipo: 'fechado'; inicio: null; fim: null })
+  | (ScheduleExceptionBase & { tipo: 'horas-extra' | 'horario-especial'; inicio: string; fim: string });
+
+export interface ExcecaoPayload {
+  data: string;
+  tipo: TipoExcecao;
+  inicio?: string | null;
+  fim?: string | null;
+  observacao?: string;
 }
 
 // 2. Criamos a função para buscar todos os horários.
@@ -42,15 +69,47 @@ export const updateSchedule = async (
   }
 };
 
+// ============================================================
+// Excepções por data (F02) — endpoints canónicos { success, data }
+// ============================================================
+
+export const getExcecoes = async (from?: string, to?: string): Promise<ScheduleException[]> => {
+  try {
+    const response = await api.get('/schedules/excecoes', { params: { from, to } });
+    return response.data.data ?? [];
+  } catch (error) {
+    console.error('Erro ao buscar excepções:', error);
+    throw error;
+  }
+};
+
+export const criarExcecao = async (payload: ExcecaoPayload): Promise<ScheduleException> => {
+  const response = await api.post('/schedules/excecoes', payload);
+  return response.data.data;
+};
+
+export const actualizarExcecao = async (
+  id: string,
+  payload: ExcecaoPayload
+): Promise<ScheduleException> => {
+  const response = await api.put(`/schedules/excecoes/${id}`, payload);
+  return response.data.data;
+};
+
+export const removerExcecao = async (id: string): Promise<void> => {
+  await api.delete(`/schedules/excecoes/${id}`);
+};
+
 // ADICIONE ESTA NOVA INTERFACE
 export interface Agendamento {
   _id: string;
   dataHora: string; // Vem como string ISO do backend
-  cliente: {
+  // Opcional: dados reais podem trazer agendamentos sem cliente populado.
+  cliente?: {
     _id: string;
     nome: string;
     telefone?: string;
-  };
+  } | null;
 }
 
 /**
@@ -71,8 +130,8 @@ export const getAvailableSlots = async (date: string, duration: number = 60): Pr
     // A API deve retornar um objeto { availableSlots: [...] }
     return response.data.availableSlots || [];
   } catch (error) {
+    // O interceptor global do api.js já mostra o toast de erro (URL != /auth/).
     console.error('Erro ao buscar slots disponíveis:', error);
-    toast.error('Não foi possível buscar os horários disponíveis.');
     throw error;
   }
 };
