@@ -3,7 +3,7 @@
 ## C1 — Endpoint returns the same slots as `getAvailableSlots`
 - **GIVEN** a tenant with a base `Schedule` and existing bookings for a date
 - **WHEN** `GET /api/internal/disponibilidade?tenantId=<t>&date=<d>&duration=60` with a valid `X-Service-Token`
-- **THEN** it returns `200` with `data.days[0].slots` **equal** to what `GET /schedules/available-slots?date=<d>&duration=60` returns for that tenant/date (both use the shared `resolveAvailableSlots`).
+- **THEN** it returns `200` with `internalRes.body.data.days[0].slots` **equal** to `legacyRes.body.availableSlots` from `GET /schedules/available-slots?date=<d>&duration=60` for that tenant/date (both use the shared `resolveAvailableSlots`). Note: the two responses use **different envelopes** — the internal endpoint wraps in `{ success, data }` while the legacy endpoint returns a raw `{ availableSlots }` array; compare the extracted slot arrays, not the full response bodies.
 
 ## C2 — Service-token guard
 - **GIVEN** a request with a missing or wrong `X-Service-Token`
@@ -39,8 +39,8 @@
 ## C8 — One-off migration seeds Schedule from the hardcoded rules
 - **GIVEN** the hardcoded Python rules snapshot (incl. the pilot tenant)
 - **WHEN** `node src/migrations/seedScheduleFromAgentRules.js` runs in dry-run, then with `--apply`
-- **THEN** dry-run writes nothing; `--apply` seeds base `Schedule` (correct Python→Mongo weekday/field mapping) + `ScheduleException` (`None→fechado`, window→`horario-especial`); re-running `--apply` is a no-op (idempotent)
-- **AND** after seeding, the endpoint reproduces the pilot tenant's pre-migration availability for an unchanged schedule (no regression).
+- **THEN** dry-run writes nothing and prints each base `Schedule` day as `"would write"` or `"preserved (customizado)"`; `--apply` seeds base `Schedule` (correct Python→Mongo weekday/field mapping) for untouched days only (customized days skipped) + `ScheduleException` (`None→fechado`, window→`horario-especial`); re-running `--apply` is a no-op (idempotent); `--force` overrides the customization guard.
+- **AND** after seeding, the endpoint reproduces the pilot tenant's pre-migration availability for an unchanged schedule — "no regression" means **parity with `getAvailableSlots`** (Node whitelist), not with the old Python blacklist. The status-filter change (`Realizado`/`Não compareceu` no longer blocking slots) is an accepted, documented behavior change (D12), not a silent regression.
 
 ## C9 — Param resolution
 - **GIVEN** the endpoint
