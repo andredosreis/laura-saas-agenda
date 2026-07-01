@@ -23,8 +23,9 @@
       "name": "AI Reads Availability from Schedule",
       "priority": 1,
       "wave": 3,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F03-ai-reads-schedule/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F03-ai-reads-schedule/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F03-ai-reads-schedule/eval-report.md"
     },
     "F04": {
       "name": "Slot Picking in Manual Booking",
