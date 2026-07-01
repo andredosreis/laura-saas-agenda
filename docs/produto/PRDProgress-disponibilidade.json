@@ -31,8 +31,9 @@
       "name": "Slot Picking in Manual Booking",
       "priority": 2,
       "wave": 3,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F04-slot-picking-booking/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F04-slot-picking-booking/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F04-slot-picking-booking/eval-report.md"
     },
     "F05": {
       "name": "Backend Availability Enforcement",
