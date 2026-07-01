@@ -258,6 +258,51 @@ async def update_lead_info(
     return resp["data"]
 
 
+# ─────────────────────── Availability (F03) ─────────────────────────
+
+
+def fetch_available_slots(
+    tenant_id: str,
+    *,
+    date: str | None = None,
+    from_: str | None = None,
+    to: str | None = None,
+    days: int = 7,
+    duration: int = 60,
+    timeout: float = 10.0,
+) -> dict:
+    """Fetch availability from the Node backend (F03 single source).
+
+    Synchronous on purpose: the caller (`mongo_reader.find_available_slots`)
+    and the `get_available_slots` agent tool are sync, so we use
+    `httpx.Client` instead of forcing an event loop into the tool.
+
+    Returns the parsed `data` payload:
+        {tenantId, timezone, duration, scheduleConfigured, days: [...]}
+
+    Raises on any HTTP/transport error — this function does NOT swallow
+    errors. `find_available_slots` is the error boundary (it catches and
+    degrades to `[]`); keeping the two layers distinct means graceful
+    degradation lives in exactly one place.
+    """
+    params: dict[str, str | int] = {"tenantId": tenant_id, "duration": duration}
+    if date is not None:
+        params["date"] = date
+    elif from_ is not None or to is not None:
+        if from_ is not None:
+            params["from"] = from_
+        if to is not None:
+            params["to"] = to
+    else:
+        params["days"] = days
+
+    url = f"{settings.marcai_api_url}/api/internal/disponibilidade"
+    with httpx.Client(timeout=timeout) as client:
+        r = client.get(url, params=params, headers=_auth_headers())
+        r.raise_for_status()
+        return r.json()["data"]
+
+
 # ─────────────────────── Client lifecycle ───────────────────────────
 
 

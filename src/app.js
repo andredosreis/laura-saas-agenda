@@ -35,6 +35,7 @@ import leadRoutes from './modules/leads/leadRoutes.js';
 import conversasRoutes from './modules/messaging/conversas/conversasRoutes.js';
 import leadInternalRoutes from './modules/leads/leadInternalRoutes.js';
 import clienteInternalRoutes from './modules/clientes/clienteInternalRoutes.js';
+import disponibilidadeInternalRoutes from './routes/disponibilidadeInternalRoutes.js'; // 🆕 F03 — IA lê disponibilidade
 import adminRoutes from './modules/admin/adminRoutes.js'; // 🆕 Painel super-admin (ADR-024)
 
 const app = express();
@@ -122,6 +123,7 @@ for (const [path, router] of apiResources) {
 // Python (Phase 2+). Não expostas em /api/v1 — só /api/internal/*.
 app.use('/api/internal/leads', leadInternalRoutes);
 app.use('/api/internal/clientes', clienteInternalRoutes);
+app.use('/api/internal/disponibilidade', disponibilidadeInternalRoutes);
 
 // Webhook Evolution API — limite maior para payloads com dados binários de grupos
 app.use('/webhook', express.json({ limit: '1mb' }), webhookRoutes);
