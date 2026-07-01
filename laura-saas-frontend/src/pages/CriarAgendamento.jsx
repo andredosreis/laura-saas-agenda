@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { DateTime } from 'luxon';
 import { CheckCircle2, XCircle, ArrowLeft, UserPlus, Users, Gift, Package, Search, X, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { getAvailableSlots } from '../services/scheduleService';
+import SlotPicker from '../components/SlotPicker';
+import { useAuth } from '../contexts/AuthContext';
 
 const sessaoSchema = z.object({
   cliente: z.string().min(1, 'Selecione um cliente'),
@@ -73,13 +75,17 @@ const avaliacaoSchema = z.object({
 
 function CriarAgendamento() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   const preSelecaoFeita = useRef(false);
   const [tipo, setTipo] = useState('Sessao');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dataSelecionada] = useState('');
-  const [, setHorariosVagos] = useState([]);
+  // F04 — data escolhida por formulário (o horário vem do SlotPicker).
+  const [dataSessao, setDataSessao] = useState('');
+  const [forcarSessao, setForcarSessao] = useState(false);
+  const [dataAval, setDataAval] = useState('');
+  const [forcarAval, setForcarAval] = useState(false);
   const [clientes, setClientes] = useState([]);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [pacotesDoCliente, setPacotesDoCliente] = useState([]);
@@ -87,7 +93,8 @@ function CriarAgendamento() {
   const [clienteBuscaAberta, setClienteBuscaAberta] = useState(false);
   const clienteBuscaRef = useRef(null);
 
-  const formatDateForInput = (date) => date.toISOString().slice(0, 16);
+  // Data mínima do date-picker (hoje, Europe/Lisbon).
+  const hojeISO = DateTime.now().setZone('Europe/Lisbon').toISODate();
 
   // Formulário para Sessão
   const sessaoForm = useForm({
@@ -100,7 +107,7 @@ function CriarAgendamento() {
       servicoAvulsoNome: '',
       servicoAvulsoValor: '',
       servicoOfertaNome: '',
-      dataHora: formatDateForInput(new Date()),
+      dataHora: '',
       observacoes: '',
     },
   });
@@ -109,8 +116,39 @@ function CriarAgendamento() {
   const avaliacaoForm = useForm({
     resolver: zodResolver(avaliacaoSchema),
     mode: 'onChange',
-    defaultValues: { leadNome: '', leadTelefone: '', leadEmail: '', dataHora: formatDateForInput(new Date()), observacoes: '' },
+    defaultValues: { leadNome: '', leadTelefone: '', leadEmail: '', dataHora: '', observacoes: '' },
   });
+
+  // F04 — horário seleccionado ("HH:mm") derivado do dataHora de cada formulário.
+  const dataHoraSessao = sessaoForm.watch('dataHora');
+  const dataHoraAval = avaliacaoForm.watch('dataHora');
+  const horaSessao = useMemo(() => {
+    if (!dataSessao || !dataHoraSessao) return null;
+    const [d, t] = dataHoraSessao.split('T');
+    return d === dataSessao && t ? t.slice(0, 5) : null;
+  }, [dataSessao, dataHoraSessao]);
+  const horaAval = useMemo(() => {
+    if (!dataAval || !dataHoraAval) return null;
+    const [d, t] = dataHoraAval.split('T');
+    return d === dataAval && t ? t.slice(0, 5) : null;
+  }, [dataAval, dataHoraAval]);
+
+  const handleDataSessao = (novaData) => {
+    setDataSessao(novaData);
+    // Nova data → obriga a re-escolher o slot.
+    sessaoForm.setValue('dataHora', '', { shouldValidate: true });
+  };
+  const handleSlotSessao = (hora) => {
+    // `hora` pode vir vazio (input "Hora manual" limpo) — nunca compor "YYYY-MM-DDT".
+    sessaoForm.setValue('dataHora', dataSessao && hora ? `${dataSessao}T${hora}` : '', { shouldValidate: true });
+  };
+  const handleDataAval = (novaData) => {
+    setDataAval(novaData);
+    avaliacaoForm.setValue('dataHora', '', { shouldValidate: true });
+  };
+  const handleSlotAval = (hora) => {
+    avaliacaoForm.setValue('dataHora', dataAval && hora ? `${dataAval}T${hora}` : '', { shouldValidate: true });
+  };
 
   const watchObsSessao = sessaoForm.watch('observacoes');
   const watchObsAval = avaliacaoForm.watch('observacoes');
@@ -160,12 +198,6 @@ function CriarAgendamento() {
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [clienteBuscaAberta]);
-
-  useEffect(() => {
-    if (dataSelecionada) {
-      getAvailableSlots(dataSelecionada, 60).then(setHorariosVagos);
-    }
-  }, [dataSelecionada]);
 
   useEffect(() => {
     async function fetchClientes() {
@@ -511,13 +543,28 @@ function CriarAgendamento() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data e Hora <span className="text-red-500">*</span>
+                  Data <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="datetime-local"
-                  {...sessaoForm.register('dataHora')}
+                  type="date"
+                  value={dataSessao}
+                  min={hojeISO}
+                  onChange={(e) => handleDataSessao(e.target.value)}
                   disabled={isSubmitting}
                   className={getInputClasses(sessaoForm, 'dataHora')}
+                />
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Horário <span className="text-red-500">*</span>
+                </label>
+                <SlotPicker
+                  date={dataSessao}
+                  value={horaSessao}
+                  onChange={handleSlotSessao}
+                  allowForce={forcarSessao}
+                  onForceToggle={isAdmin ? setForcarSessao : undefined}
                 />
                 <ErrorMsg form={sessaoForm} name="dataHora" />
               </div>
@@ -775,13 +822,32 @@ function CriarAgendamento() {
 
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h2 className="text-lg font-medium text-gray-700 mb-3">Data e Hora</h2>
-              <input
-                type="datetime-local"
-                {...avaliacaoForm.register('dataHora')}
-                disabled={isSubmitting}
-                className={getInputClasses(avaliacaoForm, 'dataHora')}
-              />
-              <ErrorMsg form={avaliacaoForm} name="dataHora" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={dataAval}
+                  min={hojeISO}
+                  onChange={(e) => handleDataAval(e.target.value)}
+                  disabled={isSubmitting}
+                  className={getInputClasses(avaliacaoForm, 'dataHora')}
+                />
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Horário <span className="text-red-500">*</span>
+                </label>
+                <SlotPicker
+                  date={dataAval}
+                  value={horaAval}
+                  onChange={handleSlotAval}
+                  allowForce={forcarAval}
+                  onForceToggle={isAdmin ? setForcarAval : undefined}
+                />
+                <ErrorMsg form={avaliacaoForm} name="dataHora" />
+              </div>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
