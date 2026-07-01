@@ -103,6 +103,7 @@ function Sidebar() {
       items: [
         { to: "/agendamentos", text: "Agendamentos", icon: ListChecks, perm: 'verAgendamentos', badge: iaPendingCount },
         { to: "/calendario", text: "Calendário", icon: Calendar, perm: 'verAgendamentos' },
+        { to: "/disponibilidade", text: "Disponibilidade", icon: CalendarClock, perm: 'verAgendamentos' },
         { to: "/atendimentos", text: "Atendimentos", icon: CalendarClock, perm: 'verAgendamentos' }
       ]
     },

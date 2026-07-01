@@ -39,6 +39,12 @@ const scheduleSchema = new mongoose.Schema({
     type: String,
     default: '13:00',
   },
+  // Nota livre opcional sobre o horário base deste dia (F02)
+  observacao: {
+    type: String,
+    default: '',
+    maxlength: 280,
+  },
 }, { timestamps: true });
 
 // Exporta schema para uso no registry (database-per-tenant)

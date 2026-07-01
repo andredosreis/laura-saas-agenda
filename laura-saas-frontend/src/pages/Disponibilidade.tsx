@@ -1,29 +1,68 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getSchedules, updateSchedule } from '../services/scheduleService.js';
-import type { Schedule, Agendamento } from '../services/scheduleService.js';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  getSchedules,
+  updateSchedule,
+  getExcecoes,
+  criarExcecao,
+  actualizarExcecao,
+  removerExcecao,
+} from '../services/scheduleService.js';
+import type { Schedule, ScheduleException, TipoExcecao } from '../services/scheduleService.js';
 import { DateTime } from 'luxon';
 import { toast } from 'react-toastify';
-import { ChevronLeft, ChevronRight, RefreshCw, Edit2, Check, X, Calendar } from 'lucide-react';
+import {
+  RefreshCw,
+  Edit2,
+  Check,
+  X,
+  Calendar,
+  CalendarClock,
+  Copy,
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+} from 'lucide-react';
 
-// Componente para um "slot" de agendamento na agenda
-const AgendamentoSlot = ({ agendamento }: { agendamento: Agendamento }) => (
-  <div className="bg-linear-to-r from-indigo-500/20 to-purple-500/20 border-l-4 border-indigo-500 p-2 rounded-r-md shadow-lg text-xs absolute w-[calc(100%-8px)] left-1 backdrop-blur-sm">
-    <p className="font-bold text-indigo-700 dark:text-indigo-300">{agendamento.cliente.nome}</p>
-    <p className="text-indigo-600 dark:text-indigo-400">{agendamento.cliente.telefone}</p>
-  </div>
-);
+// Ordem de apresentação: Segunda → Domingo (dayOfWeek: 0 = Domingo, 1 = Segunda ... 6 = Sábado)
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+// "Dias úteis" para a acção de copiar (Seg–Sex)
+const WEEKDAYS = [1, 2, 3, 4, 5];
 
-// Modal para editar horários de um dia específico
+const TIPO_LABEL: Record<TipoExcecao, string> = {
+  'fechado': 'Fechado',
+  'horas-extra': 'Horas extra',
+  'horario-especial': 'Horário especial',
+};
+
+// Resumo textual dos horários de um dia
+const formatScheduleSummary = (s: Schedule): string => {
+  if (!s.isActive) return 'Inativo';
+  const base = `${s.startTime}–${s.endTime}`;
+  return s.breakStartTime && s.breakEndTime
+    ? `${base} · pausa ${s.breakStartTime}–${s.breakEndTime}`
+    : base;
+};
+
+// Resumo curto de uma excepção (para a célula do calendário)
+const formatExcecaoBadge = (e: ScheduleException): string =>
+  e.tipo === 'fechado' ? 'Fechado' : `${e.inicio}–${e.fim}`;
+
+// ============================================================
+// Modal: editar horário base de um dia da semana
+// ============================================================
 const EditScheduleModal = ({
   schedule,
   isOpen,
   onClose,
-  onSave
+  onSave,
+  onCopyToWeekdays,
 }: {
   schedule: Schedule | null;
   isOpen: boolean;
   onClose: () => void;
   onSave: (dayOfWeek: number, data: Partial<Schedule>) => Promise<void>;
+  onCopyToWeekdays: (data: Partial<Schedule>) => Promise<void>;
 }) => {
   const [formData, setFormData] = useState({
     isActive: false,
@@ -32,6 +71,7 @@ const EditScheduleModal = ({
     breakStartTime: '12:00',
     breakEndTime: '13:00'
   });
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     if (schedule) {
@@ -45,10 +85,11 @@ const EditScheduleModal = ({
     }
   }, [schedule]);
 
+  const invalidRange = formData.isActive && formData.startTime >= formData.endTime;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schedule) return;
-
+    if (!schedule || invalidRange) return;
     try {
       await onSave(schedule.dayOfWeek, formData);
       onClose();
@@ -58,19 +99,31 @@ const EditScheduleModal = ({
     }
   };
 
+  const handleCopy = async () => {
+    if (invalidRange) return;
+    setCopying(true);
+    try {
+      await onCopyToWeekdays(formData);
+      onClose();
+    } finally {
+      setCopying(false);
+    }
+  };
+
   if (!isOpen || !schedule) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Editar Horários</h2>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Editar horário base</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{schedule.label}</p>
             </div>
             <button
               onClick={onClose}
+              aria-label="Fechar"
               className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -101,9 +154,7 @@ const EditScheduleModal = ({
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-                      Início
-                    </label>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Início</label>
                     <input
                       type="time"
                       value={formData.startTime}
@@ -113,9 +164,7 @@ const EditScheduleModal = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-                      Fim
-                    </label>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Fim</label>
                     <input
                       type="time"
                       value={formData.endTime}
@@ -125,6 +174,9 @@ const EditScheduleModal = ({
                     />
                   </div>
                 </div>
+                {invalidRange && (
+                  <p className="text-red-500 dark:text-red-400 text-sm mt-2">A hora de início tem de ser anterior à hora de fim.</p>
+                )}
               </div>
 
               <div>
@@ -134,9 +186,7 @@ const EditScheduleModal = ({
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-                      Início
-                    </label>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Início</label>
                     <input
                       type="time"
                       value={formData.breakStartTime}
@@ -145,9 +195,7 @@ const EditScheduleModal = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-                      Fim
-                    </label>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Fim</label>
                     <input
                       type="time"
                       value={formData.breakEndTime}
@@ -157,6 +205,16 @@ const EditScheduleModal = ({
                   </div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleCopy}
+                disabled={copying || invalidRange}
+                className="w-full px-4 py-2.5 text-indigo-600 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Copy className="w-4 h-4" />
+                {copying ? 'A copiar…' : 'Copiar para os dias úteis (Seg–Sex)'}
+              </button>
             </div>
           )}
 
@@ -170,7 +228,8 @@ const EditScheduleModal = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/30 flex items-center gap-2"
+              disabled={invalidRange}
+              className="px-6 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check className="w-4 h-4" />
               Salvar
@@ -182,22 +241,276 @@ const EditScheduleModal = ({
   );
 };
 
+// ============================================================
+// Modal: criar/editar/remover uma excepção de uma data
+// ============================================================
+const ExcecaoModal = ({
+  dateKey,
+  existing,
+  isOpen,
+  onClose,
+  onSaved,
+}: {
+  dateKey: string | null;
+  existing: ScheduleException | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const [tipo, setTipo] = useState<TipoExcecao>('fechado');
+  const [inicio, setInicio] = useState('09:00');
+  const [fim, setFim] = useState('13:00');
+  const [observacao, setObservacao] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (existing) {
+      setTipo(existing.tipo);
+      setInicio(existing.inicio ?? '09:00');
+      setFim(existing.fim ?? '13:00');
+      setObservacao(existing.observacao ?? '');
+    } else {
+      setTipo('fechado');
+      setInicio('09:00');
+      setFim('13:00');
+      setObservacao('');
+    }
+  }, [existing, dateKey, isOpen]);
+
+  if (!isOpen || !dateKey) return null;
+
+  const isFechado = tipo === 'fechado';
+  const invalidRange = !isFechado && inicio >= fim;
+  const dataLabel = DateTime.fromISO(dateKey).setLocale('pt-PT').toFormat("cccc, d 'de' LLLL 'de' yyyy");
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (invalidRange) return;
+    setSaving(true);
+    try {
+      const payload = {
+        data: dateKey,
+        tipo,
+        observacao,
+        inicio: isFechado ? null : inicio,
+        fim: isFechado ? null : fim,
+      };
+      if (existing) await actualizarExcecao(existing._id, payload);
+      else await criarExcecao(payload);
+      toast.success('✅ Excepção guardada!');
+      onSaved();
+      onClose();
+    } catch (error) {
+      toast.error('❌ Erro ao guardar a excepção');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!existing) return;
+    setSaving(true);
+    try {
+      await removerExcecao(existing._id);
+      toast.success('✅ Excepção removida');
+      onSaved();
+      onClose();
+    } catch (error) {
+      toast.error('❌ Erro ao remover a excepção');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Excepção de data</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 capitalize">{dataLabel}</p>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Fechar"
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSave} className="p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">O que acontece neste dia?</label>
+            <div className="grid grid-cols-1 gap-2">
+              {(Object.keys(TIPO_LABEL) as TipoExcecao[]).map((t) => (
+                <label
+                  key={t}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                    tipo === t
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/40'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="tipo"
+                    value={t}
+                    checked={tipo === t}
+                    onChange={() => setTipo(t)}
+                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {t === 'fechado' ? 'Fechado (dia todo)' : TIPO_LABEL[t]}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {!isFechado && (
+            <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-300">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Início</label>
+                <input
+                  type="time"
+                  value={inicio}
+                  onChange={(e) => setInicio(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Fim</label>
+                <input
+                  type="time"
+                  value={fim}
+                  onChange={(e) => setFim(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  required
+                />
+              </div>
+              {invalidRange && (
+                <p className="col-span-2 text-red-500 dark:text-red-400 text-sm">A hora de início tem de ser anterior à hora de fim.</p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+              Nota (opcional)
+            </label>
+            <textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              maxLength={280}
+              rows={2}
+              placeholder="ex.: Feriado, formação, folga…"
+              className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+            />
+            <p className="text-xs text-slate-400 mt-1 text-right">{observacao.length}/280</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div>
+              {existing && (
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  disabled={saving}
+                  className="px-4 py-2.5 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all font-medium flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remover
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2.5 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={invalidRange || saving}
+                className="px-5 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all font-medium shadow-lg shadow-indigo-500/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="w-4 h-4" />
+                {saving ? 'A guardar…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Cartão de um dia da semana (editor compacto do horário base)
+const DayCard = ({ schedule, onEdit }: { schedule: Schedule; onEdit: (s: Schedule) => void }) => (
+  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-4">
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-800 dark:text-white">{schedule.label}</span>
+          <span
+            className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+              schedule.isActive
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            {schedule.isActive ? 'Ativo' : 'Inativo'}
+          </span>
+        </div>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate">
+          {formatScheduleSummary(schedule)}
+        </p>
+      </div>
+      <button
+        onClick={() => onEdit(schedule)}
+        className="shrink-0 px-4 py-2.5 text-sm bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md flex items-center gap-1.5 font-medium"
+      >
+        <Edit2 className="w-4 h-4" />
+        Editar
+      </button>
+    </div>
+  </div>
+);
+
+const WEEKDAY_HEADERS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
 const AgendaDisponibilidade = () => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [currentWeekStart, setCurrentWeekStart] = useState<DateTime>(DateTime.now().startOf('week'));
 
-  // Função para buscar os dados
+  // Excepções por data
+  const [month, setMonth] = useState<DateTime>(DateTime.now().setZone('Europe/Lisbon').startOf('month'));
+  const [excecoes, setExcecoes] = useState<ScheduleException[]>([]);
+  const [excModalDate, setExcModalDate] = useState<string | null>(null);
+  const [excModalExisting, setExcModalExisting] = useState<ScheduleException | null>(null);
+  const [isExcModalOpen, setIsExcModalOpen] = useState<boolean>(false);
+
+  // Grelha do mês: 6 semanas a partir da 2ª-feira que contém o 1º dia do mês
+  const gridStart = useMemo(() => month.startOf('week'), [month]);
+  const gridDays = useMemo(
+    () => Array.from({ length: 42 }, (_, i) => gridStart.plus({ days: i })),
+    [gridStart]
+  );
+
   const fetchSchedules = useCallback(async () => {
     try {
       setLoading(true);
-      const { disponibilidade, agendamentos } = await getSchedules();
+      const { disponibilidade } = await getSchedules();
       setSchedules(disponibilidade);
-      setAgendamentos(agendamentos);
       setError(null);
     } catch (err) {
       if (err instanceof Error) setError(err.message);
@@ -205,70 +518,94 @@ const AgendaDisponibilidade = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentWeekStart]);
+  }, []);
+
+  const fetchExcecoes = useCallback(async () => {
+    try {
+      const from = gridStart.toISODate() ?? undefined;
+      const to = gridStart.plus({ days: 41 }).toISODate() ?? undefined;
+      const data = await getExcecoes(from, to);
+      setExcecoes(data);
+    } catch {
+      // Secundário — não pode partir a página; deixa o calendário vazio.
+      setExcecoes([]);
+    }
+  }, [gridStart]);
 
   useEffect(() => {
     fetchSchedules();
   }, [fetchSchedules]);
 
-  // Funções para navegar entre as semanas
-  const goToPreviousWeek = () => {
-    setCurrentWeekStart(prev => prev.minus({ weeks: 1 }));
-  };
+  useEffect(() => {
+    fetchExcecoes();
+  }, [fetchExcecoes]);
 
-  const goToNextWeek = () => {
-    setCurrentWeekStart(prev => prev.plus({ weeks: 1 }));
-  };
-
-  const goToCurrentWeek = () => {
-    setCurrentWeekStart(DateTime.now().startOf('week'));
-  };
-
-  // Função para abrir modal de edição
   const handleEditSchedule = (schedule: Schedule) => {
     setEditingSchedule(schedule);
     setIsModalOpen(true);
   };
-
-  // Função para fechar modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingSchedule(null);
   };
 
-  // Função para salvar alterações
   const handleSaveSchedule = async (dayOfWeek: number, data: Partial<Schedule>) => {
-    try {
-      await updateSchedule(dayOfWeek, data);
-      await fetchSchedules();
-    } catch (error) {
-      throw error;
+    await updateSchedule(dayOfWeek, data);
+    await fetchSchedules();
+  };
+
+  const handleCopyToWeekdays = async (source: Partial<Schedule>) => {
+    const payload = {
+      isActive: source.isActive ?? true,
+      startTime: source.startTime ?? '09:00',
+      endTime: source.endTime ?? '18:00',
+      breakStartTime: source.breakStartTime ?? '',
+      breakEndTime: source.breakEndTime ?? '',
+    };
+    const results = await Promise.allSettled(WEEKDAYS.map((day) => updateSchedule(day, payload)));
+    await fetchSchedules();
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    if (failed > 0) {
+      toast.error(`❌ Falha ao copiar para ${failed} dia(s). Verifique e tente de novo.`);
+    } else {
+      toast.success('✅ Horários copiados para os dias úteis (Seg–Sex)!');
     }
   };
 
-  // Gerar slots de tempo para o dia (ex: 08:00, 08:30, ...)
-  const timeSlots: string[] = [];
-  for (let hour = 8; hour < 20; hour++) {
-    timeSlots.push(`${String(hour).padStart(2, '0')}:00`);
-    timeSlots.push(`${String(hour).padStart(2, '0')}:30`);
-  }
+  const openExcecao = (dateKey: string) => {
+    setExcModalDate(dateKey);
+    setExcModalExisting(excecoes.find((e) => e.data === dateKey) ?? null);
+    setIsExcModalOpen(true);
+  };
 
-  // Gerar os dias da semana com as datas específicas
-  const weekDays = Array.from({ length: 7 }).map((_, i) => {
-    const date = currentWeekStart.plus({ days: i });
-    return {
-      dayOfWeek: date.weekday === 7 ? 0 : date.weekday,
-      label: date.toFormat('EEE dd/MM'),
-      fullDate: date.toISODate() as string,
-    };
-  });
+  const hasActiveDays = useMemo(() => schedules.some((s) => s.isActive), [schedules]);
+
+  const orderedSchedules = useMemo(
+    () =>
+      WEEK_ORDER.map((d) => schedules.find((s) => s.dayOfWeek === d)).filter(
+        (s): s is Schedule => Boolean(s)
+      ),
+    [schedules]
+  );
+
+  const firstDay = useMemo(
+    () => schedules.find((s) => s.dayOfWeek === 1) ?? orderedSchedules[0] ?? schedules[0] ?? null,
+    [schedules, orderedSchedules]
+  );
+
+  // Mapa data → excepção para lookup rápido nas células
+  const excecoesByDate = useMemo(() => {
+    const map = new Map<string, ScheduleException>();
+    for (const e of excecoes) map.set(e.data, e);
+    return map;
+  }, [excecoes]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center">
           <RefreshCw className="w-12 h-12 text-indigo-500 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 dark:text-slate-400 font-medium">A carregar agenda...</p>
+          <p className="text-slate-600 dark:text-slate-400 font-medium">A carregar horários...</p>
         </div>
       </div>
     );
@@ -289,184 +626,199 @@ const AgendaDisponibilidade = () => {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-[1600px] mx-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold bg-linear-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                Agenda Semanal
+              <h1 className="text-3xl font-bold bg-linear-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
+                <CalendarClock className="w-7 h-7 text-indigo-500" />
+                Disponibilidade
               </h1>
               <p className="text-slate-500 dark:text-slate-400 mt-1">
-                Gerencie sua disponibilidade e visualize agendamentos
+                Define o teu <span className="font-semibold text-slate-600 dark:text-slate-300">horário base</span> e as excepções por data
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={goToPreviousWeek}
-                className="px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all border border-slate-300 dark:border-slate-600 shadow-xs flex items-center gap-2 font-medium"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Anterior
-              </button>
-
-              <button
-                onClick={goToCurrentWeek}
-                className="px-4 py-2.5 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/30 font-medium"
-              >
-                Hoje
-              </button>
-
-              <span className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold border border-slate-300 dark:border-slate-600">
-                {currentWeekStart.toFormat('dd/MM/yyyy')} - {currentWeekStart.plus({ days: 6 }).toFormat('dd/MM/yyyy')}
-              </span>
-
-              <button
-                onClick={goToNextWeek}
-                className="px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all border border-slate-300 dark:border-slate-600 shadow-xs flex items-center gap-2 font-medium"
-              >
-                Próxima
-                <ChevronRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => fetchSchedules()}
-                className="px-4 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30 flex items-center gap-2 font-medium"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Atualizar
-              </button>
-            </div>
+            <button
+              onClick={() => { fetchSchedules(); fetchExcecoes(); }}
+              className="shrink-0 px-4 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Atualizar
+            </button>
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-          {/* Header with days */}
-          <div className="grid grid-cols-8 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-            <div className="p-4 text-center font-bold text-slate-600 dark:text-slate-400 text-sm">
-              Hora
+        {/* Empty state — CTA "Define o teu horário" */}
+        {!hasActiveDays && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+            <div className="backdrop-blur-xl bg-linear-to-br from-indigo-500/10 to-purple-500/10 p-8 sm:p-12 text-center">
+              <div className="w-16 h-16 bg-linear-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-500/30">
+                <CalendarPlus className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Define o teu horário</h2>
+              <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
+                Ainda não configuraste nenhum dia de atendimento. Começa por definir o teu horário base — depois podes copiá-lo para os restantes dias úteis.
+              </p>
+              <button
+                onClick={() => firstDay && handleEditSchedule(firstDay)}
+                disabled={!firstDay}
+                className="px-6 py-3 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                <CalendarPlus className="w-5 h-5" />
+                Define o teu horário
+              </button>
             </div>
-            {weekDays.map(dayInfo => {
-              const daySchedule = schedules.find(s => s.dayOfWeek === dayInfo.dayOfWeek);
+          </div>
+        )}
+
+        {/* Secção "Horário base" */}
+        <div className="mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-700 dark:text-slate-200">Horário base</h2>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1">
+            Recorrente · por dia da semana
+          </span>
+        </div>
+
+        <div className="space-y-3" data-testid="day-by-day">
+          {orderedSchedules.map((daySchedule) => (
+            <DayCard key={daySchedule.dayOfWeek} schedule={daySchedule} onEdit={handleEditSchedule} />
+          ))}
+        </div>
+
+        {/* Secção "Excepções por data" — calendário mensal */}
+        <div className="mt-8 mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-700 dark:text-slate-200">Excepções por data</h2>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1">
+            Feriados · folgas · horas extra
+          </span>
+        </div>
+
+        <div
+          data-testid="excecoes-calendar"
+          className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6"
+        >
+          {/* Navegação do mês */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setMonth((m) => m.minus({ months: 1 }))}
+              aria-label="Mês anterior"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="font-bold text-slate-800 dark:text-white capitalize" data-testid="month-label">
+              {month.setLocale('pt-PT').toFormat('LLLL yyyy')}
+            </span>
+            <button
+              onClick={() => setMonth((m) => m.plus({ months: 1 }))}
+              aria-label="Mês seguinte"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Cabeçalho dos dias da semana */}
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {WEEKDAY_HEADERS.map((d) => (
+              <div key={d} className="text-center text-xs font-semibold text-slate-400 dark:text-slate-500 py-1">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Células do mês */}
+          <div className="grid grid-cols-7 gap-1">
+            {gridDays.map((d) => {
+              const dateKey = d.toISODate() as string;
+              const inMonth = d.month === month.month;
+              const exc = excecoesByDate.get(dateKey);
+              const isToday = d.hasSame(DateTime.now().setZone('Europe/Lisbon'), 'day');
+
+              let cellClass = 'relative min-h-16 sm:min-h-20 rounded-lg border p-1.5 text-left transition-all overflow-hidden ';
+              if (!inMonth) {
+                cellClass += 'border-transparent text-slate-300 dark:text-slate-600 ';
+              } else if (exc?.tipo === 'fechado') {
+                cellClass += 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 ';
+              } else if (exc) {
+                cellClass += 'border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 ';
+              } else {
+                cellClass += 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/40 ';
+              }
+
               return (
-                <div key={dayInfo.fullDate} className="p-4 text-center border-l border-slate-200 dark:border-slate-700">
-                  <div className="flex flex-col items-center gap-2">
-                    <span className={`font-bold text-sm ${daySchedule?.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-600'}`}>
-                      {dayInfo.label}
-                    </span>
-                    {daySchedule && (
-                      <button
-                        onClick={() => handleEditSchedule(daySchedule)}
-                        className="px-3 py-1.5 text-xs bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md flex items-center gap-1.5 font-medium"
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => openExcecao(dateKey)}
+                  className={cellClass}
+                  data-testid={`day-cell-${dateKey}`}
+                  title={exc ? `${TIPO_LABEL[exc.tipo]}${exc.observacao ? ` · ${exc.observacao}` : ''}` : undefined}
+                >
+                  <span
+                    className={`text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full ${
+                      isToday && inMonth ? 'bg-indigo-500 text-white' : 'text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {d.day}
+                  </span>
+                  {exc && inMonth && (
+                    <span className="mt-1 block leading-tight">
+                      <span
+                        className={`block text-[10px] font-semibold truncate ${
+                          exc.tipo === 'fechado'
+                            ? 'text-red-600 dark:text-red-300'
+                            : 'text-indigo-600 dark:text-indigo-300'
+                        }`}
                       >
-                        <Edit2 className="w-3 h-3" />
-                        Editar
-                      </button>
-                    )}
-                  </div>
-                </div>
+                        {formatExcecaoBadge(exc)}
+                      </span>
+                      {exc.observacao && (
+                        <span className="block text-[9px] text-slate-500 dark:text-slate-400 truncate">
+                          {exc.observacao}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </button>
               );
             })}
           </div>
 
-          {/* Time slots grid */}
-          <div className="grid grid-cols-8">
-            {/* Time column */}
-            <div className="col-span-1">
-              {timeSlots.map(time => (
-                <div key={time} className="h-14 border-r border-b border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-medium text-slate-500 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/30">
-                  {time}
-                </div>
-              ))}
+          {/* Legenda */}
+          <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800"></div>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Fechado</span>
             </div>
-
-            {/* Days columns */}
-            {weekDays.map(dayInfo => {
-              const daySchedule = schedules.find(s => s.dayOfWeek === dayInfo.dayOfWeek);
-              return (
-                <div key={dayInfo.fullDate} className="col-span-1 relative">
-                  {timeSlots.map(time => {
-                    const agendamentoNesteSlot = agendamentos.find(ag => {
-                      const agDateTime = DateTime.fromISO(ag.dataHora);
-                      const isSameDay = agDateTime.toISODate() === dayInfo.fullDate;
-                      const horaCorreta = agDateTime.toFormat('HH:mm') === time;
-                      return isSameDay && horaCorreta;
-                    });
-
-                    // Verificar se o horário está dentro do expediente
-                    const [timeHour, timeMinute] = time.split(":");
-                    const timeInMinutes = parseInt(timeHour ?? "0") * 60 + parseInt(timeMinute ?? "0");
-
-                    const startTimeParts = daySchedule?.startTime?.split(":");
-                    const startTimeInMinutes = daySchedule?.startTime && startTimeParts ? parseInt(startTimeParts[0] ?? "0") * 60 + parseInt(startTimeParts[1] ?? "0") : 0;
-
-                    const endTimeParts = daySchedule?.endTime?.split(":");
-                    const endTimeInMinutes = daySchedule?.endTime && endTimeParts ? parseInt(endTimeParts[0] ?? "23") * 60 + parseInt(endTimeParts[1] ?? "59") : 1440;
-
-                    const breakStartTimeParts = daySchedule?.breakStartTime?.split(":");
-                    const breakStartInMinutes = daySchedule?.breakStartTime && breakStartTimeParts ? parseInt(breakStartTimeParts[0] ?? "0") * 60 + parseInt(breakStartTimeParts[1] ?? "0") : null;
-
-                    const breakEndTimeParts = daySchedule?.breakEndTime?.split(":");
-                    const breakEndInMinutes = daySchedule?.breakEndTime && breakEndTimeParts ? parseInt(breakEndTimeParts[0] ?? "0") * 60 + parseInt(breakEndTimeParts[1] ?? "0") : null;
-
-                    const isWorkingHour = daySchedule?.isActive && timeInMinutes >= startTimeInMinutes && timeInMinutes < endTimeInMinutes;
-                    const isBreakTime = breakStartInMinutes && breakEndInMinutes && timeInMinutes >= breakStartInMinutes && timeInMinutes < breakEndInMinutes;
-
-                    let slotClass = "h-14 border-b border-r border-slate-200 dark:border-slate-700 transition-colors ";
-                    if (!daySchedule?.isActive) {
-                      slotClass += "bg-slate-100 dark:bg-slate-900/50";
-                    } else if (isBreakTime) {
-                      slotClass += "bg-red-50 dark:bg-red-900/20";
-                    } else if (isWorkingHour) {
-                      slotClass += agendamentoNesteSlot ? "bg-indigo-50 dark:bg-indigo-900/20" : "bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30";
-                    } else {
-                      slotClass += "bg-slate-100 dark:bg-slate-900/50";
-                    }
-
-                    return (
-                      <div key={time} className={slotClass}>
-                        {agendamentoNesteSlot && <AgendamentoSlot agendamento={agendamentoNesteSlot} />}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800"></div>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Horas extra / horário especial</span>
+            </div>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Toca numa data para adicionar/editar.</span>
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="mt-6 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Legenda</h3>
-          <div className="flex flex-wrap gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-700 rounded-sm"></div>
-              <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Horário disponível</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700 rounded-sm"></div>
-              <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Agendamento marcado</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-700 rounded-sm"></div>
-              <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Horário de pausa</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-slate-100 dark:bg-slate-900/50 border-2 border-slate-300 dark:border-slate-700 rounded-sm"></div>
-              <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Fora do expediente</span>
-            </div>
-          </div>
-        </div>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-4">
+          O horário base repete-se todas as semanas. As excepções acima têm precedência na data indicada. Para ver os agendamentos marcados, usa o <span className="font-medium">Calendário</span>.
+        </p>
       </div>
 
-      {/* Modal de Edição */}
       <EditScheduleModal
         schedule={editingSchedule}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveSchedule}
+        onCopyToWeekdays={handleCopyToWeekdays}
+      />
+
+      <ExcecaoModal
+        dateKey={excModalDate}
+        existing={excModalExisting}
+        isOpen={isExcModalOpen}
+        onClose={() => setIsExcModalOpen(false)}
+        onSaved={fetchExcecoes}
       />
     </div>
   );
