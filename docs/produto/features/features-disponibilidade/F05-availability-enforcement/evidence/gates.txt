@@ -1,0 +1,8 @@
+===== GATE: ESLINT =====
+   38:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  158:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+✖ 4 problems (0 errors, 4 warnings)
+  0 errors and 4 warnings potentially fixable with the `--fix` option.
+
+===== GATE: JEST (suite F05, verbose) =====
