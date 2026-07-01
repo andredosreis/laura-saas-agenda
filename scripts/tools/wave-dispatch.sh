@@ -39,6 +39,8 @@ WARMUP="${WAVE_CLAUDE_WARMUP:-8}"     # segundos à espera do TUI do Claude arra
 POLL="${WAVE_POLL:-15}"               # intervalo de sondagem (s)
 
 MAX_PARALLEL=3; TIMEOUT=1800; ASSUME_YES=0; CLEANUP_DONE=0; DRY_RUN=0
+# Texto extra (guardrails de segurança, contexto) apenso à instrução de cada time.
+EXTRA_PROMPT="${WAVE_EXTRA_PROMPT:-}"
 
 [ "${1:-}" ] || { echo "uso: wave-dispatch.sh <tracking.json> <wave|F01 ...> [--max-parallel N] [--yes] [--dry-run]"; exit 1; }
 TRACKING="$1"; shift
@@ -117,7 +119,13 @@ echo "✅ Gate de segurança OK — nenhum worktree aponta para produção."
 
 # --- painel principal (top-left) de uma janela de feature ---
 main_pane() { tmux list-panes -t "$SESSION:$1" -F '#{pane_id} #{pane_left} #{pane_top}' 2>/dev/null | awk '$2==0 && $3==0 {print $1; exit}'; }
-report_path() { echo "$WT_ROOT/${IDS[$1]}-${SLUGS[$1]}/${SPECS[$1]}/eval-report.md"; }
+report_path() {
+  local exact="$WT_ROOT/${IDS[$1]}-${SLUGS[$1]}/${SPECS[$1]}/eval-report.md"
+  if [ -f "$exact" ]; then echo "$exact"; return; fi
+  # Fallback: o campo "spec" do tracking pode estar desatualizado (ex.: docs movidos).
+  # Localiza o eval-report onde quer que a feature o tenha escrito no worktree.
+  find "$WT_ROOT/${IDS[$1]}-${SLUGS[$1]}" -type f -name eval-report.md -path "*${IDS[$1]}*" 2>/dev/null | head -1
+}
 
 if [ "$DRY_RUN" = 1 ] || [ "$ASSUME_YES" != 1 ]; then
   echo
@@ -143,11 +151,15 @@ fire() {
   local idx="$1" ID="${IDS[$1]}" pane
   pane="$(main_pane "$ID")"
   if [ -z "$pane" ]; then echo "  ⚠️ $ID: painel não encontrado (janela existe?) — a saltar."; STATE[$idx]="error"; return; fi
-  local prompt="Implementa e avalia a feature $ID. 1) Corre a skill implement-feature com \"$PRD_REL $ID\". 2) Quando terminar, corre a skill evaluator para $ID (gera eval-report.md + screenshots e atualiza $PRD_REL). Segue CLAUDE.md e as regras do projeto. Nao abras PR."
+  local prompt="Implementa e avalia a feature $ID. 1) Corre a skill implement-feature com \"$PRD_REL $ID\". 2) Quando terminar, corre a skill evaluator para $ID (gera eval-report.md + screenshots e atualiza $PRD_REL). Segue CLAUDE.md e as regras do projeto. Nao abras PR.${EXTRA_PROMPT:+ $EXTRA_PROMPT}"
   echo "  ▶ $ID: a arrancar claude no painel $pane"
   tmux send-keys -t "$pane" "claude" C-m
   sleep "$WARMUP"
-  tmux send-keys -t "$pane" "$prompt" C-m
+  # O TUI do Claude usa bracketed-paste: enviar o prompt e o C-m juntos NÃO submete
+  # (o Enter é absorvido pela colagem). Enviar o texto, esperar, e só depois um Enter.
+  tmux send-keys -t "$pane" "$prompt"
+  sleep 1
+  tmux send-keys -t "$pane" Enter
   STATE[$idx]="running"; START[$idx]="$(date +%s)"
 }
 
