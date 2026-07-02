@@ -80,3 +80,25 @@ describe('resolveAvailableSlots — intervalo de arrumação', () => {
     expect(slots).toEqual(['15:15','16:30','17:45','19:00']);
   });
 });
+
+describe('resolveAvailableSlots — pausa parcialmente sobreposta à janela', () => {
+  it('pausa que ultrapassa o fecho continua a excluir os slots dentro da pausa', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    // Config incoerente mas alcançável pelo painel: fecho às 13:20, pausa 12:00-15:00.
+    await seedWeek(tenantId, { start: '09:00', end: '13:20', bStart: '12:00', bEnd: '15:00' });
+    const { slots } = await call(tenantId, 0);
+    expect(slots).not.toContain('12:00');
+    expect(slots).toEqual(['09:00', '10:00', '11:00']);
+  });
+
+  it('excepção cuja janela começa a meio da pausa base respeita a parte da pausa dentro da janela', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId); // base 09-18, pausa 12-13
+    const { ScheduleException } = models(tenantId);
+    await ScheduleException.create({ tenantId, data: DATE, tipo: 'horas-extra', inicio: '12:30', fim: '20:00' });
+    const { slots } = await call(tenantId, 0);
+    // A pausa aplica-se também às janelas de excepção: 12:30 cai dentro dela.
+    expect(slots).not.toContain('12:30');
+    expect(slots).toEqual(['13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00']);
+  });
+});

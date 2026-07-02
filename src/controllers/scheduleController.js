@@ -139,15 +139,17 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
   const agora = DateTime.now().setZone('Europe/Lisbon');
   const nowMinutes = dateKey === agora.toISODate() ? agora.hour * 60 + agora.minute : null;
 
-  // Blocos de trabalho: a pausa (se dentro da janela) divide o dia em manhã/tarde.
+  // Blocos de trabalho: a pausa divide o dia em manhã/tarde. A pausa é
+  // clampada à janela — pode sobrepor-se só parcialmente (janela de excepção
+  // que começa a meio da pausa, ou fecho antes do fim da pausa); só a parte
+  // que intersecta a janela conta, mas nunca é ignorada por inteiro.
   const blocks = [];
-  const hasBreak =
-    breakStartMinutes !== null && breakEndMinutes !== null &&
-    breakStartMinutes >= startWorkMinutes && breakEndMinutes <= endWorkMinutes &&
-    breakStartMinutes < breakEndMinutes;
+  const pauseStart = breakStartMinutes !== null ? Math.max(breakStartMinutes, startWorkMinutes) : null;
+  const pauseEnd = breakEndMinutes !== null ? Math.min(breakEndMinutes, endWorkMinutes) : null;
+  const hasBreak = pauseStart !== null && pauseEnd !== null && pauseStart < pauseEnd;
   if (hasBreak) {
-    if (breakStartMinutes > startWorkMinutes) blocks.push([startWorkMinutes, breakStartMinutes]);
-    if (breakEndMinutes < endWorkMinutes) blocks.push([breakEndMinutes, endWorkMinutes]);
+    if (pauseStart > startWorkMinutes) blocks.push([startWorkMinutes, pauseStart]);
+    if (pauseEnd < endWorkMinutes) blocks.push([pauseEnd, endWorkMinutes]);
   } else {
     blocks.push([startWorkMinutes, endWorkMinutes]);
   }
