@@ -6,6 +6,11 @@
  * notificationWorker para não tocar no pipeline de lembretes existente.
  */
 import { DateTime } from 'luxon';
+import { getTenantDB } from '../config/tenantDB.js';
+import { getModels } from '../models/registry.js';
+import Tenant from '../models/Tenant.js';
+import { sendWhatsAppMessage } from '../utils/evolutionClient.js';
+import logger from '../utils/logger.js';
 
 const ZONA = 'Europe/Lisbon';
 const STATUS_CANCELADOS = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
@@ -90,4 +95,86 @@ export function buildFollowUpMensagem({ clienteNome, variante, pacote, clinicaNo
     proposta +
     assinatura
   );
+}
+
+/**
+ * Handler do job BullMQ 'follow-up-pos-sessao'. Carrega o estado actual,
+ * decide via avaliarFollowUp (pura) e envia. Throw apenas em falha de envio
+ * (para o retry do BullMQ); todas as skip conditions retornam em silêncio.
+ */
+export async function processFollowUpJob(job) {
+  const { agendamentoId, tenantId } = job.data;
+
+  const db = getTenantDB(tenantId);
+  const { Agendamento, Cliente, CompraPacote, Mensagem, Conversa } = getModels(db);
+
+  const agendamento = await Agendamento.findById(agendamentoId).lean();
+  const [cliente, tenant, compra] = await Promise.all([
+    agendamento?.cliente
+      ? Cliente.findOne({ _id: agendamento.cliente, tenantId }).select('nome telefone iaAtiva').lean()
+      : null,
+    Tenant.findById(tenantId).lean(),
+    agendamento?.compraPacote
+      ? CompraPacote.findOne({ _id: agendamento.compraPacote, tenantId })
+          .populate('pacote', 'nome')
+          .lean()
+      : null,
+  ]);
+
+  const decisao = avaliarFollowUp({
+    agendamento,
+    cliente,
+    tenant,
+    compra,
+    jobDataHoraISO: job.data.dataHora,
+  });
+  if (!decisao.enviar) {
+    logger.info({ jobId: job.id, agendamentoId, motivo: decisao.motivo }, '[FollowUp] não enviado');
+    return;
+  }
+
+  const mensagem = buildFollowUpMensagem({
+    clienteNome: cliente.nome || 'Cliente',
+    variante: decisao.variante,
+    pacote: decisao.pacote,
+    clinicaNome: tenant?.nome || 'A clínica',
+  });
+
+  const resultado = await sendWhatsAppMessage(
+    cliente.telefone,
+    mensagem,
+    tenant?.whatsapp?.instanceName
+  );
+  if (!resultado.success) {
+    throw new Error(`[FollowUp] Falha ao enviar para ${cliente.nome}: ${JSON.stringify(resultado.error)}`);
+  }
+
+  // Marca enviado ANTES da persistência do inbox: se o registo na thread
+  // falhar, o retry do BullMQ não pode reenviar a mensagem ao cliente.
+  await Agendamento.updateOne(
+    { _id: agendamentoId, tenantId },
+    { $set: { 'followUp.enviadoEm': new Date() } }
+  );
+
+  try {
+    const tel = String(cliente.telefone).replace(/\D/g, '');
+    const variants = [tel, `351${tel}`, tel.replace(/^351/, '')];
+    let conversa = await Conversa.findOne({ tenantId, telefone: { $in: variants } });
+    if (!conversa) {
+      conversa = await Conversa.create({ tenantId, telefone: tel, estado: 'aguardando_agendamento' });
+    }
+    await Mensagem.create({
+      tenantId,
+      telefone: tel,
+      mensagem,
+      origem: 'laura',
+      direcao: 'saida',
+      geradoPor: 'sistema',
+      conversa: conversa._id,
+    });
+  } catch (err) {
+    logger.warn({ err: err.message, agendamentoId }, '[FollowUp] falha a registar na thread (envio OK)');
+  }
+
+  logger.info({ jobId: job.id, agendamentoId, variante: decisao.variante }, '[FollowUp] enviado');
 }
