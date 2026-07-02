@@ -59,9 +59,10 @@ const minutesToTime = (totalMinutes) => {
  * @param {string}  args.tenantId
  * @param {string}  args.date       — "YYYY-MM-DD" (assume já validada)
  * @param {number}  args.duration   — duração do serviço em minutos (default 60)
+ * @param {number}  args.interval   — minutos de arrumação reservados após cada sessão (default 0)
  * @returns {Promise<{ slots: string[], isException: boolean, exceptionType: (string|null), hasBaseSchedule: boolean, baseActive: boolean }>}
  */
-export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agendamento, tenantId, date, duration = 60 }) => {
+export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agendamento, tenantId, date, duration = 60, interval = 0 }) => {
   const targetDate = DateTime.fromISO(date, { zone: 'Europe/Lisbon' });
   const dayOfWeek = targetDate.weekday === 7 ? 0 : targetDate.weekday; // Luxon: 1=Seg..7=Dom → Mongoose: 0=Dom..6=Sab
   const dateKey = targetDate.toISODate(); // "YYYY-MM-DD"
@@ -119,12 +120,17 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
     'confirmacao.tipo': { $ne: 'rejeitado' }
   });
 
-  const occupiedSlots = existingAgendamentos.map(ag => {
-    const agendamentoStart = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' });
-    const agendamentoStartMinutes = timeToMinutes(agendamentoStart.toFormat('HH:mm'));
-    const agendamentoEndMinutes = agendamentoStartMinutes + Number(duration);
-    return { start: agendamentoStartMinutes, end: agendamentoEndMinutes };
-  });
+  // Cada agendamento reserva a sessão + a arrumação a seguir.
+  const dur = Number(duration);
+  const gap = Number(interval) || 0;
+  const step = dur + gap;
+
+  const reserved = existingAgendamentos
+    .map((ag) => {
+      const start = timeToMinutes(DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm'));
+      return { start, end: start + dur + gap };
+    })
+    .sort((a, b) => a.start - b.start);
 
   // Para HOJE, não propor horas já passadas (paridade com o antigo guard
   // Python `if slot < now_naive: continue`, removido no rewire F03 — sem
@@ -132,25 +138,30 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
   const agora = DateTime.now().setZone('Europe/Lisbon');
   const nowMinutes = dateKey === agora.toISODate() ? agora.hour * 60 + agora.minute : null;
 
+  // Blocos de trabalho: a pausa (se dentro da janela) divide o dia em manhã/tarde.
+  const blocks = [];
+  const hasBreak =
+    breakStartMinutes !== null && breakEndMinutes !== null &&
+    breakStartMinutes >= startWorkMinutes && breakEndMinutes <= endWorkMinutes &&
+    breakStartMinutes < breakEndMinutes;
+  if (hasBreak) {
+    if (breakStartMinutes > startWorkMinutes) blocks.push([startWorkMinutes, breakStartMinutes]);
+    if (breakEndMinutes < endWorkMinutes) blocks.push([breakEndMinutes, endWorkMinutes]);
+  } else {
+    blocks.push([startWorkMinutes, endWorkMinutes]);
+  }
+
   const slots = [];
-  for (let time = startWorkMinutes; time < endWorkMinutes; time += Number(duration)) {
-    const slotEnd = time + Number(duration);
-
-    if (slotEnd > endWorkMinutes) continue;
-    if (nowMinutes !== null && time <= nowMinutes) continue;
-
-    if (breakStartMinutes !== null && breakEndMinutes !== null) {
-      if ((time < breakEndMinutes && slotEnd > breakStartMinutes)) {
-        continue;
-      }
-    }
-
-    const isOccupied = occupiedSlots.some(occupied => {
-      return (time < occupied.end && slotEnd > occupied.start);
-    });
-
-    if (!isOccupied) {
-      slots.push(minutesToTime(time));
+  for (const [blockStart, blockEnd] of blocks) {
+    let cursor = blockStart;
+    while (cursor + dur <= blockEnd) {
+      const slotEnd = cursor + dur;
+      if (nowMinutes !== null && cursor <= nowMinutes) { cursor += step; continue; }
+      // Colisão com uma marcação real (sessão + arrumação) → saltar e reancorar no fim dela.
+      const hit = reserved.find((r) => cursor < r.end && slotEnd > r.start);
+      if (hit) { cursor = hit.end; continue; }
+      slots.push(minutesToTime(cursor));
+      cursor += step;
     }
   }
 
