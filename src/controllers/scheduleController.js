@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import Tenant from '../models/Tenant.js';
 
 /**
  * @desc    Garante que os 7 dias da semana existem na base de dados para o tenant.
@@ -219,11 +220,14 @@ export const getAvailableSlots = async (req, res) => {
       return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD.' });
     }
 
+    const tenantDoc = await Tenant.findById(req.tenantId).select('configuracoes.intervaloEntreSessoes').lean();
+    const interval = tenantDoc?.configuracoes?.intervaloEntreSessoes || 0;
+
     // Cálculo delegado ao helper partilhado (F03) — mesma fonte que o
     // endpoint interno da IA, garantindo paridade.
     const result = await resolveAvailableSlots({
       Schedule, ScheduleException, Agendamento,
-      tenantId: req.tenantId, date, duration,
+      tenantId: req.tenantId, date, duration, interval,
     });
 
     // Mensagens informativas do contrato legado (preservadas).
