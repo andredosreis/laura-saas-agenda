@@ -213,6 +213,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       clienteNome: cliente.nome || 'Cliente',
       clienteTelefone: cliente.telefone,
       servicoNome: tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão',
+      duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-appointment] scheduleNotifications falhou'));
 
     res.status(201).json({ success: true, data: agendamento });
@@ -328,6 +329,7 @@ router.patch('/:id/agendamentos/:agendamentoId/reschedule', async (req, res) => 
       clienteNome: cliente?.nome || 'Cliente',
       clienteTelefone: cliente?.telefone,
       servicoNome: agendamento.tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão',
+      duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-reschedule] scheduleNotifications falhou'));
 
     res.json({ success: true, data: agendamento });
