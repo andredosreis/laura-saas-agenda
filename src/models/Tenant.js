@@ -92,6 +92,7 @@ const TenantSchema = new Schema({
         formatoData: { type: String, default: 'DD/MM/YYYY' },
         formatoHora: { type: String, default: 'HH:mm' },
         duracaoSessaoPadrao: { type: Number, default: 60 }, // minutos
+        intervaloEntreSessoes: { type: Number, default: 0, min: 0 }, // min. de arrumação entre sessões
         antecedenciaMinAgendamento: { type: Number, default: 2 }, // horas
         antecedenciaMaxAgendamento: { type: Number, default: 30 }, // dias
         permitirAgendamentoOnline: { type: Boolean, default: false },
