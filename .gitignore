@@ -35,3 +35,6 @@ Revisação de md/
 
 # Playwright CLI session artefacts
 .playwright-cli/
+
+# Scratch de progresso do fluxo subagent-driven (superpowers)
+.superpowers/

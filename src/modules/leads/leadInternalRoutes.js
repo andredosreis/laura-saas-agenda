@@ -396,16 +396,17 @@ router.post('/:id/agendamento', async (req, res) => {
       return res.status(400).json({ success: false, error: 'leadId inválido' });
     }
 
-    const { models } = await resolveTenantContext(tenantId);
+    const { tenant, models } = await resolveTenantContext(tenantId);
     const lead = await models.Lead.findOne({ _id: req.params.id, tenantId });
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead não encontrado' });
     }
 
     // Atomic slot check: refuse if any non-cancelled appointment overlaps the
-    // 60-min window centered on dataHora (we treat each appointment as 60min).
-    const SLOT_MIN = 60;
-    const halfMs = (SLOT_MIN * 60 * 1000) - 1; // [start, start+60min)
+    // session+arrumação window centered on dataHora — same formula as the
+    // cliente/painel booking paths (60min session + intervaloEntreSessoes).
+    const gapMin = 60 + (tenant?.configuracoes?.intervaloEntreSessoes || 0);
+    const halfMs = (gapMin * 60 * 1000) - 1; // [start, start+gapMin)
     const windowStart = new Date(dataHora.getTime() - halfMs);
     const windowEnd = new Date(dataHora.getTime() + halfMs);
     const cancelledStatus = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];

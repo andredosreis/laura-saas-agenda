@@ -120,7 +120,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       return res.status(400).json({ success: false, error: 'dataHora no passado' });
     }
 
-    const { models } = await resolveTenantContext(tenantId);
+    const { tenant, models } = await resolveTenantContext(tenantId);
 
     const cliente = await models.Cliente.findOne({ _id: clienteId, tenantId })
       .select('_id nome telefone')
@@ -146,8 +146,8 @@ router.post('/:id/agendamentos', async (req, res) => {
       });
     }
 
-    const SLOT_MIN = 60;
-    const halfMs = (SLOT_MIN * 60 * 1000) - 1;
+    const gapMin = 60 + (tenant?.configuracoes?.intervaloEntreSessoes || 0);
+    const halfMs = (gapMin * 60 * 1000) - 1;
     const windowStart = new Date(dataHora.getTime() - halfMs);
     const windowEnd = new Date(dataHora.getTime() + halfMs);
     const conflict = await models.Agendamento.findOne({
@@ -231,7 +231,7 @@ router.patch('/:id/agendamentos/:agendamentoId/reschedule', async (req, res) => 
       return res.status(400).json({ success: false, error: 'novaDataHora no passado' });
     }
 
-    const { models } = await resolveTenantContext(tenantId);
+    const { tenant, models } = await resolveTenantContext(tenantId);
 
     const cancelledStatus = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
     const agendamento = await models.Agendamento.findOne({
@@ -256,10 +256,10 @@ router.patch('/:id/agendamentos/:agendamentoId/reschedule', async (req, res) => 
       });
     }
 
-    // Slot conflict check for the new time (same 60min window logic)
+    // Slot conflict check for the new time (same window logic as create, com arrumação)
     const novaDataHora = novaDataHoraDT.toJSDate();
-    const SLOT_MIN = 60;
-    const halfMs = (SLOT_MIN * 60 * 1000) - 1;
+    const gapMin = 60 + (tenant?.configuracoes?.intervaloEntreSessoes || 0);
+    const halfMs = (gapMin * 60 * 1000) - 1;
     const windowStart = new Date(novaDataHora.getTime() - halfMs);
     const windowEnd = new Date(novaDataHora.getTime() + halfMs);
     const conflict = await models.Agendamento.findOne({

@@ -57,14 +57,20 @@ const minutosParaHora = (min: number): string => {
 };
 
 /**
- * Classifica cada candidato da janela do dia:
- *  - na lista `slots` → `livre`
+ * Classifica cada candidato do dia:
+ *  - na lista `slots` → `livre` (ganha sempre — conjunto autoritativo, ver JSDoc do módulo)
  *  - sobrepõe uma reserva → `ocupado`
  *  - dentro da pausa → `pausa`
  *  - caso contrário → `fora`
  * Quando não há janela (fallback best-effort), devolve só os `slots` como livres.
+ *
+ * IMPORTANTE: `dia.slots` pode ter passo variável (ex.: `intervaloEntreSessoes`
+ * configurado no tenant gera `10:15`, `14:15`, ...) — nunca só múltiplos de
+ * `duration`. Por isso as horas candidatas são a UNIÃO de `dia.slots` com a
+ * grelha de contexto de passo fixo (que serve apenas para colorir `ocupado`/
+ * `pausa`/`fora`); nenhum `dia.slot` pode ser reclassificado como não-livre.
  */
-function construirCandidatos(
+export function construirCandidatos(
   dia: DiaDisponibilidade,
   duration: number,
   dateISO: string
@@ -91,26 +97,38 @@ function construirCandidatos(
   const pausaFim = horaParaMinutos(dia.janela.breakEndTime);
   const temPausa = pausaFim > pausaInicio;
 
-  const candidatos: SlotCandidato[] = [];
+  // União das horas candidatas: grelha de contexto (passo fixo, só para
+  // colorir ocupado/pausa/fora) + todos os `dia.slots` (autoritativo, sempre
+  // livre, seja qual for o minuto). Um Set<number> de minutos evita duplicados.
+  const minutosCandidatos = new Set<number>();
   // Mesmo stepping do backend: só candidatos cujo fim cabe na janela.
   for (let min = inicio; min < fim; min += duration) {
-    const fimSlot = min + duration;
-    if (fimSlot > fim) continue;
-
-    const hora = minutosParaHora(min);
-    let estado: SlotEstado;
-    if (disponiveis.has(hora)) {
-      estado = 'livre';
-    } else if (dia.ocupados.some((o) => min < o.end && fimSlot > o.start)) {
-      estado = 'ocupado';
-    } else if (temPausa && min < pausaFim && fimSlot > pausaInicio) {
-      estado = 'pausa';
-    } else {
-      estado = 'fora';
-    }
-
-    candidatos.push({ hora, estado, passado: marcarPassado(min) });
+    if (min + duration > fim) continue;
+    minutosCandidatos.add(min);
   }
+  for (const hora of dia.slots) {
+    minutosCandidatos.add(horaParaMinutos(hora));
+  }
+
+  const candidatos: SlotCandidato[] = Array.from(minutosCandidatos)
+    .sort((a, b) => a - b)
+    .map((min) => {
+      const fimSlot = min + duration;
+      const hora = minutosParaHora(min);
+      let estado: SlotEstado;
+      if (disponiveis.has(hora)) {
+        // `dia.slots` é sempre a fonte de verdade — nunca reclassificar.
+        estado = 'livre';
+      } else if (dia.ocupados.some((o) => min < o.end && fimSlot > o.start)) {
+        estado = 'ocupado';
+      } else if (temPausa && min < pausaFim && fimSlot > pausaInicio) {
+        estado = 'pausa';
+      } else {
+        estado = 'fora';
+      }
+
+      return { hora, estado, passado: marcarPassado(min) };
+    });
 
   return candidatos;
 }

@@ -105,7 +105,8 @@ export const getDisponibilidadeInterna = async (req, res) => {
   try {
     const { tenantId, date, from, to, duration } = req.query;
 
-    const { models } = await resolveTenantContext(tenantId);
+    const { tenant, models } = await resolveTenantContext(tenantId);
+    const interval = tenant?.configuracoes?.intervaloEntreSessoes || 0;
 
     const durationNum = Math.max(1, parseInt(duration, 10) || DEFAULT_DURATION);
     const daysNum = Math.min(MAX_DAYS, Math.max(1, parseInt(req.query.days, 10) || DEFAULT_DAYS));
@@ -130,6 +131,7 @@ export const getDisponibilidadeInterna = async (req, res) => {
         tenantId,
         date: isoDate,
         duration: durationNum,
+        interval,
       });
       const dow = dt.weekday === 7 ? 0 : dt.weekday;
       return {

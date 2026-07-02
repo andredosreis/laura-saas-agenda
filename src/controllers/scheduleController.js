@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import Tenant from '../models/Tenant.js';
 
 /**
  * @desc    Garante que os 7 dias da semana existem na base de dados para o tenant.
@@ -59,9 +60,10 @@ const minutesToTime = (totalMinutes) => {
  * @param {string}  args.tenantId
  * @param {string}  args.date       — "YYYY-MM-DD" (assume já validada)
  * @param {number}  args.duration   — duração do serviço em minutos (default 60)
+ * @param {number}  args.interval   — minutos de arrumação reservados após cada sessão (default 0)
  * @returns {Promise<{ slots: string[], isException: boolean, exceptionType: (string|null), hasBaseSchedule: boolean, baseActive: boolean }>}
  */
-export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agendamento, tenantId, date, duration = 60 }) => {
+export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agendamento, tenantId, date, duration = 60, interval = 0 }) => {
   const targetDate = DateTime.fromISO(date, { zone: 'Europe/Lisbon' });
   const dayOfWeek = targetDate.weekday === 7 ? 0 : targetDate.weekday; // Luxon: 1=Seg..7=Dom → Mongoose: 0=Dom..6=Sab
   const dateKey = targetDate.toISODate(); // "YYYY-MM-DD"
@@ -119,12 +121,17 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
     'confirmacao.tipo': { $ne: 'rejeitado' }
   });
 
-  const occupiedSlots = existingAgendamentos.map(ag => {
-    const agendamentoStart = DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' });
-    const agendamentoStartMinutes = timeToMinutes(agendamentoStart.toFormat('HH:mm'));
-    const agendamentoEndMinutes = agendamentoStartMinutes + Number(duration);
-    return { start: agendamentoStartMinutes, end: agendamentoEndMinutes };
-  });
+  // Cada agendamento reserva a sessão + a arrumação a seguir.
+  const dur = Number(duration);
+  const gap = Number(interval) || 0;
+  const step = dur + gap;
+
+  const reserved = existingAgendamentos
+    .map((ag) => {
+      const start = timeToMinutes(DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm'));
+      return { start, end: start + dur + gap };
+    })
+    .sort((a, b) => a.start - b.start);
 
   // Para HOJE, não propor horas já passadas (paridade com o antigo guard
   // Python `if slot < now_naive: continue`, removido no rewire F03 — sem
@@ -132,25 +139,35 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
   const agora = DateTime.now().setZone('Europe/Lisbon');
   const nowMinutes = dateKey === agora.toISODate() ? agora.hour * 60 + agora.minute : null;
 
+  // Blocos de trabalho: a pausa divide o dia em manhã/tarde. A pausa é
+  // clampada à janela — pode sobrepor-se só parcialmente (janela de excepção
+  // que começa a meio da pausa, ou fecho antes do fim da pausa); só a parte
+  // que intersecta a janela conta, mas nunca é ignorada por inteiro.
+  const blocks = [];
+  const pauseStart = breakStartMinutes !== null ? Math.max(breakStartMinutes, startWorkMinutes) : null;
+  const pauseEnd = breakEndMinutes !== null ? Math.min(breakEndMinutes, endWorkMinutes) : null;
+  const hasBreak = pauseStart !== null && pauseEnd !== null && pauseStart < pauseEnd;
+  if (hasBreak) {
+    if (pauseStart > startWorkMinutes) blocks.push([startWorkMinutes, pauseStart]);
+    if (pauseEnd < endWorkMinutes) blocks.push([pauseEnd, endWorkMinutes]);
+  } else {
+    blocks.push([startWorkMinutes, endWorkMinutes]);
+  }
+
   const slots = [];
-  for (let time = startWorkMinutes; time < endWorkMinutes; time += Number(duration)) {
-    const slotEnd = time + Number(duration);
-
-    if (slotEnd > endWorkMinutes) continue;
-    if (nowMinutes !== null && time <= nowMinutes) continue;
-
-    if (breakStartMinutes !== null && breakEndMinutes !== null) {
-      if ((time < breakEndMinutes && slotEnd > breakStartMinutes)) {
-        continue;
-      }
-    }
-
-    const isOccupied = occupiedSlots.some(occupied => {
-      return (time < occupied.end && slotEnd > occupied.start);
-    });
-
-    if (!isOccupied) {
-      slots.push(minutesToTime(time));
+  for (const [blockStart, blockEnd] of blocks) {
+    let cursor = blockStart;
+    while (cursor + dur <= blockEnd) {
+      const slotEnd = cursor + dur;
+      if (nowMinutes !== null && cursor <= nowMinutes) { cursor += step; continue; }
+      // Colisão com uma marcação real (sessão + arrumação) → saltar e reancorar no fim dela.
+      // Simétrico: a arrumação DO PRÓPRIO candidato (slotEnd + gap) também não
+      // pode invadir a marcação seguinte — senão o helper oferece um slot que
+      // o booking depois rejeita com 409 (arrumação insuficiente antes da marcação real).
+      const hit = reserved.find((r) => cursor < r.end && (slotEnd + gap) > r.start);
+      if (hit) { cursor = hit.end; continue; }
+      slots.push(minutesToTime(cursor));
+      cursor += step;
     }
   }
 
@@ -208,11 +225,14 @@ export const getAvailableSlots = async (req, res) => {
       return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD.' });
     }
 
+    const tenantDoc = await Tenant.findById(req.tenantId).select('configuracoes.intervaloEntreSessoes').lean();
+    const interval = tenantDoc?.configuracoes?.intervaloEntreSessoes || 0;
+
     // Cálculo delegado ao helper partilhado (F03) — mesma fonte que o
     // endpoint interno da IA, garantindo paridade.
     const result = await resolveAvailableSlots({
       Schedule, ScheduleException, Agendamento,
-      tenantId: req.tenantId, date, duration,
+      tenantId: req.tenantId, date, duration, interval,
     });
 
     // Mensagens informativas do contrato legado (preservadas).
