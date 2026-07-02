@@ -9,6 +9,9 @@
  *   POST  /:id/agendamentos                        — criar agendamento (max 1 pendente)
  *   PATCH /:id/agendamentos/:agendamentoId/reschedule — remarcar (24h mínimo)
  *   PATCH /:id/agendamentos/:agendamentoId/cancel     — cancelar (late cancel policy)
+ *   PATCH /:id/agendamentos/:agendamentoId/presenca   — resposta ao follow-up (Compareceu/Não Compareceu)
+ *   GET   /:id/followup-pendente                      — follow-up pós-sessão pendente (<24h)
+ *   POST  /:id/renovacao-interesse                    — alerta a equipa (renovação de pacote)
  *   GET   /:id/pacotes                             — pacotes activos com sessões restantes
  *   GET   /:id/messages                            — histórico de mensagens por telefone
  *   POST  /mensagens                               — persistir mensagem (in ou out)
@@ -425,6 +428,62 @@ router.patch('/:id/agendamentos/:agendamentoId/cancel', async (req, res) => {
       return res.status(err.statusCode).json({ success: false, error: err.message });
     }
     logger.error({ err: err.message, stack: err.stack }, '[internal] PATCH /clientes/:id/agendamentos/:agendamentoId/cancel');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// PATCH /api/internal/clientes/:id/agendamentos/:agendamentoId/presenca
+// Body: { tenantId, compareceu: boolean, feedback?: string }
+// Resposta ao follow-up pós-sessão. Só transita status a partir de
+// Agendado/Confirmado — nunca sobrepõe estado definido pela Laura
+// (Realizado, Fechado, cancelados). Grava sempre followUp.respostaEm.
+// =====================================================================
+router.patch('/:id/agendamentos/:agendamentoId/presenca', async (req, res) => {
+  try {
+    const { id: clienteId, agendamentoId } = req.params;
+    const { tenantId, compareceu, feedback } = req.body || {};
+
+    if (!tenantId || typeof compareceu !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'tenantId e compareceu (boolean) são obrigatórios' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(clienteId) || !mongoose.Types.ObjectId.isValid(agendamentoId)) {
+      return res.status(400).json({ success: false, error: 'ID inválido' });
+    }
+
+    const { models } = await resolveTenantContext(tenantId);
+
+    const followUpSet = { 'followUp.respostaEm': new Date() };
+    if (feedback) followUpSet['followUp.feedback'] = String(feedback).slice(0, 500);
+
+    const novoStatus = compareceu ? 'Compareceu' : 'Não Compareceu';
+
+    // 1ª tentativa: atómica, com guarda de status (evita corrida com a Laura).
+    let agendamento = await models.Agendamento.findOneAndUpdate(
+      { _id: agendamentoId, tenantId, cliente: clienteId, status: { $in: ['Agendado', 'Confirmado'] } },
+      { $set: { ...followUpSet, status: novoStatus, compareceu } },
+      { new: true }
+    ).lean();
+    const statusAtualizado = Boolean(agendamento);
+
+    // Guarda falhou → status já definido pela Laura; regista só a resposta.
+    if (!agendamento) {
+      agendamento = await models.Agendamento.findOneAndUpdate(
+        { _id: agendamentoId, tenantId, cliente: clienteId },
+        { $set: followUpSet },
+        { new: true }
+      ).lean();
+    }
+    if (!agendamento) {
+      return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
+    }
+
+    res.json({ success: true, data: { statusAtualizado, status: agendamento.status } });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] PATCH /clientes/:id/agendamentos/:agendamentoId/presenca');
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });
