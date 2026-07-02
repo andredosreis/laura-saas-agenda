@@ -28,6 +28,10 @@ import { scheduleNotifications } from '../../utils/scheduleNotifications.js';
 import logger from '../../utils/logger.js';
 // F05 — mesma regra única de disponibilidade que a IA lê (F03) e o painel aplica.
 import { resolveAvailableSlots } from '../../controllers/scheduleController.js';
+import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
+import { sendPushNotification } from '../../services/pushService.js';
+import User from '../../models/User.js';
+import UserSubscription from '../../models/UserSubscription.js';
 
 const router = express.Router();
 
@@ -484,6 +488,117 @@ router.patch('/:id/agendamentos/:agendamentoId/presenca', async (req, res) => {
       return res.status(err.statusCode).json({ success: false, error: err.message });
     }
     logger.error({ err: err.message, stack: err.stack }, '[internal] PATCH /clientes/:id/agendamentos/:agendamentoId/presenca');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// GET /api/internal/clientes/:id/followup-pendente?tenantId=...
+// Follow-up pós-sessão pendente: enviado nas últimas 24h e sem resposta.
+// data: null quando não há (o orchestrator Python trata null = sem contexto).
+// =====================================================================
+router.get('/:id/followup-pendente', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+    const clienteId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+      return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+
+    const { models } = await resolveTenantContext(tenantId);
+
+    const cutoff = DateTime.now().setZone('Europe/Lisbon').minus({ hours: 24 }).toJSDate();
+    const agendamento = await models.Agendamento.findOne({
+      tenantId,
+      cliente: clienteId,
+      'followUp.enviadoEm': { $gte: cutoff },
+      'followUp.respostaEm': null,
+    })
+      .sort({ 'followUp.enviadoEm': -1 })
+      .select('dataHora status tipo followUp compraPacote')
+      .lean();
+
+    res.json({ success: true, data: agendamento || null });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] GET /clientes/:id/followup-pendente');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// POST /api/internal/clientes/:id/renovacao-interesse
+// Body: { tenantId }
+// Handoff de renovação: alerta a equipa (WhatsApp admin + push best-effort).
+// A IA NUNCA cria a CompraPacote — a venda é fechada pela equipa.
+// =====================================================================
+router.post('/:id/renovacao-interesse', async (req, res) => {
+  try {
+    const clienteId = req.params.id;
+    const { tenantId } = req.body || {};
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenantId é obrigatório' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+      return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+
+    const { tenant, models } = await resolveTenantContext(tenantId);
+
+    const cliente = await models.Cliente.findOne({ _id: clienteId, tenantId })
+      .select('nome telefone')
+      .lean();
+    if (!cliente) {
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
+    }
+
+    const alerta =
+      `💜 *Interesse em Renovação*\n\n` +
+      `A cliente *${cliente.nome}* terminou o pacote e demonstrou interesse em renovar.\n\n` +
+      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}`;
+
+    let whatsappEnviado = false;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    if (numeroAdmin) {
+      const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
+      whatsappEnviado = Boolean(resultado?.success);
+    }
+
+    // Push best-effort aos admins do tenant — nunca falha o pedido.
+    let pushEnviado = false;
+    try {
+      const admins = await User.find({ tenantId, role: { $in: ['admin', 'gerente'] } })
+        .select('_id')
+        .lean();
+      const subs = await UserSubscription.find({
+        userId: { $in: admins.map((a) => String(a._id)) },
+        active: true,
+      }).lean();
+      await Promise.all(
+        subs.map((sub) =>
+          sendPushNotification(sub, {
+            title: '💜 Interesse em renovação',
+            body: `${cliente.nome} terminou o pacote e quer renovar.`,
+            tag: `renovacao-${clienteId}`,
+            data: { tipo: 'renovacao-interesse', clienteId },
+          })
+        )
+      );
+      pushEnviado = subs.length > 0;
+    } catch (pushErr) {
+      logger.warn({ err: pushErr.message, tenantId }, '[internal] push de renovação falhou');
+    }
+
+    res.json({ success: true, data: { whatsappEnviado, pushEnviado } });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] POST /clientes/:id/renovacao-interesse');
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });
