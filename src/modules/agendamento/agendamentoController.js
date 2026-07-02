@@ -94,7 +94,8 @@ export const createAgendamento = async (req, res) => {
     }
 
     const tenantDoc = await Tenant.findById(req.tenantId).select('configuracoes.intervaloEntreSessoes').lean();
-    const agendamentoDurationMinutes = 60 + (tenantDoc?.configuracoes?.intervaloEntreSessoes || 0);
+    const intervaloEntreSessoes = tenantDoc?.configuracoes?.intervaloEntreSessoes || 0;
+    const agendamentoDurationMinutes = 60 + intervaloEntreSessoes;
     const conflictWindow = {
       $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
       $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
@@ -150,7 +151,12 @@ export const createAgendamento = async (req, res) => {
         Agendamento,
         tenantId: req.tenantId,
         date: agendamentoDateTime.toFormat('yyyy-MM-dd'),
-        duration: agendamentoDurationMinutes, // D2 — mesma duração do conflito acima
+        // Fase A — sessão e arrumação passam SEPARADOS: duration é só a sessão
+        // (o slot cabe se a sessão couber na janela; a arrumação pode morrer no
+        // fecho) e interval é a arrumação. Passar a soma como duration rejeitaria
+        // o último slot do dia que o picker mostra.
+        duration: 60,
+        interval: intervaloEntreSessoes,
       });
 
       if (!slots.includes(agendamentoDateTime.toFormat('HH:mm'))) {

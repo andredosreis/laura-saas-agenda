@@ -181,6 +181,8 @@ router.post('/:id/agendamentos', async (req, res) => {
         tenantId,
         date: dataHoraDT.toFormat('yyyy-MM-dd'),
         duration: 60,
+        // Fase A — mesma grelha ancorada (com arrumação) que o picker/IA mostram.
+        interval: tenant?.configuracoes?.intervaloEntreSessoes || 0,
       });
       if (!slots.includes(dataHoraDT.toFormat('HH:mm'))) {
         return res.status(400).json({

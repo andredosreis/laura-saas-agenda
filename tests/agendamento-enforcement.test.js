@@ -32,11 +32,12 @@ const D_NORMAL = '2026-12-21';   // dia base activo 09:00–18:00, pausa 12:00�
 const D_FECHADO = '2026-12-25';  // excepção fechado (Natal)
 const D_EXTRA = '2026-12-26';    // excepção horas-extra 19:00–22:00
 
-async function criarTenant(slug, role = 'admin') {
+async function criarTenant(slug, role = 'admin', intervalo = 0) {
   const tenant = await Tenant.create({
     nome: `Salão ${slug}`,
     slug,
     plano: { tipo: 'basico', status: 'ativo', trialDias: 7 },
+    configuracoes: { intervaloEntreSessoes: intervalo },
   });
   const user = await User.create({
     tenantId: tenant._id,
@@ -77,7 +78,7 @@ function tenantModels(tenantId) {
 
 // Semana toda activa 09:00–18:00 (pausa 12:00–13:00) → slots por dia:
 // [09,10,11,13,14,15,16,17] (12:00 cai na pausa; 17:00 é o último que cabe).
-async function seedWeek(tenantId) {
+async function seedWeek(tenantId, { end = '18:00' } = {}) {
   const { Schedule } = tenantModels(tenantId);
   await Promise.all([0, 1, 2, 3, 4, 5, 6].map((d) => Schedule.create({
     tenantId,
@@ -85,7 +86,7 @@ async function seedWeek(tenantId) {
     label: WEEK_LABELS[d],
     isActive: true,
     startTime: '09:00',
-    endTime: '18:00',
+    endTime: end,
     breakStartTime: '12:00',
     breakEndTime: '13:00',
   })));
@@ -360,5 +361,81 @@ describe('F05 — C10: rotas internas da IA são enforced (sem override)', () =>
       .send({ tenantId: String(tenant._id), dataHoraISO: `${D_NORMAL}T20:00:00` });
 
     expect(res.status).toBe(201);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// F05 × Fase A — o enforcement valida contra a MESMA grelha que o picker e
+// a IA mostram: com intervaloEntreSessoes=15 a grelha ancorada do dia base
+// (09–18, pausa 12–13) é ['09:00','10:15','13:00','14:15','15:30','16:45'].
+// Sem passar o intervalo, o enforcement recalcularia a grelha hora-a-hora e
+// rejeitaria slots legítimos (10:15) enquanto aceitava slots fora da grelha (15:00).
+describe('F05 × Fase A — enforcement usa o intervaloEntreSessoes do tenant', () => {
+  it('painel: slot ancorado 10:15 → 201; slot fora da grelha 15:00 → 400', async () => {
+    const { tenant, token } = await criarTenant('f05-int-painel', 'admin', 15);
+    await seedWeek(tenant._id);
+    const c1 = await seedCliente(tenant._id, '930000001');
+    const c2 = await seedCliente(tenant._id, '930000002');
+
+    const ancorado = await request(app)
+      .post('/api/v1/agendamentos')
+      .set(auth(token))
+      .send(payload(c1, `${D_NORMAL}T10:15:00`));
+    expect(ancorado.status).toBe(201);
+
+    const foraGrelha = await request(app)
+      .post('/api/v1/agendamentos')
+      .set(auth(token))
+      .send(payload(c2, `${D_NORMAL}T15:00:00`));
+    expect(foraGrelha.status).toBe(400);
+    expect(foraGrelha.body.message).toBe('Horário fora da disponibilidade configurada.');
+  });
+
+  it('painel: último slot do dia (16:45, fecho 17:45) → 201 — a arrumação pode morrer no fecho', async () => {
+    const { tenant, token } = await criarTenant('f05-int-fecho', 'admin', 15);
+    await seedWeek(tenant._id, { end: '17:45' }); // tarde 13:00–17:45 → 13:00,14:15,15:30,16:45
+    const cliente = await seedCliente(tenant._id, '930000004');
+
+    // A sessão (60 min) cabe até ao fecho; só a arrumação ficaria depois dele.
+    // O picker oferece 16:45 — o enforcement não pode exigir sessão+arrumação
+    // dentro da janela (senão rejeita um slot que a própria grelha mostrou).
+    const res = await request(app)
+      .post('/api/v1/agendamentos')
+      .set(auth(token))
+      .send(payload(cliente, `${D_NORMAL}T16:45:00`));
+    expect(res.status).toBe(201);
+  });
+
+  it('cliente interno (IA): slot ancorado 10:15 → 201', async () => {
+    const { tenant } = await criarTenant('f05-int-cli', 'admin', 15);
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '930000003');
+
+    const res = await request(app)
+      .post(`/api/internal/clientes/${cliente._id}/agendamentos`)
+      .set(svc())
+      .send({ tenantId: String(tenant._id), dataHoraISO: `${D_NORMAL}T10:15:00` });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('lead interno (IA): slot ancorado 10:15 → 201; fora da grelha 15:00 → 400', async () => {
+    const { tenant } = await criarTenant('f05-int-lead', 'admin', 15);
+    await seedWeek(tenant._id);
+    const l1 = await seedLead(tenant._id, '940000001');
+    const l2 = await seedLead(tenant._id, '940000002');
+
+    const ancorado = await request(app)
+      .post(`/api/internal/leads/${l1._id}/agendamento`)
+      .set(svc())
+      .send({ tenantId: String(tenant._id), dataHoraISO: `${D_NORMAL}T10:15:00` });
+    expect(ancorado.status).toBe(201);
+
+    const foraGrelha = await request(app)
+      .post(`/api/internal/leads/${l2._id}/agendamento`)
+      .set(svc())
+      .send({ tenantId: String(tenant._id), dataHoraISO: `${D_NORMAL}T15:00:00` });
+    expect(foraGrelha.status).toBe(400);
+    expect(foraGrelha.body.code).toBe('fora_disponibilidade');
   });
 });
