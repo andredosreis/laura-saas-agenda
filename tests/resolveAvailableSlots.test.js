@@ -68,4 +68,15 @@ describe('resolveAvailableSlots — intervalo de arrumação', () => {
     // 13:00,14:15,15:30,16:45,18:00 ; 19:15→20:15 passa do fecho → fora
     expect(slots).toEqual(['13:00','14:15','15:30','16:45','18:00']);
   });
+
+  it('interval=15 → candidato NÃO invade a arrumação da marcação seguinte (regressão)', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '13:00', end: '20:00', bStart: '13:00', bEnd: '13:00' }); // bloco único 13-20
+    await seedBooking(tenantId, `${DATE}T14:00`); // marcação real às 14:00
+    const { slots } = await call(tenantId, 15);
+    // 13:00–14:00 deixaria 0 min de arrumação antes da marcação das 14:00 —
+    // o helper não pode oferecer um slot que o booking depois rejeita (409).
+    expect(slots).not.toContain('13:00');
+    expect(slots).toEqual(['15:15','16:30','17:45','19:00']);
+  });
 });

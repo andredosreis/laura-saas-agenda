@@ -159,7 +159,10 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
       const slotEnd = cursor + dur;
       if (nowMinutes !== null && cursor <= nowMinutes) { cursor += step; continue; }
       // Colisão com uma marcação real (sessão + arrumação) → saltar e reancorar no fim dela.
-      const hit = reserved.find((r) => cursor < r.end && slotEnd > r.start);
+      // Simétrico: a arrumação DO PRÓPRIO candidato (slotEnd + gap) também não
+      // pode invadir a marcação seguinte — senão o helper oferece um slot que
+      // o booking depois rejeita com 409 (arrumação insuficiente antes da marcação real).
+      const hit = reserved.find((r) => cursor < r.end && (slotEnd + gap) > r.start);
       if (hit) { cursor = hit.end; continue; }
       slots.push(minutesToTime(cursor));
       cursor += step;
