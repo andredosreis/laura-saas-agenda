@@ -5,10 +5,6 @@ import { sendWhatsAppMessage } from "../../utils/evolutionClient.js";
 import { scheduleNotifications } from "../../utils/scheduleNotifications.js";
 import { formatarDataLembrete } from "../../utils/lembreteFormat.js";
 import { scopeAgendamentoQuery } from "./agendamentoScope.js";
-// F05 (ADR-028 Fase 4) — regra ÚNICA de disponibilidade (F03): o mesmo cálculo
-// que a IA lê e que o slot-picker (F04) mostra. Import cross-módulo aceite
-// enquanto o subsistema Schedule não é migrado (D9).
-import { resolveAvailableSlots } from "../../controllers/scheduleController.js";
 
 const ZONA = 'Europe/Lisbon';
 const STATUS_CANCELADO_CLIENTE = 'Cancelado Pelo Cliente';
@@ -55,10 +51,17 @@ const getConfirmacaoPatchForStatus = (status, respondidoPor = 'laura') => {
   return {};
 };
 
+// Função auxiliar para converter hora string (HH:mm) para minutos desde a meia-noite
+const timeToMinutes = (timeString) => {
+  if (!timeString) return null;
+  const [hours, minutes] = timeString.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
 // @desc    Criar novo agendamento
 export const createAgendamento = async (req, res) => {
   try {
-    const { Agendamento, Schedule, ScheduleException } = req.models;
+    const { Agendamento } = req.models; // Schedule desactivado — ver bloco comentado abaixo
     const {
       tipo = 'Sessao',
       cliente,
@@ -71,8 +74,6 @@ export const createAgendamento = async (req, res) => {
       servicoAvulsoValor,
       profissional,
       observacoes,
-      forcarEncaixe = false,
-      motivoEncaixe,
     } = req.body;
 
     // Validação contextual que não dá para expressar no Zod sem discriminated union mais complexa
@@ -91,6 +92,36 @@ export const createAgendamento = async (req, res) => {
     if (agendamentoDateTime < DateTime.now().setZone(ZONA)) {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
+
+    // TODO: Revisitar se faz sentido reactivar a validação de disponibilidade.
+    // Por agora desactivada — agendamentos livres, sem verificação de expediente/pausa.
+    // const dayOfWeek = agendamentoDateTime.weekday === 7 ? 0 : agendamentoDateTime.weekday;
+    // const requestedTimeInMinutes = timeToMinutes(agendamentoDateTime.toFormat("HH:mm"));
+    //
+    // const tenantHasSchedule = await Schedule.exists({ tenantId: req.tenantId, isActive: true });
+    //
+    // if (tenantHasSchedule) {
+    //   const schedule = await Schedule.findOne({ dayOfWeek, tenantId: req.tenantId });
+    //
+    //   if (!schedule || !schedule.isActive) {
+    //     return res.status(400).json({ message: `O salão não está ativo para agendamentos na ${schedule?.label || "este dia da semana"}.` });
+    //   }
+    //
+    //   const startWorkMinutes = timeToMinutes(schedule.startTime);
+    //   const endWorkMinutes = timeToMinutes(schedule.endTime);
+    //
+    //   if (requestedTimeInMinutes < startWorkMinutes || requestedTimeInMinutes >= endWorkMinutes) {
+    //     return res.status(400).json({ message: "Horário de agendamento fora do expediente de trabalho." });
+    //   }
+    //
+    //   const breakStartMinutes = timeToMinutes(schedule.breakStartTime);
+    //   const breakEndMinutes = timeToMinutes(schedule.breakEndTime);
+    //
+    //   if (breakStartMinutes !== null && breakEndMinutes !== null &&
+    //     requestedTimeInMinutes >= breakStartMinutes && requestedTimeInMinutes < breakEndMinutes) {
+    //     return res.status(400).json({ message: "Horário de agendamento coincide com o período de pausa." });
+    //   }
+    // }
 
     const agendamentoDurationMinutes = 60;
     const conflictWindow = {
@@ -127,49 +158,6 @@ export const createAgendamento = async (req, res) => {
 
     if (conflictingAgendamento) {
       return res.status(400).json({ message: "Já existe um agendamento para este horário." });
-    }
-
-    // F05 (ADR-028 Fase 4) — enforcement de disponibilidade, reactivado.
-    // A regra é a MESMA fonte única que a IA lê (F03) e o slot-picker mostra
-    // (F04): resolveAvailableSlots = horário base + precedência de excepções
-    // (F02) + pausa − reservas. Corre DEPOIS do check de conflito para
-    // preservar a mensagem legada "Já existe um agendamento..." em slots
-    // ocupados (e o 409 slot_taken na corrida). Permissivo quando o tenant
-    // ainda não tem NENHUM dia activo (D4 — rollout não-destrutivo; os docs
-    // inactivos default do initializeSchedules não contam como configuração).
-    // Um admin pode forçar um encaixe fora de horas com `forcarEncaixe: true`
-    // — registado no sub-doc `encaixe`.
-    let encaixeRecord = null; // preenchido apenas num override válido de admin
-    const tenantHasSchedule = await Schedule.exists({ tenantId: req.tenantId, isActive: true });
-    if (tenantHasSchedule) {
-      const { slots, isException, exceptionType } = await resolveAvailableSlots({
-        Schedule,
-        ScheduleException,
-        Agendamento,
-        tenantId: req.tenantId,
-        date: agendamentoDateTime.toFormat('yyyy-MM-dd'),
-        duration: agendamentoDurationMinutes, // D2 — mesma duração do conflito acima
-      });
-
-      if (!slots.includes(agendamentoDateTime.toFormat('HH:mm'))) {
-        const motivoIndisponivel = isException && exceptionType === 'fechado'
-          ? 'O salão está fechado nesta data.'
-          : 'Horário fora da disponibilidade configurada.';
-
-        if (forcarEncaixe !== true) {
-          return res.status(400).json({ message: motivoIndisponivel });
-        }
-        const isAdmin = req.user?.role === 'admin' || req.user?.role === 'superadmin';
-        if (!isAdmin) {
-          return res.status(403).json({ message: 'Apenas um admin pode forçar um encaixe fora de horas.' });
-        }
-        encaixeRecord = {
-          forcado: true,
-          motivo: motivoEncaixe ?? null,
-          autorizadoPor: req.user.userId ?? null, // do JWT, nunca do body
-          autorizadoEm: nowLisbonDate(),
-        };
-      }
     }
 
     const servicoTipoFinal = servicoTipo || (servicoAvulsoNome ? 'avulso' : 'pacote');
@@ -214,7 +202,6 @@ export const createAgendamento = async (req, res) => {
       valorCobrado: valorCobradoInicial,
       profissional,
       observacoes,
-      encaixe: encaixeRecord ?? undefined, // F05 — auditoria do override (defaults quando normal)
       tenantId: req.tenantId
     });
     await novoAgendamento.save();

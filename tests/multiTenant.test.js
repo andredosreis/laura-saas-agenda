@@ -113,8 +113,7 @@ describe('Isolamento Multi-Tenant — Agendamentos', () => {
     // Amanhã às 14:00 hora de São Paulo (UTC-3) — dentro do expediente
     const amanha = new Date();
     amanha.setDate(amanha.getDate() + 1);
-    // F05: sem offset (14:00 Lisboa = slot valido em qualquer estacao; -03:00 dava 18:00 no verao)
-    const dataHora = amanha.toISOString().split('T')[0] + 'T14:00:00';
+    const dataHora = amanha.toISOString().split('T')[0] + 'T14:00:00-03:00';
 
     await request(app)
       .post('/api/agendamentos')

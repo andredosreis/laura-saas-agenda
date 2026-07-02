@@ -1,3 +1,0 @@
-===== GATE: JEST suite completa =====
-Test Suites: 55 passed, 55 total
-Tests:       472 passed, 472 total

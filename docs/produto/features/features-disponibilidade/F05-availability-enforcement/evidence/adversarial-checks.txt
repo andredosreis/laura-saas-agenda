@@ -1,6 +1,0 @@
-    ✓ A1 — mass-assignment de `encaixe` no body → 400 (.strict rejeita chave desconhecida) (168 ms)
-    ✓ A2 — motivoEncaixe > 280 chars → 400 { success:false } (Zod pré-handler) (66 ms)
-    ✓ A3 — superadmin também pode forçar encaixe (201 + registado) (110 ms)
-    ✓ A4 — recepcionista continua a criar bookings NORMAIS em horas (roles inalterados) (89 ms)
-Test Suites: 1 passed, 1 total
-Tests:       4 passed, 4 total

@@ -54,10 +54,7 @@ async function criarCliente(token, telefone = '910111111') {
 function dataFutura() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  // F05: sem offset — o backend interpreta em Europe/Lisbon, logo 14:00 e um slot
-  // valido do expediente 09-18 em qualquer estacao (com -03:00 dava 18:00 no verao,
-  // fora da disponibilidade agora enforced).
-  return d.toISOString().split('T')[0] + 'T14:00:00';
+  return d.toISOString().split('T')[0] + 'T14:00:00-03:00';
 }
 
 // ──────────────────────────────────────────────
