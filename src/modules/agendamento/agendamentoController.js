@@ -5,6 +5,7 @@ import { sendWhatsAppMessage } from "../../utils/evolutionClient.js";
 import { scheduleNotifications } from "../../utils/scheduleNotifications.js";
 import { formatarDataLembrete } from "../../utils/lembreteFormat.js";
 import { scopeAgendamentoQuery } from "./agendamentoScope.js";
+import Tenant from "../../models/Tenant.js";
 
 const ZONA = 'Europe/Lisbon';
 const STATUS_CANCELADO_CLIENTE = 'Cancelado Pelo Cliente';
@@ -123,7 +124,8 @@ export const createAgendamento = async (req, res) => {
     //   }
     // }
 
-    const agendamentoDurationMinutes = 60;
+    const tenantDoc = await Tenant.findById(req.tenantId).select('configuracoes.intervaloEntreSessoes').lean();
+    const agendamentoDurationMinutes = 60 + (tenantDoc?.configuracoes?.intervaloEntreSessoes || 0);
     const conflictWindow = {
       $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
       $lt: agendamentoDateTime.plus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
