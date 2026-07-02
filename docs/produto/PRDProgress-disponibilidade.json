@@ -39,8 +39,10 @@
       "name": "Backend Availability Enforcement",
       "priority": 3,
       "wave": 4,
-      "status": "Specified",
-      "spec": "docs/produto/features-disponibilidade/F05-availability-enforcement/"
+      "status": "done",
+      "spec": "docs/produto/features/features-disponibilidade/F05-availability-enforcement/",
+      "eval_report": "docs/produto/features/features-disponibilidade/F05-availability-enforcement/eval-report.md",
+      "note": "Código done (draft PR #54); ativação em produção = merge do PR após confirmar config semanal do painel (Domingo/Segunda)"
     }
   }
 }

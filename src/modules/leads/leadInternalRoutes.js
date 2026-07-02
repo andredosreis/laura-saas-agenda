@@ -19,6 +19,9 @@ import Tenant from '../../models/Tenant.js';
 import { transitionStage, LeadError } from './leadService.js';
 import { LEAD_STAGES, ORIGEM_VALUES } from './pipelineConstants.js';
 import { scheduleNotifications } from '../../utils/scheduleNotifications.js';
+import { DateTime } from 'luxon';
+// F05 — mesma regra única de disponibilidade que a IA lê (F03) e o painel aplica.
+import { resolveAvailableSlots } from '../../controllers/scheduleController.js';
 
 const router = express.Router();
 
@@ -422,6 +425,34 @@ router.post('/:id/agendamento', async (req, res) => {
         error: 'Slot já ocupado por outro agendamento',
         code: 'slot_taken',
       });
+    }
+
+    // F05 — enforcement de disponibilidade (regra única resolveAvailableSlots,
+    // a mesma que a IA leu ao propor o slot em F03). SEM override neste caminho:
+    // a IA nunca força encaixes (qualquer `forcarEncaixe` no body é ignorado).
+    // Corre DEPOIS do check de conflito (preserva o 409 slot_taken que a IA
+    // trata). Permissivo se o tenant não tem nenhum dia activo (D4 — os docs
+    // inactivos default do initializeSchedules não contam como configuração).
+    const leadTenantHasSchedule = await models.Schedule.exists({ tenantId, isActive: true });
+    if (leadTenantHasSchedule) {
+      const dataHoraDT = DateTime.fromJSDate(dataHora, { zone: 'Europe/Lisbon' });
+      const { slots, isException, exceptionType } = await resolveAvailableSlots({
+        Schedule: models.Schedule,
+        ScheduleException: models.ScheduleException,
+        Agendamento: models.Agendamento,
+        tenantId,
+        date: dataHoraDT.toFormat('yyyy-MM-dd'),
+        duration: 60,
+      });
+      if (!slots.includes(dataHoraDT.toFormat('HH:mm'))) {
+        return res.status(400).json({
+          success: false,
+          error: isException && exceptionType === 'fechado'
+            ? 'O salão está fechado nesta data.'
+            : 'Horário fora da disponibilidade configurada.',
+          code: 'fora_disponibilidade',
+        });
+      }
     }
 
     const agendamento = await models.Agendamento.create({

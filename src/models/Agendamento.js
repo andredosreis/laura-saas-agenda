@@ -78,6 +78,16 @@ const agendamentoSchema = new mongoose.Schema({
     default: 'pacote',
     index: true
   },
+  // F05 (ADR-028 Fase 4) — auditoria de encaixe forçado: preenchido APENAS
+  // quando um admin cria um agendamento fora da disponibilidade resolvida com
+  // `forcarEncaixe: true`. `autorizadoPor`/`autorizadoEm` são derivados no
+  // servidor (req.user / Europe/Lisbon), nunca do body. Sem índice (audit-only).
+  encaixe: {
+    forcado:       { type: Boolean, default: false },
+    motivo:        { type: String, default: null, maxlength: 280 },
+    autorizadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    autorizadoEm:  { type: Date, default: null },
+  },
   confirmacao: {
     tipo: {
       type: String,
