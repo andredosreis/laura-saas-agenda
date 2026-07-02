@@ -108,7 +108,7 @@ export async function processFollowUpJob(job) {
   const db = getTenantDB(tenantId);
   const { Agendamento, Cliente, CompraPacote, Mensagem, Conversa } = getModels(db);
 
-  const agendamento = await Agendamento.findById(agendamentoId).lean();
+  const agendamento = await Agendamento.findOne({ _id: agendamentoId, tenantId }).lean();
   const [cliente, tenant, compra] = await Promise.all([
     agendamento?.cliente
       ? Cliente.findOne({ _id: agendamento.cliente, tenantId }).select('nome telefone iaAtiva').lean()
