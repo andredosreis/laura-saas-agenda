@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, User, Package, Calendar, FileText, Loader2, Gift, Search, ChevronDown } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { toast } from 'react-toastify';
@@ -285,8 +286,12 @@ function QuickAppointmentModal({
     const borderClass = isDarkMode ? 'border-white/10' : 'border-slate-200';
     const inputBgClass = isDarkMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200';
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    // createPortal → document.body: `position: fixed` deixa de depender dos
+    // ancestrais da página (um transform/filter num deles reposicionava o
+    // modal para fora do ecrã). Em mobile é bottom-sheet (items-end) para as
+    // acções ficarem sempre visíveis; ≥sm volta a ser card centrado.
+    return createPortal(
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -294,7 +299,7 @@ function QuickAppointmentModal({
             />
 
             {/* Modal */}
-            <div className={`relative w-full max-w-md max-h-[90dvh] flex flex-col rounded-2xl ${bgClass} border ${borderClass} shadow-2xl overflow-hidden`}>
+            <div className={`relative w-full max-w-md max-h-[92dvh] sm:max-h-[90dvh] flex flex-col rounded-t-2xl sm:rounded-2xl ${bgClass} border ${borderClass} shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]`}>
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
                     <h2 className={`text-lg font-semibold ${textClass}`}>Novo Agendamento Rápido</h2>
@@ -455,7 +460,7 @@ function QuickAppointmentModal({
                                 </option>
                                 {pacotesDoCliente.map(compra => (
                                     <option key={compra._id} value={compra._id}>
-                                        {compra.pacote?.nome || 'Pacote'} - {compra.sessoesRestantes} sessões restantes
+                                        {compra.pacote?.nome || 'Pacote'} - {compra.sessoesRestantes} {compra.sessoesRestantes === 1 ? 'sessão restante' : 'sessões restantes'}
                                     </option>
                                 ))}
                             </select>
@@ -567,8 +572,9 @@ function QuickAppointmentModal({
                         </p>
                     )}
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-3 pt-2">
+                    {/* Actions — sticky no fundo da área scrollável para nunca
+                        ficarem cortadas/fora do ecrã em ecrãs baixos. */}
+                    <div className={`sticky bottom-0 -mx-4 -mb-4 mt-2 px-4 py-3 ${bgClass} border-t ${borderClass} flex items-center gap-3`}>
                         <button
                             type="button"
                             onClick={onClose}
@@ -593,7 +599,8 @@ function QuickAppointmentModal({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
