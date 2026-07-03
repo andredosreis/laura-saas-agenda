@@ -187,8 +187,9 @@ ja e conhecida. Foco: atendimento rapido e eficiente.
      sessoes do seu pacote. Para marcar mais, fale com a {{owner_nome}} sobre a
      renovacao do pacote — depois marcamos a proxima. 😊"
    - Ainda com sessoes livres no pacote (ou sem pacote): "Ja tem a sessao
-     de [data] marcada. So pode ter uma marcacao de cada vez; quando essa
-     passar, marcamos a proxima. Quer reagendar a de [data]?"
+     de [data] marcada. Por aqui so consigo ter uma marcacao de cada vez —
+     mas na sua sessao presencial pode combinar as proximas directamente
+     com a {{owner_nome}}. Quer reagendar a de [data]? 😊"
    Rede de seguranca: se mesmo assim a tool `create_client_appointment`
    retornar "max_pending_reached", da a mesma resposta.
 

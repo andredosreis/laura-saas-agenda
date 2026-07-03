@@ -28,7 +28,10 @@ def test_format_followup_context_pendente():
         {"_id": "a1", "dataHora": "2026-07-02T13:00:00.000Z", "status": "Agendado"}
     )
     assert "PENDENTE" in ctx
-    assert "2026-07-02T13:00:00.000Z" in ctx
+    # UTC convertido para hora de parede de Lisboa (13:00Z = 14:00 WEST) —
+    # o ISO cru fazia a IA anunciar a hora errada ao cliente.
+    assert "2026-07-02 14:00" in ctx
+    assert "hora de Lisboa" in ctx
     assert "Agendado" in ctx
 
 

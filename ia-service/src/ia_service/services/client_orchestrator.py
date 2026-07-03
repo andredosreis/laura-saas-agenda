@@ -83,6 +83,22 @@ async def _build_conversation_history(
     return messages, turn_number, last_clinic_message
 
 
+def _iso_utc_para_lisboa(dt_str: str) -> str:
+    """UTC ISO do backend → hora de parede de Lisboa para o modelo.
+
+    O ISO cru fazia a IA dizer "16:30" para uma sessao das 17:30 (bug
+    apanhado em teste, 2026-07-03).
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        dt = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
+        return dt.astimezone(ZoneInfo("Europe/Lisbon")).strftime("%Y-%m-%d %H:%M (hora de Lisboa)")
+    except Exception:
+        return str(dt_str)
+
+
 async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) -> str:
     try:
         appointments = await marcai_client.get_client_appointments(
@@ -92,7 +108,7 @@ async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) ->
             return "Nenhum agendamento futuro."
         lines = []
         for appt in appointments:
-            dt = appt.get("dataHora", "?")
+            dt = _iso_utc_para_lisboa(appt.get("dataHora", "?"))
             status = appt.get("status", "?")
             tipo = appt.get("tipo", "Sessao")
             servico = appt.get("servicoAvulsoNome", "")
@@ -136,7 +152,7 @@ def _booking_created_this_turn(messages: list) -> bool:
 def _format_followup_context(followup: dict | None) -> str:
     if not followup:
         return "Nenhum follow-up pendente."
-    data_hora = followup.get("dataHora", "?")
+    data_hora = _iso_utc_para_lisboa(followup.get("dataHora", "?"))
     status = followup.get("status", "?")
     return (
         f"PENDENTE — foi enviada uma mensagem pos-sessao sobre a sessao de "
