@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { DateTime } from 'luxon';
 import { Loader2, AlertCircle, CalendarClock } from 'lucide-react';
 import {
@@ -149,6 +149,15 @@ const ROTULO_ESTADO: Record<SlotEstado, string> = {
 // isto é o override manual, tem de aceitar qualquer HH:MM).
 const soDigitos = (s: string): string => s.replace(/\D/g, '').slice(0, 2);
 
+// Selecciona o conteúdo ao focar (clique ou Tab), para escrever por cima
+// sem ter de apagar primeiro. Adiado: o clique que traz o foco reposiciona
+// o cursor DEPOIS do evento `focus` disparar — chamar select() directamente
+// no onFocus é anulado por esse reposicionamento subsequente.
+const selectOnFocus = (e: FocusEvent<HTMLInputElement>) => {
+  const el = e.currentTarget;
+  setTimeout(() => el.select(), 0);
+};
+
 function SlotPicker({
   date,
   duration = 60,
@@ -244,8 +253,16 @@ function SlotPicker({
       const clamped = String(Math.min(23, Number(h))).padStart(2, '0');
       setHInput(clamped);
       commitForce(clamped, mInput || '00');
-      minutoInputRef.current?.focus();
-      minutoInputRef.current?.select();
+      // Adiado: chamar focus() aqui já dispara um blur síncrono no campo
+      // da hora, ANTES do React aplicar o `setHInput` acima — o
+      // handleHoraBlur corria então com o closure antigo (só o 1º
+      // dígito, ex. "1") e reescrevia por cima do valor de 2 dígitos
+      // recém-confirmado (ex.: "10" virava "01"). setTimeout empurra o
+      // focus para depois do render, quando o closure já reflecte "10".
+      // O select() do conteúdo é feito pelo onFocus do próprio campo.
+      setTimeout(() => {
+        minutoInputRef.current?.focus();
+      }, 0);
     } else if (!h) {
       commitForce('', mInput);
     }
@@ -419,6 +436,7 @@ function SlotPicker({
                   autoComplete="off"
                   value={hInput}
                   onChange={(e) => handleHoraChange(e.target.value)}
+                  onFocus={selectOnFocus}
                   onBlur={handleHoraBlur}
                   data-testid="slot-picker-force-input"
                   aria-label="Hora (00–23)"
@@ -436,6 +454,7 @@ function SlotPicker({
                   value={mInput}
                   disabled={!hInput}
                   onChange={(e) => handleMinutoChange(e.target.value)}
+                  onFocus={selectOnFocus}
                   onBlur={handleMinutoBlur}
                   data-testid="slot-picker-force-minutos"
                   aria-label="Minutos (00–59)"
