@@ -75,6 +75,7 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
         Nao precisa de argumentos — a cliente ja esta identificada.
         """
         from datetime import datetime, timezone
+        from zoneinfo import ZoneInfo
 
         try:
             appointments = await marcai_client.get_client_appointments(
@@ -94,9 +95,15 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
                 servico = appt.get("servicoAvulsoNome", "")
                 label = servico or tipo
 
+                # O backend devolve UTC; ao modelo chega SEMPRE hora de parede
+                # de Lisboa — o ISO cru fazia a IA dizer "16:30" para uma
+                # sessao das 17:30 (bug apanhado em teste, 2026-07-03).
                 hours_until = "?"
                 try:
                     dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                    dt_str = dt.astimezone(ZoneInfo("Europe/Lisbon")).strftime(
+                        "%Y-%m-%d %H:%M (hora de Lisboa)"
+                    )
                     h = (dt - now).total_seconds() / 3600
                     hours_until = f"{h:.0f}h"
                 except Exception:
@@ -180,8 +187,10 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
                 return (
                     "ERRO: o cliente ja tem um agendamento pendente. "
                     "NAO tentes marcar outro. Diz ao cliente: "
-                    "'Ja tem uma sessao marcada. Assim que essa passar, "
-                    "pode marcar outra. Quer reagendar a existente?'"
+                    "'Ja tem uma sessao marcada. Por aqui so consigo ter uma "
+                    "marcacao de cada vez — mas na sessao presencial pode "
+                    "combinar as proximas directamente com a Laura. Quer "
+                    "reagendar a existente?'"
                 )
             if "409" in msg or "slot_taken" in msg:
                 return (

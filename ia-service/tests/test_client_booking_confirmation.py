@@ -198,3 +198,31 @@ def test_prompt_usa_apenas_primeiro_nome():
 def test_prompt_nome_vazio_cai_no_default():
     prompt = render_client_system_prompt(TENANT_ID, client_state={"nome": "  "})
     assert "Cliente" in prompt
+
+
+# ───────────────── horas ao modelo sempre em Lisboa ─────────────────
+
+
+async def test_get_my_appointments_mostra_hora_de_lisboa(monkeypatch):
+    from ia_service.tools.client_tools import make_get_my_appointments_tool
+
+    async def fake_appointments(**kwargs):
+        # 16:30 UTC em julho (WEST) = 17:30 de Lisboa — bug real: a IA dizia
+        # "16:30" para uma sessao das 17:30.
+        return [
+            {
+                "_id": "a1",
+                "dataHora": "2026-07-30T16:30:00.000Z",
+                "status": "Agendado",
+                "tipo": "Sessao",
+            }
+        ]
+
+    monkeypatch.setattr(marcai_client, "get_client_appointments", fake_appointments)
+
+    tool = make_get_my_appointments_tool("t1", "c1")
+    result = await tool.ainvoke({})
+
+    assert "2026-07-30 17:30" in result
+    assert "hora de Lisboa" in result
+    assert "16:30" not in result
