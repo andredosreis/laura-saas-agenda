@@ -180,7 +180,11 @@ def render_client_system_prompt(
     followup_context: str = "Nenhum follow-up pendente.",
 ) -> str:
     state = client_state or {}
-    nome = (state.get("nome") or "").strip() or "Cliente"
+    # So o primeiro nome chega ao prompt — recepcionista trata por "Dulce",
+    # nunca "Dulce Felicidades Gerra". Garantia deterministica: o LLM nao
+    # pode usar um apelido que nunca viu.
+    nome_completo = (state.get("nome") or "").strip() or "Cliente"
+    nome = nome_completo.split()[0]
     last_clinic = (last_clinic_message or "").strip() or NOT_YET
 
     # Identidade da clínica por tenant — substituída DEPOIS de voz/catalogo/

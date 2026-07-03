@@ -2,6 +2,7 @@ import { DateTime } from 'luxon';
 import { getNotificationQueue } from '../queues/notificationQueue.js';
 import { sendWhatsAppMessage } from './evolutionClient.js';
 import { formatarDataLembrete } from './lembreteFormat.js';
+import { primeiroNome } from './primeiroNome.js';
 import logger from './logger.js';
 
 const ZONA = 'Europe/Lisbon';
@@ -12,7 +13,7 @@ function buildConfirmacaoMessage({ clienteNome, dataHora, servicoNome }) {
 
   return `✅ *Agendamento Confirmado!*
 
-Olá ${clienteNome}! A sua sessão ficou marcada para:
+Olá ${primeiroNome(clienteNome)}! A sua sessão ficou marcada para:
 📅 *${dataExtenso}*
 ${servicoLinha}
 Até breve! 💆‍♀️✨

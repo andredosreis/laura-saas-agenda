@@ -141,16 +141,21 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
         from zoneinfo import ZoneInfo
 
         try:
-            packages = await marcai_client.get_client_packages(
-                tenant_id=tenant_id, cliente_id=cliente_id
-            )
-            pkg_info = ""
-            if not packages:
-                pkg_info = (
-                    " NOTA: cliente sem pacote activo — sessao marcada como avulsa. "
-                    "Informa o cliente que pode combinar com a Laura qual pacote "
-                    "lhe fica melhor."
+            # Nome do servico do pacote activo → o template de confirmacao do
+            # backend mostra "Drenagem Linfatica Avancada" em vez do generico
+            # "Sessao" (best-effort: sem pacote resolvido, o backend usa o
+            # label por defeito).
+            servico_nome = None
+            try:
+                packages = await marcai_client.get_client_packages(
+                    tenant_id=tenant_id, cliente_id=cliente_id
                 )
+                for pkg in packages:
+                    if pkg.get("sessoesRestantes", 0) > 0:
+                        servico_nome = pkg.get("pacoteNome")
+                        break
+            except Exception:
+                pass
 
             local = datetime.fromisoformat(f"{data}T{hora}:00").replace(
                 tzinfo=ZoneInfo("Europe/Lisbon")
@@ -161,10 +166,12 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
                 cliente_id=cliente_id,
                 data_hora_iso=iso_utc,
                 tipo="Sessao",
+                servico_nome=servico_nome,
             )
             return (
-                f"OK — sessao marcada para {data} as {hora}. "
-                "Confirma o agendamento ao cliente com naturalidade." + pkg_info
+                f"OK — sessao marcada para {data} as {hora}. O sistema ja "
+                "enviou a mensagem automatica de confirmacao ao cliente; a "
+                "tua resposta NAO sera enviada. Responde apenas 'OK'."
             )
         except Exception as exc:
             msg = str(exc)
@@ -220,7 +227,8 @@ def make_reschedule_appointment_tool(tenant_id: str, cliente_id: str):
             )
             return (
                 f"OK — agendamento reagendado para {nova_data} as {nova_hora}. "
-                "Confirma a alteracao ao cliente com naturalidade."
+                "O sistema ja enviou a confirmacao automatica com a nova data; "
+                "a tua resposta NAO sera enviada. Responde apenas 'OK'."
             )
         except Exception as exc:
             msg = str(exc)

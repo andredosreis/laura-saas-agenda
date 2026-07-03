@@ -11,6 +11,9 @@ Flow:
   5. Generate reply via client_agent (fallback to greeting)
   6. Send reply via Evolution API
   7. Persist outbound message
+
+Excepcao: se o agente criou um agendamento neste turno, os passos 6-7 sao
+saltados — o backend ja enviou o template automatico de confirmacao.
 """
 
 from __future__ import annotations
@@ -107,6 +110,29 @@ async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) ->
         return "Erro ao consultar agendamentos."
 
 
+_SYSTEM_CONFIRMED_TOOLS = {"create_client_appointment", "reschedule_appointment"}
+
+
+def _booking_created_this_turn(messages: list) -> bool:
+    """True se o agente marcou/remarcou uma sessao com sucesso neste turno.
+
+    Nesses casos o backend ja enviou o template automatico "Agendamento
+    Confirmado" ao cliente (create e reschedule re-agendam as notificacoes)
+    — a resposta textual do agente e suprimida para nao chegarem duas
+    confirmacoes seguidas (decisao 2026-07-03).
+    O historico e reconstruido a cada turno so com texto user/assistant,
+    por isso qualquer ToolMessage no resultado pertence a este turno.
+    """
+    from langchain.messages import ToolMessage
+
+    for m in messages:
+        if isinstance(m, ToolMessage) and getattr(m, "name", "") in _SYSTEM_CONFIRMED_TOOLS:
+            content = m.content if isinstance(m.content, str) else str(m.content)
+            if content.strip().startswith("OK"):
+                return True
+    return False
+
+
 def _format_followup_context(followup: dict | None) -> str:
     if not followup:
         return "Nenhum follow-up pendente."
@@ -175,6 +201,9 @@ async def _generate_reply(
         content = ""
         for attempt in (1, 2):
             result = await agent.ainvoke({"messages": messages}, config=run_config)
+            if _booking_created_this_turn(result["messages"]):
+                log.info("client_agent_booking_created_reply_suppressed")
+                return "", "booking_confirmed_by_system"
             last_msg = result["messages"][-1]
             raw = getattr(last_msg, "content", "")
             if isinstance(raw, list):
@@ -254,6 +283,16 @@ async def run(payload) -> dict:
     reply, reply_source = await _generate_reply(
         tenant_id, cliente_id, client_state, mensagem, fallback_greeting, log
     )
+
+    # Marcacao criada neste turno: o backend ja enviou (e persistiu) o
+    # template automatico de confirmacao — nao enviar segunda mensagem.
+    if reply_source == "booking_confirmed_by_system":
+        log.info("client_processed", reply_source=reply_source)
+        return {
+            "status": "processed",
+            "cliente_id": cliente_id,
+            "action_taken": reply_source,
+        }
 
     # 4. Send reply via Evolution API
     try:

@@ -6,6 +6,7 @@ import Tenant from '../models/Tenant.js';
 import { getTenantDB } from '../config/tenantDB.js';
 import { getModels } from '../models/registry.js';
 import { formatarDataLembrete } from '../utils/lembreteFormat.js';
+import { primeiroNome } from '../utils/primeiroNome.js';
 import { processFollowUpJob } from './followUpPosSessao.js';
 import logger from '../utils/logger.js';
 
@@ -47,17 +48,20 @@ export function buildMensagem(job) {
   const { tipo, clienteNome, dataHora, servicoNome } = job.data;
   const dataExtenso = formatarDataLembrete(dataHora);
   const servicoLinha = servicoNome ? `💆 Serviço: ${servicoNome}\n` : '';
+  // Cliente é tratado pelo primeiro nome; o alerta ao admin (mais abaixo)
+  // mantém o nome completo para identificação.
+  const nome = primeiroNome(clienteNome);
 
   if (tipo === 'confirmacao') {
-    return `✅ *Agendamento Confirmado!*\n\nOlá ${clienteNome}! A sua sessão ficou marcada para:\n📅 *${dataExtenso}*\n${servicoLinha}\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
+    return `✅ *Agendamento Confirmado!*\n\nOlá ${nome}! A sua sessão ficou marcada para:\n📅 *${dataExtenso}*\n${servicoLinha}\nAté breve! 💆‍♀️✨\n\n_LA Estética Avançada_`;
   }
 
   if (tipo === 'lembrete-antecipado') {
-    return `🔔 *Lembrete de Agendamento*\n\nOlá ${clienteNome}! Tem uma sessão marcada para:\n📅 *${dataExtenso}*\n${servicoLinha}\nConfirma a sua presença?\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
+    return `🔔 *Lembrete de Agendamento*\n\nOlá ${nome}! Tem uma sessão marcada para:\n📅 *${dataExtenso}*\n${servicoLinha}\nConfirma a sua presença?\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
   }
 
   if (tipo === 'lembrete-1h') {
-    return `⏰ *A sua sessão é já a seguir!*\n\nOlá ${clienteNome}! Lembrete da sua sessão:\n📅 *${dataExtenso}*\n${servicoLinha}\nConfirma a sua presença?\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
+    return `⏰ *A sua sessão é já a seguir!*\n\nOlá ${nome}! Lembrete da sua sessão:\n📅 *${dataExtenso}*\n${servicoLinha}\nConfirma a sua presença?\n✅ *SIM* — confirmar\n❌ *NÃO* — cancelar\n\n_LA Estética Avançada_`;
   }
 
   return null;
