@@ -51,7 +51,8 @@ def make_get_my_packages_tool(tenant_id: str, cliente_id: str):
             return (
                 f"Pacotes activos ({len(packages)}):\n"
                 + "\n".join(lines)
-                + "\n\nMostra ao cliente de forma natural."
+                + "\n\nUSO INTERNO: nao anuncies a contagem de sessoes por "
+                "iniciativa propria — so se o cliente perguntar."
             )
         except Exception as exc:
             return f"Erro ao consultar pacotes: {exc}"
