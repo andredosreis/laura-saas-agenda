@@ -559,6 +559,9 @@ function CalendarView() {
                                     const clienteName = arg.event.extendedProps.cliente?.nome || arg.event.extendedProps.lead?.nome || 'Sem nome';
                                     // Nome do serviço contratado (pacote/avulso) ou "Avaliação".
                                     const servico = nomeServicoAgendamento(arg.event.extendedProps);
+                                    // Marcações feitas pelo agente IA levam 🤖 à frente do nome
+                                    // (mesma identificação que o badge nos cards de Agendamentos).
+                                    const iaPrefix = arg.event.extendedProps.criadoPorIA ? '🤖 ' : '';
                                     const isMonth = arg.view.type === 'dayGridMonth';
                                     const isList = arg.view.type.startsWith('list');
 
@@ -568,7 +571,7 @@ function CalendarView() {
                                     if (isList) {
                                         return (
                                             <div className="flex flex-wrap items-baseline gap-x-2">
-                                                <span className="font-semibold text-sm">{clienteName}</span>
+                                                <span className="font-semibold text-sm">{iaPrefix}{clienteName}</span>
                                                 <span className="text-xs opacity-70">{servico}</span>
                                             </div>
                                         );
@@ -580,7 +583,7 @@ function CalendarView() {
                                         return (
                                             <div className="px-1 flex flex-col items-start sm:flex-row sm:items-center sm:gap-1 overflow-hidden w-full">
                                                 <span className="text-[10px] font-semibold text-white shrink-0">{arg.timeText}</span>
-                                                <span className="text-[10px] text-white/90 truncate w-full sm:w-auto">{clienteName}</span>
+                                                <span className="text-[10px] text-white/90 truncate w-full sm:w-auto">{iaPrefix}{clienteName}</span>
                                             </div>
                                         );
                                     }
@@ -589,7 +592,7 @@ function CalendarView() {
                                     return (
                                         <div className="px-1.5 py-1 h-full flex flex-col justify-center overflow-hidden">
                                             <div className="font-bold text-xs leading-tight text-white wrap-break-word w-full mb-0.5">
-                                                {clienteName}
+                                                {iaPrefix}{clienteName}
                                             </div>
                                             <div className="text-[10px] leading-tight text-white/80 font-normal wrap-break-word w-full">
                                                 {servico}

@@ -480,6 +480,11 @@ function Agendamentos() {
                   <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusBadgeClass(ag.status)}`}>
                     {ag.status}
                   </span>
+                  {ag.criadoPorIA && (
+                    <span className="text-xs px-2 py-0.5 rounded-full border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 font-medium">
+                      🤖 IA
+                    </span>
+                  )}
                   {conf === 'pendente' && (
                     <span className="text-xs px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-500 border-amber-500/20 font-medium">
                       ⏳ WhatsApp pendente
