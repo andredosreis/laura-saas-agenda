@@ -335,11 +335,19 @@ async def create_client_appointment(
     cliente_id: str,
     data_hora_iso: str,
     tipo: str = "Sessao",
+    servico_nome: str | None = None,
 ) -> dict:
-    """Creates a new appointment for an existing client."""
+    """Creates a new appointment for an existing client.
+
+    servico_nome: label do servico (ex: nome do pacote activo) usado pelo
+    backend no template de confirmacao e nos lembretes.
+    """
+    payload = {"tenantId": tenant_id, "dataHoraISO": data_hora_iso, "tipo": tipo}
+    if servico_nome:
+        payload["servicoNome"] = servico_nome
     resp = await _post_with_retry(
         f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/agendamentos",
-        json={"tenantId": tenant_id, "dataHoraISO": data_hora_iso, "tipo": tipo},
+        json=payload,
     )
     return resp["data"]
 

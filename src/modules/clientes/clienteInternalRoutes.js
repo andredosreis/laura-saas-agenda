@@ -111,7 +111,7 @@ router.get('/:id/agendamentos', async (req, res) => {
 router.post('/:id/agendamentos', async (req, res) => {
   try {
     const clienteId = req.params.id;
-    const { tenantId, dataHoraISO, tipo } = req.body || {};
+    const { tenantId, dataHoraISO, tipo, servicoNome } = req.body || {};
 
     if (!tenantId || !dataHoraISO) {
       return res.status(400).json({ success: false, error: 'tenantId e dataHoraISO são obrigatórios' });
@@ -213,13 +213,19 @@ router.post('/:id/agendamentos', async (req, res) => {
       observacoes: 'Marcação criada automaticamente pelo agent IA — confirmar com cliente.',
     });
 
+    // servicoNome (opcional): nome do pacote activo enviado pela IA — o
+    // template de confirmação e os lembretes mostram o serviço real em vez
+    // do genérico "Sessão".
+    const servicoLabel = (typeof servicoNome === 'string' && servicoNome.trim())
+      ? servicoNome.trim().slice(0, 120)
+      : (tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão');
     scheduleNotifications({
       agendamentoId: agendamento._id,
       tenantId,
       dataHora: agendamento.dataHora,
       clienteNome: cliente.nome || 'Cliente',
       clienteTelefone: cliente.telefone,
-      servicoNome: tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão',
+      servicoNome: servicoLabel,
       duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-appointment] scheduleNotifications falhou'));
 
