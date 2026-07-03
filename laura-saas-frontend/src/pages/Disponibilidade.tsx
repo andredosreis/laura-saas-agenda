@@ -603,6 +603,16 @@ const AgendaDisponibilidade = () => {
     return map;
   }, [excecoes]);
 
+  // Lista legível das excepções do mês visível — nas células estreitas do
+  // telemóvel o texto truncava até ficar ilegível ("Fec…"); o detalhe vive aqui.
+  const excecoesDoMes = useMemo(
+    () =>
+      excecoes
+        .filter((e) => DateTime.fromISO(e.data).hasSame(month, 'month'))
+        .sort((a, b) => a.data.localeCompare(b.data)),
+    [excecoes, month]
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -767,27 +777,77 @@ const AgendaDisponibilidade = () => {
                     {d.day}
                   </span>
                   {exc && inMonth && (
-                    <span className="mt-1 block leading-tight">
+                    <>
+                      {/* xs: só um ponto — o texto truncado era ilegível ("Fec…");
+                          o detalhe está na lista "Excepções deste mês" abaixo. */}
                       <span
-                        className={`block text-[10px] font-semibold truncate ${
-                          exc.tipo === 'fechado'
-                            ? 'text-red-600 dark:text-red-300'
-                            : 'text-indigo-600 dark:text-indigo-300'
+                        aria-hidden="true"
+                        className={`sm:hidden absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${
+                          exc.tipo === 'fechado' ? 'bg-red-500' : 'bg-indigo-500'
                         }`}
-                      >
-                        {formatExcecaoBadge(exc)}
-                      </span>
-                      {exc.observacao && (
-                        <span className="block text-[9px] text-slate-500 dark:text-slate-400 truncate">
-                          {exc.observacao}
+                      />
+                      <span className="mt-1 hidden sm:block leading-tight">
+                        <span
+                          className={`block text-[10px] font-semibold truncate ${
+                            exc.tipo === 'fechado'
+                              ? 'text-red-600 dark:text-red-300'
+                              : 'text-indigo-600 dark:text-indigo-300'
+                          }`}
+                        >
+                          {formatExcecaoBadge(exc)}
                         </span>
-                      )}
-                    </span>
+                        {exc.observacao && (
+                          <span className="block text-[9px] text-slate-500 dark:text-slate-400 truncate">
+                            {exc.observacao}
+                          </span>
+                        )}
+                      </span>
+                    </>
                   )}
                 </button>
               );
             })}
           </div>
+
+          {/* Lista das excepções do mês — legível em qualquer ecrã, toca para editar */}
+          {excecoesDoMes.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2" data-testid="excecoes-list">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Excepções deste mês</h3>
+              {excecoesDoMes.map((e) => {
+                const d = DateTime.fromISO(e.data).setLocale('pt-PT');
+                const isFechado = e.tipo === 'fechado';
+                return (
+                  <button
+                    key={e._id}
+                    type="button"
+                    onClick={() => openExcecao(e.data)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors text-left"
+                  >
+                    <span className="shrink-0 w-12 text-center">
+                      <span className="block text-lg font-bold text-slate-800 dark:text-white leading-none">{d.day}</span>
+                      <span className="block text-[10px] uppercase text-slate-400 dark:text-slate-500 mt-0.5">{d.toFormat('ccc')}</span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          isFechado
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                            : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                        }`}
+                      >
+                        {TIPO_LABEL[e.tipo]}
+                        {!isFechado && e.inicio && e.fim ? ` · ${e.inicio}–${e.fim}` : ''}
+                      </span>
+                      {e.observacao && (
+                        <span className="block text-sm text-slate-600 dark:text-slate-300 mt-1">{e.observacao}</span>
+                      )}
+                    </span>
+                    <Edit2 className="w-4 h-4 shrink-0 text-slate-400" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Legenda */}
           <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
