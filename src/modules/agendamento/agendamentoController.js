@@ -386,7 +386,17 @@ export const updateAgendamento = async (req, res) => {
     } = req.body;
 
     const update = {};
-    if (dataHora !== undefined) update.dataHora = dataHora;
+    if (dataHora !== undefined) {
+      // Mesma interpretação de fuso que a criação (linha ~88): o frontend
+      // envia string naïve ("2026-07-30T10:00") que é hora de parede de
+      // Lisboa. Sem isto o Mongoose castava como UTC — a edição deslocava
+      // o agendamento 1h no verão (WEST).
+      const dataHoraDT = DateTime.fromISO(dataHora, { zone: ZONA });
+      if (!dataHoraDT.isValid) {
+        return res.status(400).json({ success: false, error: 'dataHora inválida' });
+      }
+      update.dataHora = dataHoraDT.toJSDate();
+    }
     if (status !== undefined) update.status = status;
     if (observacoes !== undefined) update.observacoes = observacoes;
     if (profissional !== undefined) update.profissional = profissional;
@@ -441,6 +451,28 @@ export const updateAgendamento = async (req, res) => {
 
     if (!agendamento) {
       return res.status(404).json({ message: "Agendamento não encontrado." });
+    }
+
+    // Data alterada → recriar lembretes para a nova hora. Os jobIds
+    // determinísticos substituem os jobs antigos; sem isto a edição deixava
+    // o agendamento sem lembretes (os velhos auto-invalidam ao disparar).
+    const statusCancelados = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
+    if (update.dataHora && agendamento.cliente?.telefone && !statusCancelados.includes(agendamento.status)) {
+      Tenant.findById(req.tenantId)
+        .select('configuracoes.duracaoSessaoPadrao')
+        .lean()
+        .then((tenantDoc) =>
+          scheduleNotifications({
+            agendamentoId: agendamento._id,
+            tenantId: req.tenantId,
+            dataHora: agendamento.dataHora,
+            clienteNome: agendamento.cliente.nome || 'Cliente',
+            clienteTelefone: agendamento.cliente.telefone,
+            servicoNome: agendamento.servicoAvulsoNome || agendamento.pacote?.nome || 'Sessão',
+            duracaoSessaoMin: tenantDoc?.configuracoes?.duracaoSessaoPadrao || 60,
+          })
+        )
+        .catch((err) => console.error('[updateAgendamento] Falha ao reagendar notificações:', err));
     }
     res.status(200).json(agendamento);
   } catch (error) {

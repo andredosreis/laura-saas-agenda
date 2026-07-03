@@ -11,6 +11,21 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import SlotPicker from '../components/SlotPicker';
 import { useAuth } from '../contexts/AuthContext';
 
+// Um dedo no segmento do ano do input de data grava p.ex. 2027 sem aviso e
+// o agendamento "desaparece" do calendário (caso Adelaide 30/07/2027).
+const dataHoraFutura = z
+  .string()
+  .min(1, 'Selecione data e hora')
+  .refine((val) => new Date(val) > new Date(), { message: 'A data e hora devem ser no futuro' })
+  .refine(
+    (val) => {
+      const limite = new Date();
+      limite.setFullYear(limite.getFullYear() + 1);
+      return new Date(val) <= limite;
+    },
+    { message: 'Data a mais de 1 ano — confirme o ano' }
+  );
+
 const sessaoSchema = z.object({
   cliente: z.string().min(1, 'Selecione um cliente'),
   servicoTipo: z.enum(['pacote', 'avulso', 'oferta']),
@@ -18,10 +33,7 @@ const sessaoSchema = z.object({
   servicoAvulsoNome: z.string().optional(),
   servicoAvulsoValor: z.string().optional(),
   servicoOfertaNome: z.string().optional(),
-  dataHora: z
-    .string()
-    .min(1, 'Selecione data e hora')
-    .refine((val) => new Date(val) > new Date(), { message: 'A data e hora devem ser no futuro' }),
+  dataHora: dataHoraFutura,
   observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
 }).superRefine((data, ctx) => {
   if (data.servicoTipo === 'pacote' && !data.pacote) {
@@ -66,10 +78,7 @@ const avaliacaoSchema = z.object({
     .min(9, 'Telefone deve ter pelo menos 9 dígitos')
     .regex(/^[\d+\-()\s]+$/, 'Formato de telefone inválido'),
   leadEmail: z.string().email('Email inválido').optional().or(z.literal('')),
-  dataHora: z
-    .string()
-    .min(1, 'Selecione data e hora')
-    .refine((val) => new Date(val) > new Date(), { message: 'A data e hora devem ser no futuro' }),
+  dataHora: dataHoraFutura,
   observacoes: z.string().max(500, 'Máximo 500 caracteres').optional(),
 });
 
@@ -95,6 +104,10 @@ function CriarAgendamento() {
 
   // Data mínima do date-picker (hoje, Europe/Lisbon).
   const hojeISO = DateTime.now().setZone('Europe/Lisbon').toISODate();
+  // Máximo +1 ano: um dedo no segmento do ano do input gravava 2027 sem
+  // aviso (caso Adelaide 30/07/2027) e o agendamento "desaparecia" do
+  // calendário do ano corrente.
+  const maxISO = DateTime.now().setZone('Europe/Lisbon').plus({ years: 1 }).toISODate();
 
   // Formulário para Sessão
   const sessaoForm = useForm({
@@ -555,6 +568,7 @@ function CriarAgendamento() {
                   type="date"
                   value={dataSessao}
                   min={hojeISO}
+                  max={maxISO}
                   onChange={(e) => handleDataSessao(e.target.value)}
                   disabled={isSubmitting}
                   className={getInputClasses(sessaoForm, 'dataHora')}
@@ -836,6 +850,7 @@ function CriarAgendamento() {
                   type="date"
                   value={dataAval}
                   min={hojeISO}
+                  max={maxISO}
                   onChange={(e) => handleDataAval(e.target.value)}
                   disabled={isSubmitting}
                   className={getInputClasses(avaliacaoForm, 'dataHora')}
