@@ -227,9 +227,12 @@ def make_create_appointment_tool(tenant_id: str, lead_id: str):
                 lead_id=lead_id, tenant_id=tenant_id, data_hora_iso=iso_utc
             )
             return (
-                f"OK — avaliação marcada para {data} às {hora} (status pendente "
-                "de confirmação pela recepcionista). Confirma o agendamento ao "
-                "lead com naturalidade."
+                f"OK — avaliação marcada para {data} às {hora}. O sistema JÁ "
+                "ENVIOU ao lead a confirmação automática com a data e hora. "
+                "NÃO repitas a data/hora nem digas 'está marcado' — responde "
+                "APENAS com o complemento logístico: morada da clínica com "
+                "ponto de referência e link do mapa (do politicas.md), e "
+                "disponibilidade para ajudar."
             )
         except Exception as exc:
             msg = str(exc)
