@@ -308,3 +308,80 @@ def make_pausar_atendimento_tool(tenant_id: str, cliente_id: str):
             return f"ERRO ao pausar: {exc}. Da na mesma a despedida e termina."
 
     return pausar_atendimento
+
+
+def make_registar_presenca_tool(tenant_id: str, cliente_id: str, agendamento_id: str):
+    """agendamento_id capturado por closure — vem do follow-up pendente
+    detectado pelo orchestrator; o LLM nunca escolhe o agendamento."""
+
+    @tool
+    async def registar_presenca(compareceu: bool, feedback: str = "") -> str:
+        """Regista se a cliente compareceu a sessao do follow-up pendente.
+
+        Usa esta tool quando a cliente responde a mensagem de follow-up
+        pos-sessao:
+        - resposta indica que a sessao aconteceu (ex: "correu bem",
+          "adorei") -> compareceu=True
+        - resposta indica que faltou (ex: "nao fui", "tive um imprevisto")
+          -> compareceu=False
+        - resposta ambigua -> NAO chames a tool; pergunta primeiro.
+
+        Chama UMA unica vez por follow-up.
+
+        Args:
+            compareceu: True se a sessao aconteceu, False se a cliente faltou.
+            feedback: Resumo curto do que a cliente disse sobre a sessao.
+        """
+        try:
+            result = await marcai_client.registar_presenca(
+                tenant_id=tenant_id,
+                cliente_id=cliente_id,
+                agendamento_id=agendamento_id,
+                compareceu=compareceu,
+                feedback=feedback,
+            )
+            if not result.get("statusAtualizado", False):
+                return (
+                    "OK — resposta registada. O estado da sessao ja tinha sido "
+                    "definido pela equipa e nao foi alterado. Continua a conversa."
+                )
+            if compareceu:
+                return "OK — presenca registada. Continua a conversa naturalmente."
+            return (
+                "OK — falta registada. Propoe com empatia remarcar a sessao "
+                "(usa get_available_slots para veres horarios livres)."
+            )
+        except Exception as exc:
+            return f"ERRO ao registar presenca: {exc}. Continua a conversa na mesma."
+
+    return registar_presenca
+
+
+def make_sinalizar_renovacao_tool(tenant_id: str, cliente_id: str):
+
+    @tool
+    async def sinalizar_interesse_renovacao() -> str:
+        """Avisa a equipa de que a cliente quer renovar o pacote.
+
+        Usa esta tool APENAS quando o pacote da cliente terminou (era a
+        ultima sessao) E a cliente disse explicitamente que quer renovar
+        ou saber mais sobre a renovacao.
+
+        NAO faças a venda: nao inventes precos nem condicoes. A equipa
+        contacta a cliente para fechar a renovacao.
+
+        Nao precisa de argumentos.
+        """
+        try:
+            await marcai_client.sinalizar_renovacao(tenant_id=tenant_id, cliente_id=cliente_id)
+            return (
+                "OK — equipa avisada. Diz a cliente que a equipa entra em "
+                "contacto em breve para tratar da renovacao. NAO fales de precos."
+            )
+        except Exception as exc:
+            return (
+                f"ERRO ao avisar equipa: {exc}. "
+                "Diz a cliente que vais passar o pedido a equipa na mesma."
+            )
+
+    return sinalizar_interesse_renovacao

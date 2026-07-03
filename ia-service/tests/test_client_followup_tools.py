@@ -1,0 +1,92 @@
+"""Tools de follow-up pós-sessão (registar_presenca, sinalizar_interesse_renovacao)."""
+
+from ia_service.services import marcai_client
+from ia_service.tools.client_tools import (
+    make_registar_presenca_tool,
+    make_sinalizar_renovacao_tool,
+)
+
+
+async def test_registar_presenca_compareceu(monkeypatch):
+    calls = {}
+
+    async def fake_registar(**kwargs):
+        calls.update(kwargs)
+        return {"statusAtualizado": True, "status": "Compareceu"}
+
+    monkeypatch.setattr(marcai_client, "registar_presenca", fake_registar)
+
+    tool = make_registar_presenca_tool("t1", "c1", "a1")
+    result = await tool.ainvoke({"compareceu": True, "feedback": "correu bem"})
+
+    assert "OK" in result
+    assert calls["tenant_id"] == "t1"
+    assert calls["cliente_id"] == "c1"
+    assert calls["agendamento_id"] == "a1"
+    assert calls["compareceu"] is True
+    assert calls["feedback"] == "correu bem"
+
+
+async def test_registar_presenca_faltou_sugere_remarcar(monkeypatch):
+    async def fake_registar(**kwargs):
+        return {"statusAtualizado": True, "status": "Não Compareceu"}
+
+    monkeypatch.setattr(marcai_client, "registar_presenca", fake_registar)
+
+    tool = make_registar_presenca_tool("t1", "c1", "a1")
+    result = await tool.ainvoke({"compareceu": False})
+
+    assert "remarcar" in result.lower()
+
+
+async def test_registar_presenca_noop_quando_laura_ja_definiu(monkeypatch):
+    async def fake_registar(**kwargs):
+        return {"statusAtualizado": False, "status": "Realizado"}
+
+    monkeypatch.setattr(marcai_client, "registar_presenca", fake_registar)
+
+    tool = make_registar_presenca_tool("t1", "c1", "a1")
+    result = await tool.ainvoke({"compareceu": True})
+
+    assert "nao foi alterado" in result.lower().replace("ã", "a")
+
+
+async def test_registar_presenca_erro_http_nao_rebenta(monkeypatch):
+    async def fake_registar(**kwargs):
+        raise RuntimeError("500 Server Error")
+
+    monkeypatch.setattr(marcai_client, "registar_presenca", fake_registar)
+
+    tool = make_registar_presenca_tool("t1", "c1", "a1")
+    result = await tool.ainvoke({"compareceu": True})
+
+    assert "ERRO" in result
+
+
+async def test_sinalizar_renovacao_avisa_equipa(monkeypatch):
+    calls = {}
+
+    async def fake_sinalizar(**kwargs):
+        calls.update(kwargs)
+        return {"whatsappEnviado": True, "pushEnviado": False}
+
+    monkeypatch.setattr(marcai_client, "sinalizar_renovacao", fake_sinalizar)
+
+    tool = make_sinalizar_renovacao_tool("t1", "c1")
+    result = await tool.ainvoke({})
+
+    assert "OK" in result
+    assert "precos" in result.lower().replace("ç", "c")
+    assert calls == {"tenant_id": "t1", "cliente_id": "c1"}
+
+
+async def test_sinalizar_renovacao_erro_degrada(monkeypatch):
+    async def fake_sinalizar(**kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(marcai_client, "sinalizar_renovacao", fake_sinalizar)
+
+    tool = make_sinalizar_renovacao_tool("t1", "c1")
+    result = await tool.ainvoke({})
+
+    assert "ERRO" in result
