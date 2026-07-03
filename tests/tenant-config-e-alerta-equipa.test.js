@@ -177,4 +177,25 @@ describe('POST /api/internal/clientes/:id/alerta-equipa', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('2º alerta do mesmo cliente em <10 min é deduplicado (anti-spam)', async () => {
+    const { tenant, cliente } = await seed('alerta-e');
+    const body = { tenantId: String(tenant._id), motivo: 'Cliente contesta sessões' };
+
+    const primeiro = await request(app)
+      .post(`/api/internal/clientes/${cliente._id}/alerta-equipa`)
+      .set(svc)
+      .send(body);
+    expect(primeiro.body.data.whatsappEnviado).toBe(true);
+
+    const segundo = await request(app)
+      .post(`/api/internal/clientes/${cliente._id}/alerta-equipa`)
+      .set(svc)
+      .send({ ...body, motivo: 'Outro texto, mesmo cliente' });
+
+    expect(segundo.status).toBe(200);
+    expect(segundo.body.data.deduplicado).toBe(true);
+    expect(segundo.body.data.whatsappEnviado).toBe(false);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
 });

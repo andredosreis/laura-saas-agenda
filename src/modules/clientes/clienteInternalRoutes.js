@@ -623,6 +623,13 @@ router.post('/:id/renovacao-interesse', async (req, res) => {
 // Torna real o "vou pedir à Laura" da IA: alerta a equipa (WhatsApp admin
 // + push best-effort) com o motivo — ex: cliente contesta dados da ficha.
 // =====================================================================
+
+// Anti-spam: o modelo pode repetir a promessa em turns seguidos (visto nos
+// traces: 2 alertas em 36s para o mesmo assunto). 1 alerta por cliente a
+// cada 10 min; janela em memória — um restart limpa, aceitável para spam.
+const ALERTA_EQUIPA_DEDUP_MS = 10 * 60 * 1000;
+const ultimoAlertaEquipa = new Map();
+
 router.post('/:id/alerta-equipa', async (req, res) => {
   try {
     const clienteId = req.params.id;
@@ -635,6 +642,15 @@ router.post('/:id/alerta-equipa', async (req, res) => {
       return res.status(400).json({ success: false, error: 'clienteId inválido' });
     }
 
+    const dedupKey = `${tenantId}:${clienteId}`;
+    const ultimo = ultimoAlertaEquipa.get(dedupKey);
+    if (ultimo && Date.now() - ultimo < ALERTA_EQUIPA_DEDUP_MS) {
+      return res.json({
+        success: true,
+        data: { whatsappEnviado: false, pushEnviado: false, deduplicado: true },
+      });
+    }
+
     const { tenant, models } = await resolveTenantContext(tenantId);
 
     const cliente = await models.Cliente.findOne({ _id: clienteId, tenantId })
@@ -643,6 +659,8 @@ router.post('/:id/alerta-equipa', async (req, res) => {
     if (!cliente) {
       return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
     }
+
+    ultimoAlertaEquipa.set(dedupKey, Date.now());
 
     const motivoTxt = String(motivo || 'A cliente precisa de apoio da equipa.').slice(0, 300);
     const alerta =
