@@ -13,6 +13,7 @@ from langchain.agents import create_agent
 
 from ..services.prompt_renderer import render_client_system_prompt
 from ..tools.client_tools import (
+    make_avisar_equipa_tool,
     make_cancel_appointment_tool,
     make_create_client_appointment_tool,
     make_get_my_appointments_tool,
@@ -48,6 +49,7 @@ def make_client_agent(
         make_reschedule_appointment_tool(tenant_id, cliente_id),
         make_cancel_appointment_tool(tenant_id, cliente_id),
         make_pausar_atendimento_tool(tenant_id, cliente_id),
+        make_avisar_equipa_tool(tenant_id, cliente_id),
     ]
     # Tools de follow-up so existem quando ha follow-up pendente — o
     # agendamento alvo e capturado por closure, nunca escolhido pelo LLM.

@@ -1,7 +1,8 @@
-"""Tools de follow-up pós-sessão (registar_presenca, sinalizar_interesse_renovacao)."""
+"""Tools de alerta à equipa (registar_presenca, sinalizar_renovacao, avisar_equipa)."""
 
 from ia_service.services import marcai_client
 from ia_service.tools.client_tools import (
+    make_avisar_equipa_tool,
     make_registar_presenca_tool,
     make_sinalizar_renovacao_tool,
 )
@@ -88,5 +89,38 @@ async def test_sinalizar_renovacao_erro_degrada(monkeypatch):
 
     tool = make_sinalizar_renovacao_tool("t1", "c1")
     result = await tool.ainvoke({})
+
+    assert "ERRO" in result
+
+
+async def test_avisar_equipa_envia_motivo(monkeypatch):
+    calls = {}
+
+    async def fake_alertar(**kwargs):
+        calls.update(kwargs)
+        return {"whatsappEnviado": True, "pushEnviado": False}
+
+    monkeypatch.setattr(marcai_client, "alertar_equipa", fake_alertar)
+
+    tool = make_avisar_equipa_tool("t1", "c1")
+    result = await tool.ainvoke({"motivo": "Cliente diz ter 3 sessoes; ficha mostra 1"})
+
+    assert "OK" in result
+    assert "NAO bloqueia" in result
+    assert calls == {
+        "tenant_id": "t1",
+        "cliente_id": "c1",
+        "motivo": "Cliente diz ter 3 sessoes; ficha mostra 1",
+    }
+
+
+async def test_avisar_equipa_erro_nao_rebenta(monkeypatch):
+    async def fake_alertar(**kwargs):
+        raise RuntimeError("500 Server Error")
+
+    monkeypatch.setattr(marcai_client, "alertar_equipa", fake_alertar)
+
+    tool = make_avisar_equipa_tool("t1", "c1")
+    result = await tool.ainvoke({"motivo": "x"})
 
     assert "ERRO" in result

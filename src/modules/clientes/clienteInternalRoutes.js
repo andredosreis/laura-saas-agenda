@@ -618,6 +618,82 @@ router.post('/:id/renovacao-interesse', async (req, res) => {
 });
 
 // =====================================================================
+// POST /api/internal/clientes/:id/alerta-equipa
+// Body: { tenantId, motivo }
+// Torna real o "vou pedir à Laura" da IA: alerta a equipa (WhatsApp admin
+// + push best-effort) com o motivo — ex: cliente contesta dados da ficha.
+// =====================================================================
+router.post('/:id/alerta-equipa', async (req, res) => {
+  try {
+    const clienteId = req.params.id;
+    const { tenantId, motivo } = req.body || {};
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenantId é obrigatório' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+      return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+
+    const { tenant, models } = await resolveTenantContext(tenantId);
+
+    const cliente = await models.Cliente.findOne({ _id: clienteId, tenantId })
+      .select('nome telefone')
+      .lean();
+    if (!cliente) {
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
+    }
+
+    const motivoTxt = String(motivo || 'A cliente precisa de apoio da equipa.').slice(0, 300);
+    const alerta =
+      `📋 *Pedido de Verificação (IA)*\n\n` +
+      `A IA precisa da tua ajuda com a cliente *${cliente.nome}*:\n\n` +
+      `${motivoTxt}\n\n` +
+      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}`;
+
+    let whatsappEnviado = false;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    if (numeroAdmin) {
+      const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
+      whatsappEnviado = Boolean(resultado?.success);
+    }
+
+    // Push best-effort aos admins do tenant — nunca falha o pedido.
+    let pushEnviado = false;
+    try {
+      const admins = await User.find({ tenantId, role: { $in: ['admin', 'gerente'] } })
+        .select('_id')
+        .lean();
+      const subs = await UserSubscription.find({
+        userId: { $in: admins.map((a) => String(a._id)) },
+        active: true,
+      }).lean();
+      await Promise.all(
+        subs.map((sub) =>
+          sendPushNotification(sub, {
+            title: '📋 IA pede verificação',
+            body: `${cliente.nome}: ${motivoTxt}`.slice(0, 160),
+            tag: `alerta-equipa-${clienteId}`,
+            data: { tipo: 'alerta-equipa', clienteId },
+          })
+        )
+      );
+      pushEnviado = subs.length > 0;
+    } catch (pushErr) {
+      logger.warn({ err: pushErr.message, tenantId }, '[internal] push de alerta-equipa falhou');
+    }
+
+    res.json({ success: true, data: { whatsappEnviado, pushEnviado } });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] POST /clientes/:id/alerta-equipa');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
 // PATCH /api/internal/clientes/:id/pausar-ia
 // Body: { tenantId, ativa? }  — pausa (ativa=false/omitido) ou reactiva
 // (ativa=true) a IA para este cliente. Usado pela auto-pausa off-topic do

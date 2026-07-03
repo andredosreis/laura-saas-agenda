@@ -865,10 +865,28 @@ export const updateTenant = async (req, res) => {
     try {
         const { contato, configuracoes, nome, whatsapp } = req.body;
 
+        // $set por campo (dot-notation), nunca substituição do subdocumento:
+        // configuracoes também guarda iaGlobalAtiva, followUpPosSessaoAtivo e
+        // intervaloEntreSessoes — um replace total apagava-os e os defaults
+        // do schema religavam a IA sozinhos.
         const updates = {};
         if (nome) updates.nome = nome;
-        if (contato) updates.contato = contato;
-        if (configuracoes) updates.configuracoes = configuracoes;
+        if (contato && typeof contato === 'object') {
+            const { endereco, ...contatoCampos } = contato;
+            for (const [campo, valor] of Object.entries(contatoCampos)) {
+                updates[`contato.${campo}`] = valor;
+            }
+            if (endereco && typeof endereco === 'object') {
+                for (const [campo, valor] of Object.entries(endereco)) {
+                    updates[`contato.endereco.${campo}`] = valor;
+                }
+            }
+        }
+        if (configuracoes && typeof configuracoes === 'object') {
+            for (const [campo, valor] of Object.entries(configuracoes)) {
+                updates[`configuracoes.${campo}`] = valor;
+            }
+        }
         if (whatsapp?.numeroWhatsapp !== undefined) {
             updates['whatsapp.numeroWhatsapp'] = whatsapp.numeroWhatsapp;
         }

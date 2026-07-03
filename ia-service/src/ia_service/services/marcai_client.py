@@ -352,6 +352,19 @@ async def create_client_appointment(
     return resp["data"]
 
 
+async def alertar_equipa(tenant_id: str, cliente_id: str, motivo: str) -> dict:
+    """Alerta a equipa da clinica (WhatsApp admin + push) com um motivo.
+
+    Torna real o "vou pedir a Laura" — sem isto a promessa da IA nao
+    chega a ninguem.
+    """
+    resp = await _post_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/alerta-equipa",
+        json={"tenantId": tenant_id, "motivo": motivo},
+    )
+    return resp["data"]
+
+
 async def get_client_messages(
     tenant_id: str,
     cliente_id: str,

@@ -365,6 +365,42 @@ def make_registar_presenca_tool(tenant_id: str, cliente_id: str, agendamento_id:
     return registar_presenca
 
 
+def make_avisar_equipa_tool(tenant_id: str, cliente_id: str):
+
+    @tool
+    async def avisar_equipa(motivo: str) -> str:
+        """Envia um alerta REAL a equipa da clinica com um motivo.
+
+        Usa esta tool SEMPRE que prometeres ao cliente que vais pedir ou
+        confirmar algo com a equipa/Laura (ex: cliente contesta os dados
+        da ficha, pedido que so a equipa pode resolver). NUNCA digas
+        "vou pedir a Laura" sem chamar esta tool — sem ela o aviso nao
+        chega a ninguem.
+
+        Chama UMA unica vez por assunto — nao repitas para o mesmo motivo.
+
+        Args:
+            motivo: Resumo curto e objectivo do que a equipa deve verificar
+                (ex: "Cliente diz que devia ter 3 sessoes; a ficha mostra 1").
+        """
+        try:
+            await marcai_client.alertar_equipa(
+                tenant_id=tenant_id, cliente_id=cliente_id, motivo=motivo
+            )
+            return (
+                "OK — equipa avisada. Diz ao cliente que a equipa vai "
+                "verificar e entra em contacto. Continua a conversa "
+                "normalmente — isto NAO bloqueia marcacoes."
+            )
+        except Exception as exc:
+            return (
+                f"ERRO ao avisar equipa: {exc}. "
+                "Diz ao cliente que vais passar o pedido a equipa na mesma."
+            )
+
+    return avisar_equipa
+
+
 def make_sinalizar_renovacao_tool(tenant_id: str, cliente_id: str):
 
     @tool

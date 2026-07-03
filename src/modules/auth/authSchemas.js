@@ -113,10 +113,17 @@ export const changePasswordSchema = z
 export const updateTenantSchema = z
   .object({
     nome: z.string().trim().min(2).max(100).optional(),
-    whatsapp: z.string().trim().max(20).optional(),
+    // Objecto (não string) — o frontend envia { numeroWhatsapp } e o
+    // controller lê whatsapp.numeroWhatsapp.
+    whatsapp: z
+      .object({
+        numeroWhatsapp: z.string().trim().max(20).optional().or(z.literal('')),
+      })
+      .strict()
+      .optional(),
     contato: z
       .object({
-        email: email.optional(),
+        email: email.optional().or(z.literal('')),
         telefone: z.string().trim().max(20).optional(),
         website: z.string().trim().max(200).optional().or(z.literal('')),
         endereco: z
@@ -132,8 +139,18 @@ export const updateTenantSchema = z
       })
       .strict()
       .optional(),
+    // strict deliberado: iaGlobalAtiva, followUpPosSessaoAtivo e
+    // intervaloEntreSessoes NÃO passam por esta rota — têm caminhos
+    // próprios (master switch do inbox / script de configuração).
     configuracoes: z
       .object({
+        timezone: z.string().max(50).optional(),
+        idioma: z.string().max(10).optional(),
+        moedaDisplay: z.string().max(5).optional(),
+        duracaoSessaoPadrao: z.number().int().min(15).max(480).optional(),
+        antecedenciaMinAgendamento: z.number().int().min(0).max(168).optional(),
+        antecedenciaMaxAgendamento: z.number().int().min(1).max(365).optional(),
+        permitirAgendamentoOnline: z.boolean().optional(),
         horarioInicio: z.string().max(10).optional(),
         horarioFim: z.string().max(10).optional(),
         diasAtivos: z.array(z.number().int().min(0).max(6)).optional(),
