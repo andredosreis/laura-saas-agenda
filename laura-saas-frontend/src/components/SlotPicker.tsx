@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DateTime } from 'luxon';
 import { Loader2, AlertCircle, CalendarClock } from 'lucide-react';
 import {
@@ -140,12 +140,14 @@ const ROTULO_ESTADO: Record<SlotEstado, string> = {
   fora: 'Fora do horário',
 };
 
-// Opções da "Hora manual" (forçar encaixe). Selects nativos em vez de
-// <input type="time">: o diálogo-relógio do Android pode abrir cortado fora
-// do ecrã (botão "Definir" inalcançável) em dispositivos com ampliação de
-// ecrã; <select> abre bottom-sheet (Android) / roda (iOS) que nunca corta.
-const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTOS = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+// "Hora manual" (forçar encaixe): dois campos numéricos (HH / MM) em vez de
+// <input type="time"> — o diálogo-relógio nativo do Android pode abrir
+// cortado fora do ecrã (botão "Definir" inalcançável) em dispositivos com
+// ampliação de ecrã. `inputMode="numeric"` traz o teclado numérico sem
+// invocar nenhum picker nativo, e mantém qualquer minuto seleccionável
+// (a grelha de chips acima é que segue o passo de `intervaloEntreSessoes`;
+// isto é o override manual, tem de aceitar qualquer HH:MM).
+const soDigitos = (s: string): string => s.replace(/\D/g, '').slice(0, 2);
 
 function SlotPicker({
   date,
@@ -198,6 +200,24 @@ function SlotPicker({
 
   const semSlots = !!dia && dia.slots.length === 0;
 
+  // "Hora manual" (forçar encaixe) — estado local de digitação (hooks têm
+  // de ficar antes do early-return abaixo). Sincroniza com `value` só
+  // quando muda por fora (chip clicado, reset do formulário) — nunca
+  // sobrepõe o que o utilizador está a escrever nos próprios campos.
+  const [hInput, setHInput] = useState(() => (value ?? '').split(':')[0] ?? '');
+  const [mInput, setMInput] = useState(() => (value ?? '').split(':')[1] ?? '');
+  const lastEmitted = useRef<string>(value ?? '');
+  const minutoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if ((value ?? '') !== lastEmitted.current) {
+      const [h = '', m = ''] = (value ?? '').split(':');
+      setHInput(h);
+      setMInput(m);
+      lastEmitted.current = value ?? '';
+    }
+  }, [value]);
+
   // --- Sem data escolhida ---
   if (!date) {
     return (
@@ -211,24 +231,55 @@ function SlotPicker({
   const chipBase =
     'inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-sm font-medium border transition-all select-none';
 
-  // "Hora manual" (forçar encaixe) — decompõe o valor "HH:mm" nos dois selects.
-  const [forceHora = '', forceMinuto = ''] = (value ?? '').split(':');
-  // Um chip seleccionado pode ter minuto fora do passo de 5 (intervaloEntreSessoes)
-  // — inclui-o nas opções para o select continuar a reflectir o valor real.
-  const minutoOpts =
-    forceMinuto && !MINUTOS.includes(forceMinuto)
-      ? [...MINUTOS, forceMinuto].sort()
-      : MINUTOS;
-
-  const handleForceHora = (h: string) => {
-    onChange(h ? `${h}:${forceMinuto || '00'}` : '');
+  const commitForce = (h: string, m: string) => {
+    const next = h && m ? `${h}:${m}` : '';
+    lastEmitted.current = next;
+    onChange(next);
   };
 
-  const handleForceMinuto = (m: string) => {
-    if (forceHora) onChange(`${forceHora}:${m}`);
+  const handleHoraChange = (raw: string) => {
+    const h = soDigitos(raw);
+    setHInput(h);
+    if (h.length === 2) {
+      const clamped = String(Math.min(23, Number(h))).padStart(2, '0');
+      setHInput(clamped);
+      commitForce(clamped, mInput || '00');
+      minutoInputRef.current?.focus();
+      minutoInputRef.current?.select();
+    } else if (!h) {
+      commitForce('', mInput);
+    }
   };
 
-  const forceSelectClass = `min-h-[44px] px-3 py-2 rounded-xl border text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500 ${
+  const handleHoraBlur = () => {
+    if (!hInput) return;
+    const clamped = String(Math.min(23, Number(hInput))).padStart(2, '0');
+    setHInput(clamped);
+    commitForce(clamped, mInput || '00');
+  };
+
+  const handleMinutoChange = (raw: string) => {
+    const m = soDigitos(raw);
+    setMInput(m);
+    if (hInput && m.length === 2) {
+      const clamped = String(Math.min(59, Number(m))).padStart(2, '0');
+      setMInput(clamped);
+      commitForce(hInput, clamped);
+    }
+  };
+
+  const handleMinutoBlur = () => {
+    if (!hInput) return;
+    if (!mInput) {
+      commitForce('', '');
+      return;
+    }
+    const clamped = String(Math.min(59, Number(mInput))).padStart(2, '0');
+    setMInput(clamped);
+    commitForce(hInput, clamped);
+  };
+
+  const forceInputClass = `min-h-[44px] w-14 px-2 py-2 rounded-xl border text-sm text-center focus:outline-hidden focus:ring-2 focus:ring-indigo-500 ${
     isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'
   }`;
 
@@ -359,40 +410,40 @@ function SlotPicker({
                 Hora manual
               </label>
               <div className="flex items-center gap-2">
-                <select
-                  value={forceHora}
-                  onChange={(e) => handleForceHora(e.target.value)}
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
+                  placeholder="HH"
+                  autoComplete="off"
+                  value={hInput}
+                  onChange={(e) => handleHoraChange(e.target.value)}
+                  onBlur={handleHoraBlur}
                   data-testid="slot-picker-force-input"
-                  aria-label="Hora"
-                  className={forceSelectClass}
-                >
-                  <option value="" disabled>
-                    --
-                  </option>
-                  {HORAS.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
+                  aria-label="Hora (00–23)"
+                  className={forceInputClass}
+                />
                 <span className={isDarkMode ? 'text-slate-400' : 'text-gray-500'}>:</span>
-                <select
-                  value={forceMinuto}
-                  onChange={(e) => handleForceMinuto(e.target.value)}
-                  disabled={!forceHora}
+                <input
+                  ref={minutoInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
+                  placeholder="MM"
+                  autoComplete="off"
+                  value={mInput}
+                  disabled={!hInput}
+                  onChange={(e) => handleMinutoChange(e.target.value)}
+                  onBlur={handleMinutoBlur}
                   data-testid="slot-picker-force-minutos"
-                  aria-label="Minutos"
-                  className={`${forceSelectClass} disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <option value="" disabled>
-                    --
-                  </option>
-                  {minutoOpts.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                  aria-label="Minutos (00–59)"
+                  className={`${forceInputClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+                />
+                <span className={`text-xs ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                  qualquer minuto
+                </span>
               </div>
             </div>
           )}
