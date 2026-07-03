@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
+import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
 import luxonPlugin from '@fullcalendar/luxon3';
 import { DateTime } from 'luxon';
@@ -11,6 +12,7 @@ import {
     CalendarDays,
     CalendarCheck,
     Clock,
+    List,
     Loader2,
     RefreshCw,
     Plus,
@@ -70,15 +72,18 @@ function CalendarView() {
         const handleResize = () => {
             const mobile = window.innerWidth < 640;
             setIsMobile(mobile);
-            // Auto-switch to day view on mobile if not already there
-            if (mobile && calendarApi && currentView !== 'timeGridDay') {
+            // Só na transição desktop→mobile, e só para a vista Semana (a única
+            // inutilizável em ecrã estreito). Forçar sempre 'Dia' lutava contra
+            // o utilizador que escolhe Mês/Lista no telemóvel — o browser mobile
+            // dispara resize ao esconder a barra de URL e a vista "saltava".
+            if (mobile && !isMobile && calendarApi && currentView === 'timeGridWeek') {
                 calendarApi.changeView('timeGridDay');
             }
         };
 
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [calendarApi, currentView]);
+    }, [calendarApi, currentView, isMobile]);
 
     // Modal states
     const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -384,7 +389,8 @@ function CalendarView() {
     const viewButtons = [
         { key: 'dayGridMonth', label: 'Mês', icon: CalendarDays },
         { key: 'timeGridWeek', label: 'Semana', icon: CalendarCheck },
-        { key: 'timeGridDay', label: 'Dia', icon: Clock }
+        { key: 'timeGridDay', label: 'Dia', icon: Clock },
+        { key: 'listMonth', label: 'Lista', icon: List }
     ];
 
     // Card style based on theme
@@ -517,7 +523,7 @@ function CalendarView() {
                     <div className={`calendar-container ${isDarkMode ? 'dark-calendar' : 'light-calendar'} ${currentView === 'timeGridWeek' ? 'min-w-[1000px]' : ''}`}>
                             <FullCalendar
                                 ref={handleCalendarRef}
-                                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, luxonPlugin]}
+                                plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, luxonPlugin]}
                                 initialView={isMobile ? 'timeGridDay' : 'dayGridMonth'}
                                 locale="pt"
                                 timeZone="Europe/Lisbon"
@@ -536,6 +542,7 @@ function CalendarView() {
                                 slotDuration="00:30:00"
                                 slotLabelInterval="01:00"
                                 allDaySlot={false}
+                                noEventsContent="Sem agendamentos neste período."
                                 height="auto"
                                 aspectRatio={isMobile ? 1.2 : 1.8}
                                 contentHeight={isMobile ? 600 : 'auto'}
@@ -553,13 +560,27 @@ function CalendarView() {
                                     // Nome do serviço contratado (pacote/avulso) ou "Avaliação".
                                     const servico = nomeServicoAgendamento(arg.event.extendedProps);
                                     const isMonth = arg.view.type === 'dayGridMonth';
+                                    const isList = arg.view.type.startsWith('list');
 
-                                    // Vista Mês: chip compacto numa só linha (hora + nome).
+                                    // Vista Lista: a linha já tem hora e ponto colorido próprios;
+                                    // aqui vai só o título — cor herdada da linha (nunca branco,
+                                    // o fundo é o da página).
+                                    if (isList) {
+                                        return (
+                                            <div className="flex flex-wrap items-baseline gap-x-2">
+                                                <span className="font-semibold text-sm">{clienteName}</span>
+                                                <span className="text-xs opacity-70">{servico}</span>
+                                            </div>
+                                        );
+                                    }
+
+                                    // Vista Mês: hora + nome. Em ecrã estreito a coluna não
+                                    // chega para os dois lado a lado — empilha em 2 linhas.
                                     if (isMonth) {
                                         return (
-                                            <div className="px-1 flex items-center gap-1 overflow-hidden w-full">
+                                            <div className="px-1 flex flex-col items-start sm:flex-row sm:items-center sm:gap-1 overflow-hidden w-full">
                                                 <span className="text-[10px] font-semibold text-white shrink-0">{arg.timeText}</span>
-                                                <span className="text-[10px] text-white/90 truncate">{clienteName}</span>
+                                                <span className="text-[10px] text-white/90 truncate w-full sm:w-auto">{clienteName}</span>
                                             </div>
                                         );
                                     }
@@ -722,6 +743,30 @@ function CalendarView() {
         /* Week view: guarantee minimum column width so names are readable */
         .fc-timeGridWeek-view .fc-timegrid-col {
           min-width: 130px;
+        }
+
+        /* Vista Lista: cores do tema (o texto herda da página, não é branco) */
+        .dark-calendar .fc-list {
+          border-color: rgba(255, 255, 255, 0.1);
+        }
+        .dark-calendar .fc-list-day-cushion {
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .dark-calendar .fc-list-event td {
+          color: #f8fafc;
+        }
+        .dark-calendar .fc-list-empty {
+          background: transparent;
+          color: #94a3b8;
+        }
+        .light-calendar .fc-list {
+          border-color: #e2e8f0;
+        }
+        .fc-list-event {
+          cursor: pointer;
+        }
+        .fc-list-event-time {
+          white-space: nowrap;
         }
 
         /* 📱 Mobile Optimizations */
