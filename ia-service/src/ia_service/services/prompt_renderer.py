@@ -177,6 +177,7 @@ def render_client_system_prompt(
     upcoming_appointments: str = "Nenhum agendamento futuro.",
     turn_number: int = 0,
     last_clinic_message: str = "",
+    followup_context: str = "Nenhum follow-up pendente.",
 ) -> str:
     state = client_state or {}
     nome = (state.get("nome") or "").strip() or "Cliente"
@@ -197,6 +198,7 @@ def render_client_system_prompt(
         .replace("{{upcoming_appointments}}", upcoming_appointments)
         .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{last_clinic_message}}", last_clinic)
+        .replace("{{followup_context}}", followup_context)
         .replace("{{clinica_nome}}", clinica["nome"])
         .replace("{{owner_nome}}", clinica["dona"])
         .replace("{{owner_profissao}}", clinica["profissao"])
