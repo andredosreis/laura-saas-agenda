@@ -322,6 +322,9 @@ function CriarAgendamento() {
       cliente: data.cliente,
       dataHora: data.dataHora,
       observacoes: data.observacoes || '',
+      // F05 — sem este flag o backend rejeita horários fora da
+      // disponibilidade mesmo com o toggle de encaixe ligado.
+      ...(forcarSessao && { forcarEncaixe: true }),
     };
 
     if (data.servicoTipo === 'pacote') {
@@ -375,6 +378,9 @@ function CriarAgendamento() {
         },
         dataHora: data.dataHora,
         observacoes: data.observacoes || '',
+        // F05 — sem este flag o backend rejeita horários fora da
+        // disponibilidade mesmo com o toggle de encaixe ligado.
+        ...(forcarAval && { forcarEncaixe: true }),
       });
       toast.success('Avaliação agendada com sucesso!');
       navigate('/agendamentos');

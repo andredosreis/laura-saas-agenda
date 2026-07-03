@@ -254,7 +254,10 @@ function QuickAppointmentModal({
             const submitData = {
                 cliente: formData.cliente,
                 dataHora: formData.dataHora,
-                observacoes: formData.observacoes
+                observacoes: formData.observacoes,
+                // F05 — sem este flag o backend rejeita horários fora da
+                // disponibilidade mesmo com o toggle de encaixe ligado.
+                ...(forcarEncaixe && { forcarEncaixe: true })
             };
 
             if (serviceMode === 'avulso') {
