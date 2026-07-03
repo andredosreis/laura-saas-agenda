@@ -120,6 +120,20 @@ async def test_process_lead_returns_error_on_evolution_failure(client, auth_head
     assert r.status_code == 500
 
 
+async def test_process_lead_500_does_not_leak_internal_details(client, auth_headers, monkeypatch):
+    """Erro interno → detail genérico; nunca ecoar str(exc) ao chamador."""
+    from ia_service.services import lead_orchestrator
+
+    async def boom(payload):
+        raise RuntimeError("segredo-interno mongodb://user:pass@host")
+
+    monkeypatch.setattr(lead_orchestrator, "run", boom)
+    r = await client.post("/process-lead", json=BASE_PAYLOAD, headers=auth_headers)
+    assert r.status_code == 500
+    assert "segredo-interno" not in r.text
+    assert "mongodb://" not in r.text
+
+
 async def test_process_lead_morning_greeting_contains_bom_dia(client, auth_headers):
     payload = {**BASE_PAYLOAD, "timestamp": "2026-05-05T09:00:00Z"}
     evolution_calls: list[str] = []

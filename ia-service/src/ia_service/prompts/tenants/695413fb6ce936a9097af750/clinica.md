@@ -5,3 +5,4 @@
 nome: L.A. Estética Avançada
 dona: Laura
 profissao: terapeuta e esteticista
+preco_entrada: 40 €

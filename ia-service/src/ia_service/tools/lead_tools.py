@@ -227,9 +227,10 @@ def make_create_appointment_tool(tenant_id: str, lead_id: str):
                 lead_id=lead_id, tenant_id=tenant_id, data_hora_iso=iso_utc
             )
             return (
-                f"OK — avaliação marcada para {data} às {hora} (status pendente "
-                "de confirmação pela recepcionista). Confirma o agendamento ao "
-                "lead com naturalidade."
+                f"OK — avaliação marcada para {data} às {hora}. A marcação "
+                "está FEITA na agenda e a equipa é notificada. Confirma ao "
+                "lead de forma DEFINITIVA — não digas que a recepcionista "
+                "ainda vai confirmar."
             )
         except Exception as exc:
             msg = str(exc)
@@ -278,6 +279,16 @@ def make_get_available_slots_tool(tenant_id: str):
         all_slots = mongo_reader.find_available_slots(
             tenant_id, dias_a_frente=min(dias_a_frente, 30)
         )
+        if all_slots is None:
+            # Erro TÉCNICO (backend indisponível) ≠ agenda cheia. Nunca
+            # transformar uma falha de rede em "não há vagas" — isso perde
+            # o lead com informação falsa.
+            return (
+                "ERRO TÉCNICO: não consegui consultar a disponibilidade "
+                "neste momento. NÃO digas ao lead que não há vagas. Diz com "
+                "transparência que vais confirmar os horários com a "
+                "recepcionista e pergunta a preferência dele (manhã ou tarde)."
+            )
         if not all_slots:
             return (
                 "Não há slots livres nos próximos dias. Pede ao lead a "

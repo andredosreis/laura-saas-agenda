@@ -16,10 +16,11 @@ Flow:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import structlog
 
-from ..config import settings
+from ..config import llm_api_key_configured, settings
 from ..services import marcai_client
 from ..services.evolution_client import send_message
 
@@ -31,9 +32,17 @@ _GREETINGS = {
     "noite": "Boa noite! 😊 Em que posso ajudar?",
 }
 
+# Fallback quando o agente falha a MEIO da conversa (turn ≥ 1): repetir a
+# saudação de abertura soa a reset. Ver lead_orchestrator._MID_CONV_FALLBACK.
+_MID_CONV_FALLBACK = (
+    "Peço desculpa — não consegui processar a sua mensagem agora. "
+    "Pode reenviar daqui a um instante, por favor? 🙏"
+)
+
 
 def _period_of_day(dt: datetime) -> str:
-    hour = dt.astimezone(timezone.utc).hour
+    # Hora LOCAL da clínica (não UTC) — ver lead_orchestrator._period_of_day.
+    hour = dt.astimezone(ZoneInfo("Europe/Lisbon")).hour
     if 6 <= hour < 12:
         return "manha"
     if 12 <= hour < 19:
@@ -127,9 +136,10 @@ async def _generate_reply(
     fallback_greeting: str,
     log,
 ) -> tuple[str, str]:
-    if not settings.openai_api_key:
+    if not llm_api_key_configured():
         return fallback_greeting, "greeting_fallback"
 
+    turn_number = 0
     try:
         from ..agents.client_agent import make_client_agent
 
@@ -187,12 +197,16 @@ async def _generate_reply(
 
         if not content.strip():
             log.warning("client_agent_empty_reply_falling_back")
-            return fallback_greeting, "greeting_fallback"
+            return (
+                _MID_CONV_FALLBACK if turn_number >= 1 else fallback_greeting
+            ), "greeting_fallback"
         log.info("client_agent_reply_generated", chars=len(content))
         return content, "agent"
     except Exception as exc:
         log.error("client_agent_failed_falling_back", error=str(exc))
-        return fallback_greeting, "greeting_fallback"
+        return (
+            _MID_CONV_FALLBACK if turn_number >= 1 else fallback_greeting
+        ), "greeting_fallback"
 
 
 async def run(payload) -> dict:

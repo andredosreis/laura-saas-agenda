@@ -115,6 +115,10 @@ _CLINICA_DEFAULTS = {
     "nome": "clínica",
     "dona": "responsável",
     "profissao": "profissional de estética e bem-estar",
+    # Preço "a partir de" citado ao lead/cliente ({{preco_entrada}}). É por
+    # tenant (clinica.md) — nunca hardcodar um valor concreto nos templates
+    # partilhados. Default preserva o comportamento histórico (Laura).
+    "preco_entrada": "40 €",
 }
 
 

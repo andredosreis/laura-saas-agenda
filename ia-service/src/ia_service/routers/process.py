@@ -46,7 +46,8 @@ async def process_lead(payload: ProcessLeadRequest) -> ProcessLeadResponse:
             telefone=payload.telefone,
             error=str(exc),
         )
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Detalhe fica no log — nunca ecoar str(exc) ao chamador.
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 class ProcessClientRequest(BaseModel):
@@ -82,4 +83,5 @@ async def process_client(payload: ProcessClientRequest) -> ProcessClientResponse
             telefone=payload.telefone,
             error=str(exc),
         )
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Detalhe fica no log — nunca ecoar str(exc) ao chamador.
+        raise HTTPException(status_code=500, detail="Internal server error") from exc

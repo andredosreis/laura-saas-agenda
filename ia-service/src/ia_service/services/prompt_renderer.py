@@ -168,6 +168,7 @@ def render_system_prompt(
         .replace("{{clinica_nome}}", clinica["nome"])
         .replace("{{owner_nome}}", clinica["dona"])
         .replace("{{owner_profissao}}", clinica["profissao"])
+        .replace("{{preco_entrada}}", clinica.get("preco_entrada", "40 €"))
     )
 
 
@@ -202,4 +203,5 @@ def render_client_system_prompt(
         .replace("{{clinica_nome}}", clinica["nome"])
         .replace("{{owner_nome}}", clinica["dona"])
         .replace("{{owner_profissao}}", clinica["profissao"])
+        .replace("{{preco_entrada}}", clinica.get("preco_entrada", "40 €"))
     )

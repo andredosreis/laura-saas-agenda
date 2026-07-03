@@ -55,3 +55,19 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def llm_api_key_configured() -> bool:
+    """Chave de API do provider LLM ACTIVO está definida?
+
+    Os orchestrators usam isto como gate antes de tentar o agente. Tem de
+    verificar a chave do provider seleccionado (`llm_provider`) — nunca uma
+    chave fixa: com provider=gemini e apenas OPENAI_API_KEY definida, o
+    agente nunca correria e toda a IA degradaria silenciosamente para a
+    saudação fixa.
+    """
+    if settings.llm_provider == "openai":
+        return bool(settings.openai_api_key)
+    if settings.llm_provider == "anthropic":
+        return bool(settings.anthropic_api_key)
+    return bool(settings.google_api_key)

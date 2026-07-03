@@ -58,18 +58,20 @@ def test_schedule_not_configured_returns_empty():
         assert mongo_reader.find_available_slots(TENANT) == []
 
 
-def test_endpoint_500_returns_empty_no_exception():
+def test_endpoint_500_returns_none_no_exception():
+    # None = erro técnico (≠ [] = genuinamente sem vagas) — permite à tool
+    # distinguir "não há vagas" de "não consegui consultar" na resposta ao lead.
     with respx.mock:
         respx.get(ENDPOINT).mock(
             return_value=Response(500, json={"success": False, "error": "Erro interno"})
         )
-        assert mongo_reader.find_available_slots(TENANT) == []
+        assert mongo_reader.find_available_slots(TENANT) is None
 
 
-def test_endpoint_timeout_returns_empty_no_exception():
+def test_endpoint_timeout_returns_none_no_exception():
     with respx.mock:
         respx.get(ENDPOINT).mock(side_effect=httpx.TimeoutException("timeout"))
-        assert mongo_reader.find_available_slots(TENANT) == []
+        assert mongo_reader.find_available_slots(TENANT) is None
 
 
 def test_source_switch_does_not_use_agent_business_rules(monkeypatch):

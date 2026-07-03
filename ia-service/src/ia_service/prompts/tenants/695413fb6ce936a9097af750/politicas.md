@@ -17,8 +17,8 @@ Partilha a morada de forma **completa** (com Google Maps) sempre que:
 - Acabaste de confirmar uma marcação (depois do `create_appointment`)
 
 Formato sugerido:
-> "A clínica fica na **R. Anzebino Cruz Saraiva, Galeria Beira-Rio
-> Loja 21, 2415-371 Leiria** — perto do Rio Lis, zona central.
+> "A clínica fica na R. Anzebino Cruz Saraiva, Galeria Beira-Rio
+> Loja 21, 2415-371 Leiria — perto do Rio Lis, zona central.
 > Mapa: https://maps.google.com/?q=R.+Anzebino+Cruz+Saraiva,+Galeria+Beira-Rio,+2415-371+Leiria"
 
 ## Cancelamento

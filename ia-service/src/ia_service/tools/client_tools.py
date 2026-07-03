@@ -93,22 +93,23 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
                 servico = appt.get("servicoAvulsoNome", "")
                 label = servico or tipo
 
-                hours_until = "?"
+                # Comparar o float SEM arredondar: 23.6h arredondado dava
+                # "24h" e aparecia como reagendável — o backend rejeitava
+                # depois e o cliente recebia promessa seguida de desculpa.
+                hours_until: float | None = None
                 try:
                     dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-                    h = (dt - now).total_seconds() / 3600
-                    hours_until = f"{h:.0f}h"
+                    hours_until = (dt - now).total_seconds() / 3600
                 except Exception:
                     pass
 
                 can_reschedule = (
-                    "SIM"
-                    if hours_until != "?" and float(hours_until.replace("h", "")) >= 24
-                    else "NAO (<24h)"
+                    "SIM" if hours_until is not None and hours_until >= 24 else "NAO (<24h)"
                 )
+                hours_label = f"{hours_until:.1f}h" if hours_until is not None else "?"
                 lines.append(
                     f"- [id={appt_id}] {label}: {dt_str} (status: {status}) "
-                    f"— faltam {hours_until}, reagendar/cancelar: {can_reschedule}"
+                    f"— faltam {hours_label}, reagendar/cancelar: {can_reschedule}"
                 )
 
             return (

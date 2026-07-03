@@ -11,3 +11,5 @@
 nome: clínica
 dona: responsável
 profissao: profissional de estética e bem-estar
+# Preço "a partir de" citado nos prompts ({{preco_entrada}}) — definir por tenant.
+preco_entrada: 40 €

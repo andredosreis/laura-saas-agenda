@@ -13,11 +13,12 @@ any reason (timeout, API error), falls back to the fixed time-based greeting.
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import structlog
 
-from ..config import settings
+from ..config import llm_api_key_configured, settings
 from . import evolution_client, lead_extractor, marcai_client
 
 logger = structlog.get_logger()
@@ -39,12 +40,23 @@ _GREETINGS = {
 
 
 def _period_of_day(dt: datetime) -> str:
-    hour = dt.astimezone(timezone.utc).hour
+    # Hora LOCAL da clínica (não UTC): em horário de verão UTC+1, usar UTC
+    # dava "Boa tarde" às 19:30 e "Boa noite" às 06:30 locais.
+    hour = dt.astimezone(ZoneInfo("Europe/Lisbon")).hour
     if 6 <= hour < 12:
         return "manha"
     if 12 <= hour < 19:
         return "tarde"
     return "noite"
+
+
+# Fallback quando o agente falha a MEIO da conversa (turn ≥ 1): repetir o
+# greeting de primeiro contacto soa a reset. Pedir para reenviar re-dispara
+# o pipeline na mensagem seguinte do lead.
+_MID_CONV_FALLBACK = (
+    "Peço desculpa — não consegui processar a sua mensagem agora. "
+    "Pode reenviar daqui a um instante, por favor? 🙏"
+)
 
 
 async def _build_conversation_history(
@@ -120,15 +132,18 @@ async def _generate_reply(
 ) -> tuple[str, str]:
     """Returns (reply_text, source) where source is 'agent' or 'greeting_fallback'.
 
-    Tries the LangChain agent first if OPENAI_API_KEY is set. Falls back to
-    the fixed greeting on any failure (timeout, API error, etc).
+    Tries the LangChain agent first if the ACTIVE provider's API key is set
+    (gemini → GOOGLE_API_KEY, openai → OPENAI_API_KEY, anthropic →
+    ANTHROPIC_API_KEY). Falls back to the fixed greeting on any failure
+    (timeout, API error, etc).
     """
-    if not settings.openai_api_key:
+    if not llm_api_key_configured():
         return fallback_greeting, "greeting_fallback"
 
+    turn_number = 0
     try:
-        # Imported lazily so test setups without the openai_api_key do not
-        # need to instantiate ChatOpenAI on import.
+        # Imported lazily so test setups without an LLM API key do not
+        # need to instantiate the chat model on import.
         from ..agents.lead_agent import make_lead_agent
 
         messages, turn_number, last_clinic_message = await _build_conversation_history(
@@ -187,7 +202,9 @@ async def _generate_reply(
 
         if not content.strip():
             log.warning("agent_empty_reply_falling_back")
-            return fallback_greeting, "greeting_fallback"
+            return (
+                _MID_CONV_FALLBACK if turn_number >= 1 else fallback_greeting
+            ), "greeting_fallback"
         log.info("agent_reply_generated", chars=len(content))
 
         # Defense-in-depth: detect booking confirmation in reply and
@@ -199,14 +216,22 @@ async def _generate_reply(
         return content, "agent"
     except Exception as exc:
         log.error("agent_failed_falling_back", error=str(exc))
-        return fallback_greeting, "greeting_fallback"
+        return (
+            _MID_CONV_FALLBACK if turn_number >= 1 else fallback_greeting
+        ), "greeting_fallback"
 
 
 _BOOKING_REGEX = re.compile(
-    # Roots: marc/agend/confirm cover "marcado", "marcação", "marcar",
-    # "agendado", "agendamento", "agendar", "confirmado", "confirmar",
-    # "confirmação". Followed (in same paragraph) by an HH:MM or "Xh"
-    # time within ~120 chars.
+    # Roots são PARTICÍPIOS — "marcado/marcada", "agendado/agendada",
+    # "confirmado/confirmada" — seguidos de uma hora HH:MM ou "Xh" no
+    # mesmo período (até 120 chars, sem atravessar "." ou "?").
+    #
+    # 2026-07-03: as raízes antigas (marc/agend/confirm) apanhavam
+    # infinitivos e perguntas — "Podemos marcar às 15:00?" promovia o
+    # lead a 'agendado' no Kanban sem marcação real. Particípios só
+    # aparecem em confirmações ("Está marcado ... às 09:00"). Falso
+    # negativo aceitável ("a sua marcação está feita às 15:00"): isto é
+    # defense-in-depth — o caminho principal é a tool move_lead_stage.
     #
     # 2026-05-20: lookahead used to exclude "!" / "." / "?", which broke
     # auto-book on perfectly valid confirmations like
@@ -215,7 +240,7 @@ _BOOKING_REGEX = re.compile(
     # Now we only exclude "." and "?" (sentence terminators), and cap the
     # gap at 120 chars to avoid pulling unrelated times from much later
     # in the reply.
-    r"(?:marc|agend|confirm)\w*\b[^.?]{0,120}?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
+    r"(?:marcad|agendad|confirmad)\w*\b[^.?]{0,120}?\b(\d{1,2}[h:]\d{2}|\d{1,2}\s*h\b)",
     re.IGNORECASE,
 )
 
