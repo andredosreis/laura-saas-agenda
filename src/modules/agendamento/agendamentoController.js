@@ -93,8 +93,11 @@ export const createAgendamento = async (req, res) => {
       return res.status(400).json({ message: "Não é possível criar agendamentos com data no passado." });
     }
 
-    const tenantDoc = await Tenant.findById(req.tenantId).select('configuracoes.intervaloEntreSessoes').lean();
+    const tenantDoc = await Tenant.findById(req.tenantId)
+      .select('configuracoes.intervaloEntreSessoes configuracoes.duracaoSessaoPadrao')
+      .lean();
     const intervaloEntreSessoes = tenantDoc?.configuracoes?.intervaloEntreSessoes || 0;
+    const duracaoSessaoPadrao = tenantDoc?.configuracoes?.duracaoSessaoPadrao || 60;
     const agendamentoDurationMinutes = 60 + intervaloEntreSessoes;
     const conflictWindow = {
       $gte: agendamentoDateTime.minus({ minutes: agendamentoDurationMinutes - 1 }).toJSDate(),
@@ -266,6 +269,7 @@ export const createAgendamento = async (req, res) => {
       clienteNome,
       clienteTelefone,
       servicoNome: formatServicoNomeLembrete(servicoTipoFinal, servicoNomeNotif),
+      duracaoSessaoMin: duracaoSessaoPadrao,
     }).catch((err) => console.error('[createAgendamento] Falha ao agendar notificações:', err));
 
     res.status(201).json(novoAgendamento);

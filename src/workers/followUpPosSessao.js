@@ -19,6 +19,9 @@ const STATUS_CANCELADOS = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
  * Decide se o follow-up é enviado e com que variante.
  * Recebe docs .lean() (possivelmente null) — nenhum acesso a DB aqui.
  * Semântica das flags: ausente = activo; só bloqueia com `false` explícito.
+ * Excepções fail-closed: tenant null (apagado após o job ser agendado — sem
+ * ele o envio cairia na instância Evolution default) e plano.status
+ * explicitamente inactivo bloqueiam sempre; plano ausente segue a regra geral.
  */
 export function avaliarFollowUp({ agendamento, cliente, tenant, compra, jobDataHoraISO }) {
   if (!agendamento) return { enviar: false, motivo: 'inexistente' };
@@ -41,6 +44,10 @@ export function avaliarFollowUp({ agendamento, cliente, tenant, compra, jobDataH
 
   if (!agendamento.cliente || !cliente) return { enviar: false, motivo: 'sem_cliente' };
   if (agendamento.followUp?.enviadoEm) return { enviar: false, motivo: 'ja_enviado' };
+  if (!tenant) return { enviar: false, motivo: 'tenant_inexistente' };
+  if (tenant.plano?.status && !['ativo', 'trial'].includes(tenant.plano.status)) {
+    return { enviar: false, motivo: 'plano_inativo' };
+  }
   if (tenant?.configuracoes?.iaGlobalAtiva === false) return { enviar: false, motivo: 'ia_global_off' };
   if (tenant?.configuracoes?.followUpPosSessaoAtivo === false) return { enviar: false, motivo: 'followup_off' };
   if (cliente.iaAtiva === false) return { enviar: false, motivo: 'ia_cliente_off' };

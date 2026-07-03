@@ -89,6 +89,22 @@ describe('avaliarFollowUp — skip conditions', () => {
     delete input.cliente.iaAtiva;
     expect(avaliarFollowUp(input).enviar).toBe(true);
   });
+
+  it('tenant null (apagado após agendar o job) → não envia (fail-closed)', () => {
+    expect(avaliarFollowUp({ ...base(), tenant: null }).motivo).toBe('tenant_inexistente');
+  });
+
+  it.each(['suspenso', 'cancelado', 'expirado'])('plano.status %s → não envia', (status) => {
+    const input = base();
+    input.tenant.plano = { status };
+    expect(avaliarFollowUp(input).motivo).toBe('plano_inativo');
+  });
+
+  it.each(['ativo', 'trial'])('plano.status %s → envia', (status) => {
+    const input = base();
+    input.tenant.plano = { status };
+    expect(avaliarFollowUp(input).enviar).toBe(true);
+  });
 });
 
 describe('avaliarFollowUp — variantes e matemática do pacote', () => {

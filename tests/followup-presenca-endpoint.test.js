@@ -32,6 +32,8 @@ async function seedTenantClienteAgendamento(slug, agOverrides = {}) {
     cliente: cliente._id,
     dataHora: new Date(Date.now() + 60 * 60 * 1000),
     status: 'Agendado',
+    // Fluxo legítimo: só se responde a um follow-up que foi de facto enviado.
+    followUp: { enviadoEm: new Date() },
     ...agOverrides,
   });
   return { tenant, models, cliente, agendamento };
@@ -108,6 +110,23 @@ describe('PATCH /presenca', () => {
       .send({ tenantId: String(tenantB._id), compareceu: true });
 
     expect(res.status).toBe(404);
+  });
+
+  it('sem follow-up enviado (followUp.enviadoEm ausente) → 404 e nada muda', async () => {
+    const { tenant, models, cliente, agendamento } = await seedTenantClienteAgendamento(
+      'pres-sem-followup',
+      { followUp: undefined }
+    );
+
+    const res = await request(app)
+      .patch(url(cliente._id, agendamento._id))
+      .set(svc)
+      .send({ tenantId: String(tenant._id), compareceu: true });
+
+    expect(res.status).toBe(404);
+    const ag = await models.Agendamento.findById(agendamento._id).lean();
+    expect(ag.status).toBe('Agendado');
+    expect(ag.followUp?.respostaEm ?? null).toBeNull();
   });
 
   it('compareceu não-boolean → 400', async () => {

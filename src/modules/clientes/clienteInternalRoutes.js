@@ -439,9 +439,11 @@ router.patch('/:id/agendamentos/:agendamentoId/cancel', async (req, res) => {
 // =====================================================================
 // PATCH /api/internal/clientes/:id/agendamentos/:agendamentoId/presenca
 // Body: { tenantId, compareceu: boolean, feedback?: string }
-// Resposta ao follow-up pós-sessão. Só transita status a partir de
-// Agendado/Confirmado — nunca sobrepõe estado definido pela Laura
-// (Realizado, Fechado, cancelados). Grava sempre followUp.respostaEm.
+// Resposta ao follow-up pós-sessão. Exige followUp.enviadoEm — sem follow-up
+// enviado (ex.: sessão futura) o agendamento não é elegível e responde 404,
+// mesma garantia que o GET /followup-pendente dá ao orchestrator Python.
+// Só transita status a partir de Agendado/Confirmado — nunca sobrepõe estado
+// definido pela Laura (Realizado, Fechado, cancelados). Grava followUp.respostaEm.
 // =====================================================================
 router.patch('/:id/agendamentos/:agendamentoId/presenca', async (req, res) => {
   try {
@@ -464,7 +466,13 @@ router.patch('/:id/agendamentos/:agendamentoId/presenca', async (req, res) => {
 
     // 1ª tentativa: atómica, com guarda de status (evita corrida com a Laura).
     let agendamento = await models.Agendamento.findOneAndUpdate(
-      { _id: agendamentoId, tenantId, cliente: clienteId, status: { $in: ['Agendado', 'Confirmado'] } },
+      {
+        _id: agendamentoId,
+        tenantId,
+        cliente: clienteId,
+        'followUp.enviadoEm': { $ne: null },
+        status: { $in: ['Agendado', 'Confirmado'] },
+      },
       { $set: { ...followUpSet, status: novoStatus, compareceu } },
       { new: true }
     ).lean();
@@ -473,7 +481,7 @@ router.patch('/:id/agendamentos/:agendamentoId/presenca', async (req, res) => {
     // Guarda falhou → status já definido pela Laura; regista só a resposta.
     if (!agendamento) {
       agendamento = await models.Agendamento.findOneAndUpdate(
-        { _id: agendamentoId, tenantId, cliente: clienteId },
+        { _id: agendamentoId, tenantId, cliente: clienteId, 'followUp.enviadoEm': { $ne: null } },
         { $set: followUpSet },
         { new: true }
       ).lean();
