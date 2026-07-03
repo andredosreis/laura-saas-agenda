@@ -147,21 +147,46 @@ export async function processFollowUpJob(job) {
     clinicaNome: tenant?.nome || 'A clínica',
   });
 
-  const resultado = await sendWhatsAppMessage(
-    cliente.telefone,
-    mensagem,
-    tenant?.whatsapp?.instanceName
-  );
-  if (!resultado.success) {
-    throw new Error(`[FollowUp] Falha ao enviar para ${cliente.nome}: ${JSON.stringify(resultado.error)}`);
+  // Claim atómico ANTES do envio: só a execução que consegue marcar
+  // followUp.enviadoEm (ainda null) envia. Fecha a janela de duplicação do
+  // retry — marcar depois do envio deixava um write falhado reenviar a
+  // mensagem. Trade-off deliberado: crash entre o claim e o envio perde a
+  // mensagem (fail-closed) — num follow-up, não enviar é melhor que duplicar.
+  const claim = await Agendamento.findOneAndUpdate(
+    { _id: agendamentoId, tenantId, 'followUp.enviadoEm': null },
+    { $set: { 'followUp.enviadoEm': new Date() } }
+  ).lean();
+  if (!claim) {
+    logger.info({ jobId: job.id, agendamentoId, motivo: 'claim_perdido' }, '[FollowUp] não enviado');
+    return;
   }
 
-  // Marca enviado ANTES da persistência do inbox: se o registo na thread
-  // falhar, o retry do BullMQ não pode reenviar a mensagem ao cliente.
-  await Agendamento.updateOne(
-    { _id: agendamentoId, tenantId },
-    { $set: { 'followUp.enviadoEm': new Date() } }
-  );
+  let resultado;
+  try {
+    resultado = await sendWhatsAppMessage(
+      cliente.telefone,
+      mensagem,
+      tenant?.whatsapp?.instanceName
+    );
+  } catch (err) {
+    resultado = { success: false, error: err.message };
+  }
+  if (!resultado.success) {
+    // Falha confirmada do envio → liberta o claim para o retry do BullMQ
+    // poder reenviar. Se o $unset falhar, fica fail-closed (sem reenvio).
+    try {
+      await Agendamento.updateOne(
+        { _id: agendamentoId, tenantId },
+        { $unset: { 'followUp.enviadoEm': '' } }
+      );
+    } catch (unsetErr) {
+      logger.warn(
+        { agendamentoId, err: unsetErr.message },
+        '[FollowUp] claim não libertado após falha de envio'
+      );
+    }
+    throw new Error(`[FollowUp] Falha ao enviar para ${cliente.nome}: ${JSON.stringify(resultado.error)}`);
+  }
 
   try {
     const tel = String(cliente.telefone).replace(/\D/g, '');

@@ -147,4 +147,30 @@ describe('processFollowUpJob', () => {
     const ag = await models.Agendamento.findById(agendamento._id).lean();
     expect(ag.followUp?.enviadoEm ?? null).toBeNull();
   });
+
+  it('após falha de envio o claim é libertado — o retry seguinte envia', async () => {
+    const { models, agendamento, job } = await seed();
+    sendMock.mockResolvedValueOnce({ success: false, error: 'down' });
+    await expect(processFollowUpJob(job)).rejects.toThrow();
+
+    await processFollowUpJob(job); // retry do BullMQ
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    const ag = await models.Agendamento.findById(agendamento._id).lean();
+    expect(ag.followUp.enviadoEm).toBeInstanceOf(Date);
+  });
+
+  it('sendWhatsAppMessage a lançar (erro de rede) liberta o claim e propaga', async () => {
+    const { models, agendamento, job } = await seed();
+    sendMock.mockRejectedValueOnce(new Error('ECONNRESET'));
+    await expect(processFollowUpJob(job)).rejects.toThrow();
+    const ag = await models.Agendamento.findById(agendamento._id).lean();
+    expect(ag.followUp?.enviadoEm ?? null).toBeNull();
+  });
+
+  it('execuções concorrentes do mesmo job: claim atómico → um único envio', async () => {
+    const { job } = await seed();
+    await Promise.all([processFollowUpJob(job), processFollowUpJob(job)]);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
 });
