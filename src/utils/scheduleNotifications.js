@@ -20,7 +20,7 @@ Até breve! 💆‍♀️✨
 _LA Estética Avançada_`;
 }
 
-export async function scheduleNotifications({ agendamentoId, tenantId, dataHora, clienteNome, clienteTelefone, servicoNome }) {
+export async function scheduleNotifications({ agendamentoId, tenantId, dataHora, clienteNome, clienteTelefone, servicoNome, duracaoSessaoMin = 60 }) {
   if (!clienteTelefone) {
     logger.warn({ agendamentoId }, '[Notifications] Sem telefone — jobs não agendados');
     return { queued: false, reason: 'missing_phone' };
@@ -74,10 +74,11 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
   const jobIdConfirmacao = `${baseData.agendamentoId}-confirmacao`;
   const jobIdAntecipado = `${baseData.agendamentoId}-lembrete-antecipado`;
   const jobId1h = `${baseData.agendamentoId}-lembrete-1h`;
+  const jobIdFollowUp = `${baseData.agendamentoId}-followup`;
 
   // Remove lembretes anteriores deste agendamento (remarcação/recriação limpa).
   await Promise.all(
-    [jobIdConfirmacao, jobIdAntecipado, jobId1h].map((jid) =>
+    [jobIdConfirmacao, jobIdAntecipado, jobId1h, jobIdFollowUp].map((jid) =>
       queue.remove(jid).catch(() => {})
     )
   );
@@ -113,6 +114,19 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
       'lembrete-1h',
       { ...baseData, tipo: 'lembrete-1h' },
       { delay: delay1h, jobId: jobId1h }
+    );
+  }
+
+  // 4. Follow-up pós-sessão: fim previsto da sessão + 5 min. O worker
+  // revalida tudo no disparo (avaliarFollowUp) — aqui só se agenda.
+  const delayFollowUp = agendamento
+    .plus({ minutes: duracaoSessaoMin + 5 })
+    .diff(agora).milliseconds;
+  if (delayFollowUp > 0) {
+    await queue.add(
+      'follow-up-pos-sessao',
+      { ...baseData, tipo: 'follow-up-pos-sessao' },
+      { delay: delayFollowUp, jobId: jobIdFollowUp }
     );
   }
 

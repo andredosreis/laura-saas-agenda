@@ -6,6 +6,7 @@ import Tenant from '../models/Tenant.js';
 import { getTenantDB } from '../config/tenantDB.js';
 import { getModels } from '../models/registry.js';
 import { formatarDataLembrete } from '../utils/lembreteFormat.js';
+import { processFollowUpJob } from './followUpPosSessao.js';
 import logger from '../utils/logger.js';
 
 const ZONA = 'Europe/Lisbon';
@@ -85,6 +86,11 @@ async function registarNaThread(Mensagem, { tenantId, telefone, mensagem }) {
 
 async function processJob(job) {
   const { tipo, clienteTelefone, clienteNome, agendamentoId, tenantId } = job.data;
+
+  // Follow-up pós-sessão vive em módulo próprio — pipeline de lembretes intocado.
+  if (job.data.tipo === 'follow-up-pos-sessao') {
+    return processFollowUpJob(job);
+  }
 
   // Resolver DB do tenant para queries isoladas
   const tenantDb = getTenantDB(tenantId);

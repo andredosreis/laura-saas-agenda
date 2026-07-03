@@ -391,3 +391,40 @@ async def pause_client_ia(tenant_id: str, cliente_id: str) -> dict:
         json={"tenantId": tenant_id, "ativa": False},
     )
     return resp["data"]
+
+
+async def get_pending_followup(tenant_id: str, cliente_id: str) -> dict | None:
+    """Agendamento com follow-up pós-sessão pendente (<24h, sem resposta) ou None."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(
+            f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/followup-pendente",
+            params={"tenantId": tenant_id},
+            headers=_auth_headers(),
+        )
+        r.raise_for_status()
+        return r.json().get("data")
+
+
+async def registar_presenca(
+    tenant_id: str,
+    cliente_id: str,
+    agendamento_id: str,
+    compareceu: bool,
+    feedback: str = "",
+) -> dict:
+    """Regista a resposta ao follow-up (Compareceu / Não Compareceu)."""
+    resp = await _patch_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}"
+        f"/agendamentos/{agendamento_id}/presenca",
+        json={"tenantId": tenant_id, "compareceu": compareceu, "feedback": feedback},
+    )
+    return resp["data"]
+
+
+async def sinalizar_renovacao(tenant_id: str, cliente_id: str) -> dict:
+    """Alerta a equipa de que o cliente quer renovar o pacote (handoff)."""
+    resp = await _post_with_retry(
+        f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/renovacao-interesse",
+        json={"tenantId": tenant_id},
+    )
+    return resp["data"]

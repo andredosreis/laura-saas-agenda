@@ -99,7 +99,10 @@ const TenantSchema = new Schema({
         // Master switch da IA conversacional (controlado pela Laura no inbox).
         // true = IA responde; false = silêncio total (humano assume tudo).
         // Default true: nunca desliga sozinho — só quando explicitamente posto a false.
-        iaGlobalAtiva: { type: Boolean, default: true }
+        iaGlobalAtiva: { type: Boolean, default: true },
+        // Follow-up pós-sessão (kill-switch por tenant, independente do master
+        // switch da IA). Ausente = activo — só bloqueia quando explicitamente false.
+        followUpPosSessaoAtivo: { type: Boolean, default: true }
     },
 
     // =============================================

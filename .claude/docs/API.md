@@ -223,6 +223,27 @@ Retorna configuração de horários por dia da semana.
 
 ---
 
+## Rotas Internas (ia-service) 🔑
+
+Autenticadas por header `X-Service-Token` (não JWT). `tenantId` vem no body ou query. Usadas pelo microserviço IA Python.
+
+### PATCH `/api/internal/clientes/:id/agendamentos/:agendamentoId/presenca`
+Regista a resposta ao follow-up pós-sessão. Marca `Compareceu`/`Não Compareceu` apenas se o estado actual for `Agendado`/`Confirmado` (nunca sobrepõe estado definido pela equipa). Grava sempre `followUp.respostaEm`.
+
+**Body:** `{ "tenantId": "...", "compareceu": true, "feedback": "opcional" }`
+
+### GET `/api/internal/clientes/:id/followup-pendente`
+Devolve o agendamento com follow-up pós-sessão pendente (`enviadoEm` < 24h, sem `respostaEm`) ou `data: null`.
+
+**Query:** `?tenantId=...`
+
+### POST `/api/internal/clientes/:id/renovacao-interesse`
+Handoff de renovação de pacote — alerta a equipa (WhatsApp admin + push). Não cria CompraPacote.
+
+**Body:** `{ "tenantId": "..." }`
+
+---
+
 ## Webhooks (público)
 
 ### POST `/webhook/whatsapp`

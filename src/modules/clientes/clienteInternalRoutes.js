@@ -9,6 +9,9 @@
  *   POST  /:id/agendamentos                        — criar agendamento (max 1 pendente)
  *   PATCH /:id/agendamentos/:agendamentoId/reschedule — remarcar (24h mínimo)
  *   PATCH /:id/agendamentos/:agendamentoId/cancel     — cancelar (late cancel policy)
+ *   PATCH /:id/agendamentos/:agendamentoId/presenca   — resposta ao follow-up (Compareceu/Não Compareceu)
+ *   GET   /:id/followup-pendente                      — follow-up pós-sessão pendente (<24h)
+ *   POST  /:id/renovacao-interesse                    — alerta a equipa (renovação de pacote)
  *   GET   /:id/pacotes                             — pacotes activos com sessões restantes
  *   GET   /:id/messages                            — histórico de mensagens por telefone
  *   POST  /mensagens                               — persistir mensagem (in ou out)
@@ -25,6 +28,10 @@ import { scheduleNotifications } from '../../utils/scheduleNotifications.js';
 import logger from '../../utils/logger.js';
 // F05 — mesma regra única de disponibilidade que a IA lê (F03) e o painel aplica.
 import { resolveAvailableSlots } from '../../controllers/scheduleController.js';
+import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
+import { sendPushNotification } from '../../services/pushService.js';
+import User from '../../models/User.js';
+import UserSubscription from '../../models/UserSubscription.js';
 
 const router = express.Router();
 
@@ -213,6 +220,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       clienteNome: cliente.nome || 'Cliente',
       clienteTelefone: cliente.telefone,
       servicoNome: tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão',
+      duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-appointment] scheduleNotifications falhou'));
 
     res.status(201).json({ success: true, data: agendamento });
@@ -328,6 +336,7 @@ router.patch('/:id/agendamentos/:agendamentoId/reschedule', async (req, res) => 
       clienteNome: cliente?.nome || 'Cliente',
       clienteTelefone: cliente?.telefone,
       servicoNome: agendamento.tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão',
+      duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-reschedule] scheduleNotifications falhou'));
 
     res.json({ success: true, data: agendamento });
@@ -423,6 +432,181 @@ router.patch('/:id/agendamentos/:agendamentoId/cancel', async (req, res) => {
       return res.status(err.statusCode).json({ success: false, error: err.message });
     }
     logger.error({ err: err.message, stack: err.stack }, '[internal] PATCH /clientes/:id/agendamentos/:agendamentoId/cancel');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// PATCH /api/internal/clientes/:id/agendamentos/:agendamentoId/presenca
+// Body: { tenantId, compareceu: boolean, feedback?: string }
+// Resposta ao follow-up pós-sessão. Exige followUp.enviadoEm — sem follow-up
+// enviado (ex.: sessão futura) o agendamento não é elegível e responde 404,
+// mesma garantia que o GET /followup-pendente dá ao orchestrator Python.
+// Só transita status a partir de Agendado/Confirmado — nunca sobrepõe estado
+// definido pela Laura (Realizado, Fechado, cancelados). Grava followUp.respostaEm.
+// =====================================================================
+router.patch('/:id/agendamentos/:agendamentoId/presenca', async (req, res) => {
+  try {
+    const { id: clienteId, agendamentoId } = req.params;
+    const { tenantId, compareceu, feedback } = req.body || {};
+
+    if (!tenantId || typeof compareceu !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'tenantId e compareceu (boolean) são obrigatórios' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(clienteId) || !mongoose.Types.ObjectId.isValid(agendamentoId)) {
+      return res.status(400).json({ success: false, error: 'ID inválido' });
+    }
+
+    const { models } = await resolveTenantContext(tenantId);
+
+    const followUpSet = { 'followUp.respostaEm': new Date() };
+    if (feedback) followUpSet['followUp.feedback'] = String(feedback).slice(0, 500);
+
+    const novoStatus = compareceu ? 'Compareceu' : 'Não Compareceu';
+
+    // 1ª tentativa: atómica, com guarda de status (evita corrida com a Laura).
+    let agendamento = await models.Agendamento.findOneAndUpdate(
+      {
+        _id: agendamentoId,
+        tenantId,
+        cliente: clienteId,
+        'followUp.enviadoEm': { $ne: null },
+        status: { $in: ['Agendado', 'Confirmado'] },
+      },
+      { $set: { ...followUpSet, status: novoStatus, compareceu } },
+      { new: true }
+    ).lean();
+    const statusAtualizado = Boolean(agendamento);
+
+    // Guarda falhou → status já definido pela Laura; regista só a resposta.
+    if (!agendamento) {
+      agendamento = await models.Agendamento.findOneAndUpdate(
+        { _id: agendamentoId, tenantId, cliente: clienteId, 'followUp.enviadoEm': { $ne: null } },
+        { $set: followUpSet },
+        { new: true }
+      ).lean();
+    }
+    if (!agendamento) {
+      return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
+    }
+
+    res.json({ success: true, data: { statusAtualizado, status: agendamento.status } });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] PATCH /clientes/:id/agendamentos/:agendamentoId/presenca');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// GET /api/internal/clientes/:id/followup-pendente?tenantId=...
+// Follow-up pós-sessão pendente: enviado nas últimas 24h e sem resposta.
+// data: null quando não há (o orchestrator Python trata null = sem contexto).
+// =====================================================================
+router.get('/:id/followup-pendente', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+    const clienteId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+      return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+
+    const { models } = await resolveTenantContext(tenantId);
+
+    const cutoff = DateTime.now().setZone('Europe/Lisbon').minus({ hours: 24 }).toJSDate();
+    const agendamento = await models.Agendamento.findOne({
+      tenantId,
+      cliente: clienteId,
+      'followUp.enviadoEm': { $gte: cutoff },
+      'followUp.respostaEm': null,
+    })
+      .sort({ 'followUp.enviadoEm': -1 })
+      .select('dataHora status tipo followUp compraPacote')
+      .lean();
+
+    res.json({ success: true, data: agendamento || null });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] GET /clientes/:id/followup-pendente');
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// POST /api/internal/clientes/:id/renovacao-interesse
+// Body: { tenantId }
+// Handoff de renovação: alerta a equipa (WhatsApp admin + push best-effort).
+// A IA NUNCA cria a CompraPacote — a venda é fechada pela equipa.
+// =====================================================================
+router.post('/:id/renovacao-interesse', async (req, res) => {
+  try {
+    const clienteId = req.params.id;
+    const { tenantId } = req.body || {};
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenantId é obrigatório' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+      return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+
+    const { tenant, models } = await resolveTenantContext(tenantId);
+
+    const cliente = await models.Cliente.findOne({ _id: clienteId, tenantId })
+      .select('nome telefone')
+      .lean();
+    if (!cliente) {
+      return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
+    }
+
+    const alerta =
+      `💜 *Interesse em Renovação*\n\n` +
+      `A cliente *${cliente.nome}* terminou o pacote e demonstrou interesse em renovar.\n\n` +
+      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}`;
+
+    let whatsappEnviado = false;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    if (numeroAdmin) {
+      const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
+      whatsappEnviado = Boolean(resultado?.success);
+    }
+
+    // Push best-effort aos admins do tenant — nunca falha o pedido.
+    let pushEnviado = false;
+    try {
+      const admins = await User.find({ tenantId, role: { $in: ['admin', 'gerente'] } })
+        .select('_id')
+        .lean();
+      const subs = await UserSubscription.find({
+        userId: { $in: admins.map((a) => String(a._id)) },
+        active: true,
+      }).lean();
+      await Promise.all(
+        subs.map((sub) =>
+          sendPushNotification(sub, {
+            title: '💜 Interesse em renovação',
+            body: `${cliente.nome} terminou o pacote e quer renovar.`,
+            tag: `renovacao-${clienteId}`,
+            data: { tipo: 'renovacao-interesse', clienteId },
+          })
+        )
+      );
+      pushEnviado = subs.length > 0;
+    } catch (pushErr) {
+      logger.warn({ err: pushErr.message, tenantId }, '[internal] push de renovação falhou');
+    }
+
+    res.json({ success: true, data: { whatsappEnviado, pushEnviado } });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    logger.error({ err: err.message, stack: err.stack }, '[internal] POST /clientes/:id/renovacao-interesse');
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });

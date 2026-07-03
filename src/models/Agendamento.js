@@ -152,6 +152,16 @@ const agendamentoSchema = new mongoose.Schema({
     default: null
   },
 
+  // Follow-up pós-sessão (spec 2026-07-02): marcador de idempotência do job
+  // BullMQ e da resposta do cliente. `enviadoEm` set pelo worker no envio;
+  // `respostaEm`/`feedback` set pelo endpoint interno /presenca quando o
+  // agente IA interpreta a resposta.
+  followUp: {
+    enviadoEm: { type: Date, default: null },
+    respostaEm: { type: Date, default: null },
+    feedback: { type: String, trim: true, maxlength: 500, default: null },
+  },
+
   // GAP-01 fix: campo derivado de `status`. true quando o agendamento ocupa
   // efectivamente um slot (não está cancelado). Usado pelo índice composto
   // único parcial abaixo para tornar a detecção de conflito de slot atómica
@@ -205,6 +215,9 @@ agendamentoSchema.index({ tenantId: 1, cliente: 1, status: 1 });
 
 agendamentoSchema.index({ tenantId: 1, tipo: 1 });
 agendamentoSchema.index({ tenantId: 1, compareceu: 1, fechouPacote: 1 });
+
+// Follow-up pós-sessão: lookup do follow-up pendente por cliente (janela 24h)
+agendamentoSchema.index({ tenantId: 1, cliente: 1, 'followUp.enviadoEm': -1 });
 
 // 💰 Phase 3: Financial indexes
 agendamentoSchema.index({ tenantId: 1, compraPacote: 1 });

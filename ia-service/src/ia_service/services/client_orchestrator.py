@@ -107,6 +107,18 @@ async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) ->
         return "Erro ao consultar agendamentos."
 
 
+def _format_followup_context(followup: dict | None) -> str:
+    if not followup:
+        return "Nenhum follow-up pendente."
+    data_hora = followup.get("dataHora", "?")
+    status = followup.get("status", "?")
+    return (
+        f"PENDENTE — foi enviada uma mensagem pos-sessao sobre a sessao de "
+        f"{data_hora} (status actual: {status}). A mensagem da cliente e "
+        "provavelmente a resposta. Segue o protocolo 'Follow-up pos-sessao'."
+    )
+
+
 async def _generate_reply(
     tenant_id: str,
     cliente_id: str,
@@ -127,6 +139,12 @@ async def _generate_reply(
 
         upcoming = await _format_upcoming_appointments(tenant_id, cliente_id, log)
 
+        followup = None
+        try:
+            followup = await marcai_client.get_pending_followup(tenant_id, cliente_id)
+        except Exception as exc:
+            log.warning("client_followup_fetch_failed", error=str(exc))
+
         agent = make_client_agent(
             tenant_id,
             cliente_id=cliente_id,
@@ -134,6 +152,8 @@ async def _generate_reply(
             upcoming_appointments=upcoming,
             turn_number=turn_number,
             last_clinic_message=last_clinic_message,
+            followup_context=_format_followup_context(followup),
+            followup_agendamento_id=str(followup["_id"]) if followup else None,
         )
 
         run_config = {
