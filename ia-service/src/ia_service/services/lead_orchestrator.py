@@ -111,6 +111,23 @@ async def _build_conversation_history(
     return messages, turn_number, last_clinic_message
 
 
+def _booking_created_this_turn(messages: list) -> bool:
+    """True se `create_appointment` devolveu OK neste turno (ToolMessage).
+
+    Mais fiavel que o regex sobre o texto da resposta: com a confirmacao
+    automatica do sistema, a resposta do agente passou a ser so o
+    complemento logistico (morada/mapa) e pode nao conter "marcado as HH:MM".
+    """
+    from langchain.messages import ToolMessage
+
+    for m in messages:
+        if isinstance(m, ToolMessage) and getattr(m, "name", "") == "create_appointment":
+            content = m.content if isinstance(m.content, str) else str(m.content)
+            if content.strip().startswith("OK"):
+                return True
+    return False
+
+
 async def _generate_reply(
     tenant_id: str,
     lead_id: str | None,
@@ -173,8 +190,10 @@ async def _generate_reply(
         # Gemini Flash sometimes returns empty content after tool calls
         # (transient quirk). Retry once before falling back to greeting.
         content = ""
+        booking_created = False
         for attempt in (1, 2):
             result = await agent.ainvoke({"messages": messages}, config=run_config)
+            booking_created = booking_created or _booking_created_this_turn(result["messages"])
             last_msg = result["messages"][-1]
             raw = getattr(last_msg, "content", "")
             if isinstance(raw, list):
@@ -189,6 +208,17 @@ async def _generate_reply(
             log.warning("agent_empty_reply_falling_back")
             return fallback_greeting, "greeting_fallback"
         log.info("agent_reply_generated", chars=len(content))
+
+        # Marcacao feita via tool neste turno → stage 'agendado'
+        # deterministico (a resposta pode ja nao citar "marcado as HH:MM").
+        if booking_created and lead_id:
+            try:
+                await marcai_client.move_lead_stage(
+                    lead_id=lead_id, tenant_id=tenant_id, stage="agendado"
+                )
+                log.info("stage_moved_on_tool_booking", stage="agendado")
+            except Exception as exc:
+                log.info("stage_move_on_tool_booking_skipped", error=str(exc))
 
         # Defense-in-depth: detect booking confirmation in reply and
         # auto-move stage to 'agendado'. LLMs sometimes craft a perfect
