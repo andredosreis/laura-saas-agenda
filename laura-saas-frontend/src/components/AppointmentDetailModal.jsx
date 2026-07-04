@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { X, User, Package, Calendar, Clock, Edit, Trash2, MessageCircle, Gift } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { useTheme } from '../contexts/ThemeContext';
@@ -6,6 +7,17 @@ import { nomeServicoAgendamento } from '../utils/agendamento';
 // Texto boilerplate gravado pela IA nas observações — redundante no modal
 // quando já mostramos o chip "🤖 Marcada pela IA".
 const OBS_BOILERPLATE_IA = 'Marcação criada automaticamente pelo agent IA';
+
+// Acções primárias por status actual — o passo natural seguinte do fluxo.
+// Os restantes statuses ficam atrás de "Mais opções" (7 botões sempre
+// visíveis era ruído; marcar "Não Compareceu" antes da sessão não é acção
+// primária de ninguém).
+const PRIMARY_NEXT = {
+    'Agendado': ['Confirmado', 'Cancelado Pelo Cliente'],
+    'Confirmado': ['Compareceu', 'Não Compareceu'],
+    'Compareceu': ['Realizado'],
+    'Realizado': ['Fechado'],
+};
 
 const STATUS_OPTIONS = [
     { value: 'Agendado', label: 'Agendado', color: 'blue' },
@@ -27,6 +39,14 @@ function AppointmentDetailModal({
     onEdit
 }) {
     const { isDarkMode } = useTheme();
+    const [showAllStatus, setShowAllStatus] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+    // Reset dos estados transitórios ao fechar/trocar de agendamento.
+    useEffect(() => {
+        setShowAllStatus(false);
+        setConfirmingDelete(false);
+    }, [isOpen, appointment?._id]);
 
     if (!isOpen || !appointment) return null;
 
@@ -56,6 +76,17 @@ function AppointmentDetailModal({
         .filter((linha) => !linha.startsWith(OBS_BOILERPLATE_IA))
         .join('\n')
         .trim();
+
+    // Confirmação WhatsApp (mesmos chips dos cards de Agendamentos).
+    const conf = appointment.confirmacao?.tipo;
+
+    // Acções de status: primárias do fluxo + restantes atrás de "Mais opções".
+    const primarias = STATUS_OPTIONS.filter(
+        (s) => (PRIMARY_NEXT[appointment.status] || []).includes(s.value)
+    );
+    const restantes = STATUS_OPTIONS.filter(
+        (s) => s.value !== appointment.status && !(PRIMARY_NEXT[appointment.status] || []).includes(s.value)
+    );
 
     const getStatusColor = (color) => {
         const colors = {
@@ -102,7 +133,7 @@ function AppointmentDetailModal({
                         <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center">
                             <User className="w-6 h-6 text-indigo-400" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                             <p className={`font-semibold ${textClass} flex items-center gap-2`}>
                                 {nomeContacto}
                                 {isLead && (
@@ -112,6 +143,32 @@ function AppointmentDetailModal({
                             <p className={`text-sm ${subtextClass}`}>
                                 {telefoneContacto || 'Sem telefone'}
                             </p>
+                            {/* Estado num relance: status + confirmação WhatsApp + origem IA */}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${getStatusColor(currentStatus.color)}`}>
+                                    {currentStatus.label}
+                                </span>
+                                {conf === 'pendente' && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-500 border-amber-500/20 font-medium">
+                                        ⏳ WhatsApp pendente
+                                    </span>
+                                )}
+                                {conf === 'confirmado' && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-medium">
+                                        ✓ Confirmado no WhatsApp
+                                    </span>
+                                )}
+                                {conf === 'rejeitado' && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-red-500/10 text-red-500 border-red-500/20 font-medium">
+                                        ✗ Cancelado no WhatsApp
+                                    </span>
+                                )}
+                                {appointment.criadoPorIA && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 font-medium">
+                                        🤖 IA
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -159,21 +216,6 @@ function AppointmentDetailModal({
                         </div>
                     </div>
 
-                    {/* Current Status */}
-                    <div>
-                        <p className={`text-sm font-medium ${subtextClass} mb-2`}>Status Atual</p>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getStatusColor(currentStatus.color)}`}>
-                                {currentStatus.label}
-                            </span>
-                            {appointment.criadoPorIA && (
-                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-sm font-medium">
-                                    🤖 Marcada pela IA
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
                     {/* Observations (sem o boilerplate da IA — o chip acima já o diz) */}
                     {observacoesVisiveis && (
                         <div>
@@ -184,21 +226,45 @@ function AppointmentDetailModal({
                         </div>
                     )}
 
-                    {/* Status Change Buttons */}
-                    <div>
-                        <p className={`text-sm font-medium ${subtextClass} mb-2`}>Alterar Status</p>
-                        <div className="flex flex-wrap gap-2">
-                            {STATUS_OPTIONS.filter(s => s.value !== appointment.status).map(status => (
+                    {/* Acções contextuais: o passo seguinte natural do fluxo,
+                        com os statuses raros atrás de "Mais opções" */}
+                    {(primarias.length > 0 || restantes.length > 0) && (
+                        <div>
+                            <p className={`text-sm font-medium ${subtextClass} mb-2`}>Ações</p>
+                            <div className="flex flex-wrap gap-2">
+                                {primarias.map(status => (
+                                    <button
+                                        key={status.value}
+                                        onClick={() => onUpdateStatus(appointment._id || appointment.id, status.value)}
+                                        className={`flex-1 min-w-[40%] px-3 py-2.5 text-sm font-medium rounded-xl border transition-all hover:scale-[1.02] ${getStatusColor(status.color)}`}
+                                    >
+                                        {status.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {!showAllStatus && restantes.length > 0 && (
                                 <button
-                                    key={status.value}
-                                    onClick={() => onUpdateStatus(appointment._id || appointment.id, status.value)}
-                                    className={`px-3 py-1.5 text-sm rounded-lg border transition-all hover:scale-105 ${getStatusColor(status.color)}`}
+                                    onClick={() => setShowAllStatus(true)}
+                                    className={`mt-2 text-xs ${subtextClass} hover:underline`}
                                 >
-                                    {status.label}
+                                    Mais opções…
                                 </button>
-                            ))}
+                            )}
+                            {showAllStatus && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {restantes.map(status => (
+                                        <button
+                                            key={status.value}
+                                            onClick={() => onUpdateStatus(appointment._id || appointment.id, status.value)}
+                                            className={`px-3 py-1.5 text-xs rounded-lg border transition-all hover:scale-105 ${getStatusColor(status.color)}`}
+                                        >
+                                            {status.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Actions */}
@@ -237,12 +303,31 @@ function AppointmentDetailModal({
                         <MessageCircle className="w-4 h-4" />
                         WhatsApp
                     </button>
-                    <button
-                        onClick={() => onDelete(appointment._id || appointment.id)}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    {!confirmingDelete ? (
+                        <button
+                            onClick={() => setConfirmingDelete(true)}
+                            title="Eliminar agendamento"
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => onDelete(appointment._id || appointment.id)}
+                                className="flex items-center gap-1.5 px-3 py-2.5 bg-red-500 text-white text-sm font-medium rounded-xl hover:bg-red-600 transition-colors"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Apagar?
+                            </button>
+                            <button
+                                onClick={() => setConfirmingDelete(false)}
+                                className={`p-2.5 rounded-xl ${isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'} transition-colors`}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
