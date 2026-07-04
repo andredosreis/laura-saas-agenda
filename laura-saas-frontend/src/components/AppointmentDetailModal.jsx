@@ -1,6 +1,11 @@
 import { X, User, Package, Calendar, Clock, Edit, Trash2, MessageCircle, Gift } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { useTheme } from '../contexts/ThemeContext';
+import { nomeServicoAgendamento } from '../utils/agendamento';
+
+// Texto boilerplate gravado pela IA nas observações — redundante no modal
+// quando já mostramos o chip "🤖 Marcada pela IA".
+const OBS_BOILERPLATE_IA = 'Marcação criada automaticamente pelo agent IA';
 
 const STATUS_OPTIONS = [
     { value: 'Agendado', label: 'Agendado', color: 'blue' },
@@ -30,6 +35,27 @@ function AppointmentDetailModal({
     const formattedTime = dateTime.toFormat('HH:mm');
 
     const currentStatus = STATUS_OPTIONS.find(s => s.value === appointment.status) || STATUS_OPTIONS[0];
+
+    // Marcações de leads (avaliações via IA) não têm Cliente — o contacto
+    // vem embebido em appointment.lead.
+    const isLead = !appointment.cliente?.nome && Boolean(appointment.lead?.nome || appointment.lead?.telefone);
+    const nomeContacto = appointment.cliente?.nome || appointment.lead?.nome || 'Cliente não identificado';
+    const telefoneContacto = appointment.cliente?.telefone || appointment.lead?.telefone || null;
+    const servicoNome = nomeServicoAgendamento(appointment);
+
+    // "Sessão X de Y" só quando há compraPacote populada — os contadores
+    // vivem lá (sessoesUsadas/Contratadas), não no cliente.
+    const compra = appointment.compraPacote;
+    const sessaoInfo = compra?.sessoesContratadas
+        ? `Sessão ${Math.min((compra.sessoesUsadas ?? 0) + 1, compra.sessoesContratadas)} de ${compra.sessoesContratadas}`
+        : null;
+
+    // Observações: esconder o boilerplate da IA (o chip 🤖 já o diz).
+    const observacoesVisiveis = appointment.observacoes
+        ?.split('\n')
+        .filter((linha) => !linha.startsWith(OBS_BOILERPLATE_IA))
+        .join('\n')
+        .trim();
 
     const getStatusColor = (color) => {
         const colors = {
@@ -77,11 +103,14 @@ function AppointmentDetailModal({
                             <User className="w-6 h-6 text-indigo-400" />
                         </div>
                         <div>
-                            <p className={`font-semibold ${textClass}`}>
-                                {appointment.cliente?.nome || 'Cliente não identificado'}
+                            <p className={`font-semibold ${textClass} flex items-center gap-2`}>
+                                {nomeContacto}
+                                {isLead && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium">lead</span>
+                                )}
                             </p>
                             <p className={`text-sm ${subtextClass}`}>
-                                {appointment.cliente?.telefone || 'Sem telefone'}
+                                {telefoneContacto || 'Sem telefone'}
                             </p>
                         </div>
                     </div>
@@ -93,18 +122,10 @@ function AppointmentDetailModal({
                         </div>
                         <div>
                             <p className={`font-semibold ${textClass}`}>
-                                {appointment.pacote?.nome || appointment.servicoAvulsoNome || 'Serviço'}
+                                {servicoNome}
                             </p>
-                            {appointment.pacote && (
-                                <p className={`text-sm ${subtextClass}`}>
-                                    Sessão {(() => {
-                                        // Calcular sessão atual: total - restantes + 1
-                                        const totalSessoes = appointment.pacote.sessoes || 0;
-                                        const sessoesRestantes = appointment.cliente?.sessoesRestantes ?? totalSessoes;
-                                        const sessaoAtual = totalSessoes - sessoesRestantes + 1;
-                                        return sessaoAtual > 0 ? sessaoAtual : 1;
-                                    })()} de {appointment.pacote.sessoes || '?'}
-                                </p>
+                            {sessaoInfo && (
+                                <p className={`text-sm ${subtextClass}`}>{sessaoInfo}</p>
                             )}
                             {appointment.servicoTipo === 'oferta' && (
                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-medium">
@@ -141,17 +162,24 @@ function AppointmentDetailModal({
                     {/* Current Status */}
                     <div>
                         <p className={`text-sm font-medium ${subtextClass} mb-2`}>Status Atual</p>
-                        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getStatusColor(currentStatus.color)}`}>
-                            {currentStatus.label}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getStatusColor(currentStatus.color)}`}>
+                                {currentStatus.label}
+                            </span>
+                            {appointment.criadoPorIA && (
+                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-sm font-medium">
+                                    🤖 Marcada pela IA
+                                </span>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Observations */}
-                    {appointment.observacoes && (
+                    {/* Observations (sem o boilerplate da IA — o chip acima já o diz) */}
+                    {observacoesVisiveis && (
                         <div>
                             <p className={`text-sm font-medium ${subtextClass} mb-2`}>Observações</p>
                             <p className={`text-sm ${textClass} p-3 rounded-xl ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
-                                {appointment.observacoes}
+                                {observacoesVisiveis}
                             </p>
                         </div>
                     )}
@@ -184,27 +212,27 @@ function AppointmentDetailModal({
                     </button>
                     <button
                         onClick={() => {
-                            const raw = appointment.cliente?.telefone?.replace(/[\s\-()+]/g, '');
+                            const raw = telefoneContacto?.replace(/[\s\-()+]/g, '');
                             const phone = raw
                                 ? raw.startsWith('351') ? raw
                                     : (raw.startsWith('9') || raw.startsWith('2')) ? `351${raw}`
                                     : raw
                                 : null;
                             if (phone) {
-                                const clientName = appointment.cliente?.nome || 'Cliente';
-                                const serviceName = appointment.pacote?.nome || appointment.servicoAvulsoNome || 'Serviço';
+                                const primeiroNome = nomeContacto.split(' ')[0];
                                 const message = encodeURIComponent(
-                                    `Olá ${clientName}! 👋\n\n` +
+                                    `Olá ${primeiroNome}! 👋\n\n` +
                                     `Lembrete do seu agendamento:\n` +
                                     `📅 ${formattedDate}\n` +
                                     `🕐 ${formattedTime}\n` +
-                                    `💆 ${serviceName}\n\n` +
+                                    `💆 ${servicoNome}\n\n` +
                                     `Confirma a sua presença? 😊`
                                 );
                                 window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
                             }
                         }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-colors"
+                        disabled={!telefoneContacto}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-500/20"
                     >
                         <MessageCircle className="w-4 h-4" />
                         WhatsApp
