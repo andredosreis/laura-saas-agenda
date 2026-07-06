@@ -148,6 +148,14 @@ function Configuracoes() {
     },
   });
 
+  // Buscar dados frescos ao entrar na página: o tenant do contexto pode vir
+  // de um login/localStorage antigo sem todos os campos — foi assim que o
+  // avisoIA foi gravado vazio por cima do texto real (2026-07-06).
+  useEffect(() => {
+    refreshAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Inicializar form com dados do tenant
   useEffect(() => {
     if (!tenant) return;
