@@ -79,6 +79,52 @@ describe('PUT /auth/tenant — payload real das Configurações', () => {
     expect(tenant.contato.endereco.cidade).toBe('Lisboa');
   });
 
+  it('register, login, /auth/me e updateTenant devolvem o MESMO shape de tenant', async () => {
+    // Shapes divergentes custaram dados reais (2026-07-06): o login não
+    // trazia `configuracoes`, o form de Configurações hidratava vazio a
+    // partir dele e o save gravava "" por cima do avisoIA em produção.
+    const camposObrigatorios = (tenant) => {
+      expect(tenant.configuracoes).toBeDefined();
+      expect(tenant.configuracoes.timezone).toBeDefined();
+      expect(tenant.contato).toBeDefined();
+      expect(tenant.whatsapp).toBeDefined();
+      expect(typeof tenant.whatsapp.numeroWhatsapp).toBe('string');
+      expect(tenant.limites).toBeDefined();
+      expect(tenant.plano).toBeDefined();
+    };
+
+    const reg = await request(app).post(`${API}/auth/register`).send({
+      nomeEmpresa: 'Clínica Shape Teste',
+      nome: 'Admin Shape',
+      email: 'shape@teste.pt',
+      password: 'Senha@Segura123',
+    });
+    expect(reg.status).toBe(201);
+    camposObrigatorios(reg.body.data.tenant);
+    const token = reg.body.data.tokens.accessToken;
+
+    const login = await request(app).post(`${API}/auth/login`).send({
+      email: 'shape@teste.pt',
+      password: 'Senha@Segura123',
+    });
+    expect(login.status).toBe(200);
+    camposObrigatorios(login.body.data.tenant);
+
+    const me = await request(app)
+      .get(`${API}/auth/me`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(me.status).toBe(200);
+    camposObrigatorios(me.body.data.tenant);
+
+    const upd = await request(app)
+      .put(`${API}/auth/tenant`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(payloadFrontend);
+    expect(upd.status).toBe(200);
+    camposObrigatorios(upd.body.data.tenant);
+    expect(upd.body.data.tenant.whatsapp.numeroWhatsapp).toBe('351910376276');
+  });
+
   it('NÃO apaga iaGlobalAtiva/followUpPosSessaoAtivo/intervaloEntreSessoes ao gravar', async () => {
     const { token, tenantId } = await registarComToken();
 

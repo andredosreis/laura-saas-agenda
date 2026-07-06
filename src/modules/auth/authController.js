@@ -75,6 +75,26 @@ const getSuperadminMockTenant = () => ({
     ativo: true
 });
 
+/**
+ * Shape ÚNICO do tenant em todas as respostas de auth (register, login, me,
+ * updateTenant). Shapes divergentes já custaram dados reais: o login não
+ * devolvia `configuracoes`, o formulário de Configurações hidratava o
+ * avisoIA/contato/whatsapp vazios a partir desse tenant e o save gravava
+ * "" por cima dos valores em produção (2026-07-06).
+ */
+const tenantToPayload = (tenant) => ({
+    id: tenant._id,
+    nome: tenant.nome,
+    slug: tenant.slug,
+    plano: tenant.plano,
+    branding: tenant.branding,
+    limites: tenant.limites,
+    configuracoes: tenant.configuracoes,
+    contato: tenant.contato,
+    whatsapp: { numeroWhatsapp: tenant.whatsapp?.numeroWhatsapp || '' },
+    diasRestantesTrial: tenant.diasRestantesTrial,
+});
+
 // =============================================
 // CONTROLLERS
 // =============================================
@@ -185,14 +205,7 @@ export const register = async (req, res) => {
             message: 'Conta criada com sucesso!',
             data: {
                 user: user.toSafeObject(),
-                tenant: {
-                    id: tenant._id,
-                    nome: tenant.nome,
-                    slug: tenant.slug,
-                    plano: tenant.plano,
-                    branding: tenant.branding,
-                    diasRestantesTrial: tenant.diasRestantesTrial
-                },
+                tenant: tenantToPayload(tenant),
                 tokens: {
                     accessToken,
                     refreshToken,
@@ -336,15 +349,7 @@ export const login = async (req, res) => {
             message: 'Login realizado com sucesso!',
             data: {
                 user: user.toSafeObject(),
-                tenant: {
-                    id: tenant._id,
-                    nome: tenant.nome,
-                    slug: tenant.slug,
-                    plano: tenant.plano,
-                    branding: tenant.branding,
-                    limites: tenant.limites,
-                    diasRestantesTrial: tenant.diasRestantesTrial
-                },
+                tenant: tenantToPayload(tenant),
                 tokens: {
                     accessToken,
                     refreshToken,
@@ -545,16 +550,7 @@ export const me = async (req, res) => {
             success: true,
             data: {
                 user: user.toSafeObject(),
-                tenant: {
-                    id: tenant._id,
-                    nome: tenant.nome,
-                    slug: tenant.slug,
-                    plano: tenant.plano,
-                    branding: tenant.branding,
-                    limites: tenant.limites,
-                    configuracoes: tenant.configuracoes,
-                    diasRestantesTrial: tenant.diasRestantesTrial
-                }
+                tenant: tenantToPayload(tenant)
             }
         });
 
@@ -905,17 +901,7 @@ export const updateTenant = async (req, res) => {
             success: true,
             message: 'Configurações actualizadas com sucesso',
             data: {
-                tenant: {
-                    id: tenant._id,
-                    nome: tenant.nome,
-                    slug: tenant.slug,
-                    plano: tenant.plano,
-                    branding: tenant.branding,
-                    limites: tenant.limites,
-                    configuracoes: tenant.configuracoes,
-                    contato: tenant.contato,
-                    diasRestantesTrial: tenant.diasRestantesTrial,
-                }
+                tenant: tenantToPayload(tenant)
             }
         });
 
