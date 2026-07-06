@@ -6,7 +6,11 @@ import axios from 'axios';
 
 const IA_SERVICE_URL = process.env.IA_SERVICE_URL;
 const INTERNAL_SERVICE_TOKEN = process.env.INTERNAL_SERVICE_TOKEN;
-const TIMEOUT_MS = 20_000;
+// 120s: turnos com tool-calls em modelos maiores (gemini-3.5-flash) levam
+// 15-40s. Com 20s o backend dava timeout com o ia-service AINDA A TRABALHAR
+// → retry reprocessava (resposta duplicada) e o handler caía no greeting
+// legacy (3 mensagens para um "olá" — caso real 2026-07-06 14:52).
+const TIMEOUT_MS = 120_000;
 const RETRY_DELAY_MS = 1_000;
 
 function buildClient() {
@@ -27,6 +31,14 @@ async function withRetry(fn, retries = 1) {
   try {
     return await fn();
   } catch (err) {
+    // Timeout ≠ serviço em baixo: o ia-service provavelmente continua a
+    // processar e vai entregar a resposta ao cliente. Repetir duplicava a
+    // resposta; propagar já, marcado, para o handler decidir não fazer
+    // fallback. Retry fica só para erros de ligação (serviço mesmo down).
+    if (err?.code === 'ECONNABORTED' || /timeout/i.test(err?.message || '')) {
+      err.isTimeout = true;
+      throw err;
+    }
     if (retries > 0) {
       await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
       return withRetry(fn, retries - 1);

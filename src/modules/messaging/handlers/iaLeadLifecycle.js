@@ -67,6 +67,13 @@ export async function handle(input) {
     });
     return { delivered: true, source: 'ia_service' };
   } catch (err) {
+    // Timeout: o ia-service continua a processar e entrega a resposta por
+    // conta própria — mandar o greeting legacy aqui duplicaria mensagens
+    // (caso real 2026-07-06: 3 mensagens para um "olá").
+    if (err?.isTimeout) {
+      console.warn('[iaLeadLifecycle] ia_service_lento — sem fallback, resposta segue pelo serviço:', err?.message);
+      return { delivered: true, source: 'ia_service' };
+    }
     // Persistent failure → degrade to greeting fallback (spec §6.5).
     // Sentry captures the error via global integration.
     console.error('[iaLeadLifecycle] ia_service_unreachable — fallback:', err?.message);

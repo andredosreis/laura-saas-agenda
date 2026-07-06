@@ -50,6 +50,12 @@ export async function handle(input) {
     });
     return { delivered: true, source: 'ia_service' };
   } catch (err) {
+    // Timeout: o ia-service continua a processar e entrega a resposta —
+    // não duplicar com o greeting legacy (ver iaLeadLifecycle).
+    if (err?.isTimeout) {
+      logger.warn({ err: err?.message }, '[iaClientLifecycle] ia_service_lento — sem fallback');
+      return { delivered: true, source: 'ia_service' };
+    }
     logger.error({ err: err?.message }, '[iaClientLifecycle] ia_service_unreachable — fallback');
     await handleLegacyFallback(input);
     return { delivered: true, source: 'fallback' };
