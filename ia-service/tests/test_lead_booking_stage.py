@@ -95,6 +95,40 @@ async def test_avisar_equipa_lead_erro_nao_rebenta(monkeypatch):
     assert "ERRO" in result
 
 
+async def test_avisar_equipa_lead_deduplicado_avisa_modelo(monkeypatch):
+    from ia_service.services import marcai_client
+    from ia_service.tools.lead_tools import make_avisar_equipa_tool
+
+    async def fake_alertar(**kwargs):
+        return {"whatsappEnviado": False, "pushEnviado": False, "deduplicado": True}
+
+    monkeypatch.setattr(marcai_client, "alertar_equipa_lead", fake_alertar)
+
+    tool = make_avisar_equipa_tool("t1", "l1")
+    result = await tool.ainvoke({"motivo": "x"})
+
+    assert "JÁ tinha sido avisada" in result
+
+
+async def test_avisar_equipa_lead_sem_canal_nao_mente(monkeypatch):
+    # Caso real 2026-07-06: tenant sem numeroWhatsapp → rota devolve 200 com
+    # whatsappEnviado:false e a tool dizia "equipa avisada" na mesma. O modelo
+    # prometia contacto que nunca ia acontecer.
+    from ia_service.services import marcai_client
+    from ia_service.tools.lead_tools import make_avisar_equipa_tool
+
+    async def fake_alertar(**kwargs):
+        return {"whatsappEnviado": False, "pushEnviado": False}
+
+    monkeypatch.setattr(marcai_client, "alertar_equipa_lead", fake_alertar)
+
+    tool = make_avisar_equipa_tool("t1", "l1")
+    result = await tool.ainvoke({"motivo": "x"})
+
+    assert "ATENÇÃO" in result
+    assert "equipa avisada" not in result
+
+
 def test_prompt_lead_injeta_observacoes():
     from ia_service.services import tenant_knowledge
     from ia_service.services.prompt_renderer import render_system_prompt

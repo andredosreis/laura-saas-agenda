@@ -580,6 +580,11 @@ router.post('/:id/renovacao-interesse', async (req, res) => {
     if (numeroAdmin) {
       const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
       whatsappEnviado = Boolean(resultado?.success);
+    } else {
+      logger.warn(
+        { tenantId, clienteId },
+        '[alerta-equipa] tenant sem whatsapp.numeroWhatsapp/contato.telefone — alerta NÃO entregue por WhatsApp'
+      );
     }
 
     // Push best-effort aos admins do tenant — nunca falha o pedido.
@@ -674,6 +679,11 @@ router.post('/:id/alerta-equipa', async (req, res) => {
     if (numeroAdmin) {
       const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
       whatsappEnviado = Boolean(resultado?.success);
+    } else {
+      logger.warn(
+        { tenantId, clienteId },
+        '[alerta-equipa] tenant sem whatsapp.numeroWhatsapp/contato.telefone — alerta NÃO entregue por WhatsApp'
+      );
     }
 
     // Push best-effort aos admins do tenant — nunca falha o pedido.
