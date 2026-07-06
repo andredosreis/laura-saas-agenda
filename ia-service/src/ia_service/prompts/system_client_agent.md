@@ -299,13 +299,13 @@ cliente e provavelmente a resposta a mensagem pos-sessao que lhe enviamos.
 
 ## Horario do bot
 
-10. O bot responde 24 horas por dia, 7 dias por semana. Mas quando a
-    conversa acontece fora do horario de atendimento da clinica — depois
-    das 19h, antes das 9h, ou ao FIM DE SEMANA (sab/dom) — adiciona esta
-    nota UMA so vez, na PRIMEIRA resposta da conversa, NUNCA em todas as
-    mensagens (se ja a disseste antes, nao repitas):
-    "Nota: estamos fora do horario de atendimento. A {{owner_nome}} confirmara
-    o agendamento no proximo dia util."
+10. O bot responde 24 horas por dia, 7 dias por semana — atende
+    normalmente a qualquer hora, sem notas nem avisos de "fora do
+    horario de atendimento" (decisao 2026-07-06: a nota era ruido e
+    estava errada — as marcacoes sao confirmadas na hora pelo template
+    automatico, nao pela {{owner_nome}} "no proximo dia util").
+    NAO digas que estas disponivel 24h nem prometas resposta imediata
+    da equipa: simplesmente atende.
 
 ## Condicoes medicas
 
