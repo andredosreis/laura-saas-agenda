@@ -44,6 +44,17 @@ def _period_of_day(dt: datetime) -> str:
     return "noite"
 
 
+# Contexto vs fluxo de sessao (caso Maria, 2026-07-06): a cliente respondeu
+# 8h30 depois da resposta manual da Laura e a janela unica de 30 min cortou
+# TODO o historico — a IA cumprimentou como 1o turno, ignorando a conversa.
+# O HISTORICO entra ate 48h (contexto: clientes respondem horas/dias depois,
+# incluindo handoff manual->IA); turn_number/last_clinic_message continuam
+# na janela de 30 min porque controlam fluxo de sessao (saudacao,
+# anti-repeticao), nao contexto.
+HISTORY_WINDOW = timedelta(hours=48)
+TURN_WINDOW = timedelta(minutes=30)
+
+
 async def _build_conversation_history(
     tenant_id: str, cliente_id: str, current_message: str, log
 ) -> tuple[list[dict], int, str]:
@@ -55,20 +66,22 @@ async def _build_conversation_history(
         history = await marcai_client.get_client_messages(
             tenant_id=tenant_id, cliente_id=cliente_id, limit=8
         )
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+        now = datetime.now(timezone.utc)
+        history_cutoff = now - HISTORY_WINDOW
+        turn_cutoff = now - TURN_WINDOW
         for m in history:
             data_str = m.get("data") or m.get("createdAt") or ""
             try:
                 msg_dt = datetime.fromisoformat(data_str.replace("Z", "+00:00"))
             except ValueError:
                 continue
-            if msg_dt < cutoff:
+            if msg_dt < history_cutoff:
                 continue
             role = "user" if m.get("direcao") == "entrada" else "assistant"
             content = m.get("mensagem", "").strip()
             if content:
                 messages.append({"role": role, "content": content})
-                if role == "assistant":
+                if role == "assistant" and msg_dt >= turn_cutoff:
                     turn_number += 1
                     last_clinic_message = content
         log.info(

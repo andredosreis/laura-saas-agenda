@@ -74,12 +74,18 @@ async def _build_conversation_history(
             history = await marcai_client.get_recent_messages(
                 tenant_id=tenant_id, lead_id=lead_id, limit=8
             )
-            # Session-style filter: only include messages from the last
-            # 30 minutes. Older interactions (e.g. lead from 2 days ago)
-            # would bias the LLM with stale slot proposals or old context.
+            # Contexto vs fluxo (caso Maria 2026-07-06, client agent): o
+            # HISTORICO entra ate 48h — pessoas respondem horas depois e a
+            # janela unica de 30 min deixava a IA amnesica apos handoff
+            # manual. turn_number/last_clinic_message ficam na janela de
+            # 30 min (controlo de sessao: saudacao, anti-repeticao). Slots
+            # antigos no historico nao enviesam: o prompt obriga a chamar
+            # a tool de slots em cada proposta.
             from datetime import datetime, timedelta, timezone
 
-            cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+            now = datetime.now(timezone.utc)
+            history_cutoff = now - timedelta(hours=48)
+            turn_cutoff = now - timedelta(minutes=30)
             for m in history:
                 # `data` is ISO 8601 from the Node side
                 data_str = m.get("data") or m.get("createdAt") or ""
@@ -87,19 +93,20 @@ async def _build_conversation_history(
                     msg_dt = datetime.fromisoformat(data_str.replace("Z", "+00:00"))
                 except ValueError:
                     continue
-                if msg_dt < cutoff:
+                if msg_dt < history_cutoff:
                     continue
                 role = "user" if m.get("direcao") == "entrada" else "assistant"
                 content = m.get("mensagem", "").strip()
                 if content:
                     messages.append({"role": role, "content": content})
-                    if role == "assistant":
+                    if role == "assistant" and msg_dt >= turn_cutoff:
                         turn_number += 1
                         last_clinic_message = content
             log.info(
                 "history_loaded",
                 turns=len(messages),
-                cutoff_min=30,
+                history_window_h=48,
+                turn_window_min=30,
                 clinic_turns=turn_number,
             )
         except Exception as exc:
@@ -331,10 +338,11 @@ async def _extract_and_apply_intel(
         history = await marcai_client.get_recent_messages(
             tenant_id=tenant_id, lead_id=lead_id, limit=6
         )
-        # Filter by 30-min window (same logic as agent history) and convert
+        # Mesma janela de contexto do historico do agente (48h) — a intel
+        # vive na conversa toda, nao so nos ultimos 30 min.
         from datetime import datetime, timedelta, timezone
 
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
         msgs: list[dict] = []
         for m in history:
             data_str = m.get("data") or m.get("createdAt") or ""
