@@ -247,6 +247,46 @@ def make_create_appointment_tool(tenant_id: str, lead_id: str):
     return create_appointment
 
 
+def make_avisar_equipa_tool(tenant_id: str, lead_id: str):
+    """Alerta REAL à equipa — sem isto "vou deixar com a Laura" é promessa vazia."""
+
+    @tool
+    async def avisar_equipa(motivo: str) -> str:
+        """Envia um alerta REAL à equipa da clínica com um motivo.
+
+        Usa esta tool SEMPRE que prometeres ao lead que vais passar o
+        contacto dele à equipa/Laura, pedir para verificarem algo, ou
+        avisar de desistências/encaixes. NUNCA digas "vou deixar o seu
+        contacto com a Laura" sem chamar esta tool — sem ela o aviso não
+        chega a ninguém e o lead fica à espera de um contacto que nunca vem.
+
+        Chama UMA única vez por assunto.
+
+        Args:
+            motivo: Resumo curto e objectivo (ex: "Lead de férias só até
+                15/07, quer avaliação + 2 sessões/semana; sem vagas antes
+                de dia 15 — verificar desistências/encaixe").
+        """
+        from ..services import marcai_client
+
+        try:
+            await marcai_client.alertar_equipa_lead(
+                tenant_id=tenant_id, lead_id=lead_id, motivo=motivo
+            )
+            return (
+                "OK — equipa avisada (WhatsApp + notificação). Diz ao lead "
+                "que a equipa entra em contacto. Continua a conversa "
+                "normalmente."
+            )
+        except Exception as exc:
+            return (
+                f"ERRO ao avisar equipa: {exc}. "
+                "Diz ao lead que vais passar o pedido à equipa na mesma."
+            )
+
+    return avisar_equipa
+
+
 def make_get_available_slots_tool(tenant_id: str):
     """Build a `get_available_slots` tool bound to a specific tenant.
 

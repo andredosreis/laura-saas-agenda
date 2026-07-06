@@ -151,6 +151,7 @@ export const updateTenantSchema = z
         antecedenciaMinAgendamento: z.number().int().min(0).max(168).optional(),
         antecedenciaMaxAgendamento: z.number().int().min(1).max(365).optional(),
         permitirAgendamentoOnline: z.boolean().optional(),
+        avisoIA: z.string().trim().max(500).optional().or(z.literal('')),
         horarioInicio: z.string().max(10).optional(),
         horarioFim: z.string().max(10).optional(),
         diasAtivos: z.array(z.number().int().min(0).max(6)).optional(),

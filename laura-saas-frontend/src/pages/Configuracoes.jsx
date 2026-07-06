@@ -141,6 +141,7 @@ function Configuracoes() {
       antecedenciaMinAgendamento: 2,
       antecedenciaMaxAgendamento: 30,
       permitirAgendamentoOnline: false,
+      avisoIA: '',
     },
     whatsapp: {
       numeroWhatsapp: '',
@@ -172,6 +173,7 @@ function Configuracoes() {
         antecedenciaMinAgendamento: tenant.configuracoes?.antecedenciaMinAgendamento ?? 2,
         antecedenciaMaxAgendamento: tenant.configuracoes?.antecedenciaMaxAgendamento ?? 30,
         permitirAgendamentoOnline: tenant.configuracoes?.permitirAgendamentoOnline ?? false,
+        avisoIA: tenant.configuracoes?.avisoIA || '',
       },
       whatsapp: {
         numeroWhatsapp: tenant.whatsapp?.numeroWhatsapp || '',
@@ -496,6 +498,28 @@ function Configuracoes() {
                 Formato: 351 seguido do número sem espaços. Ex: 351912345678
               </p>
             </div>
+          </div>
+
+          {/* Aviso para a IA */}
+          <div className={card}>
+            <h2 className={`text-base font-semibold mb-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              🤖 Aviso para a IA
+            </h2>
+            <p className={`text-xs mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              A assistente lê este aviso em todas as conversas e usa-o para responder com contexto.
+              Ideal para férias e encerramentos — ex: “Clínica fechada de 7 a 29 de julho; reabrimos a 30/07.”
+            </p>
+            <textarea
+              className={input}
+              rows="3"
+              maxLength={500}
+              value={form.configuracoes.avisoIA}
+              onChange={e => handleChange('configuracoes', 'avisoIA', e.target.value)}
+              placeholder="Sem avisos de momento"
+            />
+            <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Deixar vazio quando não há avisos. Máx. 500 caracteres.
+            </p>
           </div>
 
           {/* Botão Guardar */}

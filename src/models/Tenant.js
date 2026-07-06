@@ -102,7 +102,12 @@ const TenantSchema = new Schema({
         iaGlobalAtiva: { type: Boolean, default: true },
         // Follow-up pós-sessão (kill-switch por tenant, independente do master
         // switch da IA). Ausente = activo — só bloqueia quando explicitamente false.
-        followUpPosSessaoAtivo: { type: Boolean, default: true }
+        followUpPosSessaoAtivo: { type: Boolean, default: true },
+        // Aviso da equipa lido pela IA em todas as conversas (editável nas
+        // Configurações). Ex: "Clínica fechada de 7 a 29/07 (férias);
+        // reabrimos a 30/07." A IA usa-o para explicar encerramentos com
+        // transparência em vez de "agenda preenchida".
+        avisoIA: { type: String, trim: true, default: '', maxlength: 500 }
     },
 
     // =============================================
