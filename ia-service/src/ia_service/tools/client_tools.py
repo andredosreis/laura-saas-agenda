@@ -430,13 +430,30 @@ def make_avisar_equipa_tool(tenant_id: str, cliente_id: str):
                 (ex: "Cliente diz que devia ter 3 sessoes; a ficha mostra 1").
         """
         try:
-            await marcai_client.alertar_equipa(
+            data = await marcai_client.alertar_equipa(
                 tenant_id=tenant_id, cliente_id=cliente_id, motivo=motivo
             )
+            if data.get("deduplicado"):
+                return (
+                    "OK — a equipa JA tinha sido avisada ha minutos sobre "
+                    "este assunto (alerta nao repetido). Nao anuncies novo "
+                    "aviso; continua a conversa normalmente."
+                )
+            if not data.get("whatsappEnviado") and not data.get("pushEnviado"):
+                return (
+                    "ATENCAO — o pedido ficou registado mas NENHUM canal de "
+                    "alerta esta configurado (WhatsApp da equipa em falta): "
+                    "a equipa pode nao ver isto de imediato. Diz que "
+                    "deixaste nota para a equipa, SEM prometer contacto "
+                    "imediato nem prazos."
+                )
             return (
-                "OK — equipa avisada. Diz ao cliente que a equipa vai "
-                "verificar e entra em contacto. Continua a conversa "
-                "normalmente — isto NAO bloqueia marcacoes."
+                "OK — equipa avisada. O recado e UNIDIRECCIONAL: nao "
+                "falaste com ninguem da equipa nem sabes quando respondem. "
+                "Diz que deixaste o recado e que entram em contacto assim "
+                "que possivel — NUNCA prometas prazos ('ainda hoje') nem "
+                "digas que reforcaste algo pessoalmente. Continua a "
+                "conversa normalmente — isto NAO bloqueia marcacoes."
             )
         except Exception as exc:
             return (

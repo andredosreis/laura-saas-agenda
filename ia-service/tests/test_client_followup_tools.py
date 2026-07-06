@@ -124,3 +124,30 @@ async def test_avisar_equipa_erro_nao_rebenta(monkeypatch):
     result = await tool.ainvoke({"motivo": "x"})
 
     assert "ERRO" in result
+
+
+async def test_avisar_equipa_deduplicado_avisa_modelo(monkeypatch):
+    async def fake_alertar(**kwargs):
+        return {"whatsappEnviado": False, "pushEnviado": False, "deduplicado": True}
+
+    monkeypatch.setattr(marcai_client, "alertar_equipa", fake_alertar)
+
+    tool = make_avisar_equipa_tool("t1", "c1")
+    result = await tool.ainvoke({"motivo": "x"})
+
+    assert "JA tinha sido avisada" in result
+
+
+async def test_avisar_equipa_sem_canal_nao_mente(monkeypatch):
+    # Tenant sem numeroWhatsapp: rota devolve 200 mas nada foi entregue —
+    # a tool tem de o dizer ao modelo em vez de "equipa avisada".
+    async def fake_alertar(**kwargs):
+        return {"whatsappEnviado": False, "pushEnviado": False}
+
+    monkeypatch.setattr(marcai_client, "alertar_equipa", fake_alertar)
+
+    tool = make_avisar_equipa_tool("t1", "c1")
+    result = await tool.ainvoke({"motivo": "x"})
+
+    assert "ATENCAO" in result
+    assert "equipa avisada" not in result

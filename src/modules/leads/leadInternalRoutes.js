@@ -567,6 +567,10 @@ router.post('/:id/alerta-equipa', async (req, res) => {
     if (numeroAdmin) {
       const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
       whatsappEnviado = Boolean(resultado?.success);
+    } else {
+      console.warn(
+        `[alerta-equipa-lead] tenant ${tenantId} sem whatsapp.numeroWhatsapp/contato.telefone — alerta NÃO entregue por WhatsApp (lead ${leadId})`
+      );
     }
 
     // Push best-effort aos admins do tenant — nunca falha o pedido.
