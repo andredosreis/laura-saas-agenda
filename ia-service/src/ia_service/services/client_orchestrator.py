@@ -257,6 +257,9 @@ async def run(payload) -> dict:
 
     # Defesa em profundidade: validar que o cliente existe na DB DESTE
     # tenant antes de processar (mesmo racional do lead_orchestrator).
+    # Aproveita a mesma leitura para trazer as observacoes da ficha —
+    # notas duraveis da equipa ("de ferias ate 20/08") que o prompt usa.
+    cliente_observacoes = ""
     if cliente_id:
         try:
             from bson import ObjectId
@@ -264,19 +267,29 @@ async def run(payload) -> dict:
             from . import mongo_reader
 
             db = mongo_reader.get_tenant_db(tenant_id)
-            if db.clientes.find_one({"_id": ObjectId(cliente_id)}, {"_id": 1}) is None:
+            doc = db.clientes.find_one(
+                {"_id": ObjectId(cliente_id)}, {"_id": 1, "observacoes": 1}
+            )
+            if doc is None:
                 log.warning("cliente_tenant_mismatch", cliente_id=cliente_id)
                 return {
                     "status": "error",
                     "cliente_id": None,
                     "action_taken": "cliente_tenant_mismatch",
                 }
+            cliente_observacoes = doc.get("observacoes") or ""
         except Exception as exc:
             log.warning("cliente_tenant_check_skipped", error=str(exc))
 
     # 1. Build client state for the system prompt
     cliente_nome = getattr(payload, "cliente_nome", None) or "Cliente"
-    client_state = {"nome": cliente_nome, "telefone": telefone}
+    client_state = {
+        "nome": cliente_nome,
+        "telefone": telefone,
+        "observacoes": cliente_observacoes,
+        # Aviso da equipa (Tenant.configuracoes.avisoIA) — ex: ferias.
+        "aviso_clinica": (getattr(payload, "aviso_clinica", None) or "").strip(),
+    }
 
     # 2. Persist inbound message
     conversa_id = None

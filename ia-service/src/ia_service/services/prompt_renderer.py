@@ -143,6 +143,12 @@ def render_system_prompt(
     urgencia = (state.get("urgencia") or "").strip() or NOT_YET
     score = state.get("score")
     score_str = str(score) if score is not None else "0"
+    # Notas da ficha (escritas pela equipa no painel ou pelo extractor) —
+    # ex: "de férias em Portugal só até 15/07". Sem isto a IA "esquece"
+    # factos duráveis entre conversas (janela de histórico = 30 min).
+    observacoes = (state.get("observacoes") or "").strip() or "(sem notas)"
+    # Aviso global da clínica (Configurações → "Aviso para a IA").
+    aviso = (state.get("aviso_clinica") or "").strip() or "(sem avisos)"
 
     is_first_turn = "sim" if turn_number <= 0 else "não"
     last_clinic = (last_clinic_message or "").strip() or NOT_YET
@@ -162,6 +168,8 @@ def render_system_prompt(
         .replace("{{lead_motivo}}", motivo)
         .replace("{{lead_urgencia}}", urgencia)
         .replace("{{lead_score}}", score_str)
+        .replace("{{lead_observacoes}}", observacoes)
+        .replace("{{aviso_clinica}}", aviso)
         .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{is_first_turn}}", is_first_turn)
         .replace("{{last_clinic_message}}", last_clinic)
@@ -185,6 +193,11 @@ def render_client_system_prompt(
     # pode usar um apelido que nunca viu.
     nome_completo = (state.get("nome") or "").strip() or "Cliente"
     nome = nome_completo.split()[0]
+    # Notas da ficha do cliente (painel) — ex: "de férias até 20/08",
+    # "prefere manhãs". Contexto durável que sobrevive à janela de 30 min.
+    notas = (state.get("observacoes") or "").strip() or "(sem notas)"
+    # Aviso global da clínica (Configurações → "Aviso para a IA").
+    aviso = (state.get("aviso_clinica") or "").strip() or "(sem avisos)"
     last_clinic = (last_clinic_message or "").strip() or NOT_YET
 
     # Identidade da clínica por tenant — substituída DEPOIS de voz/catalogo/
@@ -199,6 +212,8 @@ def render_client_system_prompt(
         .replace("{{today}}", _today_string())
         .replace("{{calendario}}", _calendar_next_days())
         .replace("{{client_nome}}", nome)
+        .replace("{{client_notas}}", notas)
+        .replace("{{aviso_clinica}}", aviso)
         .replace("{{upcoming_appointments}}", upcoming_appointments)
         .replace("{{turn_number}}", str(max(0, turn_number)))
         .replace("{{last_clinic_message}}", last_clinic)

@@ -226,3 +226,78 @@ async def test_get_my_appointments_mostra_hora_de_lisboa(monkeypatch):
     assert "2026-07-30 17:30" in result
     assert "hora de Lisboa" in result
     assert "16:30" not in result
+
+
+# ───────── caso Inês: re-marcação colide com a PRÓPRIA marcação ─────────
+
+
+async def test_create_conflito_com_marcacao_propria_devolve_ja_marcado(monkeypatch):
+    async def fake_packages(**kwargs):
+        return []
+
+    async def fake_create(**kwargs):
+        raise RuntimeError("409 slot_taken")
+
+    async def fake_appointments(**kwargs):
+        # A marcação criada no turno anterior (suprimido): 10:15 Lisboa
+        # em agosto (WEST) = 09:15 UTC.
+        return [
+            {
+                "_id": "a1",
+                "dataHora": "2026-08-03T09:15:00.000Z",
+                "status": "Agendado",
+                "tipo": "Sessao",
+            }
+        ]
+
+    monkeypatch.setattr(marcai_client, "get_client_packages", fake_packages)
+    monkeypatch.setattr(marcai_client, "create_client_appointment", fake_create)
+    monkeypatch.setattr(marcai_client, "get_client_appointments", fake_appointments)
+
+    tool = make_create_client_appointment_tool("t1", "c1")
+    result = await tool.ainvoke({"data": "2026-08-03", "hora": "10:15"})
+
+    assert "JA MARCADO" in result
+    assert "ocupado" not in result.split("JA MARCADO")[0]
+
+
+async def test_create_max_pending_com_marcacao_propria_devolve_ja_marcado(monkeypatch):
+    async def fake_packages(**kwargs):
+        return []
+
+    async def fake_create(**kwargs):
+        raise RuntimeError("max_pending_reached")
+
+    async def fake_appointments(**kwargs):
+        return [{"_id": "a1", "dataHora": "2026-08-03T09:15:00.000Z", "status": "Agendado"}]
+
+    monkeypatch.setattr(marcai_client, "get_client_packages", fake_packages)
+    monkeypatch.setattr(marcai_client, "create_client_appointment", fake_create)
+    monkeypatch.setattr(marcai_client, "get_client_appointments", fake_appointments)
+
+    tool = make_create_client_appointment_tool("t1", "c1")
+    result = await tool.ainvoke({"data": "2026-08-03", "hora": "10:15"})
+
+    assert "JA MARCADO" in result
+
+
+async def test_create_conflito_com_marcacao_de_OUTRO_horario_mantem_script(monkeypatch):
+    async def fake_packages(**kwargs):
+        return []
+
+    async def fake_create(**kwargs):
+        raise RuntimeError("409 slot_taken")
+
+    async def fake_appointments(**kwargs):
+        # Marcação existente noutra hora — conflito genuíno com terceiro.
+        return [{"_id": "a1", "dataHora": "2026-08-05T14:00:00.000Z", "status": "Agendado"}]
+
+    monkeypatch.setattr(marcai_client, "get_client_packages", fake_packages)
+    monkeypatch.setattr(marcai_client, "create_client_appointment", fake_create)
+    monkeypatch.setattr(marcai_client, "get_client_appointments", fake_appointments)
+
+    tool = make_create_client_appointment_tool("t1", "c1")
+    result = await tool.ainvoke({"data": "2026-08-03", "hora": "10:15"})
+
+    assert "JA MARCADO" not in result
+    assert "ocupado" in result

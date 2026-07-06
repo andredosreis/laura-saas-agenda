@@ -23,6 +23,7 @@ from langchain.agents import create_agent
 from ..config import settings
 from ..services.prompt_renderer import render_system_prompt
 from ..tools.lead_tools import (
+    make_avisar_equipa_tool,
     make_create_appointment_tool,
     make_find_servico_tool,
     make_get_available_slots_tool,
@@ -105,6 +106,7 @@ def make_lead_agent(
                 make_qualify_lead_tool(tenant_id, lead_id),
                 make_move_lead_stage_tool(tenant_id, lead_id),
                 make_create_appointment_tool(tenant_id, lead_id),
+                make_avisar_equipa_tool(tenant_id, lead_id),
             ]
         )
     system_prompt = render_system_prompt(

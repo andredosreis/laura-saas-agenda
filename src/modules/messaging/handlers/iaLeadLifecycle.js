@@ -34,6 +34,7 @@ import { handle as handleLegacyFallback } from './legacyFallback.js';
  */
 export async function handle(input) {
   const {
+    tenant,
     tenantId,
     telefoneNormalizado,
     mensagem,
@@ -62,6 +63,7 @@ export async function handle(input) {
         : new Date(timestamp || Date.now()).toISOString(),
       clienteId,
       leadId,
+      avisoIA: tenant?.configuracoes?.avisoIA || null,
     });
     return { delivered: true, source: 'ia_service' };
   } catch (err) {

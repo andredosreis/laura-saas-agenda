@@ -22,6 +22,10 @@ import { scheduleNotifications } from '../../utils/scheduleNotifications.js';
 import { DateTime } from 'luxon';
 // F05 — mesma regra única de disponibilidade que a IA lê (F03) e o painel aplica.
 import { resolveAvailableSlots } from '../../controllers/scheduleController.js';
+import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
+import { sendPushNotification } from '../../services/pushService.js';
+import User from '../../models/User.js';
+import UserSubscription from '../../models/UserSubscription.js';
 
 const router = express.Router();
 
@@ -497,6 +501,105 @@ router.post('/:id/agendamento', async (req, res) => {
       });
     }
     console.error('Erro internal POST /leads/:id/agendamento:', err);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+// =====================================================================
+// POST /api/internal/leads/:id/alerta-equipa
+// Body: { tenantId, motivo }
+// Torna real o "vou deixar o seu contacto com a Laura" da IA: alerta a
+// equipa (WhatsApp admin + push best-effort) — caso Hayzel 2026-07-06:
+// lead quente com prazo prometida à espera de contacto que nunca saiu.
+// =====================================================================
+
+// Anti-spam: 1 alerta por lead a cada 10 min (mesmo racional da rota de
+// clientes — o modelo pode repetir a promessa em turns seguidos).
+const ALERTA_LEAD_DEDUP_MS = 10 * 60 * 1000;
+const ultimoAlertaLead = new Map();
+
+router.post('/:id/alerta-equipa', async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    const { tenantId, motivo } = req.body || {};
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'tenantId é obrigatório' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(leadId)) {
+      return res.status(400).json({ success: false, error: 'leadId inválido' });
+    }
+
+    const dedupKey = `${tenantId}:${leadId}`;
+    const ultimo = ultimoAlertaLead.get(dedupKey);
+    if (ultimo && Date.now() - ultimo < ALERTA_LEAD_DEDUP_MS) {
+      return res.json({
+        success: true,
+        data: { whatsappEnviado: false, pushEnviado: false, deduplicado: true },
+      });
+    }
+
+    const { tenant, models } = await resolveTenantContext(tenantId);
+
+    const lead = await models.Lead.findOne({ _id: leadId, tenantId })
+      .select('nome telefone urgencia observacoes')
+      .lean();
+    if (!lead) {
+      return res.status(404).json({ success: false, error: 'Lead não encontrado' });
+    }
+
+    ultimoAlertaLead.set(dedupKey, Date.now());
+
+    const motivoTxt = String(motivo || 'O lead precisa de apoio da equipa.').slice(0, 300);
+    const extras = [
+      lead.urgencia ? `Urgência: ${lead.urgencia}` : null,
+      lead.observacoes ? `Notas: ${String(lead.observacoes).slice(0, 200)}` : null,
+    ].filter(Boolean).join('\n');
+    const alerta =
+      `📋 *Pedido de Verificação (IA)*\n\n` +
+      `A IA precisa da tua ajuda com o lead, olhe no telefone da empresa ou no sistema *${lead.nome || 'sem nome'}*:\n\n` +
+      `${motivoTxt}\n\n` +
+      (extras ? `${extras}\n\n` : '') +
+      `📱 Contacto: ${lead.telefone || 'sem telefone registado'}`;
+
+    let whatsappEnviado = false;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    if (numeroAdmin) {
+      const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
+      whatsappEnviado = Boolean(resultado?.success);
+    }
+
+    // Push best-effort aos admins do tenant — nunca falha o pedido.
+    let pushEnviado = false;
+    try {
+      const admins = await User.find({ tenantId, role: { $in: ['admin', 'gerente'] } })
+        .select('_id')
+        .lean();
+      const subs = await UserSubscription.find({
+        userId: { $in: admins.map((a) => String(a._id)) },
+        active: true,
+      }).lean();
+      await Promise.all(
+        subs.map((sub) =>
+          sendPushNotification(sub, {
+            title: '📋 IA pede verificação (lead)',
+            body: `${lead.nome || 'Lead'}: ${motivoTxt}`.slice(0, 160),
+            tag: `alerta-equipa-lead-${leadId}`,
+            data: { tipo: 'alerta-equipa-lead', leadId },
+          })
+        )
+      );
+      pushEnviado = subs.length > 0;
+    } catch (pushErr) {
+      console.warn('[internal] push de alerta-equipa (lead) falhou:', pushErr.message);
+    }
+
+    res.json({ success: true, data: { whatsappEnviado, pushEnviado } });
+  } catch (err) {
+    if (err instanceof LeadError) {
+      return res.status(err.statusCode).json({ success: false, error: err.message, code: err.code });
+    }
+    console.error('Erro internal POST /leads/:id/alerta-equipa:', err);
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });

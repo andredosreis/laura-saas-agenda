@@ -21,6 +21,9 @@ class ProcessLeadRequest(BaseModel):
     timestamp: datetime
     cliente_id: str | None = None
     lead_id: str | None = None
+    # Aviso da equipa (Tenant.configuracoes.avisoIA) — ex: encerramento
+    # para ferias. Injectado no system prompt de cada turno.
+    aviso_clinica: str | None = None
 
 
 class ProcessLeadResponse(BaseModel):
@@ -58,6 +61,7 @@ class ProcessClientRequest(BaseModel):
     timestamp: datetime
     cliente_id: str
     cliente_nome: str | None = None
+    aviso_clinica: str | None = None
 
 
 class ProcessClientResponse(BaseModel):

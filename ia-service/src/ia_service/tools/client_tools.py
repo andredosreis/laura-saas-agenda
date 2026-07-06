@@ -183,6 +183,42 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
             )
         except Exception as exc:
             msg = str(exc)
+            conflito = (
+                "max_pending" in msg
+                or "agendamento pendente" in msg.lower()
+                or "409" in msg
+                or "slot_taken" in msg
+            )
+            if conflito:
+                # A "colisao" pode ser com uma marcacao do PROPRIO cliente —
+                # tipico quando o turno anterior JA marcou (resposta suprimida,
+                # sem rasto no historico) e o modelo tenta outra vez (caso
+                # Ines 2026-07-06). Verificar a ficha antes de dizer "ocupado".
+                try:
+                    appointments = await marcai_client.get_client_appointments(
+                        tenant_id=tenant_id, cliente_id=cliente_id
+                    )
+                    alvo = datetime.fromisoformat(f"{data}T{hora}:00").replace(
+                        tzinfo=ZoneInfo("Europe/Lisbon")
+                    )
+                    for appt in appointments:
+                        try:
+                            dt = datetime.fromisoformat(
+                                str(appt.get("dataHora", "")).replace("Z", "+00:00")
+                            )
+                        except ValueError:
+                            continue
+                        if dt.astimezone(ZoneInfo("Europe/Lisbon")) == alvo:
+                            return (
+                                f"JA MARCADO: o cliente JA TEM esta sessao marcada "
+                                f"para {data} as {hora} — a marcacao FOI FEITA "
+                                "(provavelmente no turno anterior; o cliente ja "
+                                "recebeu a confirmacao automatica). NAO digas que "
+                                "o horario esta ocupado nem tentes marcar de novo "
+                                "— confirma ao cliente que esta tudo marcado."
+                            )
+                except Exception:
+                    pass
             if "max_pending" in msg or "agendamento pendente" in msg.lower():
                 return (
                     "ERRO: o cliente ja tem um agendamento pendente. "

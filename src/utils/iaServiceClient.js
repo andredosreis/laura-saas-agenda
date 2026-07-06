@@ -37,7 +37,7 @@ async function withRetry(fn, retries = 1) {
 
 export const processLead = async ({
   tenantId, instanceName, telefone, mensagem,
-  messageId, timestamp, clienteId = null, leadId = null,
+  messageId, timestamp, clienteId = null, leadId = null, avisoIA = null,
 }) => {
   if (!_client) throw new Error('IA_SERVICE_URL não configurado — defina no .env');
   const { data } = await withRetry(() =>
@@ -50,6 +50,7 @@ export const processLead = async ({
       timestamp,
       cliente_id: clienteId,
       lead_id: leadId,
+      aviso_clinica: avisoIA,
     })
   );
   return data;
@@ -57,7 +58,7 @@ export const processLead = async ({
 
 export const processClient = async ({
   tenantId, instanceName, telefone, mensagem,
-  messageId, timestamp, clienteId, clienteNome = null,
+  messageId, timestamp, clienteId, clienteNome = null, avisoIA = null,
 }) => {
   if (!_client) throw new Error('IA_SERVICE_URL não configurado — defina no .env');
   const { data } = await withRetry(() =>
@@ -70,6 +71,7 @@ export const processClient = async ({
       timestamp,
       cliente_id: clienteId,
       cliente_nome: clienteNome,
+      aviso_clinica: avisoIA,
     })
   );
   return data;

@@ -134,6 +134,7 @@ async def _generate_reply(
     mensagem: str,
     fallback_greeting: str,
     log,
+    aviso_clinica: str = "",
 ) -> tuple[str, str]:
     """Returns (reply_text, source) where source is 'agent' or 'greeting_fallback'.
 
@@ -157,6 +158,11 @@ async def _generate_reply(
         # (name, motivo, urgência, score). Failure here is non-fatal —
         # the agent still works, just without the {{lead_*}} hints.
         lead_state = await _get_lead_state(tenant_id, lead_id, log)
+
+        # Aviso da equipa (ex: encerramento para ferias) viaja no payload
+        # do backend e entra no prompt via lead_state.
+        if aviso_clinica:
+            lead_state = {**(lead_state or {}), "aviso_clinica": aviso_clinica}
 
         agent = make_lead_agent(
             tenant_id,
@@ -275,6 +281,7 @@ async def _get_lead_state(tenant_id: str, lead_id: str | None, log) -> dict | No
             {
                 "nome": 1,
                 "urgencia": 1,
+                "observacoes": 1,
                 "qualificacao.score": 1,
                 "qualificacao.motivoInteresse": 1,
             },
@@ -287,6 +294,10 @@ async def _get_lead_state(tenant_id: str, lead_id: str | None, log) -> dict | No
             "motivo": qual.get("motivoInteresse") or "",
             "urgencia": doc.get("urgencia") or "",
             "score": int(qual.get("score") or 0),
+            # Notas duraveis da ficha (equipa/extractor) — ex: "de ferias
+            # so ate 15/07". Injectadas no prompt para sobreviverem a
+            # janela de 30 min de historico.
+            "observacoes": doc.get("observacoes") or "",
         }
     except Exception as exc:
         log.warning("lead_state_load_failed", error=str(exc))
@@ -511,7 +522,12 @@ async def run(payload) -> dict:
     period = _period_of_day(timestamp)
     fallback_greeting = _GREETINGS[period]
     reply, reply_source = await _generate_reply(
-        tenant_id, lead_id, mensagem, fallback_greeting, log
+        tenant_id,
+        lead_id,
+        mensagem,
+        fallback_greeting,
+        log,
+        aviso_clinica=(getattr(payload, "aviso_clinica", None) or "").strip(),
     )
 
     # 4. Send reply via Evolution API

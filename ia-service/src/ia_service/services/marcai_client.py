@@ -365,6 +365,15 @@ async def alertar_equipa(tenant_id: str, cliente_id: str, motivo: str) -> dict:
     return resp["data"]
 
 
+async def alertar_equipa_lead(tenant_id: str, lead_id: str, motivo: str) -> dict:
+    """Versao para leads do alerta a equipa (caso Hayzel 2026-07-06)."""
+    resp = await _post_with_retry(
+        f"{settings.marcai_api_url}/api/internal/leads/{lead_id}/alerta-equipa",
+        json={"tenantId": tenant_id, "motivo": motivo},
+    )
+    return resp["data"]
+
+
 async def get_client_messages(
     tenant_id: str,
     cliente_id: str,

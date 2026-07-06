@@ -178,6 +178,32 @@ describe('POST /api/internal/clientes/:id/alerta-equipa', () => {
     expect(res.status).toBe(400);
   });
 
+  it('lead: alerta-equipa envia WhatsApp com urgência e notas da ficha', async () => {
+    const { tenant } = await seed('alerta-lead');
+    const models = getModels(getTenantDB(String(tenant._id)));
+    const lead = await models.Lead.create({
+      tenantId: tenant._id,
+      nome: 'Hayzel Teste',
+      telefone: '13478930000',
+      origem: 'whatsapp',
+      urgencia: 'alta',
+      observacoes: 'Estadia em Portugal apenas até 15 de julho.',
+    });
+
+    const res = await request(app)
+      .post(`/api/internal/leads/${lead._id}/alerta-equipa`)
+      .set(svc)
+      .send({ tenantId: String(tenant._id), motivo: 'Sem vagas antes de 15/07 — verificar desistências' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.whatsappEnviado).toBe(true);
+    const [, alerta] = sendMock.mock.calls[0];
+    expect(alerta).toContain('Hayzel Teste');
+    expect(alerta).toContain('verificar desistências');
+    expect(alerta).toContain('alta');
+    expect(alerta).toContain('15 de julho');
+  });
+
   it('2º alerta do mesmo cliente em <10 min é deduplicado (anti-spam)', async () => {
     const { tenant, cliente } = await seed('alerta-e');
     const body = { tenantId: String(tenant._id), motivo: 'Cliente contesta sessões' };
