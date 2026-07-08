@@ -76,6 +76,10 @@ A clínica (controller) responde aos pedidos; o Marcai (processor) **dá as ferr
 
 ⚠️ **Excepção fiscal:** faturas/transações têm **retenção legal obrigatória** (lei fiscal PT). Apagamento = **anonimizar a PII** (nome/telefone/email/anamnese) mas **manter o registo financeiro** de-identificado. Nunca apagar dados fiscais por pedido de esquecimento.
 
+**Âmbito do apagamento (RECONCILIATION R5, 2026-07-07):** o apagamento cobre o mesmo universo que o export — além do `Cliente`, apaga `Conversa`/`Mensagem` (conteúdo WhatsApp é PII e pode conter dados de saúde), anonimiza `Lead` com o mesmo telefone e limpa o texto livre do `HistoricoAtendimento`. Fora do alcance do serviço, tratado operacionalmente:
+- **Arquivo R2 de mensagens (ADR-026):** os objectos arquivados da conversa do titular apagado devem ser eliminados no sweep de arquivo — incluir no runbook do job de arquivamento.
+- **Backups cifrados (R2, ADR-030):** não são reescritos por pedido de apagamento (prática aceite); os dados apagados desaparecem por **expiração da rotação de backups**. ➡️ **Acção:** documentar a janela de retenção de backups (alvo: ≤ 35 dias) na política de privacidade/DPA — é essa janela que torna a posição defensável.
+
 ---
 
 ## 5. Consentimento (onde é preciso)

@@ -140,8 +140,9 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 - Clinical access decision (whether the current user may read clinical fields) and clinical read-audit entries (used by F03)
 
 **Capabilities:**
-- Clinical/anamnesis fields on `Cliente` (allergies, medical history, diabetes, hypertension, medication, surgical history, etc.) are classified as **clinical** and only returned to roles `admin`, `gerente`, `terapeuta` (and `superadmin`). For `recepcionista`, these fields are stripped from API responses (server-side projection, not UI-only).
-- A reusable guard/projection in the clientes read paths enforces this; receptionist requests never include clinical fields.
+- Clinical/anamnesis fields on `Cliente` (allergies, medical history, diabetes, hypertension, medication, surgical history, etc.) are classified as **clinical**. Per `features/features-rgpd/RECONCILIATION.md` R2 (authoritative): base reads `GET /clientes` and `GET /clientes/:id` strip these fields for **all** roles; the single clinical-read endpoint is `GET /clientes/:id/clinico`, which returns them only to `admin`/`gerente`/`terapeuta` (+`superadmin`) — `recepcionista` → 403 — and writes the read audit.
+- A reusable guard/projection (`clinicalFields.js`) enforces this server-side (not UI-only); receptionist requests never include clinical fields.
+- **Consent withdrawal has effect (R4):** when the client's `dados_saude` consent state is `withdrawn`, the `/clinico` endpoint omits the clinical fields for every role (consent state only) and panel writes to anamnese fields are blocked, until a new F04 submission re-grants or F07 erases. `pendente` (legacy data, never formally granted) does not block.
 - **Data minimization to the AI:** clinical/anamnesis fields are also excluded from the internal AI data path (`clienteInternalRoutes` consumed by the `ia-service`). The AI never receives anamnesis/clinical fields — they are never sent to OpenAI/Google. Only non-clinical context the AI needs (name, booking state) is exposed.
 - New `AcessoClinicoLog` model (tenant DB, append-only): records `clienteId`, `userId`, `timestamp` whenever clinical data is read (clinical tab open / detail with clinical fields). Retention of these access logs is bounded (e.g., pruned/archived after 12 months) to avoid unbounded growth.
 
@@ -179,10 +180,11 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 
 **Full Scope additions:**
 - Pre-fill of known fields; multi-step UX; localized confirmation screen.
+- Communications opt-in on the same form *(2026-07-07)*: optional, non-pre-checked, granular `whatsapp_optin`/`marketing` checkboxes below the required health consent — each writes its own `ConsentLog` entry (`origem: formulario`). Highest-conversion capture point for the F09 types; F09's booking/panel points remain.
 
 **Capabilities:**
 - `POST /gdpr/clientes/:id/ficha-token` (authenticated, clinic side) issues a token scoped to `{ tenantId, clienteId }`, valid for **14 days OR until a successful submission** (whichever comes first). Regenerating issues a new token and invalidates the previous one.
-- `GET /ficha/:token` (public, no auth) resolves the token and renders the form; expired/invalid/already-submitted token → friendly error, no enumeration.
+- `GET /ficha/:token` (public, no auth) resolves the token and renders the form; expired/invalid/already-submitted token → friendly error, no enumeration. The render includes the **clinic name** (the tenant is the controller — consent is given to the clinic, not to Marcai) and the **policy text/link** for the stamped version; the form displays both before the consent checkbox, plus a **"Destinado a maiores de 18 anos"** declaration (minors are out of scope, §7).
 - `POST /ficha/:token` (public) validates and writes the anamnesis to the client and a `ConsentLog` entry. Consent checkbox is **not pre-checked** and is required to submit; the submitted policy version is stamped.
 - Public endpoints are rate-limited; token is the only identifier in the URL (no other PII).
 
@@ -237,6 +239,7 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 **Capabilities:**
 - `POST /gdpr/clientes/:id/apagar` (authenticated, admin) marks `pendingDeletion = true`, `deletionRequestedAt = now`, and writes a `ConsentLog (withdrawn)` entry. New `Cliente` fields: `anonimizado`, `pendingDeletion`, `deletionRequestedAt`.
 - A reusable `anonimizarCliente(models, tenantId, clienteId)` service replaces PII and clinical fields (nome, telefone, email, dataNascimento, anamnese) with anonymized tokens/empty, sets `anonimizado = true`, and **preserves financial records** (`Transacao`/`Pagamento`) de-identified — fiscal retention overrides erasure.
+- **Erasure covers the same universe as the export (RECONCILIATION R5, 2026-07-07):** the service also hard-deletes the client's `Conversa`/`Mensagem` (WhatsApp content is PII and may contain health data), anonymizes matching `Lead` docs, and scrubs `HistoricoAtendimento` free-text/clinical fields (skeleton kept for stats). `LidCapture` self-expires (7-day TTL). R2 archive (ADR-026) and backup aging are handled organizationally in `docs/operacoes/rgpd-conformidade.md`.
 - **Two paths, no orphaned requests:** (a) on explicit admin confirmation the service runs **immediately** (so erasure works without F08); (b) otherwise the request waits a configurable grace period (default 30 days) and is then processed by the F08 scheduled job. `pendingDeletion`/`deletionRequestedAt` drive path (b).
 
 **Experience:**
@@ -314,6 +317,15 @@ At a high level: a clinic sends a self-service form link to a client over WhatsA
 **Automatic re-consent on policy change**
 - The policy version is recorded with every consent entry, but automatically prompting clients to re-consent when the privacy-policy version changes (re-consent campaigns) is out of scope for this version.
 
+**Minors / parental consent** *(2026-07-07)*
+- No age verification or parental-consent path. The form carries a "Destinado a maiores de 18 anos" declaration (F04); a date-of-birth gate and a parental-consent flow are future work, wording to be confirmed by the PT data-protection lawyer.
+
+**Automatic form send & pending reminders** *(2026-07-07)*
+- The form link send is **manual by design**: the right moment is the lead→client conversion / treatment scheduling (the F10 flow), a human decision. Auto-sending the ficha when a lead converts + a reminder if still pending near the appointment (the Fresha/Phorest/Zenoti pattern, via the existing BullMQ pipeline) is registered as roadmap in ADR-031 — not in this version.
+
+**Per-tenant policy text** *(2026-07-07)*
+- One reviewed policy template serves all tenants (clinic name interpolated — F04). A per-tenant custom policy text editor is future work.
+
 ## 8. Dependency Graph
 
 **Part 1: Dependency Table**
@@ -379,10 +391,11 @@ graph TD
 - Consent history is paginated (max 100), sorted by timestamp desc, and scoped to the tenant; cross-tenant access returns 404.
 - Invalid `clienteId` returns 400; unknown client returns 404.
 
-### F02. Need-to-Know Clinical Access Control
-- A `recepcionista` request for a client never includes clinical/anamnesis fields (verified server-side, not just hidden in UI).
-- An `admin`/`gerente`/`terapeuta` request includes clinical fields and produces exactly one `AcessoClinicoLog` entry.
-- The internal AI data path (`clienteInternalRoutes`) never returns clinical/anamnesis fields — verified that the payload sent toward the `ia-service` contains no anamnesis data.
+### F02. Need-to-Know Clinical Access Control *(aligned with RECONCILIATION R2/R4, 2026-07-07)*
+- Base reads (`GET /clientes`, `GET /clientes/:id`) never include clinical/anamnesis fields for **any** role (verified server-side, not just hidden in UI).
+- `GET /clientes/:id/clinico` returns clinical fields to `admin`/`gerente`/`terapeuta` (+`superadmin`) and produces exactly one `AcessoClinicoLog` entry; `recepcionista` → 403.
+- With `dados_saude` consent `withdrawn`, `/clinico` returns only the consent state (no clinical fields, any role) and anamnese writes are blocked (R4).
+- The internal AI data path — both `clienteInternalRoutes` and the `ia-service` `mongo_reader` projection (R1) — never returns clinical/anamnesis fields.
 - The read audit cannot be updated or deleted through any route.
 
 ### F03. Clinical Tab in Client Record
@@ -393,6 +406,7 @@ graph TD
 ### F04. Self-Service Anamnesis & Consent Form
 - Issuing a token returns a token scoped to `{tenantId, clienteId}` valid for 14 days or until a successful submission; regenerating invalidates the previous token.
 - The public form renders only for a valid token; expired/invalid/already-submitted tokens show a friendly error with no data leak.
+- The render includes the clinic name and the policy text/link for the stamped version, displayed before the consent checkbox, plus the "maiores de 18 anos" declaration *(2026-07-07)*.
 - Submitting without the (non-pre-checked) consent checkbox returns 400 and preserves the form.
 - A successful submit writes the anamnesis to the client and a `ConsentLog (dados_saude + politica_privacidade, granted, origem: formulario)` with the stamped policy version.
 
@@ -408,6 +422,7 @@ graph TD
 - Requesting erasure sets `pendingDeletion`/`deletionRequestedAt` and writes a `ConsentLog (withdrawn)` entry.
 - On explicit admin confirmation, anonymization runs immediately (without depending on F08).
 - Anonymization replaces PII and clinical fields and sets `anonimizado = true`, while `Transacao`/`Pagamento` records are preserved (de-identified).
+- Anonymization also deletes the client's `Conversa`/`Mensagem` docs, anonymizes matching `Lead` docs, and scrubs `HistoricoAtendimento` free-text/clinical fields, keeping the skeleton (R5, 2026-07-07).
 - A hard-delete of fiscal data is never performed.
 
 ### F08. Automated Retention Anonymization

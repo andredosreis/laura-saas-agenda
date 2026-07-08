@@ -9,9 +9,11 @@
 
 ## 1. Scope
 
+> **🔗 Reconciliation ([../RECONCILIATION.md](../RECONCILIATION.md), R5) — authoritative:** `anonimizarCliente` covers, beyond `Cliente`: hard-delete of `Conversa`+`Mensagem` (by the client's telefone), in-place anonymization of matching `Lead` docs, scrub of `HistoricoAtendimento` free-text/clinical fields. `LidCapture` self-expires (7-day TTL, documented only); R2 archive (ADR-026) + backups handled organizationally in `rgpd-conformidade.md`. §3/§5 below incorporate this; where older text says "single-document `Cliente` update", R5 wins.
+
 **Included:**
 - New `Cliente` fields (tenant DB): `anonimizado` (bool), `pendingDeletion` (bool), `deletionRequestedAt` (date).
-- New reusable service `src/modules/gdpr/gdprService.js` exporting **`anonimizarCliente(models, tenantId, clienteId)`** — replaces PII + ALL clinical/anamnese fields with anonymized tokens/empty, sets `anonimizado = true`, and **preserves financial records** (`Transacao`/`Pagamento`) de-identified (fiscal retention overrides erasure).
+- New reusable service `src/modules/gdpr/gdprService.js` exporting **`anonimizarCliente(models, tenantId, clienteId)`** — replaces PII + ALL clinical/anamnese fields with anonymized tokens/empty, sets `anonimizado = true`, and **preserves financial records** (`Transacao`/`Pagamento`) de-identified (fiscal retention overrides erasure). Per **R5**, the same service also erases/anonymizes the client's footprint in `Conversa`/`Mensagem`/`Lead`/`HistoricoAtendimento` (see §3).
 - `POST /gdpr/clientes/:id/apagar` (admin only) — registers an erasure request: marks `pendingDeletion`/`deletionRequestedAt` and writes a `ConsentLog (accao: 'withdrawn')` entry. On explicit admin confirmation (`confirmar: true`), runs `anonimizarCliente` **immediately**.
 - Extends the existing `gdpr` module from F01 (controller + routes + Zod schemas); the route is mounted via the F01 `['/gdpr', gdprRoutes]` entry already in `apiResources` (dual-mount `/api` + `/api/v1`), behind `authenticate`, tenant-scoped.
 
@@ -61,6 +63,13 @@ deletionRequestedAt: { type: Date,    default: null  },
 - `Transacao` documents: kept as-is. `Transacao.cliente` is a plain ObjectId ref → automatically de-identified because the referenced `Cliente` is now anonymized. Amounts, dates and references retained for fiscal retention.
 - `Pagamento` documents: kept. Embedded direct PII `dadosMBWay.telefone` is scrubbed (set to `''`/undefined) — `[Auto-Accept]`; amounts/dates/references retained.
 
+**Erasure scope beyond `Cliente` (Reconciliation R5, 2026-07-07)** — the export (F06) lists these collections as the client's personal data, so erasure covers the same universe. `anonimizarCliente` captures the client's `telefone` **before** scrubbing the `Cliente` doc, then:
+- **`Conversa` + `Mensagem`** (matched by `{ tenantId, telefone }`; `Mensagem` also via the `conversa` ref): **hard-deleted**. WhatsApp content is PII and frequently contains health data the client typed; not fiscal — deletion is the clean Art. 17 outcome.
+- **`Lead`** with the same `telefone` (pre-conversion remnant): anonymized in place — `nome = '[anonimizado]'`, `telefone = 'ANON-<leadId>'` (respects the `{tenantId, telefone}` unique index), `email = null`. Pipeline stats survive.
+- **`HistoricoAtendimento`** (`{ tenantId, cliente }`): free-text/clinical fields scrubbed to `''`/`[]` — `queixaPrincipal`, `expectativas`, `sintomasRelatados`, `restricoes`, `resultadosImediatos`, `reacoesCliente`, `orientacoesPassadas`, `proximosPassos`, `observacoesProfissional`, `fotosAntes`, `fotosDepois`. Skeleton kept for aggregate stats: datas, `servico`, `tecnicasUtilizadas`/`produtosAplicados`/`equipamentosUsados`, `intensidade`, `satisfacaoCliente`, `status`.
+- **`LidCapture`** (shared DB, diagnostic): no code — docs auto-expire via the existing 7-day TTL index.
+- **Out of the service's reach (documented in `docs/operacoes/rgpd-conformidade.md`):** archived conversation objects in R2 (ADR-026) must be deleted for the erased client in the archive sweep; encrypted backups age out within the documented rotation window (erased data disappears by backup expiry, not rewrite).
+
 ---
 
 ## 4. API Contracts
@@ -103,7 +112,8 @@ Response `200`:
 - **R6.** Fiscal records (`Transacao`, `Pagamento`) are **never hard-deleted** and **never lose fiscal data** (amounts/dates/references); they are de-identified via the anonymized `Cliente` ref (+ scrubbing embedded `dadosMBWay.telefone`). Fiscal retention overrides erasure.
 - **R7.** The client must exist within `req.tenantId`; otherwise 404 (cross-tenant client also → 404, never 403). Invalid ObjectId → 400.
 - **R8.** Erasure request/anonymization is restricted to `admin` (`superadmin` bypasses via `authorize`); other roles → 403.
-- **R9.** `anonimizarCliente` operates only on tenant-scoped queries (`{ _id, tenantId }`); it never touches another tenant's data.
+- **R9.** `anonimizarCliente` operates only on tenant-scoped queries (`{ _id, tenantId }` / `{ tenantId, telefone }` / `{ tenantId, cliente }`); it never touches another tenant's data.
+- **R10.** *(Reconciliation R5)* `anonimizarCliente` also: hard-deletes the client's `Conversa`/`Mensagem` docs, anonymizes matching `Lead` docs, and scrubs `HistoricoAtendimento` free-text/clinical fields (skeleton kept for stats) — all in the same tenant DB, telefone captured before the `Cliente` scrub. Idempotency (R4) extends to these steps (re-run finds nothing left to delete/scrub and no-ops).
 
 **UX flow:** triggered from the client record ("Apagar cliente" → confirm). F07 is the backend; the panel button/modal is deferred. Cross-tenant access returns 404.
 
@@ -137,6 +147,9 @@ Response `200`:
 **Service-level (`anonimizarCliente`):**
 - `is idempotent` — calling twice does not error and leaves a single anonymized state.
 - `respects the unique telefone index` — two anonymized clients in the same tenant get distinct `ANON-<id>` tokens; no duplicate-key error.
+- `deletes the client's Conversa/Mensagem docs` (R10) — seed a conversa + mensagens with the client's telefone; after anonymize, both are gone; another client's conversa in the same tenant is untouched.
+- `anonymizes a matching Lead` (R10) — seed a lead with the same telefone; after anonymize, `nome/telefone/email` are scrubbed with the `ANON-<leadId>` token; pipeline `status` preserved.
+- `scrubs HistoricoAtendimento free-text but keeps the skeleton` (R10) — seed a histórico; after anonymize, `queixaPrincipal`/`observacoesProfissional`/fotos are empty while `servico`/`dataAtendimento`/`status` remain.
 
 **Integration / isolation (mandatory — `.claude/rules/multi-tenant.md`):**
 - `Tenant B cannot request erasure of Tenant A's client` → 404 (never 403), no entry written.
@@ -153,7 +166,7 @@ Response `200`:
 - **`[Auto-Accept]` Two-path trigger = `confirmar` boolean in body.** PRD describes "explicit admin confirmation" (immediate) vs default grace path but doesn't name the parameter. Chosen: `{ confirmar?: boolean }`, default `false` → grace path; `true` → immediate `anonimizarCliente`.
 - **`[Auto-Accept]` Anonymization token format.** `nome = '[anonimizado]'`, `telefone = 'ANON-<clienteId>'` (per-client unique to satisfy `{tenantId, telefone}` index), `email = null`, `dataNascimento = null`, clinical strings → `''`, clinical booleans → `false`, `historicoMensagens` cleared. Chosen for human-readable, collision-free, index-safe tokens.
 - **`[Auto-Accept]` Grace-period config location.** `GRACE_PERIOD_DAYS = 30` lives in `src/modules/gdpr/gdprConfig.js` (module-level constant, consumed by F08). The per-tenant retention/grace override belongs to F08 (`Tenant.configuracoes`), so F07 only stamps `deletionRequestedAt` and does not evaluate elapsed time.
-- **`[Auto-Accept]` No DB transaction for the erasure request.** Mirrors F01's "no replica set / transactions needed" stance for `mongodb-memory-server`. Ordering: append `ConsentLog (withdrawn)` first (audit guaranteed), then mark/anonymize. `anonimizarCliente` is a single-document `Cliente` update + idempotent, so atomicity across documents is not required.
+- **`[Auto-Accept]` No DB transaction for the erasure request.** Mirrors F01's "no replica set / transactions needed" stance for `mongodb-memory-server`. Ordering: append `ConsentLog (withdrawn)` first (audit guaranteed), then anonymize. *(Updated for R5)* `anonimizarCliente` is now multi-collection but every step is **idempotent** (delete-if-exists / scrub-if-present), so a partial failure is safe to re-run (by the admin or the F08 job) instead of requiring a cross-document transaction. Step order: capture telefone → delete `Conversa`/`Mensagem` → anonymize `Lead` → scrub `HistoricoAtendimento` → scrub `Cliente` **last** (the `anonimizado = true` flag is only set when the rest succeeded, so a re-run re-enters the earlier steps).
 - **`[Auto-Accept]` Fiscal de-identification depth.** `Transacao`/`Pagamento` are preserved with all fiscal fields. `Transacao.cliente` (ObjectId ref) is de-identified automatically via the anonymized `Cliente`. Embedded direct PII `Pagamento.dadosMBWay.telefone` is scrubbed (no longer needed post-payment); amounts/dates/references retained for tax-retention law.
 - **`[Auto-Accept]` Idempotency over conflict.** Re-running erasure on an already-`anonimizado` client returns `200` with current state and does **not** append a second `withdrawn` entry nor re-scrub — chosen over `409` to keep the operation safe to retry (and safe for the F08 job to reuse).
 - **`[Auto-Accept]` Withdrawal entry `tipo`/`origem`.** The `ConsentLog (withdrawn)` written on erasure uses `tipo: 'politica_privacidade'`, `origem: 'painel'` (admin-initiated from the panel), reusing F01's enums.
