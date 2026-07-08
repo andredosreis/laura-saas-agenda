@@ -25,6 +25,7 @@
 - Pre-fill of already-known anamnesis fields on render.
 - Multi-step (wizard) UX — Core ships a single-page form.
 - Localized/branded confirmation screen beyond the basic confirmation.
+- **Communications opt-in on the same form** *(added 2026-07-07)*: two optional, non-pre-checked, granular checkboxes (`whatsapp_optin`, `marketing`) below the required health consent — each, when ticked, appends its own `ConsentLog` entry (`origem: 'formulario'`, stamped `POLICY_VERSION`). The form is the highest-conversion capture point for the F09 consent types; F09's booking/panel capture points remain.
 
 **Deferred (other features):** WhatsApp delivery of the link (F05); clinical read gate + tab (F02/F03); export/erasure (F06/F07); communications opt-in (F09). F04 targets **`Cliente` only** — leads are out of scope (PRD §7).
 
@@ -111,16 +112,19 @@ Response `201`:
 Mounted at root `/ficha`, OUTSIDE `apiResources`, not versioned (sibling of `/webhook`).
 - Resolves tenant DB from the token; finds a **valid** `FichaToken`.
 - Returns the minimum needed to render: client first name (greeting) and any already-known anamnese values are **omitted in Core** (pre-fill is a Full-Scope addition).
+- **Informed consent (2026-07-07):** the render also returns the **clinic name** (the tenant is the controller — the client consents to the *clinic*, not to Marcai) and the **policy text** the consent refers to: `politicaTexto` (template from `policyVersion.js` with the clinic name interpolated) or `politicaUrl`. The form MUST display the clinic name and the policy (inline text or expandable/link) **before** the consent checkbox.
 
 Response `200`:
 ```json
 { "success": true, "data": {
   "clienteNome": "Maria",
+  "clinicaNome": "Clínica Laura Estética",
   "politicaVersao": "2026-06-25",
+  "politicaTexto": "A Clínica Laura Estética recolhe os dados de saúde desta ficha para... (template interpolado)",
   "campos": { /* empty/blank anamnese template in Core */ }
 } }
 ```
-- No `clienteId`, no telefone/email, no tenant name beyond what is needed to render — no PII enumeration.
+- No `clienteId`, no telefone/email — no PII enumeration. The clinic name is intentionally included (the client already knows which clinic sent them the link; it is required for informed consent).
 
 ### POST /ficha/:token — public submit (no auth, rate-limited)
 - Body: the anamnese fields (see §3 of `Cliente`) + `consentimento: true`.
@@ -146,6 +150,8 @@ Response `200`:
 - **R8.** Token issuance and submission are tenant-scoped; a token from tenant A can never write to tenant B (the `tenantId` segment + per-tenant DB enforce this); cross-tenant client on issuance → 404.
 - **R9.** The submit handler accepts only the allow-listed anamnese fields + `consentimento` (no mass assignment; `tenantId`/`_id`/status are server-controlled).
 - **R10.** Form targets `Cliente` only; there is no lead path.
+- **R11.** *(2026-07-07)* The render returns and the form displays the **clinic name** and the **policy text/link** (`politicaTexto`/`politicaUrl` from `policyVersion.js`, clinic name interpolated) before the consent checkbox — consent must be informed and attributed to the clinic (controller), not to Marcai.
+- **R12.** *(2026-07-07)* The form displays, adjacent to the consent checkbox, the declaration **"Destinado a maiores de 18 anos"** — minors/parental-consent flows are out of scope (PRD §7); the declaration makes the boundary explicit to the data subject. Exact wording to be confirmed by the PT data-protection lawyer.
 
 ---
 
@@ -182,6 +188,8 @@ Response `200`:
 - `[Auto-Accept]` **Issuance allowed for any staff role** (`recepcionista` included) — sending a client their own form link is an operational, non-clinical action and does not expose clinical data.
 - `[Auto-Accept]` **Anamnese fields written** = the existing `Cliente` anamnesis set: `costumaPermanecerMuitoTempoSentada, alergias, qualAlergia, historicoMedico, qualHistorico, medicamentosEmUso, qualMedicamento, antecedentesCirurgicos, qualCirurgia, cicloMenstrualRegular, usaAnticoncepcional, qualAnticoncepcional, temHipertensao, grauHipertensao, temDiabetes, tipoDiabetes, temEpilepsia, qualEpilepsia, temMarcapasso, temMetais, observacoesAdicionaisAnamnese`.
 - `[Auto-Accept]` CORS: the public page is served from the existing Vercel frontend origin (already whitelisted in `app.js`); no new CORS entry needed for Core.
+- `[Auto-Accept]` *(2026-07-07)* **Policy text source** = a `POLICY_TEXT_TEMPLATE` constant next to `POLICY_VERSION` in `src/modules/gdpr/policyVersion.js`, with `{{clinicaNome}}` interpolated from `Tenant.nome` at render time. Per-tenant custom policy text is a future enhancement (roadmap, ADR-031); for now one reviewed template serves all tenants, but the consent is visually attributed to the clinic.
+- `[Auto-Accept]` *(2026-07-07)* **Minors**: no server-side age verification in Core (the form carries the "maiores de 18" declaration, R12). A date-of-birth gate / parental-consent path is explicitly out of scope (PRD §7).
 
 ---
 
@@ -192,6 +200,7 @@ Response `200`:
 **Acceptance (from PRD §9 F04):**
 - `issuing a token returns a token scoped to {tenantId,clienteId} valid 14 days, and regenerating invalidates the previous one` — issue → 201 with `url`+`expiresAt`; re-issue → prior token's `GET /ficha/:old` now 404 (revoked); new token works.
 - `public form renders only for a valid token` — `GET /ficha/:valid` → 200; expired → 410; revoked/unknown/malformed → 404; no PII beyond first name.
+- `render includes clinicaNome + politicaTexto/politicaVersao` (R11) — assert the tenant's name and the interpolated policy text are present in the render payload.
 - `submitting without the (non-pre-checked) consent returns 400 and preserves the form` — POST with `consentimento:false`/absent → 400, no `Cliente`/`ConsentLog` mutation.
 - `a successful submit writes the anamnese + ConsentLog (dados_saude + politica_privacidade, granted, origem:formulario, versao:POLICY_VERSION)` — POST valid → 200; `Cliente` fields updated; exactly two `ConsentLog` entries with correct tipos/accao/origem/versao; token now `usado`.
 - `token already submitted → 410` — second POST on a used token → 410, no duplicate writes.

@@ -9,7 +9,8 @@
 
 ## 1. Scope
 
-> **🔗 Reconciliation ([../RECONCILIATION.md](../RECONCILIATION.md), R2+R3):** the Clinical tab consumes the **single** F02 endpoint `GET /clientes/:id/clinico`, which returns the clinical fields **and** `consentimentoSaude` (health-consent state) in one call. The earlier `[Auto-Accept]` of a dedicated `/clientes/:id/clinico` shape is correct, but the **client-side consent derivation from `GET /gdpr/consent` is superseded** — take the consent status from this endpoint's payload.
+> **🔗 Reconciliation ([../RECONCILIATION.md](../RECONCILIATION.md), R2+R3+R4):** the Clinical tab consumes the **single** F02 endpoint `GET /clientes/:id/clinico`, which returns the clinical fields **and** `consentimentoSaude` (health-consent state) in one call. The earlier `[Auto-Accept]` of a dedicated `/clientes/:id/clinico` shape is correct, but the **client-side consent derivation from `GET /gdpr/consent` is superseded** — take the consent status from this endpoint's payload.
+> **R4 (withdrawn state, 2026-07-07):** when `consentimentoSaude` is `withdrawn`, the endpoint returns **no clinical fields** — the tab renders the "Retirado" badge, no anamnesis content, and two CTAs: **"Reenviar ficha"** (F05, re-collect consent) and **"Apagar dados"** (F07). `pendente` renders normally (legacy data) with the "Pendente" badge.
 
 **Included:**
 - A gated **"Clínico"** tab on the client-record page (`src/pages/EditarCliente.jsx`), rendered **only** when `useAuth().user.role ∈ { admin, gerente, terapeuta, superadmin }`. `recepcionista` never sees the tab button nor its content.

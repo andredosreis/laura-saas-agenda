@@ -1,6 +1,6 @@
-# RGPD Features — Cross-Feature Reconciliation (2026-06-25)
+# RGPD Features — Cross-Feature Reconciliation (2026-06-25, actualizado 2026-07-07)
 
-Resolves three seams found after the wave-batch spec generation. These decisions are **authoritative**: where a feature spec says otherwise, follow this document. Each affected spec links here.
+Resolves the seams found after the wave-batch spec generation (R1–R3, 2026-06-25) plus two gaps found in the 2026-07-07 review (R4–R5). These decisions are **authoritative**: where a feature spec says otherwise, follow this document. Each affected spec links here.
 
 ---
 
@@ -35,3 +35,30 @@ This is **in scope for F02** (no longer a deferred/residual gap). The AI keeps r
   - **F09** `GET /gdpr/clientes/:id/consent-estado` → returns the comms state (`whatsapp_optin`, `marketing`) from the helper.
   - **F10** `GET /gdpr/clientes/:id/estado-privacidade` (+ batch `?clienteIds=`) → returns anamnesis-form status (from F04's `FichaToken`) + consent state from the helper.
 - Convergence is at the **logic** level (one helper in F01); the per-feature endpoints stay, each a thin wrapper. F09's and F10's earlier independent derivations are **superseded by the F01 helper**.
+
+---
+
+## R4 — Withdrawal of `dados_saude` consent has an operational effect (owned by F02, surfaced by F03) *(2026-07-07)*
+
+**Gap found:** F01 logged the withdrawal and F03 showed "Retirado", but no feature defined what happens to the anamnesis already collected. Under Art. 7(3) processing must cease on withdrawal — a status badge alone is not enough.
+
+**Decision:**
+- When the F01 helper (`estadoAtual`) yields `dados_saude = withdrawn`, **`GET /clientes/:id/clinico` (F02) omits the clinical fields for every role** (same strip as a non-permitted role) and returns only `consentimentoSaude: 'withdrawn'` (+ date). The data stays stored (withdrawal ≠ erasure request — storage pending re-consent or erasure is defensible; the *use* stops).
+- Panel **writes to anamnese fields are blocked** while state is `withdrawn`; the only path that reopens them is a new F04 submission (which appends a fresh `granted` entry) or F07 erasure.
+- **F03 UI** for the withdrawn state: badge "Consentimento retirado", no clinical fields rendered, with two CTAs — "Reenviar ficha" (F05, re-collect consent) and "Apagar dados" (F07).
+- **`pendente` (never granted) does NOT block reads** — legacy anamnesis collected manually pre-feature remains visible to permitted roles, flagged "Pendente" (transition state; the clinic is the controller of its legacy data). Only an explicit `withdrawn` blocks.
+
+---
+
+## R5 — Erasure scope: `anonimizarCliente` covers conversations, leads and treatment history (owned by F07) *(2026-07-07)*
+
+**Gap found:** F07 anonymized only `Cliente` (+ `dadosMBWay.telefone`), but the F06 export correctly lists `Conversa`/`Mensagem`/`HistoricoAtendimento` as the client's personal data — WhatsApp message content is PII and frequently contains health data the client typed. Export and erasure must cover the same universe.
+
+**Decision — `anonimizarCliente` additionally (capture `telefone` BEFORE scrubbing the `Cliente` doc):**
+1. **`Conversa` + `Mensagem`** (tenant DB, matched by the client's `telefone`): **hard-delete** all docs. Not fiscal; content risk is high; deletion is the clean Art. 17 outcome.
+2. **`Lead`** with the same `telefone` (pre-conversion remnant): anonymize in place — `nome = '[anonimizado]'`, `telefone = 'ANON-<leadId>'` (unique index `{tenantId, telefone}` preserved), `email = null`. Pipeline stats survive.
+3. **`HistoricoAtendimento`** for the client: scrub the free-text/clinical fields (`queixaPrincipal`, `expectativas`, `sintomasRelatados`, `restricoes`, `resultadosImediatos`, `reacoesCliente`, `orientacoesPassadas`, `proximosPassos`, `observacoesProfissional`, `fotosAntes`, `fotosDepois`); keep the skeleton (datas, `servico`, técnicas/produtos/equipamentos, `satisfacaoCliente`, `status`) for aggregate stats.
+4. **`LidCapture`** (shared DB): no action — documents auto-expire via 7-day TTL index; documented, not coded.
+5. **R2 message archive (ADR-026)** and **encrypted backups**: outside `anonimizarCliente`'s transaction. Handled organizationally in `docs/operacoes/rgpd-conformidade.md`: archived conversation objects for the erased client must be deleted in the archive sweep, and backups age out within the documented rotation window (erased data disappears from backups by expiry, not by rewrite).
+
+F08 inherits all of this automatically (it only calls F07's service).
