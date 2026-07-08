@@ -132,6 +132,13 @@ const TenantSchema = new Schema({
         numeroWhatsapp: String,
         webhookConfigured: { type: Boolean, default: false },
         webhookUrl: String,
+        // Estado de saúde da ligação — feature de alerta (2026-07-08).
+        // Actualizado por $set cirúrgico em whatsapp.health.* pelo evolutionHealthService.
+        health: {
+            state:       { type: String, enum: ['open', 'down', 'unknown'], default: 'unknown' },
+            downSince:   { type: Date, default: null },
+            lastAlertAt: { type: Date, default: null },
+        },
         // Configurações de mensagens
         mensagens: {
             boasVindas: { type: String, default: 'Olá! Bem-vindo(a) ao nosso espaço. Como posso ajudar?' },
