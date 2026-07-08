@@ -14,7 +14,9 @@ export function normalizeObserved(connResult) {
 /** True se o erro de envio indica desconexão do WhatsApp (não um erro de payload). */
 export function isDisconnectError(error) {
   if (!error) return false;
-  const text = typeof error === 'string' ? error : JSON.stringify(error);
+  const text = typeof error === 'string'
+    ? error
+    : [error.message, JSON.stringify(error)].filter(Boolean).join(' ');
   return /connection closed|connection terminated|not connected|disconnected/i.test(text);
 }
 

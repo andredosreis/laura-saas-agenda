@@ -30,6 +30,10 @@ describe('isDisconnectError', () => {
     expect(isDisconnectError({ status: 400, message: 'invalid number' })).toBe(false);
     expect(isDisconnectError(null)).toBe(false);
   });
+  it('apanha Error instances nativas (message não-enumerável)', () => {
+    expect(isDisconnectError(new Error('Connection Closed'))).toBe(true);
+    expect(isDisconnectError(new Error('bad request'))).toBe(false);
+  });
 });
 
 describe('decideAlert', () => {
