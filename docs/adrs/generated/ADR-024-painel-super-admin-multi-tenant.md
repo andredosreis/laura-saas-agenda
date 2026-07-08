@@ -1,6 +1,6 @@
 # ADR-024: Painel Super-Admin para Gestão Multi-Tenant
 
-**Status:** Accepted — Implementado (módulo `src/modules/admin/`, PR #43)
+**Status:** Accepted — Fases 1–3 implementadas (módulo `src/modules/admin/`, PR #43); **Fases 4–5 planeadas** como Phase 2 em `docs/produto/PRD-superadmin-hardening.md` (F13–F22, auditoria de 2026-07-07)
 **Data:** 2026-05-29
 **Módulo:** ADMIN
 **Autor:** André dos Reis
