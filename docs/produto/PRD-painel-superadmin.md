@@ -282,11 +282,13 @@ This product has a single, homogeneous user group — the operator — so no add
 
 ## 7. Out of Scope
 
+> **Update 2026-07-07:** the two items below are no longer deferred indefinitely — they are planned as **Phase 2** in `docs/produto/PRD-superadmin-hardening.md` (F13–F22), following the audit in `docs/operacoes/auditoria-superadmin-2026-07-07.md`.
+
 **Authentication hardening**
-- Separate super-admin login, 2FA, dedicated rate limiting and short-lived super-admin tokens (ADR-024 Phase 5). The panel assumes a trusted super-admin token; it does not defend against a stolen JWT.
+- Separate super-admin login, 2FA, dedicated rate limiting and short-lived super-admin tokens (ADR-024 Phase 5). The panel assumes a trusted super-admin token; it does not defend against a stolen JWT. → *Phase 2: F13 (rate limiting), F16 (2FA); separate login remains registered debt.*
 
 **Per-tenant integrations**
-- Configuring a tenant's WhatsApp/Evolution instance from the panel (ADR-024 Phase 4, ADR-021).
+- Configuring a tenant's WhatsApp/Evolution instance from the panel (ADR-024 Phase 4, ADR-021). → *Phase 2: F21.*
 
 **Cross-database mutations**
 - Writing inside a tenant's own database (`tenant_<id>`) from the panel. Panel mutations are restricted to the control plane; cross-DB onboarding workflows (outbox/saga) are deferred.

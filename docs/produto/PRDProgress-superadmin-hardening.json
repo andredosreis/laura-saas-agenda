@@ -1,0 +1,88 @@
+{
+  "project": "Marcai Super-Admin Panel — Hardening & Operations (Phase 2)",
+  "prd": "docs/produto/PRD-superadmin-hardening.md",
+  "audit": "docs/operacoes/auditoria-superadmin-2026-07-07.md",
+  "as_of": "2026-07-07",
+  "features": {
+    "F13": {
+      "name": "Dedicated Admin Rate Limiting",
+      "priority": 1,
+      "wave": 1,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F13-admin-rate-limiting/spec.md"
+    },
+    "F14": {
+      "name": "Read-Only Connection Runtime Verification",
+      "priority": 1,
+      "wave": 1,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F14-ro-connection-verification/spec.md"
+    },
+    "F15": {
+      "name": "Tenant Detail Allowlist Projection",
+      "priority": 1,
+      "wave": 1,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F15-tenant-detail-allowlist/spec.md"
+    },
+    "F16": {
+      "name": "Super-Admin 2FA (TOTP)",
+      "priority": 1,
+      "wave": 2,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F16-superadmin-2fa-totp/spec.md",
+      "note": "after merge: enrol the operator, then set SUPERADMIN_REQUIRE_2FA=true on the VPS"
+    },
+    "F17": {
+      "name": "Complete Audit Viewer",
+      "priority": 2,
+      "wave": 1,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F17-audit-viewer-complete/spec.md"
+    },
+    "F18": {
+      "name": "Server-Side Tenant Search, Filters & Stats",
+      "priority": 2,
+      "wave": 2,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F18-tenants-server-search-stats/spec.md"
+    },
+    "F19": {
+      "name": "Tenant Users Listing",
+      "priority": 2,
+      "wave": 2,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F19-tenant-detail-users/spec.md"
+    },
+    "F20": {
+      "name": "Environment Badge & 404 Catch-All",
+      "priority": 2,
+      "wave": 1,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F20-environment-badge-404/spec.md"
+    },
+    "F21": {
+      "name": "Per-Tenant WhatsApp/Evolution Management (ADR-024 Fase 4)",
+      "priority": 2,
+      "wave": 3,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F21-whatsapp-per-tenant/spec.md",
+      "note": "same-files sequencing after F19 (TenantDetailPage); mandatory Evolution API discovery step"
+    },
+    "F22": {
+      "name": "Console UI Consolidation",
+      "priority": 3,
+      "wave": 3,
+      "status": "todo",
+      "spec": "docs/produto/features/features-super_admin/F22-console-ui-consolidation/spec.md",
+      "note": "LAST — refactors files touched by F17/F18/F19/F21"
+    }
+  },
+  "registered_debt": [
+    "separate super-admin login surface (revisit >1 operator)",
+    "DB-level audit immutability — WORM/hash-chain/insert-only role",
+    "impersonation 'login as tenant' (only after F16)",
+    "plan tier rename basico/elite -> essencial/custom (original PRD §1 note)",
+    "CLAUDE.md tech-stack table says Express 4/Mongoose 8 — manifest has Express 5/Mongoose 9 (owner to fix)"
+  ]
+}
