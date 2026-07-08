@@ -5,6 +5,14 @@ const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'marcai';
 
+// Handler reactivo opcional: chamado quando um envio falha (para o health check).
+// Registado no arranque por evolutionHealthJob; nunca importa o serviço aqui
+// (evita ciclo de imports).
+let sendFailureHandler = null;
+export function registerSendFailureHandler(fn) {
+  sendFailureHandler = typeof fn === 'function' ? fn : null;
+}
+
 const normalizePortuguesePhone = (phone) => {
   let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
   if (cleaned.startsWith('351')) return cleaned;
@@ -38,8 +46,13 @@ export const sendWhatsAppMessage = async (to, message, instanceName) => {
     logger.info({ to: phoneNormalized, instance }, '[Evolution] Mensagem enviada');
     return { success: true, result: response.data };
   } catch (error) {
-    logger.error({ to: phoneNormalized, instance, err: error.response?.data || error.message }, '[Evolution] Erro ao enviar mensagem');
-    return { success: false, error: error.response?.data || error.message };
+    const errPayload = error.response?.data || error.message;
+    logger.error({ to: phoneNormalized, instance, err: errPayload }, '[Evolution] Erro ao enviar mensagem');
+    if (sendFailureHandler) {
+      try { sendFailureHandler(instance, errPayload); }
+      catch (cbErr) { logger.error({ err: cbErr.message }, '[Evolution] sendFailureHandler lançou'); }
+    }
+    return { success: false, error: errPayload };
   }
 };
 
@@ -77,5 +90,27 @@ export const getMediaBase64 = async (messageKey, instanceName) => {
   } catch (error) {
     logger.error({ instance, err: error.response?.data || error.message }, '[Evolution] Erro ao descarregar media');
     return { success: false, error: error.response?.data || error.message };
+  }
+};
+
+/**
+ * Consulta o estado de ligação de uma instância Evolution.
+ * @param {string} [instanceName]  cai para EVOLUTION_INSTANCE se omisso
+ * @returns {Promise<{ok:true,state:string}|{ok:false,unreachable:true,error:*}>}
+ */
+export const getConnectionState = async (instanceName) => {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+    return { ok: false, unreachable: true, error: 'Evolution API não configurada' };
+  }
+  const instance = (instanceName && String(instanceName).trim()) || EVOLUTION_INSTANCE;
+  try {
+    const response = await axios.get(
+      `${EVOLUTION_API_URL}/instance/connectionState/${instance}`,
+      { headers: { apikey: EVOLUTION_API_KEY } },
+    );
+    const state = response.data?.instance?.state || response.data?.state || null;
+    return { ok: true, state };
+  } catch (error) {
+    return { ok: false, unreachable: true, error: error.response?.data || error.message };
   }
 };
