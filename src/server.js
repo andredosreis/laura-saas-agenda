@@ -9,6 +9,7 @@ import logger from './utils/logger.js';
 import { initEmailService } from './services/emailService.js';
 import { startNotificationWorker } from './workers/notificationWorker.js';
 import { startLembreteParcelaCron } from './jobs/lembreteParcelaJob.js';
+import { startEvolutionHealthCron } from './jobs/evolutionHealthJob.js';
 
 // Validação fail-fast de env vars críticas — sem secrets o servidor não arranca.
 // Nunca usar fallbacks hardcoded para JWT (vulnerabilidade crítica).
@@ -36,6 +37,7 @@ connectDB().then(async () => {
   await initEmailService();
   startNotificationWorker();
   startLembreteParcelaCron();
+  startEvolutionHealthCron();
 
   const PORT = process.env.PORT || 5000;
   const server = app.listen(PORT, () => {
