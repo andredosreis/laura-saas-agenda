@@ -14,7 +14,7 @@ import {
     verifyResetToken,
     verifyEmail
 } from './authController.js';
-import { authenticate } from '../../middlewares/auth.js';
+import { authenticate, requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import { loginLimiter, registerLimiter, forgotPasswordLimiter, refreshLimiter } from '../../middlewares/rateLimiter.js';
 import {
@@ -47,6 +47,6 @@ router.post('/logout-all', authenticate, logoutAll);
 router.get('/me', authenticate, me);
 router.put('/profile', authenticate, validate(updateProfileSchema), updateProfile);
 router.put('/password', authenticate, validate(changePasswordSchema), changePassword);
-router.put('/tenant', authenticate, validate(updateTenantSchema), updateTenant);
+router.put('/tenant', authenticate, requirePermission('editarConfiguracoes'), validate(updateTenantSchema), updateTenant);
 
 export default router;

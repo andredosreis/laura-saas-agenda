@@ -10,6 +10,7 @@ import adminRouter from '../src/modules/admin/adminRoutes.js';
 import errorHandler from '../src/middlewares/errorHandler.js';
 import AuditLog from '../src/models/AuditLog.js';
 import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 
 let replSet;
 
@@ -31,17 +32,49 @@ afterEach(async () => {
   }
 });
 
-function superToken() {
+// O `authenticate` (hardened) revalida `User.findById(decoded.userId)` — e, para
+// não-superadmin, exige um Tenant persistido com plano ativo/trial. Os tokens têm
+// de corresponder a utilizadores REAIS. Email/slug únicos por chamada (tokenSeq)
+// evitam colisão nos índices únicos.
+let tokenSeq = 0;
+async function superToken() {
+  tokenSeq += 1;
+  const user = await User.create({
+    nome: 'Superadmin Teste',
+    email: `super-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'superadmin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('superadmin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: user._id, email: user.email, role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
 }
 
-function userToken() {
+async function userToken() {
+  tokenSeq += 1;
+  const tenant = await Tenant.create({
+    nome: `Tenant admin ${tokenSeq}`,
+    slug: `tenant-admin-${tokenSeq}`,
+    ativo: true,
+    plano: { tipo: 'basico', status: 'trial', trialDias: 7 },
+  });
+  const user = await User.create({
+    tenantId: tenant._id,
+    nome: 'User admin',
+    email: `admin-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'admin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('admin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'user@marcai.pt', role: 'admin' },
+    { userId: user._id, tenantId: tenant._id, email: user.email, role: 'admin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -78,7 +111,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/plano`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ tipo: 'elite', dataExpiracao: expiry });
 
       expect(res.status).toBe(200);
@@ -104,7 +137,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/plano`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ tipo: 'pro' });
 
       expect(res.status).toBe(200);
@@ -123,7 +156,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/limites`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ maxClientes: 500, iaAtiva: true, maxLeads: -1 });
 
       expect(res.status).toBe(200);
@@ -158,7 +191,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/plano`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ tipo: 'inexistente' });
 
       expect(res.status).toBe(400);
@@ -173,7 +206,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/limites`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ maxClientes: -5 });
 
       expect(res.status).toBe(400);
@@ -184,7 +217,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/limites`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ iaAtiva: 'sim' });
 
       expect(res.status).toBe(400);
@@ -195,7 +228,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/plano`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({});
 
       expect(res.status).toBe(400);
@@ -211,7 +244,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/plano`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ tipo: 'pro', status: 'ativo', tenantId: 'hack', preco: 999 });
 
       expect(res.status).toBe(200);
@@ -227,7 +260,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/limites`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ maxClientes: 200, tenantId: 'hack', nome: 'Hack' });
 
       expect(res.status).toBe(200);
@@ -245,7 +278,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
     it('ID inválido → 400 (plano)', async () => {
       const res = await request(app)
         .put('/api/admin/tenants/invalid-id/plano')
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ tipo: 'pro' });
 
       expect(res.status).toBe(400);
@@ -254,7 +287,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
     it('ID inválido → 400 (limites)', async () => {
       const res = await request(app)
         .put('/api/admin/tenants/invalid-id/limites')
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ maxClientes: 100 });
 
       expect(res.status).toBe(400);
@@ -265,7 +298,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${fakeId}/plano`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ tipo: 'pro' });
 
       expect(res.status).toBe(404);
@@ -276,7 +309,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${fakeId}/limites`)
-        .set('Authorization', `Bearer ${superToken()}`)
+        .set('Authorization', `Bearer ${await superToken()}`)
         .send({ maxClientes: 100 });
 
       expect(res.status).toBe(404);
@@ -287,7 +320,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/plano`)
-        .set('Authorization', `Bearer ${userToken()}`)
+        .set('Authorization', `Bearer ${await userToken()}`)
         .send({ tipo: 'pro' });
 
       expect(res.status).toBe(404);
@@ -298,7 +331,7 @@ describe('F07 — Configure Tenant Plan, Limits & Feature Flags', () => {
 
       const res = await request(app)
         .put(`/api/admin/tenants/${tenant._id}/limites`)
-        .set('Authorization', `Bearer ${userToken()}`)
+        .set('Authorization', `Bearer ${await userToken()}`)
         .send({ maxClientes: 100 });
 
       expect(res.status).toBe(404);

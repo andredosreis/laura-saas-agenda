@@ -1,10 +1,16 @@
 import mongoose from 'mongoose';
 
 const userSubscriptionSchema = new mongoose.Schema({
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: true,
+    index: true,
+  },
   userId: {
-    type: String, // ✨ CORREÇÃO: Aceita String (ex: "LAURA") ou ObjectId como string
-    required: false,
-    index: true, // Adiciona índice para busca rápida
+    type: String,
+    required: true,
+    index: true,
   },
   endpoint: {
     type: String,
@@ -34,5 +40,7 @@ const userSubscriptionSchema = new mongoose.Schema({
     default: true,
   },
 });
+
+userSubscriptionSchema.index({ tenantId: 1, userId: 1, active: 1 });
 
 export default mongoose.model('UserSubscription', userSubscriptionSchema);

@@ -247,7 +247,11 @@ describe('Webhook — registo de saídas manuais (fromMe)', () => {
     expect(msgs[0].mensagem).toBe('🖼️ [imagem]');
   });
 
-  test('fromMe @lid → captura durável em LidCapture (Fase 3)', async () => {
+  // Hardening de segurança (SEC-005): a captura durável de diagnóstico @lid foi
+  // removida porque persistia o payload completo (PII/mensagens/media). O evento
+  // continua a ser ignorado e apenas registado de forma minimizada (jid com hash).
+  // Este teste é agora uma guarda de regressão: nada de PII deve ser persistido.
+  test('fromMe @lid → ignorado sem persistir payload (privacidade)', async () => {
     const { default: LidCapture } = await import('../src/models/LidCapture.js');
     await createTenant();
 
@@ -268,10 +272,8 @@ describe('Webhook — registo de saídas manuais (fromMe)', () => {
     expect(res.body.message).toBe('Saída @lid ignorada');
     await flushAsync();
 
-    const caps = await LidCapture.find({ direcao: 'saida' });
-    expect(caps.length).toBeGreaterThanOrEqual(1);
-    expect(caps[0].remoteJid).toBe('123456789@lid');
-    expect(caps[0].instance).toBe('marcai');
-    expect(caps[0].payload?.key?.remoteJid).toBe('123456789@lid');
+    // Nenhum payload @lid deve ser persistido em LidCapture (nem 'saida' nem outro).
+    const caps = await LidCapture.find({});
+    expect(caps).toHaveLength(0);
   });
 });

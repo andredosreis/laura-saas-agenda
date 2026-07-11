@@ -10,7 +10,7 @@ import {
   buscarTecnicasMaisUsadas,
   estatisticasAtendimentos
 } from './historicoAtendimentoController.js';
-import { authenticate, authorize } from '../../middlewares/auth.js';
+import { authenticate, authorize, requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
   createHistoricoSchema,
@@ -36,7 +36,8 @@ const router = express.Router();
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'profissional'),
+  requirePermission('gerenciarHistorico'),
+  authorize('admin', 'gerente', 'terapeuta'),
   validate(createHistoricoSchema),
   criarHistoricoAtendimento
 );
@@ -45,6 +46,7 @@ router.post(
 router.get(
   '/',
   authenticate,
+  requirePermission('verClientes'),
   listarHistoricosAtendimento
 );
 
@@ -52,7 +54,7 @@ router.get(
 router.get(
   '/stats',
   authenticate,
-  authorize('admin', 'profissional'),
+  requirePermission('verClientes'),
   estatisticasAtendimentos
 );
 
@@ -60,6 +62,7 @@ router.get(
 router.get(
   '/:id',
   authenticate,
+  requirePermission('verClientes'),
   validate(historicoIdParamSchema, 'params'),
   buscarHistoricoPorId
 );
@@ -68,7 +71,8 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  authorize('admin', 'profissional'),
+  requirePermission('gerenciarHistorico'),
+  authorize('admin', 'gerente', 'terapeuta'),
   validate(historicoIdParamSchema, 'params'),
   validate(updateHistoricoSchema),
   atualizarHistoricoAtendimento
@@ -78,7 +82,8 @@ router.put(
 router.put(
   '/:id/finalizar',
   authenticate,
-  authorize('admin', 'profissional'),
+  requirePermission('gerenciarHistorico'),
+  authorize('admin', 'gerente', 'terapeuta'),
   validate(historicoIdParamSchema, 'params'),
   finalizarHistoricoAtendimento
 );
@@ -87,6 +92,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  requirePermission('deletarClientes'),
   authorize('admin'),
   validate(historicoIdParamSchema, 'params'),
   deletarHistoricoAtendimento
@@ -100,6 +106,7 @@ router.delete(
 router.get(
   '/cliente/:clienteId',
   authenticate,
+  requirePermission('verClientes'),
   validate(clienteIdParamSchema, 'params'),
   buscarHistoricoCliente
 );
@@ -108,6 +115,7 @@ router.get(
 router.get(
   '/cliente/:clienteId/tecnicas',
   authenticate,
+  requirePermission('verClientes'),
   validate(clienteIdParamSchema, 'params'),
   buscarTecnicasMaisUsadas
 );

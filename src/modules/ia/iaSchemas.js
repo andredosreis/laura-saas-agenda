@@ -23,21 +23,3 @@ export const enviarMensagemDiretaSchema = z
     body: z.string().trim().min(1, 'Corpo da mensagem é obrigatório').max(4000),
   })
   .strict();
-
-// ─── Webhooks externos (Z-API legacy) — NÃO strict ──────────────────
-// Validamos apenas o que o controller lê. Campos extra vindos da API
-// externa devem fluir sem 400 — caso contrário perdemos mensagens em
-// produção quando a Z-API adicionar campos novos.
-// NOTA: evolutionWebhookSchema foi movido para
-// `src/modules/messaging/webhookSchemas.js` em F12 Phase 5 (ADR-022).
-
-export const zapiWebhookSchema = z.looseObject({
-  phone: z.string().optional(),
-  text: z.looseObject({ message: z.string().optional() }).optional(),
-  body: z.looseObject({
-    phone: z.string().optional(),
-    text: z.looseObject({ message: z.string().optional() }).optional(),
-  }).optional(),
-  data: z.looseObject({ phone: z.string().optional() }).optional(),
-  message: z.string().optional(),
-});

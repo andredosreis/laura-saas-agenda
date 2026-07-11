@@ -7,14 +7,29 @@ import { authenticate } from '../src/middlewares/auth.js';
 import { requireSuperadmin } from '../src/modules/admin/requireSuperadmin.js';
 import { auditMiddleware } from '../src/modules/admin/auditMiddleware.js';
 import AuditLog from '../src/models/AuditLog.js';
+import User from '../src/models/User.js';
 
 beforeAll(setupTestDB);
 afterAll(teardownTestDB);
 beforeEach(clearDB);
 
-function superToken() {
+// O `authenticate` (hardened) revalida `User.findById(decoded.userId)`, pelo que
+// o token tem de corresponder a um superadmin REAL persistido. Email único por
+// chamada (tokenSeq) evita colisão no índice único { tenantId, email }.
+let tokenSeq = 0;
+async function superToken() {
+  tokenSeq += 1;
+  const user = await User.create({
+    nome: 'Superadmin Teste',
+    email: `super-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'superadmin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('superadmin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: user._id, email: user.email, role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -58,7 +73,7 @@ describe('auditMiddleware — read-path do Gate 2', () => {
   it('grava entrada "ok" com a action enriquecida pelo handler', async () => {
     await request(app)
       .get('/api/admin/tenants')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .expect(200);
 
     const [entry] = await waitForAudit({ action: 'tenant.list' });
@@ -70,7 +85,7 @@ describe('auditMiddleware — read-path do Gate 2', () => {
   it('NÃO duplica quando req.audit.committed = true (a cola entre os gates)', async () => {
     await request(app)
       .get('/api/admin/committed')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .expect(200);
 
     // dá folga a um eventual finish-write indevido antes de afirmar o zero
@@ -82,7 +97,7 @@ describe('auditMiddleware — read-path do Gate 2', () => {
   it('deriva a action de METHOD+URL quando o handler não enriquece', async () => {
     await request(app)
       .get('/api/admin/plain')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .expect(200);
 
     const [entry] = await waitForAudit({ action: 'GET /api/admin/plain' });

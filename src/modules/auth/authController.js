@@ -22,6 +22,14 @@ const getJwtRefreshSecret = () => {
 };
 const ACCESS_TOKEN_EXPIRES = '1h'; // Aumentado de 15m para 1h para evitar expiração durante preenchimento de formulários
 const REFRESH_TOKEN_EXPIRES = '7d';
+const hashRefreshToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const findRefreshEntry = (user, token) => {
+    const tokenHash = hashRefreshToken(token);
+    return user.refreshTokens?.find((entry) => (
+        entry.tokenHash === tokenHash || entry.token === token
+    ));
+};
 
 // =============================================
 // HELPERS
@@ -38,7 +46,8 @@ const generateAccessToken = (user, tenant) => {
             email: user.email,
             nome: user.nome,
             role: user.role,
-            plano: tenant.plano.tipo
+            plano: tenant.plano.tipo,
+            tokenVersion: user.authVersion || 0,
         },
         getJwtSecret(),
         { expiresIn: ACCESS_TOKEN_EXPIRES }
@@ -192,7 +201,7 @@ export const register = async (req, res) => {
         await User.findByIdAndUpdate(user._id, {
             $push: {
                 refreshTokens: {
-                    token: refreshToken,
+                    tokenHash: hashRefreshToken(refreshToken),
                     device: req.headers['user-agent'] || 'unknown',
                     ip: req.ip,
                     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
@@ -245,7 +254,7 @@ export const login = async (req, res) => {
         // (índice único é {tenantId, email}). Preferimos os que têm tenant
         // existente — users órfãos (tenant apagado) são ignorados.
         const candidatos = await User.find({ email })
-            .select('+passwordHash')
+            .select('+passwordHash +authVersion')
             .sort({ createdAt: -1 }); // mais recente primeiro
 
         let user = null;
@@ -307,11 +316,12 @@ export const login = async (req, res) => {
                 });
             }
 
-            // Verificar status do plano
-            if (tenant.plano.status === 'cancelado' || tenant.plano.status === 'expirado') {
+            // Alinhado com `authenticate`: suspensão deve bloquear imediatamente
+            // sessões existentes e também novos logins.
+            if (!['ativo', 'trial'].includes(tenant.plano.status)) {
                 return res.status(403).json({
                     success: false,
-                    error: 'Plano expirado. Por favor, renove sua assinatura.',
+                    error: 'Empresa suspensa ou plano inactivo.',
                     planoStatus: tenant.plano.status
                 });
             }
@@ -328,7 +338,7 @@ export const login = async (req, res) => {
 
         // Salvar refresh token (limitar a 5 dispositivos)
         const refreshTokenData = {
-            token: refreshToken,
+            tokenHash: hashRefreshToken(refreshToken),
             device: req.headers['user-agent'] || 'unknown',
             ip: req.ip,
             createdAt: new Date(),
@@ -394,7 +404,7 @@ export const refreshToken = async (req, res) => {
         }
 
         // Buscar usuário
-        const user = await User.findById(decoded.userId);
+        let user = await User.findById(decoded.userId).select('+authVersion');
 
         if (!user || !user.ativo) {
             return res.status(401).json({
@@ -404,11 +414,26 @@ export const refreshToken = async (req, res) => {
         }
 
         // Verificar se o refresh token existe no banco
-        const tokenExists = user.refreshTokens?.some(rt => rt.token === token);
-        if (!tokenExists) {
+        const existingEntry = findRefreshEntry(user, token);
+        if (!existingEntry) {
             return res.status(401).json({
                 success: false,
                 error: 'Refresh token não reconhecido'
+            });
+        }
+
+        // Consumo atómico: apenas um pedido concorrente consegue remover a
+        // entrada. Reutilizações posteriores falham antes de emitir nova sessão.
+        user = await User.findOneAndUpdate(
+            { _id: user._id, ativo: true, 'refreshTokens._id': existingEntry._id },
+            { $pull: { refreshTokens: { _id: existingEntry._id } } },
+            { new: true }
+        ).select('+authVersion');
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Refresh token já utilizado ou revogado'
             });
         }
 
@@ -431,13 +456,11 @@ export const refreshToken = async (req, res) => {
         const newAccessToken = generateAccessToken(user, tenant);
         const newRefreshToken = generateRefreshToken(user);
 
-        // Atualizar refresh token no banco (rotação de token) — duas operações separadas
-        // para evitar conflito MongoDB ao usar $pull e $push no mesmo campo
-        await User.findByIdAndUpdate(user._id, { $pull: { refreshTokens: { token } } });
+        // Guardar apenas o hash do novo token.
         await User.findByIdAndUpdate(user._id, {
             $push: {
                 refreshTokens: {
-                    token: newRefreshToken,
+                    tokenHash: hashRefreshToken(newRefreshToken),
                     device: req.headers['user-agent'] || 'unknown',
                     ip: req.ip,
                     createdAt: new Date(),
@@ -475,10 +498,15 @@ export const logout = async (req, res) => {
         const { refreshToken } = req.body;
 
         if (refreshToken && req.user) {
-            // Remover refresh token específico
-            await User.findByIdAndUpdate(req.user.userId, {
-                $pull: { refreshTokens: { token: refreshToken } }
-            });
+            // Remover por _id para suportar sessões hasheadas e sessões legacy.
+            const user = await User.findById(req.user.userId);
+            const entry = user ? findRefreshEntry(user, refreshToken) : null;
+            if (entry) {
+                await User.updateOne(
+                    { _id: req.user.userId },
+                    { $pull: { refreshTokens: { _id: entry._id } } }
+                );
+            }
         }
 
         res.json({
@@ -502,7 +530,8 @@ export const logout = async (req, res) => {
 export const logoutAll = async (req, res) => {
     try {
         await User.findByIdAndUpdate(req.user.userId, {
-            $set: { refreshTokens: [] }
+            $set: { refreshTokens: [] },
+            $inc: { authVersion: 1 }
         });
 
         res.json({
@@ -624,7 +653,8 @@ export const changePassword = async (req, res) => {
 
         await User.findByIdAndUpdate(req.user.userId, {
             $set: { passwordHash },
-            $unset: { refreshTokens: 1 } // Invalidar todos os tokens
+            $unset: { refreshTokens: 1 }, // Invalidar todos os refresh tokens
+            $inc: { authVersion: 1 } // Invalidar access tokens já emitidos
         });
 
         res.json({
@@ -745,6 +775,7 @@ export const resetPassword = async (req, res) => {
         // chega aqui quando o colaborador define a primeira password) e limpar tokens.
         await User.findByIdAndUpdate(user._id, {
             $set: { passwordHash, emailVerificado: true },
+            $inc: { authVersion: 1 },
             $unset: {
                 resetPasswordToken: 1,
                 resetPasswordExpires: 1,

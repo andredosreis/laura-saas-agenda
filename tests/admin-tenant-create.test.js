@@ -34,17 +34,51 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-function superToken() {
+// O `authenticate` (hardened) revalida `User.findById(decoded.userId)` — e, para
+// não-superadmin, exige um Tenant persistido com plano ativo/trial. Os tokens têm
+// de corresponder a utilizadores REAIS. Email/slug únicos por chamada (tokenSeq)
+// evitam colisão nos índices únicos. O superadmin é criado via `User.create`
+// (não `createWithPassword`), pelo que o mock de `createWithPassword` no C4 não o
+// afecta.
+let tokenSeq = 0;
+async function superToken() {
+  tokenSeq += 1;
+  const user = await User.create({
+    nome: 'Superadmin Teste',
+    email: `super-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'superadmin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('superadmin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: user._id, email: user.email, role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
 }
 
-function userToken() {
+async function userToken() {
+  tokenSeq += 1;
+  const tenant = await Tenant.create({
+    nome: `Tenant admin ${tokenSeq}`,
+    slug: `tenant-admin-${tokenSeq}`,
+    ativo: true,
+    plano: { tipo: 'basico', status: 'trial', trialDias: 7 },
+  });
+  const user = await User.create({
+    tenantId: tenant._id,
+    nome: 'User admin',
+    email: `admin-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'admin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('admin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'user@marcai.pt', role: 'admin' },
+    { userId: user._id, tenantId: tenant._id, email: user.email, role: 'admin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -71,7 +105,7 @@ describe('F06 — Create Tenant + Admin User', () => {
   it('C1 — sucesso atómico: cria Tenant + admin User + AuditLog "ok" e aparece no list', async () => {
     const res = await request(app)
       .post('/api/admin/tenants')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .send(payload);
 
     expect(res.status).toBe(201);
@@ -108,7 +142,7 @@ describe('F06 — Create Tenant + Admin User', () => {
     // Verificar que aparece na listagem (F02)
     const listRes = await request(app)
       .get('/api/admin/tenants')
-      .set('Authorization', `Bearer ${superToken()}`);
+      .set('Authorization', `Bearer ${await superToken()}`);
     expect(listRes.status).toBe(200);
     expect(listRes.body.data).toHaveLength(1);
     expect(listRes.body.data[0]._id).toBe(String(tenant._id));
@@ -125,7 +159,7 @@ describe('F06 — Create Tenant + Admin User', () => {
 
     const res = await request(app)
       .post('/api/admin/tenants')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .send(maliciousPayload);
 
     expect(res.status).toBe(201);
@@ -158,7 +192,7 @@ describe('F06 — Create Tenant + Admin User', () => {
     // Tentar criar via admin
     const res = await request(app)
       .post('/api/admin/tenants')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .send(payload);
 
     expect(res.status).toBe(409);
@@ -178,7 +212,7 @@ describe('F06 — Create Tenant + Admin User', () => {
 
     const res = await request(app)
       .post('/api/admin/tenants')
-      .set('Authorization', `Bearer ${superToken()}`)
+      .set('Authorization', `Bearer ${await superToken()}`)
       .send(payload);
 
     expect(res.status).toBe(500);
@@ -186,6 +220,13 @@ describe('F06 — Create Tenant + Admin User', () => {
     // Garantir que não restou Tenant órfão
     const tenants = await Tenant.find({});
     expect(tenants).toHaveLength(0);
+
+    // O superadmin usado para autenticar é uma fixture exigida pelo hardening do
+    // `authenticate` (revalida o utilizador na DB), não um efeito da mutação.
+    // Remover só essa fixture de auth (role 'superadmin') mantém a asserção a
+    // verificar exactamente o que testa: que o rollback não deixou o admin User
+    // (role 'admin') órfão.
+    await User.deleteMany({ role: 'superadmin' });
 
     // Garantir que não restou User
     const users = await User.find({});
@@ -202,7 +243,7 @@ describe('F06 — Create Tenant + Admin User', () => {
   it('C5 — não-superadmin: retorna 404', async () => {
     const res = await request(app)
       .post('/api/admin/tenants')
-      .set('Authorization', `Bearer ${userToken()}`)
+      .set('Authorization', `Bearer ${await userToken()}`)
       .send(payload);
 
     expect(res.status).toBe(404);

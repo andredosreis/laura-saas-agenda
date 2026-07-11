@@ -1,7 +1,7 @@
 /**
  * webhookSchemas — Zod schemas for the messaging webhook entry point.
  *
- * Loose schemas by design: external WhatsApp providers (Evolution, Z-API)
+ * Loose schemas by design: Evolution may add fields to webhook payloads.
  * evolve their payload over time. We validate only the fields the
  * controller actually reads; unknown fields flow through unchanged. A
  * strict schema would drop messages in production whenever Evolution

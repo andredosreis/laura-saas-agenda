@@ -18,7 +18,6 @@ const pushSubscription = z
 export const subscribeSchema = z
   .object({
     subscription: pushSubscription,
-    userId: z.string().min(1).max(100).optional().nullable(),
     userAgent: z.string().max(500).optional(),
   })
   .strict();
@@ -28,7 +27,3 @@ export const unsubscribeSchema = z
     endpoint: z.string().url('Endpoint inválido').max(500),
   })
   .strict();
-
-export const subscriptionStatusQuerySchema = z.object({
-  userId: z.string().min(1, 'userId é obrigatório').max(100),
-});

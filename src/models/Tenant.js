@@ -111,10 +111,12 @@ const TenantSchema = new Schema({
     },
 
     // =============================================
-    // INTEGRAÇÃO WHATSAPP (Evolution API + legacy Z-API)
+    // INTEGRAÇÃO WHATSAPP (Evolution API)
     // =============================================
     whatsapp: {
-        provider: { type: String, enum: ['zapi', 'evolution', 'baileys'], default: 'zapi' },
+        // `zapi` permanece apenas para documentos históricos poderem ser lidos
+        // e migrados sem falhar validação; não existe integração Z-API em runtime.
+        provider: { type: String, enum: ['evolution', 'baileys', 'zapi'], default: 'evolution' },
         // Identificação da instância Evolution dedicada deste tenant.
         // unique sparse: nem todos os tenants têm Evolution; quem tem, tem nome único.
         // Validação: minúsculas, números, hífenes (slug-style — limite Evolution Manager).
@@ -125,10 +127,6 @@ const TenantSchema = new Schema({
             match: [/^[a-z0-9-]+$/, 'instanceName deve conter apenas minúsculas, números e hífenes']
         },
         instanceToken: { type: String },
-        // Legacy Z-API (mantido para retrocompat — ADR-014)
-        zapiInstanceId: String,
-        zapiToken: String,
-        zapiClientToken: String,
         numeroWhatsapp: String,
         webhookConfigured: { type: Boolean, default: false },
         webhookUrl: String,

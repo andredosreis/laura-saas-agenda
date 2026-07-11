@@ -22,8 +22,17 @@ logger = structlog.get_logger()
 
 
 class TranscribeRequest(BaseModel):
-    audio_base64: str = Field(..., description="Áudio em base64 (sem prefixo data:)")
-    mime_type: str = Field(default="audio/ogg", description="Ex.: audio/ogg, audio/mpeg")
+    audio_base64: str = Field(
+        ...,
+        max_length=15 * 1024 * 1024,
+        description="Áudio em base64 (sem prefixo data:)",
+    )
+    mime_type: str = Field(
+        default="audio/ogg",
+        pattern=r"^audio/[a-zA-Z0-9.+-]+$",
+        max_length=100,
+        description="Ex.: audio/ogg, audio/mpeg",
+    )
 
 
 class TranscribeResponse(BaseModel):

@@ -34,6 +34,7 @@ async function criarTenantEToken({ slug = 'test-salon', leadsAtivo = true, role 
     email: `admin@${slug}.pt`,
     passwordHash: 'hash-placeholder',
     role,
+    permissoes: User.getDefaultPermissions(role),
     emailVerificado: true,
   });
   const token = jwt.sign(
@@ -98,7 +99,7 @@ describe('POST /api/leads', () => {
     const user = await User.create({
       tenantId: tenant._id,
       nome: 'A', email: 'a@lim.pt', passwordHash: 'h',
-      role: 'admin', emailVerificado: true,
+      role: 'admin', permissoes: User.getDefaultPermissions('admin'), emailVerificado: true,
     });
     const token = jwt.sign(
       { userId: user._id, tenantId: tenant._id, role: 'admin' },

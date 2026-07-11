@@ -33,9 +33,48 @@ afterEach(async () => {
   }
 });
 
+// O `authenticate` reforçado revalida o utilizador na DB (findById + ativo).
+// Tokens têm de referenciar utilizadores realmente persistidos, senão devolvem
+// 401 antes de chegarem ao `requireSuperadmin`. Persistimos as identidades uma
+// vez por teste (as colecções são limpas no afterEach anterior); os helpers de
+// token continuam síncronos e podem ser chamados várias vezes por teste.
+let superadminId;
+let nonSuperUserId;
+let nonSuperTenantId;
+
+beforeEach(async () => {
+  const superadmin = await User.createWithPassword({
+    nome: 'Superadmin Teste',
+    email: 'super@marcai.pt',
+    password: 'Senha@Segura123',
+    role: 'superadmin',
+    emailVerificado: true,
+  });
+  superadminId = superadmin._id;
+
+  const tenant = await Tenant.create({
+    nome: 'Tenant Nao-Super',
+    slug: 'tenant-nao-super',
+    ativo: true,
+    plano: { tipo: 'basico', status: 'ativo', dataInicio: new Date() },
+  });
+  nonSuperTenantId = tenant._id;
+
+  const admin = await User.createWithPassword({
+    tenantId: tenant._id,
+    nome: 'Admin Nao-Super',
+    email: 'admin-nao-super@marcai.pt',
+    password: 'Senha@Segura123',
+    role: 'admin',
+    permissoes: User.getDefaultPermissions('admin'),
+    emailVerificado: true,
+  });
+  nonSuperUserId = admin._id;
+});
+
 function superToken() {
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: superadminId.toString(), email: 'super@marcai.pt', role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -43,7 +82,7 @@ function superToken() {
 
 function userToken() {
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'user@marcai.pt', role: 'admin' },
+    { userId: nonSuperUserId.toString(), tenantId: nonSuperTenantId.toString(), email: 'user@marcai.pt', role: 'admin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -169,8 +208,12 @@ describe('F08 — Suspend / Reactivate Tenant', () => {
       const after = await request(app)
         .get('/api/v1/clientes')
         .set('Authorization', `Bearer ${token}`);
+      // Hardening (SEC-006): o bloqueio de um tenant suspenso passou a acontecer
+      // no próprio authenticate (mais cedo e mais estrito que o requirePlan), com
+      // uma mensagem genérica e sem expor planoStatus no corpo.
       expect(after.status).toBe(403);
-      expect(after.body.planoStatus).toBe('suspenso');
+      expect(after.body.success).toBe(false);
+      expect(after.body.error).toBe('Empresa suspensa ou plano inactivo');
     });
 
     it('super-admin continua a conseguir gerir tenant suspenso', async () => {

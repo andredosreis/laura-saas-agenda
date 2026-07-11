@@ -40,7 +40,6 @@ import { handle as handleManualSilent } from '../handlers/manualSilent.js';
 import { handle as handleNoPendingAppointmentReply } from '../handlers/noPendingAppointmentReply.js';
 import { handle as handleClientLifecycle } from '../handlers/iaClientLifecycle.js';
 import { persistManualOutbound } from '../handlers/manualOutbound.js';
-import LidCapture from '../../../models/LidCapture.js';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
@@ -62,23 +61,20 @@ export function descreverMidia(msgData) {
   return null;
 }
 
-// ⚠️ DIAGNÓSTICO TEMPORÁRIO — Fase 3 do plano de inbox (docs/plano-inbox-completo.md).
-// Captura o payload COMPLETO de uma mensagem @lid para descobrir onde o Evolution v2
-// põe o número real (a doc não o documenta). Remover assim que a resolução de @lid
-// estiver implementada. Frequência: grep '"motivo":"lid"'. Payload: grep 'lidPayload'.
+// Registo mínimo de eventos @lid. Payloads completos podem conter PII, mensagens
+// e media; nunca devem entrar em logs nem numa collection de diagnóstico.
 function logLidParaFase3(direcao, msgData, instance) {
   logger.info(
-    { direcao, motivo: 'lid', lidPayload: msgData },
+    {
+      direcao,
+      motivo: 'lid',
+      remote_jid_hash: telefoneHash(msgData?.key?.remoteJid || ''),
+      message_id: msgData?.key?.id,
+      message_type: msgData?.messageType,
+      instance,
+    },
     '[webhook] @lid capturado para Fase 3',
   );
-  // Persistência DURÁVEL (sobrevive a restarts/deploys, ao contrário dos docker
-  // logs). Best-effort — uma falha aqui nunca quebra o webhook.
-  LidCapture.create({
-    direcao,
-    remoteJid: msgData?.key?.remoteJid,
-    instance,
-    payload: msgData,
-  }).catch((err) => logger.warn({ err: err.message }, '[webhook] @lid capture persist falhou'));
 }
 
 /**

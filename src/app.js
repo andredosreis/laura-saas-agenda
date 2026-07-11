@@ -23,7 +23,6 @@ import scheduleRoutes from './routes/scheduleRoutes.js';
 import notificationRoutes from './modules/notificacoes/notificationRoutes.js';
 import webhookRoutes from './modules/messaging/webhookRoutes.js';
 import authRoutes from './modules/auth/authRoutes.js'; // 🆕 Autenticação — migrado para src/modules/auth/ (ADR-011)
-import migrationRoutes from './routes/migrationRoutes.js'; // 🆕 Rota de Migração
 import transacaoRoutes from './modules/financeiro/transacaoRoutes.js';
 import compraPacoteRoutes from './modules/financeiro/compraPacoteRoutes.js';
 import pagamentoRoutes from './modules/financeiro/pagamentoRoutes.js';
@@ -62,7 +61,6 @@ app.use(requestLogger);
 // IMPORTANTE: Permite requisições sem origin (webhooks, Postman, etc) E da whitelist
 const whiteList = [
   'https://laura-saas-agenda-mfqt.vercel.app', // Frontend Vercel
-  'https://api.z-api.io'                        // Webhook Z-API
 ];
 
 logger.info({ NODE_ENV: process.env.NODE_ENV }, '[APP] Ambiente detectado');
@@ -101,7 +99,6 @@ const apiResources = [
   ['/whatsapp', whatsappRoutes],
   ['/schedules', scheduleRoutes],
   ['/notifications', notificationRoutes],
-  ['/migration', migrationRoutes],
   ['/transacoes', transacaoRoutes],
   ['/compras-pacotes', compraPacoteRoutes],
   ['/pagamentos', pagamentoRoutes],

@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate, injectTenant } from '../../middlewares/auth.js';
+import { authenticate, injectTenant, requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
   createPacote,
@@ -19,10 +19,10 @@ const router = express.Router();
 router.use(authenticate);
 router.use(injectTenant);
 
-router.get('/', getAllPacotes);
-router.post('/', validate(criarPacoteSchema), createPacote);
-router.get('/:id', validate(idParamSchema, 'params'), getPacote);
-router.put('/:id', validate(idParamSchema, 'params'), validate(atualizarPacoteSchema), updatePacote);
-router.delete('/:id', validate(idParamSchema, 'params'), deletePacote);
+router.get('/', requirePermission('verPacotes'), getAllPacotes);
+router.post('/', requirePermission('criarPacotes'), validate(criarPacoteSchema), createPacote);
+router.get('/:id', requirePermission('verPacotes'), validate(idParamSchema, 'params'), getPacote);
+router.put('/:id', requirePermission('editarPacotes'), validate(idParamSchema, 'params'), validate(atualizarPacoteSchema), updatePacote);
+router.delete('/:id', requirePermission('deletarPacotes'), validate(idParamSchema, 'params'), deletePacote);
 
 export default router;

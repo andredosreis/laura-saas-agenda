@@ -4,22 +4,59 @@ import mongoose from 'mongoose';
 import app from '../src/app.js';
 import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
 import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 
 beforeAll(setupTestDB);
 afterAll(teardownTestDB);
 beforeEach(clearDB);
 
+// O `authenticate` reforçado revalida o utilizador na DB (findById + ativo).
+// Tokens têm de referenciar utilizadores realmente persistidos, senão devolvem
+// 401 antes de chegarem ao `requireSuperadmin`. O superadmin é persistido a
+// cada teste (a DB é limpa no beforeEach anterior). NÃO tem tenantId, logo não
+// polui os testes que contam tenants.
+let superadminId;
+
+beforeEach(async () => {
+  const superadmin = await User.createWithPassword({
+    nome: 'Superadmin Teste',
+    email: 'super@marcai.pt',
+    password: 'Senha@Segura123',
+    role: 'superadmin',
+    emailVerificado: true,
+  });
+  superadminId = superadmin._id;
+});
+
 function superToken() {
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: superadminId.toString(), email: 'super@marcai.pt', role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
 }
 
-function tenantToken(role = 'admin') {
+// Persiste um admin não-superadmin + o respectivo tenant activo, apenas onde é
+// preciso (evita poluir os testes de listagem de tenants). O tenant tem de ser
+// activo/trial para o `authenticate` deixar passar até ao `requireSuperadmin`.
+async function tenantToken(role = 'admin') {
+  const tenant = await Tenant.create({
+    nome: 'Tenant Nao-Super',
+    slug: 'tenant-nao-super',
+    ativo: true,
+    plano: { tipo: 'basico', status: 'ativo', dataInicio: new Date() },
+  });
+  const admin = await User.createWithPassword({
+    tenantId: tenant._id,
+    nome: 'Admin Nao-Super',
+    email: 'admin-nao-super@marcai.pt',
+    password: 'Senha@Segura123',
+    role,
+    permissoes: User.getDefaultPermissions(role),
+    emailVerificado: true,
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), tenantId: new mongoose.Types.ObjectId().toString(), role },
+    { userId: admin._id.toString(), tenantId: tenant._id.toString(), role },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -42,7 +79,7 @@ describe('GET /api/v1/admin/tenants', () => {
   it('404 para não-superadmin — não revela a superfície', async () => {
     const res = await request(app)
       .get('/api/v1/admin/tenants')
-      .set('Authorization', `Bearer ${tenantToken('admin')}`);
+      .set('Authorization', `Bearer ${await tenantToken('admin')}`);
     expect(res.status).toBe(404);
   });
 

@@ -122,10 +122,7 @@ describe('Provisionamento de tenant — criar cliente novo (isolado da Laura)', 
     expect(tenant.whatsapp?.webhookConfigured).toBe(false); // webhook por configurar
     expect(tenant.limites.whatsappAutomacao).toBe(false); // automação WhatsApp desligada
 
-    // Observação adicional (não-bloqueante): o provider arranca em 'zapi' por
-    // defeito no schema, apesar da migração para Evolution API (ADR-014). O passo
-    // de activação no painel terá de definir provider='evolution' + instanceName.
-    expect(tenant.whatsapp?.provider).toBe('zapi');
+    expect(tenant.whatsapp?.provider).toBe('evolution');
 
     // CONCLUSÃO documentada: o painel super-admin precisa de um passo explícito de
     // "activar WhatsApp" (provider + instanceName + instância Evolution + webhook).

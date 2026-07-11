@@ -66,6 +66,7 @@ const UserSchema = new Schema({
         criarClientes: { type: Boolean, default: true },
         editarClientes: { type: Boolean, default: true },
         deletarClientes: { type: Boolean, default: false },
+        gerenciarHistorico: { type: Boolean, default: false },
 
         // Agendamentos
         verAgendamentos: { type: Boolean, default: true },
@@ -81,6 +82,8 @@ const UserSchema = new Schema({
 
         // Financeiro
         verFinanceiro: { type: Boolean, default: false },
+        editarFinanceiro: { type: Boolean, default: false },
+        registrarPagamentos: { type: Boolean, default: false },
 
         // Leads / CRM (Phase 1+)
         verLeads: { type: Boolean, default: true },
@@ -174,7 +177,10 @@ const UserSchema = new Schema({
     // SEGURANÇA
     // =============================================
     refreshTokens: [{
+        // `token` é mantido temporariamente só para sessões legacy anteriores
+        // ao hardening. Novas sessões guardam apenas tokenHash.
         token: String,
+        tokenHash: String,
         device: String,
         ip: String,
         createdAt: { type: Date, default: Date.now },
@@ -192,6 +198,10 @@ const UserSchema = new Schema({
     // Bloqueio por tentativas de login
     loginAttempts: { type: Number, default: 0 },
     lockUntil: Date,
+
+    // Incrementado em alterações de segurança para revogar access tokens já
+    // emitidos sem manter uma blacklist de JWTs.
+    authVersion: { type: Number, default: 0, select: false },
 
 }, {
     timestamps: true,  // createdAt, updatedAt
@@ -282,6 +292,7 @@ UserSchema.methods.resetLoginAttempts = function () {
 UserSchema.methods.toSafeObject = function () {
     const obj = this.toObject();
     delete obj.passwordHash;
+    delete obj.authVersion;
     delete obj.refreshTokens;
     delete obj.resetPasswordToken;
     delete obj.resetPasswordExpires;
@@ -330,6 +341,7 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             criarClientes: true,
             editarClientes: true,
             deletarClientes: true,
+            gerenciarHistorico: true,
             verAgendamentos: true,
             criarAgendamentos: true,
             editarAgendamentos: true,
@@ -339,6 +351,8 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: true,
             deletarPacotes: true,
             verFinanceiro: true,
+            editarFinanceiro: true,
+            registrarPagamentos: true,
             verLeads: true,
             criarLeads: true,
             editarLeads: true,
@@ -352,6 +366,7 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             criarClientes: true,
             editarClientes: true,
             deletarClientes: true,
+            gerenciarHistorico: true,
             verAgendamentos: true,
             criarAgendamentos: true,
             editarAgendamentos: true,
@@ -361,6 +376,8 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: true,
             deletarPacotes: true,
             verFinanceiro: true,
+            editarFinanceiro: true,
+            registrarPagamentos: true,
             verLeads: true,
             criarLeads: true,
             editarLeads: true,
@@ -374,6 +391,7 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             criarClientes: true,
             editarClientes: true,
             deletarClientes: false,
+            gerenciarHistorico: true,
             verAgendamentos: true,
             criarAgendamentos: true,
             editarAgendamentos: true,
@@ -383,6 +401,8 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: true,
             deletarPacotes: false,
             verFinanceiro: true,
+            editarFinanceiro: true,
+            registrarPagamentos: true,
             verLeads: true,
             criarLeads: true,
             editarLeads: true,
@@ -396,6 +416,7 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             criarClientes: true,
             editarClientes: true,
             deletarClientes: false,
+            gerenciarHistorico: false,
             verAgendamentos: true,
             criarAgendamentos: true,
             editarAgendamentos: true,
@@ -405,6 +426,8 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: false,
             deletarPacotes: false,
             verFinanceiro: false,
+            editarFinanceiro: false,
+            registrarPagamentos: true,
             verLeads: true,
             criarLeads: true,
             editarLeads: true,
@@ -418,6 +441,7 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             criarClientes: false,
             editarClientes: false,
             deletarClientes: false,
+            gerenciarHistorico: true,
             verAgendamentos: true,
             criarAgendamentos: false,
             editarAgendamentos: false,
@@ -427,6 +451,8 @@ UserSchema.statics.getDefaultPermissions = function (role) {
             editarPacotes: false,
             deletarPacotes: false,
             verFinanceiro: false,
+            editarFinanceiro: false,
+            registrarPagamentos: false,
             verLeads: false,
             criarLeads: false,
             editarLeads: false,

@@ -3,7 +3,16 @@ import UserSubscription from '../../models/UserSubscription.js';
 // ✅ 1. Frontend envia subscription
 export const subscribeUser = async (req, res) => {
   try {
-    const { subscription, userId } = req.body;
+    if (!req.tenantId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Subscrições Push estão disponíveis apenas para utilizadores de uma empresa',
+      });
+    }
+
+    const { subscription } = req.body;
+    const userId = String(req.user.userId);
+    const tenantId = req.tenantId;
 
     // Buscar subscription existente
     let userSub = await UserSubscription.findOne({ 
@@ -11,14 +20,19 @@ export const subscribeUser = async (req, res) => {
     });
 
     if (userSub) {
-      // Atualizar se já existe
+      // O endpoint identifica a subscrição do browser. Ao trocar de conta,
+      // reassociá-lo explicitamente à identidade autenticada actual.
+      userSub.userId = userId;
+      userSub.tenantId = tenantId;
+      userSub.keys = subscription.keys;
       userSub.active = true;
       userSub.lastSyncAt = new Date();
       await userSub.save();
     } else {
       // Criar nova
       userSub = await UserSubscription.create({
-        userId: userId || null,
+        tenantId,
+        userId,
         endpoint: subscription.endpoint,
         keys: subscription.keys,
       });
@@ -40,10 +54,17 @@ export const subscribeUser = async (req, res) => {
 // ✅ 2. Desinscrever
 export const unsubscribeUser = async (req, res) => {
   try {
+    if (!req.tenantId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Subscrições Push estão disponíveis apenas para utilizadores de uma empresa',
+      });
+    }
+
     const { endpoint } = req.body;
 
     const result = await UserSubscription.updateOne(
-      { endpoint },
+      { endpoint, tenantId: req.tenantId, userId: String(req.user.userId) },
       { active: false }
     );
 
@@ -62,10 +83,16 @@ export const unsubscribeUser = async (req, res) => {
 // ✅ 3. Obter status
 export const getSubscriptionStatus = async (req, res) => {
   try {
-    const { userId } = req.query;
+    if (!req.tenantId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Subscrições Push estão disponíveis apenas para utilizadores de uma empresa',
+      });
+    }
 
     const subscription = await UserSubscription.findOne({
-      userId,
+      tenantId: req.tenantId,
+      userId: String(req.user.userId),
       active: true,
     });
 

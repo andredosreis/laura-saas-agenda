@@ -11,6 +11,7 @@ import { adminMutation } from '../src/modules/admin/adminMutation.js';
 import errorHandler from '../src/middlewares/errorHandler.js';
 import AuditLog from '../src/models/AuditLog.js';
 import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 
 // Transações exigem replica set — o MongoMemoryServer standalone partilhado
 // (tests/setup.js) não as suporta. Setup próprio, isolado das outras 40+
@@ -35,9 +36,23 @@ afterEach(async () => {
   }
 });
 
-function superToken() {
+// O `authenticate` (hardened) revalida `User.findById(decoded.userId)`, pelo que
+// o token tem de corresponder a um superadmin REAL persistido. Email único por
+// chamada (tokenSeq) evita colisão no índice único { tenantId, email }.
+let tokenSeq = 0;
+async function superToken() {
+  tokenSeq += 1;
+  const user = await User.create({
+    nome: 'Superadmin Teste',
+    email: `super-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'superadmin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('superadmin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: user._id, email: user.email, role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -85,7 +100,7 @@ describe('adminMutation — factory de mutação auditada (F05 / ADR-024 Fase 3)
       slug: 'salao-mutation',
       plano: { tipo: 'pro', status: 'ativo' },
     });
-    const token = superToken();
+    const token = await superToken();
     const decoded = jwt.decode(token);
 
     const res = await request(app)
@@ -115,7 +130,7 @@ describe('adminMutation — factory de mutação auditada (F05 / ADR-024 Fase 3)
 
     const res = await request(app)
       .post(`/api/admin/tenants/${tenant._id}/falhar`)
-      .set('Authorization', `Bearer ${superToken()}`);
+      .set('Authorization', `Bearer ${await superToken()}`);
 
     expect(res.status).toBeGreaterThanOrEqual(400);
 
@@ -141,7 +156,7 @@ describe('adminMutation — factory de mutação auditada (F05 / ADR-024 Fase 3)
 
     const res = await request(app)
       .post(`/api/admin/tenants/${tenant._id}/suspender`)
-      .set('Authorization', `Bearer ${superToken()}`);
+      .set('Authorization', `Bearer ${await superToken()}`);
 
     expect(res.status).toBeGreaterThanOrEqual(400);
 

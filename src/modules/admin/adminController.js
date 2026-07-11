@@ -54,7 +54,7 @@ export const obterTenant = async (req, res) => {
   const [tenant, totalUsuarios] = await Promise.all([
     // Excluir credenciais WhatsApp — secrets que nunca devem chegar ao cliente.
     Tenant.findById(id).select(
-      '-whatsapp.instanceToken -whatsapp.zapiToken -whatsapp.zapiClientToken'
+      '-whatsapp.instanceToken'
     ),
     User.countDocuments({ tenantId: id }),
   ]);

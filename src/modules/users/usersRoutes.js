@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate, authorize, injectTenant } from '../../middlewares/auth.js';
+import { authenticate, authorize, injectTenant, requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
   listarColaboradores,
@@ -21,6 +21,7 @@ const router = express.Router();
 // Todas as rotas exigem autenticação + role admin/superadmin
 router.use(authenticate);
 router.use(authorize('admin', 'superadmin'));
+router.use(requirePermission('gerenciarUsuarios'));
 router.use(injectTenant);
 
 router.get('/', listarColaboradores);
