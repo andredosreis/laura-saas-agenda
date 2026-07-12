@@ -53,6 +53,8 @@ vi.mock('../SlotPicker', () => ({
 }));
 
 describe('QuickAppointmentModal — encaixe forçado (F05)', () => {
+  const futureDate = '2099-07-10';
+
   it('inclui forcarEncaixe: true no payload quando o admin activa o toggle', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
@@ -77,7 +79,7 @@ describe('QuickAppointmentModal — encaixe forçado (F05)', () => {
     // 3. Escolher a data e depois a hora fora do horário via força
     const dateInput = document.querySelector('input[name="dataDia"]');
     expect(dateInput).not.toBeNull();
-    fireEvent.change(dateInput as Element, { target: { value: '2026-07-10' } });
+    fireEvent.change(dateInput as Element, { target: { value: futureDate } });
 
     fireEvent.click(screen.getByText('stub-forcar-encaixe'));
     fireEvent.click(screen.getByText('stub-hora-0830'));
@@ -88,7 +90,7 @@ describe('QuickAppointmentModal — encaixe forçado (F05)', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        dataHora: '2026-07-10T08:30',
+        dataHora: `${futureDate}T08:30`,
         forcarEncaixe: true,
       })
     );
@@ -114,7 +116,7 @@ describe('QuickAppointmentModal — encaixe forçado (F05)', () => {
     fireEvent.change(ofertaInput, { target: { value: 'Sessão teste' } });
 
     const dateInput = document.querySelector('input[name="dataDia"]');
-    fireEvent.change(dateInput as Element, { target: { value: '2026-07-10' } });
+    fireEvent.change(dateInput as Element, { target: { value: futureDate } });
     fireEvent.click(screen.getByText('stub-hora-0830'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Criar Agendamento' }));

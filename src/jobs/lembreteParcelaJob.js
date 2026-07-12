@@ -128,8 +128,8 @@ export function startLembreteParcelaCron() {
   const schedule = process.env.LEMBRETE_PARCELA_CRON_SCHEDULE || '0 9 * * *';
 
   const task = cron.schedule(schedule, executarLembretes, {
-    scheduled: true,
-    timezone: ZONA
+    timezone: ZONA,
+    noOverlap: true
   });
 
   logger.info({ schedule, diasAntes: DIAS_ANTES }, '[LembreteParcela] CRON registado');
