@@ -6,27 +6,28 @@ Auditoria técnica do backend Node/Express, frontend React/PWA, microserviço Py
 |---|---|
 | Data | 2026-07-11 |
 | Branch | `main` |
-| Commit analisado | `cdf1663` |
-| Branch de trabalho | `main` — alterações locais ainda sem commit |
+| Commit base analisado | `cdf1663` |
+| Commit principal da remediação | `fe3eba0` na `main` |
 | Tipo | Auditoria estática, análise de dependências e testes locais |
-| Risco global | **Alto** |
-| Estado | Remediação aplicada parcialmente; todos os P0 mitigados e P1/P2 residuais documentados |
+| Risco global residual | **Moderado** |
+| Estado | Todos os P0 e advisories conhecidos mitigados; riscos estruturais residuais documentados |
 
 > Este documento não é um pentest de produção. Não foram executados ataques contra serviços reais, não foram validadas regras de firewall/cloud nem foram examinados dados reais. As conclusões abaixo resultam do código e configuração presentes no repositório, dos manifests/lockfiles e da suite de testes local.
 
-### Actualização de remediação — 2026-07-11
+### Actualização de remediação — 2026-07-12
 
 Foi aplicada uma primeira wave de hardening após a auditoria:
 
 - **Mitigados:** SEC-001 a SEC-007, SEC-014 e SEC-015. A integração Z-API de SEC-001 foi removida integralmente; apenas a Evolution permanece activa.
-- **Parcialmente mitigados:** SEC-009 (backend sem advisories altos/críticos; frontend e Python pendentes), SEC-010 (CSP adicionada; tokens ainda em `localStorage`) e SEC-011 (containers non-root; socket Docker ainda exposto ao Dozzle).
+- **Mitigado após actualização de dependências:** SEC-009, com `npm audit` e `pip-audit` sem vulnerabilidades conhecidas.
+- **Parcialmente mitigados:** SEC-010 (CSP adicionada; tokens ainda em `localStorage`) e SEC-011 (containers non-root; socket Docker ainda exposto ao Dozzle).
 - **Abertos:** SEC-008, SEC-012, SEC-013 e SEC-016.
 
-As alterações incluem remoção integral do webhook Z-API legacy, remoção da migração HTTP, Push associado ao JWT/tenant, RBAC granular, validação do utilizador/tenant actual em cada JWT, revogação por `authVersion`, refresh tokens hasheados com consumo atómico, redaction de logs, limites no FastAPI, respostas de erro genéricas e execução non-root dos containers. O audit de produção do backend ficou em **0 críticos, 0 altos e 2 moderados**, ambos no caminho `node-cron` 3 → `uuid`; a correcção automática exige uma major do `node-cron` e deve ser validada separadamente.
+As alterações incluem remoção integral do webhook Z-API legacy, remoção da migração HTTP, Push associado ao JWT/tenant, RBAC granular, validação do utilizador/tenant actual em cada JWT, revogação por `authVersion`, refresh tokens hasheados com consumo atómico, redaction de logs, limites no FastAPI, respostas de erro genéricas e execução non-root dos containers. A cadeia vulnerável `node-cron` 3 → `uuid` foi removida com a migração para `node-cron` 4.6.0. Backend e frontend ficaram com **0 vulnerabilidades** no `npm audit`; o serviço Python ficou com **0 vulnerabilidades conhecidas** no `pip-audit`.
 
 ## Estado detalhado da implementação na `main`
 
-> **Atenção operacional:** todo o trabalho está directamente no worktree da branch `main`, baseado no commit `cdf1663`. Não foi criado commit, tag, branch de segurança ou push remoto. Antes de qualquer operação Git destrutiva, estas alterações devem ser preservadas.
+> **Atenção operacional:** a remediação está directamente na branch `main`, baseada em `cdf1663`. O commit principal é `fe3eba0`; as actualizações de dependências e esta revisão documental são commits posteriores na mesma branch.
 
 ### Backend — autenticação e sessões
 
@@ -71,7 +72,8 @@ As alterações incluem remoção integral do webhook Z-API legacy, remoção da
 - O modal de colaboradores expõe `gerenciarHistorico`, `editarFinanceiro` e `registrarPagamentos`, com os mesmos defaults do backend e compatibilidade com registos antigos.
 - O build de produção passou após as alterações.
 - Access e refresh tokens continuam no `localStorage`; a migração para cookie HttpOnly permanece pendente.
-- As dependências do frontend ainda não foram actualizadas nem re-auditadas após o levantamento inicial.
+- As dependências foram actualizadas dentro das faixas compatíveis declaradas. Entre as versões directas relevantes ficaram Axios 1.18.1, React Router DOM 7.18.1 e Vite 6.4.3.
+- `npm audit --package-lock-only` ficou em 0 vulnerabilidades.
 
 ### Serviço de IA
 
@@ -79,21 +81,23 @@ As alterações incluem remoção integral do webhook Z-API legacy, remoção da
 - A transcrição valida MIME/base64 e limita o áudio codificado a 15 MB.
 - Excepções internas deixaram de ser devolvidas como `str(exc)`; callers recebem mensagem genérica.
 - O container passou a executar com utilizador dedicado non-root.
-- As dependências Python continuam pendentes de actualização e novo `pip-audit`.
+- O lock Python foi actualizado acima de todos os mínimos indicados pelo audit, incluindo `cryptography`, `idna`, LangChain/LangGraph, `langsmith`, `pydantic-settings` e `starlette`.
+- `pip-audit` ficou sem vulnerabilidades conhecidas; 92 testes passaram e 1 caso permaneceu `xfail` esperado.
 
 ### Containers e dependências
 
 - Backend e IA passaram a executar non-root; os ficheiros do backend são copiados com ownership do utilizador `node`.
 - O socket Docker do Dozzle ainda precisa de proxy/allowlist ou remoção.
 - Dependências directas do backend foram actualizadas, incluindo Axios, Sentry, BullMQ, LangChain, Morgan, `qs` e `express-rate-limit`.
-- O audit de produção do backend passou de 18 findings para 2 moderados; ambos dependem da migração major de `node-cron` 3 para 4.
+- `node-cron` foi migrado de 3.0.3 para 4.6.0; as opções removidas na v4 foram adaptadas e os dois jobs usam `noOverlap`.
+- Os audits npm de backend e frontend ficaram em 0 vulnerabilidades; `pip-audit` também ficou sem vulnerabilidades conhecidas.
 
 ### Testes e estado de validação
 
 - Backend completo: 76 suites e 619 testes passaram.
 - Testes focados no code review: 56/56 passaram.
 - Serviço de IA: 92 passaram e 1 ficou `xfail`.
-- Frontend: build de produção concluído.
+- Frontend: 14 ficheiros/45 testes passaram e o build de produção foi concluído.
 - Lint backend: 0 erros e 4 warnings preexistentes em scripts de manutenção.
 - Lint frontend: 0 erros e 6 warnings preexistentes de hooks/fast-refresh.
 - `git diff --check`: sem erros.
@@ -105,9 +109,9 @@ As alterações incluem remoção integral do webhook Z-API legacy, remoção da
 1. [x] Corrigir o bypass de `admin` e confirmar defaults/overrides de `requirePermission`.
 2. [x] Executar a suite backend completa: 76 suites, 619 testes, tudo verde.
 3. [x] Repetir lint, build frontend e testes IA.
-4. [ ] Repetir audits do frontend/Python quando as dependências forem actualizadas.
+4. [x] Repetir audits do frontend/Python: ambos sem vulnerabilidades conhecidas.
 5. [ ] Rever o diff integral, especialmente autenticação, RBAC e lockfile.
-6. [ ] Criar um commit único ou commits temáticos na `main`, conforme a estratégia escolhida pelo responsável do repositório.
+6. [x] Criar commits temáticos directamente na `main`.
 
 ### Remediação do code review posterior
 
@@ -188,8 +192,8 @@ Apesar disso, foram confirmadas superfícies que permitem contornar essas protec
 
 ### SEC-001 — Webhook Z-API legacy sem autenticação
 
-**Severidade:** Crítica  
-**Estado:** Resolvido — endpoint e código legacy removidos  
+**Severidade:** Crítica
+**Estado:** Resolvido — endpoint e código legacy removidos
 **CWE:** CWE-306 — Missing Authentication for Critical Function
 
 **Evidência**
@@ -224,8 +228,8 @@ Apesar disso, foram confirmadas superfícies que permitem contornar essas protec
 
 ### SEC-002 — RBAC e permissões granulares não são aplicados
 
-**Severidade:** Alta  
-**Estado:** Resolvido; middleware revisto e suite completa verde  
+**Severidade:** Alta
+**Estado:** Resolvido; middleware revisto e suite completa verde
 **CWE:** CWE-862 — Missing Authorization
 
 **Evidência**
@@ -258,8 +262,8 @@ Um terapeuta ou recepcionista pode chamar a API directamente para consultar ou a
 
 ### SEC-003 — Subscrições Web Push públicas e associáveis a qualquer utilizador
 
-**Severidade:** Alta  
-**Estado:** Resolvido e coberto por teste negativo  
+**Severidade:** Alta
+**Estado:** Resolvido e coberto por teste negativo
 **CWE:** CWE-639 — Authorization Bypass Through User-Controlled Key
 
 **Evidência**
@@ -287,8 +291,8 @@ Um terapeuta ou recepcionista pode chamar a API directamente para consultar ou a
 
 ### SEC-004 — Migração destrutiva disponível através da API
 
-**Severidade:** Alta  
-**Estado:** Resolvido — rota removida do runtime  
+**Severidade:** Alta
+**Estado:** Resolvido — rota removida do runtime
 **CWE:** CWE-269 — Improper Privilege Management
 
 **Evidência**
@@ -313,8 +317,8 @@ Um terapeuta ou recepcionista pode chamar a API directamente para consultar ou a
 
 ### SEC-005 — Exposição de tokens e dados pessoais em logs
 
-**Severidade:** Alta  
-**Estado:** Resolvido no código; revisão operacional de retenção do Dozzle pendente  
+**Severidade:** Alta
+**Estado:** Resolvido no código; revisão operacional de retenção do Dozzle pendente
 **CWE:** CWE-532 — Insertion of Sensitive Information into Log File
 
 **Evidência**
@@ -347,7 +351,7 @@ Um terapeuta ou recepcionista pode chamar a API directamente para consultar ou a
 ### SEC-006 — JWT mantém role e estado antigos durante uma hora
 
 **Severidade:** Alta, especialmente para superadmin
-**Estado:** Resolvido com revalidação em DB e `authVersion`  
+**Estado:** Resolvido com revalidação em DB e `authVersion`
 
 `src/middlewares/auth.js:25-53` valida a assinatura e confia em `role`, `tenantId` e outros claims sem confirmar que o utilizador e tenant continuam activos. O access token dura uma hora (`src/modules/auth/authController.js:23-45`). Desactivar um utilizador, suspender um tenant ou despromover um superadmin não revoga imediatamente o access token já emitido.
 
@@ -356,7 +360,7 @@ Um terapeuta ou recepcionista pode chamar a API directamente para consultar ou a
 ### SEC-007 — Refresh tokens armazenados em texto simples e rotação não atómica
 
 **Severidade:** Média/Alta
-**Estado:** Resolvido para novas sessões; compatibilidade temporária com tokens legacy  
+**Estado:** Resolvido para novas sessões; compatibilidade temporária com tokens legacy
 
 `src/models/User.js:176-182` guarda o JWT de refresh integral. `authController.js:406-447` verifica a string e faz `$pull` e `$push` em operações separadas. Uma leitura indevida da base permite usar sessões ainda válidas; pedidos concorrentes podem explorar a janela entre validação e rotação.
 
@@ -365,7 +369,7 @@ Um terapeuta ou recepcionista pode chamar a API directamente para consultar ou a
 ### SEC-008 — Verificação de email não é uma fronteira de acesso
 
 **Severidade:** Média
-**Estado:** Aberto  
+**Estado:** Aberto
 
 O registo devolve access e refresh tokens antes da verificação. O login não bloqueia `emailVerificado=false`. Assim, a verificação é informativa e não prova titularidade antes do uso da conta.
 
@@ -373,9 +377,9 @@ O registo devolve access e refresh tokens antes da verificação. O login não b
 
 ### SEC-009 — Dependências com advisories conhecidos
 
-**Severidade:** Alta  
+**Severidade:** Alta
 **Data do audit:** 2026-07-11
-**Estado:** Parcial — backend sem altos/críticos; frontend e Python pendentes  
+**Estado:** Resolvido — audits npm e Python sem vulnerabilidades conhecidas
 
 #### Backend
 
@@ -419,10 +423,20 @@ O audit reportou **21 vulnerabilidades**: 14 altas, 6 moderadas e 1 baixa. Parte
 
 **Recomendação:** actualizar em PRs separados por componente, regenerar locks, executar suites completas e repetir os audits. Não usar `npm audit fix --force` sem rever mudanças major.
 
+#### Remediação aplicada em 2026-07-12
+
+| Componente | Actualização relevante | Resultado do novo audit |
+|---|---|---|
+| Backend | `node-cron` 3.0.3 → 4.6.0 e lockfile regenerado | 0 vulnerabilidades |
+| Frontend | Axios 1.18.1, React Router DOM 7.18.1, Vite 6.4.3 e transitivas corrigidas | 0 vulnerabilidades |
+| Serviço Python | Packages afectados actualizados acima dos mínimos, com lockfile regenerado | 0 vulnerabilidades conhecidas |
+
+A migração de `node-cron` removeu a opção `scheduled`, que deixou de existir na v4, e adicionou `noOverlap` aos jobs de saúde Evolution e lembretes de parcelas. Não foi usado `npm audit fix --force`.
+
 ### SEC-010 — Tokens no localStorage sem Content Security Policy
 
 **Severidade:** Média
-**Estado:** Parcial — CSP aplicada; tokens continuam no `localStorage`  
+**Estado:** Parcial — CSP aplicada; tokens continuam no `localStorage`
 
 `laura-saas-frontend/src/services/api.js:27-29,49-52,87-97` guarda e lê access/refresh tokens no `localStorage`. Não foram encontrados `dangerouslySetInnerHTML`, `eval` ou sinks XSS directos, o que reduz o risco actual, mas qualquer XSS futuro ou dependência comprometida consegue extrair ambos os tokens.
 
@@ -433,7 +447,7 @@ O audit reportou **21 vulnerabilidades**: 14 altas, 6 moderadas e 1 baixa. Parte
 ### SEC-011 — Containers root e socket Docker exposto ao Dozzle
 
 **Severidade:** Média/Alta
-**Estado:** Parcial — containers non-root; socket Dozzle pendente  
+**Estado:** Parcial — containers non-root; socket Dozzle pendente
 
 - O `Dockerfile` do backend diz “utilizador não-root”, mas não contém `USER`.
 - `ia-service/Dockerfile` também executa como root.
@@ -445,7 +459,7 @@ O audit reportou **21 vulnerabilidades**: 14 altas, 6 moderadas e 1 baixa. Parte
 ### SEC-012 — Operações da IA dependem de confirmação semântica do LLM
 
 **Severidade:** Média
-**Estado:** Aberto  
+**Estado:** Aberto
 
 As tools capturam `tenant_id`, `lead_id` e `cliente_id` por closure, uma boa defesa contra troca directa de tenant. Porém, marcar, remarcar, cancelar, alterar pipeline e alertar a equipa ainda dependem do modelo interpretar correctamente a intenção do texto WhatsApp. Prompt injection ou erro do modelo pode produzir uma chamada válida mas não desejada.
 
@@ -459,7 +473,7 @@ Além disso, quando LangSmith tracing está activo, conversas e metadados podem 
 
 ### SEC-013 — Rate limiting apenas parcial e em memória
 
-**Estado:** Aberto  
+**Estado:** Aberto
 
 Os limiters cobrem login, registo, refresh e forgot-password, mas não existe uma política global consistente para webhooks, Push, reset/verify e rotas administrativas. O storage default de `express-rate-limit` é por processo, sendo reiniciado em deploys/restarts e não partilhado entre réplicas.
 
@@ -467,7 +481,7 @@ Os limiters cobrem login, registo, refresh e forgot-password, mas não existe um
 
 ### SEC-014 — Limites de payload incompletos no serviço de IA
 
-**Estado:** Resolvido no serviço; quotas por tenant permanecem como hardening  
+**Estado:** Resolvido no serviço; quotas por tenant permanecem como hardening
 
 `ProcessLeadRequest.mensagem`, `ProcessClientRequest.mensagem` e `TranscribeRequest.audio_base64` não têm `max_length`. O endpoint de transcrição pode provocar grande consumo de memória e custo do provider se o service token for comprometido ou usado indevidamente.
 
@@ -475,7 +489,7 @@ Os limiters cobrem login, registo, refresh e forgot-password, mas não existe um
 
 ### SEC-015 — Erros internos expostos pelo FastAPI a callers internos
 
-**Estado:** Resolvido  
+**Estado:** Resolvido
 
 `ia-service/src/ia_service/routers/process.py:45-52,82-89` devolve `detail=str(exc)`. Embora o serviço esteja numa rede interna e autenticado, detalhes de providers, URLs ou estrutura interna podem propagar-se para logs/callers.
 
@@ -483,7 +497,7 @@ Os limiters cobrem login, registo, refresh e forgot-password, mas não existe um
 
 ### SEC-016 — Superfície legacy duplicada
 
-**Estado:** Aberto  
+**Estado:** Aberto
 
 O dual-mount `/api/*` e `/api/v1/*` mantém duas URLs para quase todas as rotas. Isto aumenta inventário, documentação e tempo necessário para retirar endpoints antigos.
 
@@ -534,7 +548,7 @@ O dual-mount `/api/*` e `/api/v1/*` mantém duas URLs para quase todas as rotas.
 - [x] Hashear refresh tokens e tornar rotação/reuse detection atómica.
 - [ ] Exigir verificação de email para acesso completo.
 - [ ] Activar MFA/step-up para superadmin.
-- [ ] Actualizar dependências Node, frontend e Python; backend parcialmente concluído (sem altos/críticos).
+- [x] Actualizar dependências Node, frontend e Python; os três audits ficaram sem vulnerabilidades conhecidas.
 
 ### Wave 3 — hardening de plataforma e IA
 
@@ -584,11 +598,13 @@ Os testes confirmam os controlos que cobrem, mas não invalidam os findings dest
 - Backend completo: **76/76 suites e 619/619 testes passaram**.
 - Testes focados no code review: **56/56 passaram**.
 - Serviço de IA: **92 passaram e 1 xfailed**.
-- Frontend: build de produção concluído com sucesso.
+- Frontend: **14/14 ficheiros e 45/45 testes passaram**; build de produção concluído com sucesso.
 - Lint backend: **0 erros** e 4 warnings preexistentes em scripts de manutenção.
 - Lint frontend: **0 erros** e 6 warnings preexistentes.
 - `git diff --check`: sem erros de whitespace.
-- Audit de dependências de produção do backend: **0 críticos, 0 altos e 2 moderados**.
+- Audit npm do backend: **0 vulnerabilidades**.
+- Audit npm do frontend: **0 vulnerabilidades**.
+- `pip-audit` do serviço de IA: **0 vulnerabilidades conhecidas**; o package local `ia-service` não existe no PyPI e foi correctamente ignorado.
 
 Durante os testes da IA, o envio opcional de traces ao LangSmith falhou por DNS/rede restrita, mas o processo terminou com exit code 0 e todos os testes locais esperados passaram. A suite backend ainda usa `--forceExit` e emite avisos de handles assíncronos/Mongoose depreciação; são dívidas de qualidade, não falhas funcionais desta remediação.
 
