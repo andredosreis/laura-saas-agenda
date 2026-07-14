@@ -30,6 +30,7 @@ const PERMISSOES_GROUPS = [
     { key: 'criarClientes', label: 'Criar clientes' },
     { key: 'editarClientes', label: 'Editar clientes' },
     { key: 'deletarClientes', label: 'Eliminar clientes' },
+    { key: 'gerenciarHistorico', label: 'Registar e editar históricos' },
   ]},
   { area: 'Agendamentos', items: [
     { key: 'verAgendamentos', label: 'Ver agendamentos' },
@@ -43,8 +44,12 @@ const PERMISSOES_GROUPS = [
     { key: 'editarPacotes', label: 'Editar pacotes' },
     { key: 'deletarPacotes', label: 'Eliminar pacotes' },
   ]},
-  { area: 'Outros', items: [
+  { area: 'Financeiro', items: [
     { key: 'verFinanceiro', label: 'Ver financeiro' },
+    { key: 'editarFinanceiro', label: 'Editar financeiro' },
+    { key: 'registrarPagamentos', label: 'Registar pagamentos' },
+  ]},
+  { area: 'Outros', items: [
     { key: 'editarConfiguracoes', label: 'Editar configurações' },
     { key: 'gerenciarUsuarios', label: 'Gerir colaboradores' },
   ]},
@@ -53,11 +58,11 @@ const PERMISSOES_GROUPS = [
 // Defaults frontend que espelham User.getDefaultPermissions(role)
 function getDefaultPermissoes(role) {
   const map = {
-    superadmin: { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: true, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: true, verPacotes: true, criarPacotes: true, editarPacotes: true, deletarPacotes: true, verFinanceiro: true, editarConfiguracoes: true, gerenciarUsuarios: true },
-    admin:      { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: true, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: true, verPacotes: true, criarPacotes: true, editarPacotes: true, deletarPacotes: true, verFinanceiro: true, editarConfiguracoes: true, gerenciarUsuarios: true },
-    gerente:    { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: false, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: true, verPacotes: true, criarPacotes: true, editarPacotes: true, deletarPacotes: false, verFinanceiro: true, editarConfiguracoes: false, gerenciarUsuarios: false },
-    recepcionista: { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: false, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: false, verPacotes: true, criarPacotes: false, editarPacotes: false, deletarPacotes: false, verFinanceiro: false, editarConfiguracoes: false, gerenciarUsuarios: false },
-    terapeuta:  { verClientes: true, criarClientes: false, editarClientes: false, deletarClientes: false, verAgendamentos: true, criarAgendamentos: false, editarAgendamentos: false, deletarAgendamentos: false, verPacotes: true, criarPacotes: false, editarPacotes: false, deletarPacotes: false, verFinanceiro: false, editarConfiguracoes: false, gerenciarUsuarios: false },
+    superadmin: { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: true, gerenciarHistorico: true, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: true, verPacotes: true, criarPacotes: true, editarPacotes: true, deletarPacotes: true, verFinanceiro: true, editarFinanceiro: true, registrarPagamentos: true, editarConfiguracoes: true, gerenciarUsuarios: true },
+    admin:      { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: true, gerenciarHistorico: true, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: true, verPacotes: true, criarPacotes: true, editarPacotes: true, deletarPacotes: true, verFinanceiro: true, editarFinanceiro: true, registrarPagamentos: true, editarConfiguracoes: true, gerenciarUsuarios: true },
+    gerente:    { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: false, gerenciarHistorico: true, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: true, verPacotes: true, criarPacotes: true, editarPacotes: true, deletarPacotes: false, verFinanceiro: true, editarFinanceiro: true, registrarPagamentos: true, editarConfiguracoes: false, gerenciarUsuarios: false },
+    recepcionista: { verClientes: true, criarClientes: true, editarClientes: true, deletarClientes: false, gerenciarHistorico: false, verAgendamentos: true, criarAgendamentos: true, editarAgendamentos: true, deletarAgendamentos: false, verPacotes: true, criarPacotes: false, editarPacotes: false, deletarPacotes: false, verFinanceiro: false, editarFinanceiro: false, registrarPagamentos: true, editarConfiguracoes: false, gerenciarUsuarios: false },
+    terapeuta:  { verClientes: true, criarClientes: false, editarClientes: false, deletarClientes: false, gerenciarHistorico: true, verAgendamentos: true, criarAgendamentos: false, editarAgendamentos: false, deletarAgendamentos: false, verPacotes: true, criarPacotes: false, editarPacotes: false, deletarPacotes: false, verFinanceiro: false, editarFinanceiro: false, registrarPagamentos: false, editarConfiguracoes: false, gerenciarUsuarios: false },
   };
   return map[role] || map.terapeuta;
 }
@@ -90,7 +95,10 @@ function ColaboradorModal({ isOpen, onClose, onSuccess, colaborador }) {
         comissaoPadrao: colaborador.comissaoPadrao != null ? String(colaborador.comissaoPadrao) : '',
         iban: colaborador.dadosBancarios?.iban || '',
       });
-      setPermissoes(colaborador.permissoes || getDefaultPermissoes(colaborador.role));
+      setPermissoes({
+        ...getDefaultPermissoes(colaborador.role),
+        ...(colaborador.permissoes || {}),
+      });
       setPermissoesCustom(true); // assume que existem permissões guardadas → mostra-as
     } else {
       setForm({ nome: '', email: '', role: 'recepcionista', telefone: '', comissaoPadrao: '', iban: '' });

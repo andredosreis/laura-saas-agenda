@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.js';
+import { adminLimiter } from '../../middlewares/rateLimiter.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
 import { listarTenants, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit } from './adminController.js';
@@ -12,15 +13,20 @@ import { adminMutation } from './adminMutation.js';
  *
  * Gates montados ao nível do router (fail-closed, impossível esquecer numa rota
  * nova):
+ *   0. adminLimiter       — 300 pedidos/15min por IP (F13, ADR-024 Guard #4).
+ *                            Montado ANTES de authenticate: também limita
+ *                            sondagem não autenticada e o ruído de audit que
+ *                            ela geraria.
  *   1. requireSuperadmin — role === 'superadmin', senão 404 (+ audita negação)
  *   2. auditMiddleware    — read-path do AuditLog (1 entrada por request)
  *
- * Toda rota abaixo herda ambos. Mutações (Fase 3) NÃO usam router.post/put/delete
+ * Toda rota abaixo herda os três. Mutações (Fase 3) NÃO usam router.post/put/delete
  * cru — passam pela factory adminMutation (audit transacional). Ver o playbook
  * .claude/skills/marcai-superadmin-route.
  */
 const router = Router();
 
+router.use(adminLimiter);
 router.use(authenticate, requireSuperadmin);
 router.use(auditMiddleware);
 

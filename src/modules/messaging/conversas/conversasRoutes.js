@@ -7,7 +7,7 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../../../middlewares/auth.js';
+import { authenticate, requirePermission } from '../../../middlewares/auth.js';
 import {
   listConversas,
   getConversaMensagens,
@@ -21,12 +21,12 @@ const router = Router();
 router.use(authenticate);
 
 // Master switch da IA da clínica — paths estáticos ANTES das rotas com :telefone.
-router.get('/ia-global', getIaGlobal);
-router.post('/ia-global', setIaGlobal);
+router.get('/ia-global', requirePermission('verLeads'), getIaGlobal);
+router.post('/ia-global', requirePermission('editarConfiguracoes'), setIaGlobal);
 
-router.get('/', listConversas);
-router.get('/:telefone/mensagens', getConversaMensagens);
-router.post('/:telefone/reply', replyConversa);
-router.post('/:telefone/pause-ai', pauseConversaIa);
+router.get('/', requirePermission('verLeads'), listConversas);
+router.get('/:telefone/mensagens', requirePermission('verLeads'), getConversaMensagens);
+router.post('/:telefone/reply', requirePermission('responderLeads'), replyConversa);
+router.post('/:telefone/pause-ai', requirePermission('editarLeads'), pauseConversaIa);
 
 export default router;

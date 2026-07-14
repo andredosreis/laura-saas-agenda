@@ -4,16 +4,23 @@ import mongoose from 'mongoose';
 import app from '../src/app.js';
 import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
 import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 import { getTenantDB } from '../src/config/tenantDB.js';
 import { getModels } from '../src/models/registry.js';
-import { closeTenantDBAdmin } from '../src/modules/admin/getTenantDBAdmin.js';
+import {
+  closeTenantDBAdmin,
+  verifyTenantROEnforcement,
+  _resetROState,
+} from '../src/modules/admin/getTenantDBAdmin.js';
 
 beforeAll(async () => {
   await setupTestDB();
   // O acessor RO aponta ao MESMO memory-server. NÃO é fail-open: continua uma
-  // createConnection separada e fail-closed. O memory-server não impõe o read-only
-  // (isso prova-se em staging com a credencial real) — este teste cobre só a
-  // FUNCIONALIDADE das métricas, não o enforcement RO.
+  // createConnection separada e fail-closed. O memory-server é RW por natureza — o
+  // enforcement RO da credencial é agora verificado em RUNTIME (F14) por
+  // verifyTenantROEnforcement (ver admin-getTenantDBAdmin.test.js). Aqui cobrimos
+  // a FUNCIONALIDADE das métricas + o comportamento fail-closed quando a
+  // verificação marca a credencial como comprometida.
   process.env.MONGO_TENANT_RO_URI = process.env.MONGODB_URI;
 });
 afterAll(async () => {
@@ -21,18 +28,56 @@ afterAll(async () => {
   await teardownTestDB();
 });
 beforeEach(clearDB);
+// Cada teste parte de uma credencial RO não-comprometida — o teste que a compromete
+// fá-lo explicitamente (verifyTenantROEnforcement contra o memory-server RW).
+beforeEach(_resetROState);
+
+// O `authenticate` reforçado revalida o utilizador na DB (findById + ativo).
+// Tokens têm de referenciar utilizadores realmente persistidos, senão devolvem
+// 401 antes de chegarem ao `requireSuperadmin`. O superadmin é persistido a
+// cada teste (a DB é limpa no beforeEach anterior).
+let superadminId;
+
+beforeEach(async () => {
+  const superadmin = await User.createWithPassword({
+    nome: 'Superadmin Teste',
+    email: 'super@marcai.pt',
+    password: 'Senha@Segura123',
+    role: 'superadmin',
+    emailVerificado: true,
+  });
+  superadminId = superadmin._id;
+});
 
 function superToken() {
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: superadminId.toString(), email: 'super@marcai.pt', role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
 }
 
-function tenantToken() {
+// Persiste um admin não-superadmin + o respectivo tenant activo, on demand. O
+// tenant tem de ser activo/trial para o `authenticate` deixar passar até ao
+// `requireSuperadmin` (que devolve 404 para não-superadmin).
+async function tenantToken() {
+  const tenant = await Tenant.create({
+    nome: 'Tenant Nao-Super',
+    slug: 'tenant-nao-super',
+    ativo: true,
+    plano: { tipo: 'basico', status: 'ativo', dataInicio: new Date() },
+  });
+  const admin = await User.createWithPassword({
+    tenantId: tenant._id,
+    nome: 'Admin Nao-Super',
+    email: 'admin-nao-super@marcai.pt',
+    password: 'Senha@Segura123',
+    role: 'admin',
+    permissoes: User.getDefaultPermissions('admin'),
+    emailVerificado: true,
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), tenantId: new mongoose.Types.ObjectId().toString(), role: 'admin' },
+    { userId: admin._id.toString(), tenantId: tenant._id.toString(), role: 'admin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -51,7 +96,7 @@ describe('GET /api/v1/admin/tenants/:id/uso', () => {
   it('404 para não-superadmin', async () => {
     const res = await request(app)
       .get(`/api/v1/admin/tenants/${new mongoose.Types.ObjectId()}/uso`)
-      .set('Authorization', `Bearer ${tenantToken()}`);
+      .set('Authorization', `Bearer ${await tenantToken()}`);
     expect(res.status).toBe(404);
   });
 
@@ -80,5 +125,24 @@ describe('GET /api/v1/admin/tenants/:id/uso', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual({ clientes: 3, agendamentos: 2, mensagens: 5 });
+  });
+
+  it('credencial RO comprometida (Gate 4b) → 500 fail-closed, sem vazar métricas', async () => {
+    const t = await Tenant.create({ nome: 'Salão RO', slug: 'salao-ro', plano: { tipo: 'pro', status: 'ativo' } });
+    await seed(t._id.toString(), { clientes: 3 });
+
+    // Compromete a credencial pelo mecanismo real: o insert do canário passa no
+    // memory-server RW → verifyTenantROEnforcement marca roCompromised = true.
+    await verifyTenantROEnforcement();
+
+    const res = await request(app)
+      .get(`/api/v1/admin/tenants/${t._id}/uso`)
+      .set('Authorization', `Bearer ${superToken()}`);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(typeof res.body.error).toBe('string');
+    // Nenhuma métrica vazou na resposta de erro.
+    expect(res.body.data).toBeUndefined();
   });
 });

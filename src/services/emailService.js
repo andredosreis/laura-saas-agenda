@@ -19,6 +19,9 @@ export const initEmailService = async () => {
         logger.warn(
             'RESEND_API_KEY não definida — emails desactivados (envios serão logados em vez de enviados)'
         );
+        // O serviço só é fatal quando o ambiente o declara explicitamente.
+        // Isto permite deploys sem email enquanto a integração não está activa,
+        // sem voltar a expor tokens nos logs.
         if (process.env.EMAIL_REQUIRED === 'true') {
             throw new Error('RESEND_API_KEY obrigatória quando EMAIL_REQUIRED=true');
         }
@@ -37,10 +40,10 @@ export const initEmailService = async () => {
 export const sendEmail = async ({ to, subject, html, text }) => {
     const from = process.env.EMAIL_FROM || DEFAULT_FROM;
 
-    // Sem cliente configurado → log e retorna sucesso "dev" (mesmo padrão anterior)
+    // Sem cliente configurado → nunca escrever o body/token nos logs.
     if (!resendClient) {
         logger.info(
-            { to, subject, body: text || html },
+            { to, subject },
             '[DEV] Email simulado (RESEND_API_KEY não configurada)'
         );
         return { success: true, dev: true };

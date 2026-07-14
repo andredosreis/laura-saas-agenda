@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../../middlewares/auth.js';
+import { authenticate, requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
   createCliente,
@@ -18,10 +18,10 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.get('/', getAllClientes);
-router.post('/', validate(createClienteSchema), createCliente);
-router.get('/:id', validate(clienteIdParamSchema, 'params'), getCliente);
-router.put('/:id', validate(clienteIdParamSchema, 'params'), validate(updateClienteSchema), updateCliente);
-router.delete('/:id', validate(clienteIdParamSchema, 'params'), deleteCliente);
+router.get('/', requirePermission('verClientes'), getAllClientes);
+router.post('/', requirePermission('criarClientes'), validate(createClienteSchema), createCliente);
+router.get('/:id', requirePermission('verClientes'), validate(clienteIdParamSchema, 'params'), getCliente);
+router.put('/:id', requirePermission('editarClientes'), validate(clienteIdParamSchema, 'params'), validate(updateClienteSchema), updateCliente);
+router.delete('/:id', requirePermission('deletarClientes'), validate(clienteIdParamSchema, 'params'), deleteCliente);
 
 export default router;

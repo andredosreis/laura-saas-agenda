@@ -40,13 +40,69 @@ export const authenticate = async (req, res, next) => {
             });
         }
 
-        // Adicionar dados do usuário ao request
-        req.user = decoded;
-        req.tenantId = decoded.tenantId;
+        // Revalidar o estado actual no servidor. Claims JWT de role/tenant podem
+        // ficar obsoletos após desactivação, suspensão ou despromoção.
+        const currentUser = await User.findById(decoded.userId)
+            .select('tenantId email nome role permissoes ativo +authVersion')
+            .lean();
+
+        if (!currentUser || !currentUser.ativo) {
+            return res.status(401).json({
+                success: false,
+                error: 'Sessão inválida ou revogada'
+            });
+        }
+
+        const tokenVersion = Number(decoded.tokenVersion || 0);
+        const currentVersion = Number(currentUser.authVersion || 0);
+        if (tokenVersion !== currentVersion) {
+            return res.status(401).json({
+                success: false,
+                error: 'Sessão revogada',
+                code: 'TOKEN_REVOKED'
+            });
+        }
+
+        let tenant = null;
+        if (currentUser.role !== 'superadmin') {
+            const currentTenantId = currentUser.tenantId?.toString();
+            if (!currentTenantId || currentTenantId !== String(decoded.tenantId || '')) {
+                return res.status(401).json({ success: false, error: 'Sessão inválida' });
+            }
+
+            tenant = await Tenant.findById(currentUser.tenantId)
+                .select('ativo plano.status plano.tipo')
+                .lean();
+            if (!tenant || !tenant.ativo || !['ativo', 'trial'].includes(tenant.plano?.status)) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Empresa suspensa ou plano inactivo'
+                });
+            }
+        }
+
+        // A autorização downstream usa sempre os dados actuais da DB, não os
+        // claims potencialmente antigos do token.
+        const rolePermissions = User.getDefaultPermissions(currentUser.role);
+        const storedPermissions = currentUser.permissoes || {};
+
+        req.user = {
+            ...decoded,
+            userId: currentUser._id.toString(),
+            tenantId: currentUser.tenantId?.toString(),
+            email: currentUser.email,
+            nome: currentUser.nome,
+            role: currentUser.role,
+            // Defaults preenchem chaves adicionadas depois da criação do user;
+            // valores persistidos (incluindo false) têm sempre precedência.
+            permissoes: { ...rolePermissions, ...storedPermissions },
+        };
+        req.tenantId = currentUser.tenantId?.toString();
+        req.tenant = tenant;
 
         // Injectar DB e models isolados por tenant (database-per-tenant)
-        if (decoded.tenantId) {
-            req.db = getTenantDB(decoded.tenantId);
+        if (req.tenantId) {
+            req.db = getTenantDB(req.tenantId);
             req.models = getModels(req.db);
         }
 
@@ -58,6 +114,28 @@ export const authenticate = async (req, res, next) => {
             error: 'Erro interno de autenticação'
         });
     }
+};
+
+// =============================================
+// MIDDLEWARE: REQUIRE PERMISSION
+// Autoriza por permissão granular carregada da DB pelo authenticate.
+// =============================================
+export const requirePermission = (permission) => (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    if (req.user.role === 'superadmin') return next();
+
+    if (req.user.permissoes?.[permission] !== true) {
+        return res.status(403).json({
+            success: false,
+            error: 'Sem permissão para executar esta acção',
+            requiredPermission: permission,
+        });
+    }
+
+    next();
 };
 
 // =============================================
@@ -73,7 +151,7 @@ export const authorize = (...allowedRoles) => {
             });
         }
 
-        // Superadmin tem acesso a tudo
+        // Apenas superadmin ignora restrições de role.
         if (req.user.role === 'superadmin') {
             return next();
         }
@@ -298,6 +376,7 @@ export const optionalAuth = async (req, res, next) => {
 export default {
     authenticate,
     authorize,
+    requirePermission,
     requirePlan,
     checkLimit,
     injectTenant,

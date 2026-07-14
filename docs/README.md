@@ -29,4 +29,5 @@
 
 **Produto / técnico:**
 - [`produto/PRD-painel-superadmin.md`](produto/PRD-painel-superadmin.md) — painel super-admin
+- [`operacoes/auditoria-seguranca-2026-07-11.md`](operacoes/auditoria-seguranca-2026-07-11.md) — auditoria de segurança actual (backend, frontend, IA e infra)
 - [`adrs/`](adrs/) — decisões de arquitectura

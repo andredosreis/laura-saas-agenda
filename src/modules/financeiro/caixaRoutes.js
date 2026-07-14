@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../../middlewares/auth.js';
+import { authenticate, requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
   abrirCaixa,
@@ -19,11 +19,11 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.post('/abrir', validate(abrirCaixaSchema), abrirCaixa);
-router.get('/status', statusCaixa);
-router.post('/sangria', validate(sangriaSuprimentoSchema), registrarSangria);
-router.post('/suprimento', validate(sangriaSuprimentoSchema), registrarSuprimento);
-router.post('/fechar', validate(fecharCaixaSchema), fecharCaixa);
-router.get('/relatorio', relatorioCaixas);
+router.post('/abrir', requirePermission('editarFinanceiro'), validate(abrirCaixaSchema), abrirCaixa);
+router.get('/status', requirePermission('verFinanceiro'), statusCaixa);
+router.post('/sangria', requirePermission('editarFinanceiro'), validate(sangriaSuprimentoSchema), registrarSangria);
+router.post('/suprimento', requirePermission('editarFinanceiro'), validate(sangriaSuprimentoSchema), registrarSuprimento);
+router.post('/fechar', requirePermission('editarFinanceiro'), validate(fecharCaixaSchema), fecharCaixa);
+router.get('/relatorio', requirePermission('verFinanceiro'), relatorioCaixas);
 
 export default router;

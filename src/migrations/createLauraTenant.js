@@ -64,9 +64,8 @@ const LAURA_TENANT_CONFIG = {
         moedaDisplay: '€'
     },
     whatsapp: {
-        provider: 'zapi',
-        zapiInstanceId: process.env.ZAPI_INSTANCE_ID,
-        zapiToken: process.env.ZAPI_TOKEN
+        provider: 'evolution',
+        instanceName: process.env.EVOLUTION_INSTANCE || 'marcai'
     }
 };
 

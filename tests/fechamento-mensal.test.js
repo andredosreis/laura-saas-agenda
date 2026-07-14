@@ -25,6 +25,7 @@ async function criarTenantEToken(slug, role = 'admin') {
     email: `${slug}@test.pt`,
     passwordHash: 'hash-placeholder',
     role,
+    permissoes: User.getDefaultPermissions(role),
     emailVerificado: true,
   });
   const token = jwt.sign(
@@ -212,6 +213,7 @@ describe('DELETE /api/fechamentos-mensais/:ano/:mes', () => {
       email: 'admin@rec-del.test',
       passwordHash: 'hash-placeholder',
       role: 'admin',
+      permissoes: User.getDefaultPermissions('admin'),
       emailVerificado: true,
     });
     const adminToken = jwt.sign(

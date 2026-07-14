@@ -1,17 +1,36 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
 import app from '../src/app.js';
 import adminRouter from '../src/modules/admin/adminRoutes.js';
 import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
+import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 
 beforeAll(setupTestDB);
 afterAll(teardownTestDB);
 beforeEach(clearDB);
 
-function tenantToken(role = 'recepcionista') {
+let tokenSeq = 0;
+async function tenantToken(role = 'recepcionista') {
+  tokenSeq += 1;
+  const tenant = await Tenant.create({
+    nome: `Tenant sweep ${tokenSeq}`,
+    slug: `tenant-sweep-${tokenSeq}`,
+    ativo: true,
+    plano: { tipo: 'basico', status: 'trial', trialDias: 7 },
+  });
+  const user = await User.create({
+    tenantId: tenant._id,
+    nome: 'User sweep',
+    email: `sweep-${tokenSeq}@test.pt`,
+    passwordHash: 'hash-placeholder',
+    role,
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions(role),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), tenantId: new mongoose.Types.ObjectId().toString(), role },
+    { userId: user._id, tenantId: tenant._id, role },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -45,7 +64,7 @@ describe('Sweep — adminRouter exige superadmin (404) em todas as rotas', () =>
     const concrete = path.replace(/:[^/]+/g, 'x');
     it(`${method.toUpperCase()} /api/v1/admin${concrete} → 404 sem superadmin`, async () => {
       const res = await request(app)[method](`/api/v1/admin${concrete}`)
-        .set('Authorization', `Bearer ${tenantToken()}`);
+        .set('Authorization', `Bearer ${await tenantToken()}`);
       expect(res.status).toBe(404);
     });
   }

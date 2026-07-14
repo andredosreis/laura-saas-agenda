@@ -166,7 +166,14 @@ db.auditlogs.find().sort({ createdAt: -1 }).limit(5).pretty()
 
 - **Mutações (criar/suspender tenant, mudar plano) NÃO existem ainda** — é a Fase 3
   do ADR-024 (precisa do `adminMutation` transacional). O painel hoje é **só leitura**.
-- A credencial RO está **provada read-only** contra o Atlas; o enforcement só se
-  garante em produção/staging com a credencial real (em testes não se impõe).
+- A credencial RO é **verificada em runtime no arranque** (Gate 4b, F14), em duas
+  camadas: (1) enumeração dos privilégios efectivos via `connectionStatus` — afirma
+  que não há nenhuma acção de escrita sobre recursos de tenant (`tenant_*`, todas as
+  DBs ou `anyResource`/`cluster`); (2) um canário de escrita numa DB-sentinela que
+  tem de ser recusado. Se qualquer camada detectar escrita, o backend **recusa todas
+  as leituras cross-tenant** do painel (`/uso` → 500) e regista em log + Sentry —
+  fail-closed, mas nunca derruba o produto para os tenants. Por isso o passo 1 exige
+  **Only read any database** (leitura, zero escrita); em testes o enforcement não se
+  impõe (memory-server é read-write).
 - Frontend do painel: fora deste runbook (a Fase 2 entregou as rotas de API; as
   páginas React são trabalho separado).

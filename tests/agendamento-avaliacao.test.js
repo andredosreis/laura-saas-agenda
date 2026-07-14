@@ -21,6 +21,7 @@ async function criarTenantEToken(slug = 'salon-avaliacao') {
     email: `admin@${slug}.pt`,
     passwordHash: 'hash-placeholder',
     role: 'admin',
+    permissoes: User.getDefaultPermissions('admin'),
     emailVerificado: true,
   });
   const token = jwt.sign(

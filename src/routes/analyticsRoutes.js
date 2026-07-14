@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, requirePermission } from '../middlewares/auth.js';
 import {
     getAlertaSessoesBaixas,
     getReceitaTemporal,
@@ -13,11 +13,11 @@ const router = express.Router();
 router.use(authenticate);
 
 // Existing route
-router.get('/sessoes-baixas', getAlertaSessoesBaixas);
+router.get('/sessoes-baixas', requirePermission('verClientes'), getAlertaSessoesBaixas);
 
 // 🆕 Phase 2B: Analytics routes
-router.get('/receita-temporal', getReceitaTemporal);
-router.get('/distribuicao-servicos', getDistribuicaoServicos);
-router.get('/top-clientes', getTopClientes);
+router.get('/receita-temporal', requirePermission('verFinanceiro'), getReceitaTemporal);
+router.get('/distribuicao-servicos', requirePermission('verFinanceiro'), getDistribuicaoServicos);
+router.get('/top-clientes', requirePermission('verClientes'), getTopClientes);
 
 export default router;

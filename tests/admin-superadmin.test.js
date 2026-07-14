@@ -6,6 +6,8 @@ import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
 import { authenticate } from '../src/middlewares/auth.js';
 import { requireSuperadmin } from '../src/modules/admin/requireSuperadmin.js';
 import AuditLog from '../src/models/AuditLog.js';
+import Tenant from '../src/models/Tenant.js';
+import User from '../src/models/User.js';
 
 beforeAll(setupTestDB);
 afterAll(teardownTestDB);
@@ -22,9 +24,34 @@ function buildApp() {
   return app;
 }
 
-function tokenComRole(role, extra = {}) {
+let tokenSeq = 0;
+async function tokenComRole(role, extra = {}) {
+  tokenSeq += 1;
+  const userId = extra.userId || new mongoose.Types.ObjectId().toString();
+  let tenantId;
+  if (role !== 'superadmin') {
+    tenantId = extra.tenantId || new mongoose.Types.ObjectId().toString();
+    await Tenant.create({
+      _id: tenantId,
+      nome: `Tenant middleware ${tokenSeq}`,
+      slug: `tenant-middleware-${tokenSeq}`,
+      ativo: true,
+      plano: { tipo: 'basico', status: 'trial', trialDias: 7 },
+    });
+  }
+  await User.create({
+    _id: userId,
+    ...(tenantId && { tenantId }),
+    nome: `User ${role}`,
+    email: `${role}-${tokenSeq}@middleware.test`,
+    passwordHash: 'hash-placeholder',
+    role,
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions(role),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), role, ...extra },
+    { userId, role, ...(tenantId && { tenantId }) },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -46,7 +73,7 @@ describe('Middleware: requireSuperadmin', () => {
   it('rejeita user admin (não superadmin) com 404 — não revela a superfície', async () => {
     const res = await request(app)
       .get('/api/admin/ping')
-      .set('Authorization', `Bearer ${tokenComRole('admin', { tenantId: new mongoose.Types.ObjectId().toString() })}`);
+      .set('Authorization', `Bearer ${await tokenComRole('admin')}`);
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
@@ -55,7 +82,7 @@ describe('Middleware: requireSuperadmin', () => {
     for (const role of ['admin', 'gerente', 'recepcionista', 'terapeuta']) {
       const res = await request(app)
         .get('/api/admin/ping')
-        .set('Authorization', `Bearer ${tokenComRole(role, { tenantId: new mongoose.Types.ObjectId().toString() })}`);
+        .set('Authorization', `Bearer ${await tokenComRole(role)}`);
       expect(res.status).toBe(404);
     }
   });
@@ -63,7 +90,7 @@ describe('Middleware: requireSuperadmin', () => {
   it('permite superadmin (global, sem tenantId) com 200', async () => {
     const res = await request(app)
       .get('/api/admin/ping')
-      .set('Authorization', `Bearer ${tokenComRole('superadmin')}`);
+      .set('Authorization', `Bearer ${await tokenComRole('superadmin')}`);
     expect(res.status).toBe(200);
     expect(res.body.data.pong).toBe(true);
   });
@@ -72,7 +99,7 @@ describe('Middleware: requireSuperadmin', () => {
     const userId = new mongoose.Types.ObjectId().toString();
     await request(app)
       .get('/api/admin/ping')
-      .set('Authorization', `Bearer ${tokenComRole('gerente', { tenantId: new mongoose.Types.ObjectId().toString(), userId })}`);
+      .set('Authorization', `Bearer ${await tokenComRole('gerente', { userId })}`);
 
     const entries = await AuditLog.find({ status: 'denied' });
     expect(entries).toHaveLength(1);

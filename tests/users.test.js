@@ -35,6 +35,7 @@ async function criarTenantEAdmin(slug = 'test-salon', limites = {}) {
     email: `admin@${slug}.pt`,
     password: 'Pass1234!',
     role: 'admin',
+    permissoes: User.getDefaultPermissions('admin'),
     emailVerificado: true,
   });
   const token = jwt.sign(
@@ -52,6 +53,7 @@ async function criarUserComRole(tenantId, role, email) {
     email,
     password: 'Pass1234!',
     role,
+    permissoes: User.getDefaultPermissions(role),
     emailVerificado: true,
   });
 }

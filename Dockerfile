@@ -13,8 +13,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Código da aplicação (runtime)
-COPY src/ src/
-COPY seeds/ seeds/
+COPY --chown=node:node src/ src/
+COPY --chown=node:node seeds/ seeds/
 
 ENV NODE_ENV=production
 ENV PORT=5000
@@ -27,6 +27,9 @@ ENV GIT_SHA=$GIT_SHA
 ENV BUILT_AT=$BUILT_AT
 
 EXPOSE 5000
+
+# A aplicação não precisa de privilégios root em runtime.
+USER node
 
 # server.js arranca o Express + o worker BullMQ de notificações no mesmo processo
 CMD ["node", "src/server.js"]

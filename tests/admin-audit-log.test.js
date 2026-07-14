@@ -9,6 +9,8 @@ import { auditMiddleware } from '../src/modules/admin/auditMiddleware.js';
 import adminRouter from '../src/modules/admin/adminRoutes.js';
 import errorHandler from '../src/middlewares/errorHandler.js';
 import AuditLog from '../src/models/AuditLog.js';
+import User from '../src/models/User.js';
+import Tenant from '../src/models/Tenant.js';
 
 let mongoServer;
 
@@ -30,17 +32,49 @@ afterEach(async () => {
   }
 });
 
-function superToken() {
+// O `authenticate` (hardened) revalida `User.findById(decoded.userId)` — e, para
+// não-superadmin, exige um Tenant persistido com plano ativo/trial. Os tokens têm
+// de corresponder a utilizadores REAIS. Email/slug únicos por chamada (tokenSeq)
+// evitam colisão nos índices únicos.
+let tokenSeq = 0;
+async function superToken() {
+  tokenSeq += 1;
+  const user = await User.create({
+    nome: 'Superadmin Teste',
+    email: `super-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'superadmin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('superadmin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'super@marcai.pt', role: 'superadmin' },
+    { userId: user._id, email: user.email, role: 'superadmin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
 }
 
-function userToken() {
+async function userToken() {
+  tokenSeq += 1;
+  const tenant = await Tenant.create({
+    nome: `Tenant audit ${tokenSeq}`,
+    slug: `tenant-audit-${tokenSeq}`,
+    ativo: true,
+    plano: { tipo: 'basico', status: 'trial', trialDias: 7 },
+  });
+  const user = await User.create({
+    tenantId: tenant._id,
+    nome: 'User admin',
+    email: `admin-${tokenSeq}@marcai.pt`,
+    passwordHash: 'hash-placeholder',
+    role: 'admin',
+    ativo: true,
+    emailVerificado: true,
+    permissoes: User.getDefaultPermissions('admin'),
+  });
   return jwt.sign(
-    { userId: new mongoose.Types.ObjectId().toString(), email: 'user@marcai.pt', role: 'admin' },
+    { userId: user._id, tenantId: tenant._id, email: user.email, role: 'admin' },
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
@@ -120,7 +154,7 @@ describe('F09 — Audit Log Viewer', () => {
 
       const res = await request(app)
         .get('/api/admin/audit')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -138,7 +172,7 @@ describe('F09 — Audit Log Viewer', () => {
 
       const res = await request(app)
         .get('/api/admin/audit?limit=2&page=2')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(2);
@@ -162,7 +196,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtra por targetTenantId', async () => {
       const res = await request(app)
         .get(`/api/admin/audit?targetTenantId=${ids.tenant1}`)
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(2); // tenant.create e tenant.suspend
@@ -172,7 +206,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtra por actorUserId', async () => {
       const res = await request(app)
         .get(`/api/admin/audit?actorUserId=${ids.actor2}`)
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(3);
@@ -182,7 +216,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtra por action', async () => {
       const res = await request(app)
         .get('/api/admin/audit?action=tenant.suspend')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(1);
@@ -192,7 +226,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtra por status', async () => {
       const res = await request(app)
         .get('/api/admin/audit?status=error')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(1);
@@ -206,7 +240,7 @@ describe('F09 — Audit Log Viewer', () => {
 
       const res = await request(app)
         .get(`/api/admin/audit?from=${mid2}&to=${mid1}`)
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBe(3); // view, reactivate, suspend
@@ -218,9 +252,9 @@ describe('F09 — Audit Log Viewer', () => {
       const fakeId = new mongoose.Types.ObjectId();
       
       const [putRes, deleteRes, patchRes] = await Promise.all([
-        request(app).put(`/api/admin/audit/${fakeId}`).set('Authorization', `Bearer ${superToken()}`),
-        request(app).delete(`/api/admin/audit/${fakeId}`).set('Authorization', `Bearer ${superToken()}`),
-        request(app).patch(`/api/admin/audit/${fakeId}`).set('Authorization', `Bearer ${superToken()}`),
+        request(app).put(`/api/admin/audit/${fakeId}`).set('Authorization', `Bearer ${await superToken()}`),
+        request(app).delete(`/api/admin/audit/${fakeId}`).set('Authorization', `Bearer ${await superToken()}`),
+        request(app).patch(`/api/admin/audit/${fakeId}`).set('Authorization', `Bearer ${await superToken()}`),
       ]);
 
       expect(putRes.status).toBe(404);
@@ -233,7 +267,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtro inválido (bad ObjectId) → 400', async () => {
       const res = await request(app)
         .get('/api/admin/audit?targetTenantId=123-invalid')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('ID inválido');
@@ -242,7 +276,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtro inválido (out-of-enum status) → 400', async () => {
       const res = await request(app)
         .get('/api/admin/audit?status=falhou')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('status: Invalid option: expected one of');
@@ -251,7 +285,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('filtro inválido (bad date) → 400', async () => {
       const res = await request(app)
         .get('/api/admin/audit?from=2024-99-99')
-        .set('Authorization', `Bearer ${superToken()}`);
+        .set('Authorization', `Bearer ${await superToken()}`);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('data ISO válida');
@@ -260,7 +294,7 @@ describe('F09 — Audit Log Viewer', () => {
     it('não-super-admin → 404', async () => {
       const res = await request(app)
         .get('/api/admin/audit')
-        .set('Authorization', `Bearer ${userToken()}`);
+        .set('Authorization', `Bearer ${await userToken()}`);
 
       expect(res.status).toBe(404);
     });

@@ -8,13 +8,14 @@ import { validate } from '../../middlewares/validate.js';
 import {
   subscribeSchema,
   unsubscribeSchema,
-  subscriptionStatusQuerySchema,
 } from './notificationSchemas.js';
+import { authenticate } from '../../middlewares/auth.js';
 
 const router = express.Router();
 
+router.use(authenticate);
 router.post('/subscribe', validate(subscribeSchema), subscribeUser);
 router.post('/unsubscribe', validate(unsubscribeSchema), unsubscribeUser);
-router.get('/status', validate(subscriptionStatusQuerySchema, 'query'), getSubscriptionStatus);
+router.get('/status', getSubscriptionStatus);
 
 export default router;

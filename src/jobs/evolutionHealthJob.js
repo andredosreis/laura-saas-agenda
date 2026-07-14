@@ -28,7 +28,10 @@ export function startEvolutionHealthCron() {
   }
   registerSendFailureHandler(noteSendFailure); // liga o caminho reactivo
   const schedule = process.env.EVOLUTION_HEALTH_CRON_SCHEDULE || '*/5 * * * *';
-  const task = cron.schedule(schedule, checkAllInstances, { scheduled: true, timezone: ZONA });
+  const task = cron.schedule(schedule, checkAllInstances, {
+    timezone: ZONA,
+    noOverlap: true
+  });
   logger.info({ schedule }, '[EvolutionHealth] CRON registado');
   return task;
 }

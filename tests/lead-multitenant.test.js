@@ -26,7 +26,7 @@ async function criarTenantEToken(slug) {
   const user = await User.create({
     tenantId: tenant._id,
     nome: 'Admin', email: `admin@${slug}.pt`, passwordHash: 'h',
-    role: 'admin', emailVerificado: true,
+    role: 'admin', permissoes: User.getDefaultPermissions('admin'), emailVerificado: true,
   });
   const token = jwt.sign(
     { userId: user._id, tenantId: tenant._id, role: 'admin' },
