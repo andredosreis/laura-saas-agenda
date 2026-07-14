@@ -38,6 +38,53 @@ export const listarTenants = async (req, res) => {
 };
 
 /**
+ * Allowlist de campos de `GET /admin/tenants/:id` (F15).
+ *
+ * Projecção por INCLUSÃO, não denylist: um campo novo no schema `Tenant`
+ * (ex.: um secret futuro) é privado por omissão — adicionar aqui é sempre
+ * uma decisão deliberada, revista em PR. Contraste com a denylist anterior
+ * (`-whatsapp.instanceToken`), que expunha qualquer campo novo por defeito.
+ *
+ * `contato` (dados pessoais do dono — email/telefone/morada) fica visível
+ * numa base de need-to-know GDPR: o superadmin gere um serviço done-for-you
+ * e precisa de contactar o dono da conta; o acesso é superadmin-only e cada
+ * leitura fica auditada (`tenant.view`, ver abaixo).
+ *
+ * `whatsapp` é allowlisted campo-a-campo (não o subdocumento inteiro) — nunca
+ * `whatsapp.instanceToken`, `whatsapp.zapiToken`, `whatsapp.zapiClientToken`
+ * nem qualquer campo cujo nome bata em /token|secret|key|password/i.
+ *
+ * Cruzado com os paths que `TenantDetailPage.tsx` lê (superset, não subset):
+ * nome, slug, plano.*, limites.*, isTrialExpired/diasRestantesTrial (virtuals
+ * derivados de plano.status/trialDias + createdAt, por isso `plano` completo
+ * e `createdAt` têm de estar presentes), createdAt. `configuracoes` e
+ * `branding` não têm sub-secrets no schema actual (verificado) — allowlisted
+ * inteiros por ora; se ganharem um campo secreto, passam a allowlist por
+ * subcampo como o `whatsapp`.
+ *
+ * `plano` completo inclui `stripeCustomerId`/`stripeSubscriptionId` — expostos
+ * DELIBERADAMENTE: são identificadores Stripe (`cus_…`/`sub_…`), não credenciais
+ * (inúteis sem a API key, não batem em /token|secret|key|password/i) e são
+ * need-to-know para gestão de billing na consola. Se `plano` ganhar um secret
+ * real (ex.: uma chave), passa a allowlist por subcampo.
+ */
+export const TENANT_DETAIL_FIELDS = [
+  'nome',
+  'slug',
+  'ativo',
+  'plano',
+  'limites',
+  'configuracoes',
+  'branding',
+  'contato',
+  'whatsapp.instanceName',
+  'whatsapp.numeroWhatsapp',
+  'whatsapp.health.state',
+  'createdAt',
+  'updatedAt',
+];
+
+/**
  * GET /admin/tenants/:id — detalhe de um tenant + contagem de utilizadores.
  *
  * Control-plane. `Tenant.findById` sem filtro tenantId é correcto AQUI (o Tenant
@@ -52,10 +99,8 @@ export const obterTenant = async (req, res) => {
   }
 
   const [tenant, totalUsuarios] = await Promise.all([
-    // Excluir credenciais WhatsApp — secrets que nunca devem chegar ao cliente.
-    Tenant.findById(id).select(
-      '-whatsapp.instanceToken'
-    ),
+    // Allowlist explícita (TENANT_DETAIL_FIELDS) — ver comentário acima.
+    Tenant.findById(id).select(TENANT_DETAIL_FIELDS.join(' ')),
     User.countDocuments({ tenantId: id }),
   ]);
 
