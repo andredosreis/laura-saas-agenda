@@ -55,6 +55,13 @@ export const loginSchema = z
   })
   .strict();
 
+export const login2FASchema = z
+  .object({
+    challengeToken: z.string().min(1, 'Challenge token é obrigatório'),
+    token: z.string().regex(/^\d{6}$/, 'O código deve ter 6 dígitos'),
+  })
+  .strict();
+
 export const refreshTokenSchema = z
   .object({
     refreshToken: z.string().min(1, 'Refresh token é obrigatório'),

@@ -199,6 +199,14 @@ const UserSchema = new Schema({
     loginAttempts: { type: Number, default: 0 },
     lockUntil: Date,
 
+    // TOTP exclusivo do operador super-admin (F16). O segredo nunca é
+    // seleccionado implicitamente e nunca sai pelo toSafeObject().
+    twoFactor: {
+        enabled: { type: Boolean, default: false },
+        secret: { type: String, select: false },
+        confirmedAt: Date
+    },
+
     // Incrementado em alterações de segurança para revogar access tokens já
     // emitidos sem manter uma blacklist de JWTs.
     authVersion: { type: Number, default: 0, select: false },
@@ -291,9 +299,11 @@ UserSchema.methods.resetLoginAttempts = function () {
  */
 UserSchema.methods.toSafeObject = function () {
     const obj = this.toObject();
+    obj.twoFactorEnabled = !!this.twoFactor?.enabled;
     delete obj.passwordHash;
     delete obj.authVersion;
     delete obj.refreshTokens;
+    delete obj.twoFactor;
     delete obj.resetPasswordToken;
     delete obj.resetPasswordExpires;
     delete obj.emailVerificationToken;

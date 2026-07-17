@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import Tenant from '../../models/Tenant.js';
 import User from '../../models/User.js';
 import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../../services/emailService.js';
+import { verify as verifyTOTP } from 'otplib';
 
 // =============================================
 // CONFIGURAÇÕES JWT
@@ -38,17 +39,20 @@ const findRefreshEntry = (user, token) => {
 /**
  * Gera access token JWT
  */
-const generateAccessToken = (user, tenant) => {
+const generateAccessToken = (user, tenant, { mfa = false } = {}) => {
+    const payload = {
+        userId: user._id,
+        tenantId: tenant._id,
+        email: user.email,
+        nome: user.nome,
+        role: user.role,
+        plano: tenant.plano.tipo,
+        tokenVersion: user.authVersion || 0,
+    };
+    if (mfa) payload.mfa = true;
+
     return jwt.sign(
-        {
-            userId: user._id,
-            tenantId: tenant._id,
-            email: user.email,
-            nome: user.nome,
-            role: user.role,
-            plano: tenant.plano.tipo,
-            tokenVersion: user.authVersion || 0,
-        },
+        payload,
         getJwtSecret(),
         { expiresIn: ACCESS_TOKEN_EXPIRES }
     );
@@ -57,12 +61,15 @@ const generateAccessToken = (user, tenant) => {
 /**
  * Gera refresh token JWT
  */
-const generateRefreshToken = (user) => {
+const generateRefreshToken = (user, { mfa = false } = {}) => {
+    const payload = {
+        userId: user._id,
+        tokenId: crypto.randomBytes(16).toString('hex')
+    };
+    if (mfa) payload.mfa = true;
+
     const token = jwt.sign(
-        {
-            userId: user._id,
-            tokenId: crypto.randomBytes(16).toString('hex')
-        },
+        payload,
         getJwtRefreshSecret(),
         { expiresIn: REFRESH_TOKEN_EXPIRES }
     );
@@ -103,6 +110,43 @@ const tenantToPayload = (tenant) => ({
     whatsapp: { numeroWhatsapp: tenant.whatsapp?.numeroWhatsapp || '' },
     diasRestantesTrial: tenant.diasRestantesTrial,
 });
+
+/**
+ * Emite e persiste uma sessão completa. Login por password e login/2fa usam
+ * exactamente o mesmo caminho para impedir drift no shape/rotação de tokens.
+ */
+const issueSession = async (user, tenant, req, res, { mfa = false } = {}) => {
+    await user.resetLoginAttempts();
+
+    const accessToken = generateAccessToken(user, tenant, { mfa });
+    const refreshToken = generateRefreshToken(user, { mfa });
+    const refreshTokenData = {
+        tokenHash: hashRefreshToken(refreshToken),
+        device: req.headers['user-agent'] || 'unknown',
+        ip: req.ip,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    };
+
+    await User.findByIdAndUpdate(user._id, {
+        $push: {
+            refreshTokens: {
+                $each: [refreshTokenData],
+                $slice: -5
+            }
+        }
+    });
+
+    return res.json({
+        success: true,
+        message: 'Login realizado com sucesso!',
+        data: {
+            user: user.toSafeObject(),
+            tenant: tenantToPayload(tenant),
+            tokens: { accessToken, refreshToken, expiresIn: 3600 }
+        }
+    });
+};
 
 // =============================================
 // CONTROLLERS
@@ -329,44 +373,19 @@ export const login = async (req, res) => {
             tenant = getSuperadminMockTenant();
         }
 
-        // Resetar tentativas de login e atualizar último login
-        await user.resetLoginAttempts();
+        if (user.role === 'superadmin' && user.twoFactor?.enabled) {
+            const challengeToken = jwt.sign(
+                { sub: user._id.toString(), scope: '2fa-challenge' },
+                getJwtSecret(),
+                { expiresIn: '5m' }
+            );
+            return res.json({
+                success: true,
+                data: { requires2FA: true, challengeToken }
+            });
+        }
 
-        // Gerar tokens
-        const accessToken = generateAccessToken(user, tenant);
-        const refreshToken = generateRefreshToken(user);
-
-        // Salvar refresh token (limitar a 5 dispositivos)
-        const refreshTokenData = {
-            tokenHash: hashRefreshToken(refreshToken),
-            device: req.headers['user-agent'] || 'unknown',
-            ip: req.ip,
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        };
-
-        await User.findByIdAndUpdate(user._id, {
-            $push: {
-                refreshTokens: {
-                    $each: [refreshTokenData],
-                    $slice: -5 // Manter apenas os últimos 5 tokens
-                }
-            }
-        });
-
-        res.json({
-            success: true,
-            message: 'Login realizado com sucesso!',
-            data: {
-                user: user.toSafeObject(),
-                tenant: tenantToPayload(tenant),
-                tokens: {
-                    accessToken,
-                    refreshToken,
-                    expiresIn: 3600
-                }
-            }
-        });
+        return issueSession(user, tenant, req, res);
 
     } catch (error) {
         console.error('Erro no login:', error);
@@ -374,6 +393,69 @@ export const login = async (req, res) => {
             success: false,
             error: 'Erro interno ao fazer login'
         });
+    }
+};
+
+/**
+ * POST /api/auth/login/2fa — completa exclusivamente um challenge JWT de 5m.
+ * Tokens de acesso/refresh não possuem `scope:2fa-challenge` e são rejeitados.
+ */
+export const login2FA = async (req, res) => {
+    let decoded;
+    try {
+        decoded = jwt.verify(req.body.challengeToken, getJwtSecret());
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            error: 'Desafio 2FA inválido ou expirado',
+            code: error.name === 'TokenExpiredError' ? 'CHALLENGE_EXPIRED' : 'CHALLENGE_INVALID'
+        });
+    }
+
+    if (decoded.scope !== '2fa-challenge' || !decoded.sub) {
+        return res.status(401).json({
+            success: false,
+            error: 'Desafio 2FA inválido',
+            code: 'CHALLENGE_INVALID'
+        });
+    }
+
+    try {
+        const user = await User.findById(decoded.sub).select('+twoFactor.secret +authVersion');
+        if (!user || !user.ativo || user.role !== 'superadmin' ||
+            !user.twoFactor?.enabled || !user.twoFactor?.secret) {
+            return res.status(401).json({ success: false, error: 'Desafio 2FA inválido' });
+        }
+
+        if (user.isLocked) {
+            const lockTimeRemaining = Math.ceil((user.lockUntil - Date.now()) / 60000);
+            return res.status(423).json({
+                success: false,
+                error: `Conta bloqueada. Tente novamente em ${lockTimeRemaining} minutos.`
+            });
+        }
+
+        const { valid } = await verifyTOTP({
+            secret: user.twoFactor.secret,
+            token: req.body.token,
+            epochTolerance: 30
+        });
+        if (!valid) {
+            await user.incLoginAttempts();
+            const updated = await User.findById(user._id).select('lockUntil');
+            if (updated?.isLocked) {
+                return res.status(423).json({
+                    success: false,
+                    error: 'Conta bloqueada. Tente novamente em 120 minutos.'
+                });
+            }
+            return res.status(401).json({ success: false, error: 'Código inválido' });
+        }
+
+        return issueSession(user, getSuperadminMockTenant(), req, res, { mfa: true });
+    } catch (error) {
+        console.error('Erro no desafio 2FA:', error);
+        return res.status(500).json({ success: false, error: 'Erro interno ao fazer login' });
     }
 };
 
@@ -453,8 +535,9 @@ export const refreshToken = async (req, res) => {
         }
 
         // Gerar novos tokens
-        const newAccessToken = generateAccessToken(user, tenant);
-        const newRefreshToken = generateRefreshToken(user);
+        const mfa = decoded.mfa === true;
+        const newAccessToken = generateAccessToken(user, tenant, { mfa });
+        const newRefreshToken = generateRefreshToken(user, { mfa });
 
         // Guardar apenas o hash do novo token.
         await User.findByIdAndUpdate(user._id, {

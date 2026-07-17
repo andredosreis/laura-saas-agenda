@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+export const PLANO_TIPOS = ['basico', 'pro', 'elite', 'custom'];
+export const PLANO_STATUSES = ['trial', 'ativo', 'suspenso', 'cancelado', 'expirado'];
+
+const planoTipoSchema = z.enum(PLANO_TIPOS);
+const planoStatusSchema = z.enum(PLANO_STATUSES);
+
+export const setup2FASchema = z.object({}).strict();
+
+export const activate2FASchema = z
+  .object({
+    token: z.string().regex(/^\d{6}$/, 'O código deve ter 6 dígitos'),
+  })
+  .strict();
+
 const email = z
   .string()
   .trim()
@@ -17,7 +31,7 @@ export const criarTenantSchema = z
       .regex(/^[a-z0-9-]+$/, 'Slug deve conter apenas letras minúsculas, números e hífens')
       .max(100)
       .optional(),
-    planoTipo: z.enum(['basico', 'pro', 'elite', 'custom']).optional(),
+    planoTipo: planoTipoSchema.optional(),
     adminNome: z.string().trim().min(3, 'Nome do administrador deve ter no mínimo 3 caracteres').max(100),
     adminEmail: email,
   });
@@ -33,7 +47,7 @@ export const criarTenantSchema = z
  */
 export const atualizarPlanoSchema = z
   .object({
-    tipo: z.enum(['basico', 'pro', 'elite', 'custom']).optional(),
+    tipo: planoTipoSchema.optional(),
     dataExpiracao: z.iso.datetime({ message: 'dataExpiracao deve ser uma data ISO válida' }).optional(),
   })
   .refine((d) => d.tipo !== undefined || d.dataExpiracao !== undefined, {
@@ -99,4 +113,16 @@ export const listarAuditSchema = z.object({
   status: z.enum(['ok', 'denied', 'error']).optional(),
   from: z.iso.datetime({ message: 'from deve ser uma data ISO válida' }).optional(),
   to: z.iso.datetime({ message: 'to deve ser uma data ISO válida' }).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// F18 — Server-Side Tenant Search, Filters & Stats
+// ---------------------------------------------------------------------------
+
+export const listarTenantsSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().trim().max(100).optional(),
+  plano: planoTipoSchema.optional(),
+  status: planoStatusSchema.optional(),
 });

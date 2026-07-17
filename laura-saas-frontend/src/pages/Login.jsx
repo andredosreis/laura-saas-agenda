@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,11 +10,13 @@ import MarcaiLogo from '../components/MarcaiLogo';
 function Login() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { login, isLoading: authLoading } = useAuth();
+    const { login, complete2FALogin, isLoading: authLoading } = useAuth();
 
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [challengeToken, setChallengeToken] = useState('');
+    const [twoFactorCode, setTwoFactorCode] = useState('');
 
     // React Hook Form com Zod
     const {
@@ -33,6 +35,14 @@ function Login() {
     // Para onde redirecionar após login
     const from = location.state?.from?.pathname || '/dashboard';
 
+    const continueAfterLogin = (user) => {
+        if (user?.role === 'superadmin' && from === '/dashboard') {
+            navigate('/admin/tenants', { replace: true });
+        } else {
+            navigate(from, { replace: true });
+        }
+    };
+
     const onSubmit = async (data) => {
         setError('');
         setIsLoading(true);
@@ -41,17 +51,48 @@ function Login() {
             const result = await login(data.email, data.password);
 
             if (result.success) {
-                // Superadmin sem destino explícito (acesso directo a /login) vai para a consola
-                if (result.user?.role === 'superadmin' && from === '/dashboard') {
-                    navigate('/admin/tenants', { replace: true });
-                } else {
-                    navigate(from, { replace: true });
+                if (result.requires2FA) {
+                    setChallengeToken(result.challengeToken);
+                    setTwoFactorCode('');
+                    return;
                 }
+                continueAfterLogin(result.user);
             } else {
                 setError(result.error || 'Erro ao fazer login');
             }
         } catch {
             setError('Erro ao conectar com o servidor');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const onSubmit2FA = async (event) => {
+        event.preventDefault();
+        if (!/^\d{6}$/.test(twoFactorCode)) {
+            setError('Introduza o código de 6 dígitos.');
+            return;
+        }
+
+        setError('');
+        setIsLoading(true);
+        try {
+            const result = await complete2FALogin(challengeToken, twoFactorCode);
+
+            if (result.success) {
+                continueAfterLogin(result.user);
+                return;
+            }
+
+            if (result.code === 'CHALLENGE_EXPIRED') {
+                setChallengeToken('');
+                setTwoFactorCode('');
+                setError('O desafio expirou. Introduza novamente a senha.');
+                return;
+            }
+            setError(result.error || 'Código inválido');
+        } catch {
+            setError('Erro ao validar o código. Tente novamente.');
         } finally {
             setIsLoading(false);
         }
@@ -84,6 +125,68 @@ function Login() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+            </div>
+        );
+    }
+
+    if (challengeToken) {
+        return (
+            <div className="min-h-dvh flex items-center justify-center bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+                <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+                    <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20" />
+                    <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20" />
+                </div>
+                <div className="relative w-full max-w-md">
+                    <button
+                        type="button"
+                        onClick={() => { setChallengeToken(''); setTwoFactorCode(''); setError(''); }}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-gray-400 hover:text-white transition-colors mb-6 group focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    >
+                        <ArrowLeft aria-hidden="true" className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <span>Voltar à senha</span>
+                    </button>
+                    <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8">
+                        <div className="flex flex-col items-center mb-8 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center mb-4">
+                                <ShieldCheck aria-hidden="true" className="w-7 h-7 text-indigo-300" />
+                            </div>
+                            <h1 className="text-xl font-semibold text-white">Verificação em dois passos</h1>
+                            <p className="text-gray-400 mt-2">Introduza o código atual da sua aplicação autenticadora.</p>
+                        </div>
+                        <form onSubmit={onSubmit2FA} className="space-y-6">
+                            <div>
+                                <label htmlFor="two-factor-code" className="block text-sm font-medium text-white mb-2">
+                                    Código de autenticação
+                                </label>
+                                <input
+                                    id="two-factor-code"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    autoFocus
+                                    maxLength={6}
+                                    value={twoFactorCode}
+                                    onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-center text-2xl font-mono tracking-[0.45em] focus:outline-hidden focus:ring-4 focus:ring-indigo-400/60 focus:border-indigo-400 transition-all"
+                                    aria-describedby={error ? 'two-factor-error' : undefined}
+                                    aria-invalid={Boolean(error)}
+                                />
+                            </div>
+                            {error && (
+                                <div id="two-factor-error" role="alert" className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                                    <p className="text-red-400 text-sm text-center">{error}</p>
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={isLoading || twoFactorCode.length !== 6}
+                                className="w-full min-h-11 py-3 px-4 bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-hidden focus-visible:ring-4 focus-visible:ring-indigo-300/70"
+                            >
+                                {isLoading ? 'A verificar...' : 'Verificar e entrar'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -201,7 +304,7 @@ function Login() {
 
                         {/* Erro do servidor */}
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                            <div role="alert" className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                 <p className="text-red-400 text-sm text-center">{error}</p>
                             </div>
                         )}

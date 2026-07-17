@@ -22,6 +22,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+    // O produto vive em Europe/Lisbon. Sem fixar o fuso, qualquer teste sobre
+    // fronteiras de dia passa na máquina de quem o escreveu e falha no CI (UTC).
+    env: { TZ: 'Europe/Lisbon' },
     css: false, // não processar CSS em testes (mais rápido, evita PostCSS issues)
     include: ['src/**/*.{test,spec}.{ts,tsx,js,jsx}', 'tests/**/*.{test,spec}.{ts,tsx,js,jsx}'],
     exclude: [

@@ -5,6 +5,7 @@ import { computeTenantStats } from '../../components/admin/adminStats';
 import {
   Avatar, ConsoleCard, PlanBadge, StatusPill, KpiCard, PlanDistributionBar,
 } from '../../components/admin/ConsoleUI';
+import { CopyIdButton } from '../../components/admin/CopyIdButton';
 import { CreateTenantForm } from '../../components/admin/CreateTenantForm';
 
 const PAGE_SIZE = 20;
@@ -65,7 +66,7 @@ export default function TenantsListPage() {
       </div>
       {overLimit && (
         <div className="mb-4 text-[12.5px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-[3px] px-3 py-2">
-          A mostrar {tenants.length} de {total} tenants — KPIs e tabela limitados a 100. Adicionar endpoint de stats para escala maior.
+          A mostrar {tenants.length} de {total} tenants — KPIs e tabela limitados a 100. Falta ligar esta página à pesquisa e ao GET /admin/tenants/stats já disponíveis no backend (F18).
         </div>
       )}
 
@@ -109,6 +110,10 @@ export default function TenantsListPage() {
                         <div>
                           <div className="text-[14px] font-semibold text-dark-50">{t.nome}</div>
                           <div className="font-console-mono text-[12px] text-dark-400">{t.slug}</div>
+                          <div className="mt-0.5 flex items-center gap-1 font-console-mono text-[11px] text-dark-500">
+                            <span>{t._id}</span>
+                            <CopyIdButton id={t._id} label={`Copiar ID do tenant ${t.nome}`} />
+                          </div>
                         </div>
                       </div>
                     </td>

@@ -28,6 +28,12 @@ const ERROR_MESSAGES = {
 const TOKEN_KEY = 'laura_access_token';
 const REFRESH_TOKEN_KEY = 'laura_refresh_token';
 
+export const TWO_FACTOR_SETUP_REQUIRED_EVENT = 'marcai:two-factor-setup-required';
+// Espelha TWO_FACTOR_SETUP_REQUIRED_CODE em src/modules/admin/require2FA.js.
+// Emparelhar pelo `code` e não pela mensagem: o texto é copy e muda sem partir
+// o contrato.
+const TWO_FACTOR_SETUP_REQUIRED_CODE = 'TWO_FACTOR_SETUP_REQUIRED';
+
 // 🆕 Flag para evitar múltiplos refreshs simultâneos
 let isRefreshing = false;
 let refreshSubscribers = [];
@@ -70,6 +76,15 @@ api.interceptors.response.use(
   },
   async error => {
     const originalRequest = error.config;
+
+    // F16: a flag de enforcement vive apenas no backend. Quando ele confirma
+    // que o operador ainda não está enrolado, avisamos a shell da consola sem
+    // duplicar a configuração numa env var do browser.
+    if (error.response?.status === 403 &&
+      error.response?.data?.code === TWO_FACTOR_SETUP_REQUIRED_CODE &&
+      typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(TWO_FACTOR_SETUP_REQUIRED_EVENT));
+    }
 
     // 🆕 Se receber 401 e não é uma tentativa de refresh, tentar renovar token
     if (error.response?.status === 401 &&
