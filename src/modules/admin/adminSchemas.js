@@ -128,6 +128,19 @@ export const listarTenantsSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// F19 — Tenant Users Listing
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /admin/tenants/:id/users
+ * Paginação apenas — sem filtros (a listagem por tenant já é pequena).
+ */
+export const listarUsersTenantSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+// ---------------------------------------------------------------------------
 // F21 — Per-Tenant WhatsApp/Evolution Management
 // ---------------------------------------------------------------------------
 

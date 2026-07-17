@@ -3,9 +3,9 @@ import { authenticate } from '../../middlewares/auth.js';
 import { adminLimiter } from '../../middlewares/rateLimiter.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenantStats, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit, setup2FA, activate2FA, disable2FA, obterWhatsappTenant, criarInstanciaWhatsapp, qrInstanciaWhatsapp, logoutInstanciaWhatsapp } from './adminController.js';
+import { listarTenants, obterTenantStats, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit, setup2FA, activate2FA, disable2FA, listarUsersTenant, obterWhatsappTenant, criarInstanciaWhatsapp, qrInstanciaWhatsapp, logoutInstanciaWhatsapp } from './adminController.js';
 import { validate } from '../../middlewares/validate.js';
-import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema, listarAuditSchema, listarTenantsSchema, setup2FASchema, activate2FASchema, criarInstanciaWhatsappSchema } from './adminSchemas.js';
+import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema, listarAuditSchema, listarTenantsSchema, setup2FASchema, activate2FASchema, listarUsersTenantSchema, criarInstanciaWhatsappSchema } from './adminSchemas.js';
 import { adminMutation } from './adminMutation.js';
 import { require2FA } from './require2FA.js';
 
@@ -47,6 +47,9 @@ router.get('/tenants', validate(listarTenantsSchema, 'query'), listarTenants);
 router.get('/tenants/stats', obterTenantStats);
 router.get('/tenants/:id', obterTenant);
 router.get('/tenants/:id/uso', usoTenant); // métricas cross-tenant via getTenantDBAdmin (RO)
+
+// F19 — Tenant Users Listing
+router.get('/tenants/:id/users', validate(listarUsersTenantSchema, 'query'), listarUsersTenant);
 
 // F09 — Audit Log Viewer
 router.get('/audit', validate(listarAuditSchema, 'query'), listarAudit);

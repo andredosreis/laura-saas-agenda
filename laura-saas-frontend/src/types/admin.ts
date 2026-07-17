@@ -159,3 +159,23 @@ export interface CreateWhatsAppInstanceResult {
   instanceName: string;
   connectionState: WhatsAppConnectionState;
 }
+
+// ---------------------------------------------------------------------------
+// F19 — Tenant Users Listing
+// ---------------------------------------------------------------------------
+
+export type TenantUserRole = 'superadmin' | 'admin' | 'gerente' | 'recepcionista' | 'terapeuta';
+
+// Mirrors the backend select allowlist (src/modules/admin/adminController.js —
+// listarUsersTenant): nome email role ativo emailVerificado ultimoLogin createdAt.
+// Never passwordHash, refreshTokens, permissoes, twoFactor, authVersion, dadosBancarios.
+export interface AdminTenantUser {
+  _id: string;
+  nome: string;
+  email: string;
+  role: TenantUserRole;
+  ativo: boolean;
+  emailVerificado: boolean;
+  ultimoLogin?: string | null;
+  createdAt: string;
+}
