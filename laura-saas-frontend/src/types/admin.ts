@@ -105,3 +105,14 @@ export interface UpdatePlanoInput {
 }
 
 export type UpdateLimitesInput = Partial<TenantLimites>;
+
+// F18 — Server-Side Tenant Search, Filters & Stats
+// Mirrors GET /admin/tenants/stats (src/modules/admin/adminController.js — obterTenantStats).
+// Movido de components/admin/adminStats.ts (F18 apagou o cálculo client-side):
+// PlanDistributionBar consome directamente `porTipo`, que tem o mesmo shape
+// { basico, pro, elite, custom } que o antigo `TenantStats['distribution']`.
+export interface TenantStats {
+  total: number;
+  porStatus: Record<PlanoStatus, number>;
+  porTipo: Record<PlanoTipo, number>;
+}

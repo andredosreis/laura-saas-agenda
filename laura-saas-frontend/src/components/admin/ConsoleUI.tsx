@@ -1,5 +1,5 @@
 import React from 'react';
-import { TenantStats } from './adminStats';
+import { TenantStats } from '../../types/admin';
 
 export const STATUS_STYLES: Record<string, { pill: string; dot: string; label: string }> = {
   // Tenant — plano.status
@@ -119,7 +119,7 @@ const PLAN_BAR_COLORS: Record<string, string> = {
 };
 const PLAN_ORDER = ['basico', 'pro', 'elite', 'custom'] as const;
 
-export function PlanDistributionBar({ distribution }: { distribution: TenantStats['distribution'] }) {
+export function PlanDistributionBar({ distribution }: { distribution: TenantStats['porTipo'] }) {
   const total = PLAN_ORDER.reduce((sum, k) => sum + distribution[k], 0);
   return (
     <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-[15px_17px]">
