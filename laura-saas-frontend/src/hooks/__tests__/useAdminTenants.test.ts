@@ -107,6 +107,50 @@ describe('useAdminTenants', () => {
     expect(result.current.tenants).toEqual(respostaB.data);
     expect(result.current.pagination).toEqual(respostaB.pagination);
   });
+
+  it('a resposta obsoleta (A) a resolver primeiro não desliga o loading enquanto B está em voo', async () => {
+    // Ordem inversa do teste anterior: A (obsoleta) resolve PRIMEIRO, com B
+    // (recente) ainda pendente. O `finally` de A não pode chamar
+    // setLoading(false) — o spinner tem de ficar ligado até B resolver. Prende
+    // a guarda do `finally` (if myId === reqId.current), que o teste do setData
+    // sozinho não apanha.
+    let resolveA!: (value: unknown) => void;
+    let resolveB!: (value: unknown) => void;
+    const promiseA = new Promise((resolve) => { resolveA = resolve; });
+    const promiseB = new Promise((resolve) => { resolveB = resolve; });
+
+    (apiHelpers.get as any)
+      .mockReturnValueOnce(promiseA) // 1º fetch — filters.search === 'a' (obsoleto)
+      .mockReturnValueOnce(promiseB); // 2º fetch — filters.search === 'b' (recente)
+
+    const respostaA = {
+      success: true,
+      data: [{ _id: 'A', nome: 'Antiga', slug: 'a', plano: { tipo: 'pro', status: 'ativo' }, createdAt: '2026-01-01' }],
+      pagination: { total: 99, page: 1, pages: 5, limit: 20 },
+    };
+    const respostaB = {
+      success: true,
+      data: [{ _id: 'B', nome: 'Nova', slug: 'b', plano: { tipo: 'elite', status: 'trial' }, createdAt: '2026-01-02' }],
+      pagination: { total: 1, page: 1, pages: 1, limit: 20 },
+    };
+
+    const { result, rerender } = renderHook(
+      ({ filters }) => useAdminTenants(1, 20, filters),
+      { initialProps: { filters: { search: 'a' } as any } }
+    );
+
+    rerender({ filters: { search: 'b' } });
+
+    // A (obsoleta) resolve primeiro — não pode desligar o loading de B.
+    await act(async () => { resolveA(respostaA); });
+    expect(result.current.loading).toBe(true);
+    expect(result.current.tenants).toEqual([]); // A também não popula dados
+
+    // B (recente) resolve — só agora o loading desliga, com os dados de B.
+    await act(async () => { resolveB(respostaB); });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.tenants).toEqual(respostaB.data);
+  });
 });
 
 describe('useAdminTenantStats', () => {
