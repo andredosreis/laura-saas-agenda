@@ -38,3 +38,8 @@ Revisação de md/
 
 # Scratch de progresso do fluxo subagent-driven (superpowers)
 .superpowers/
+
+# Duplicados que o iCloud cria ao sincronizar a pasta do projecto ("ficheiro 2.ext").
+# NÃO são versões legítimas — o canónico é sempre o nome sem " 2". Ver PR de limpeza.
+# (A cura real é tirar o repo de uma pasta sincronizada pelo iCloud.)
+*[[:space:]]2.*
