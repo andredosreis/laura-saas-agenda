@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../../services/api', () => ({ apiHelpers: { get: vi.fn() } }));
 vi.mock('react-toastify', () => ({ toast: { error: vi.fn() } }));
@@ -63,6 +63,49 @@ describe('useAdminTenants', () => {
 
     expect(result.current.error).toBe('Tenants indisponíveis');
     expect(result.current.tenants).toEqual([]);
+  });
+
+  it('ignora respostas obsoletas: A (lenta) resolve depois de B, o estado final é o de B', async () => {
+    // Duas pesquisas em voo. A é disparada primeiro mas resolve por último
+    // (rede mais lenta). Sem a guarda de sequência, o setData de A sobreporia
+    // os resultados de B e o operador via a lista errada.
+    let resolveA!: (value: unknown) => void;
+    let resolveB!: (value: unknown) => void;
+    const promiseA = new Promise((resolve) => { resolveA = resolve; });
+    const promiseB = new Promise((resolve) => { resolveB = resolve; });
+
+    (apiHelpers.get as any)
+      .mockReturnValueOnce(promiseA) // 1º fetch — filters.search === 'a'
+      .mockReturnValueOnce(promiseB); // 2º fetch — filters.search === 'b'
+
+    const respostaA = {
+      success: true,
+      data: [{ _id: 'A', nome: 'Antiga', slug: 'a', plano: { tipo: 'pro', status: 'ativo' }, createdAt: '2026-01-01' }],
+      pagination: { total: 99, page: 1, pages: 5, limit: 20 },
+    };
+    const respostaB = {
+      success: true,
+      data: [{ _id: 'B', nome: 'Nova', slug: 'b', plano: { tipo: 'elite', status: 'trial' }, createdAt: '2026-01-02' }],
+      pagination: { total: 1, page: 1, pages: 1, limit: 20 },
+    };
+
+    const { result, rerender } = renderHook(
+      ({ filters }) => useAdminTenants(1, 20, filters),
+      { initialProps: { filters: { search: 'a' } as any } }
+    );
+
+    // Muda a pesquisa para 'b' → dispara o 2º fetch enquanto A ainda está pendente.
+    rerender({ filters: { search: 'b' } });
+
+    // B (rápida) resolve primeiro, A (lenta) depois — ordem invertida da emissão.
+    await act(async () => { resolveB(respostaB); });
+    await act(async () => { resolveA(respostaA); });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // O estado final tem de ser o de B, não o de A que chegou atrasada.
+    expect(result.current.tenants).toEqual(respostaB.data);
+    expect(result.current.pagination).toEqual(respostaB.pagination);
   });
 });
 

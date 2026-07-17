@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiHelpers } from '../services/api';
 import {
   PaginatedResponse, PaginationInfo, TenantSummary, TenantDetail, TenantUsage, TenantStats, PlanoTipo, PlanoStatus,
@@ -23,7 +23,17 @@ export function useAdminTenants(page = 1, limit = 20, filters: TenantFilters = E
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Guarda de sequência contra respostas fora de ordem: cada mudança de
+  // página/filtro dispara um fetch, mas se a pesquisa A resolver DEPOIS da B
+  // (rede mais lenta), o `setData(A)` sobreporia os resultados de B — o
+  // operador veria a lista errada. Capturamos o id no início e só aplicamos
+  // o resultado se ainda for o pedido mais recente. Um AbortController também
+  // servia, mas exigia threading pelo apiHelpers/axios; a guarda é mais simples
+  // e igualmente correcta.
+  const reqId = useRef(0);
+
   const fetchTenants = useCallback(async () => {
+    const myId = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
@@ -33,12 +43,14 @@ export function useAdminTenants(page = 1, limit = 20, filters: TenantFilters = E
       if (filters.status) query.append('status', filters.status);
 
       const response = await apiHelpers.get(`/admin/tenants?${query.toString()}`);
+      if (myId !== reqId.current) return; // resposta obsoleta — ignora
       setData(response as PaginatedResponse<TenantSummary>);
     } catch (err: any) {
+      if (myId !== reqId.current) return; // erro de pedido obsoleto — ignora
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar tenants';
       setError(msg); // toast tratado pelo interceptor central de api.js
     } finally {
-      setLoading(false);
+      if (myId === reqId.current) setLoading(false);
     }
   }, [page, limit, filters.search, filters.plano, filters.status]);
 
