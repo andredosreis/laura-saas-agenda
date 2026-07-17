@@ -106,11 +106,200 @@ export const getConnectionState = async (instanceName) => {
   try {
     const response = await axios.get(
       `${EVOLUTION_API_URL}/instance/connectionState/${instance}`,
-      { headers: { apikey: EVOLUTION_API_KEY } },
+      // timeout explícito: é o caminho que o painel (GET .../whatsapp) usa para
+      // degradar para `unknown`. Sem ele, uma ligação pendurada mantinha o GET do
+      // painel aberto até ao timeout do SO. INSTANCE_TIMEOUT_MS está definido no
+      // bloco de gestão de instância, abaixo.
+      { headers: { apikey: EVOLUTION_API_KEY }, timeout: INSTANCE_TIMEOUT_MS },
     );
     const state = response.data?.instance?.state || response.data?.state || null;
     return { ok: true, state };
   } catch (error) {
     return { ok: false, unreachable: true, error: error.response?.data || error.message };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Gestão de instância (F21 — ADR-021 Fase 4 / ADR-024 Fase 4)
+//
+// Endpoints Evolution v2 (`evoapicloud/evolution-api:v2.3.7`, docker-compose.prod.yml):
+//   POST   /instance/create               — cria instância (+ webhook no mesmo pedido)
+//   GET    /instance/connect/{instance}   — QR / pairing code
+//   DELETE /instance/logout/{instance}    — termina a sessão do dispositivo
+//   GET    /instance/connectionState/{i}  — estado (já existia, ver acima)
+//
+// Todas devolvem `{ ok: true, ... }` / `{ ok: false, ... }` — nunca lançam. É a
+// convenção das funções acima e o que permite ao painel degradar (Evolution em
+// baixo → 200 com `evolutionReachable: false`) em vez de 500.
+// ---------------------------------------------------------------------------
+
+// Timeout explícito: sem ele o painel fica pendurado numa Evolution em baixo até
+// ao timeout do SO. As funções de mensagem acima não o têm por razão histórica —
+// não é alterado aqui para não mexer no caminho de envio em produção.
+const INSTANCE_TIMEOUT_MS = Number(process.env.EVOLUTION_TIMEOUT_MS) || 15000;
+
+const instanceHeaders = () => ({ apikey: EVOLUTION_API_KEY, 'Content-Type': 'application/json' });
+
+const missingConfig = () => ({ ok: false, unreachable: true, error: 'Evolution API não configurada' });
+
+/**
+ * Cria uma instância Evolution dedicada e, no mesmo pedido, configura o webhook.
+ *
+ * O webhook é configurado na criação (e não num follow-up) para não existir uma
+ * janela em que a instância aceita mensagens sem as entregar ao backend. O
+ * formato replica `scripts/tools/webhook-restore-prod.sh` (a convenção real de
+ * produção): header `apikey` com EVOLUTION_WEBHOOK_SECRET — que é exactamente o
+ * que `src/middlewares/webhookAuth.js` valida — e `events: ['MESSAGES_UPSERT']`.
+ *
+ * @param {string} instanceName        slug único da instância
+ * @param {object} [opts]
+ * @param {string} [opts.webhookUrl]   URL pública de `/webhook/evolution`; sem ela a instância nasce muda
+ * @returns {Promise<{ok:true,instanceToken:string|null,state:string,webhookConfigured:boolean}
+ *                  |{ok:false,conflict?:boolean,unreachable?:boolean,error:*}>}
+ */
+export const createInstance = async (instanceName, { webhookUrl } = {}) => {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return missingConfig();
+
+  const instance = String(instanceName || '').trim();
+  if (!instance) return { ok: false, error: 'instanceName obrigatório' };
+
+  const payload = {
+    instanceName: instance,
+    integration: 'WHATSAPP-BAILEYS',
+    qrcode: true,
+  };
+
+  if (webhookUrl) {
+    payload.webhook = {
+      url: webhookUrl,
+      byEvents: false,
+      base64: false,
+      headers: { apikey: process.env.EVOLUTION_WEBHOOK_SECRET, 'Content-Type': 'application/json' },
+      events: ['MESSAGES_UPSERT'],
+    };
+  }
+
+  try {
+    const response = await axios.post(`${EVOLUTION_API_URL}/instance/create`, payload, {
+      headers: instanceHeaders(),
+      timeout: INSTANCE_TIMEOUT_MS,
+    });
+
+    // v2.2+ devolve `hash` string; versões anteriores devolvem `{ hash: { apikey } }`.
+    const hash = response.data?.hash;
+    const instanceToken = typeof hash === 'string' ? hash : (hash?.apikey ?? null);
+    const state = response.data?.instance?.status || response.data?.instance?.state || 'connecting';
+
+    // NUNCA logar `response.data` — contém o token da instância.
+    logger.info({ instance, webhookConfigured: Boolean(webhookUrl) }, '[Evolution] Instância criada');
+    return { ok: true, instanceToken, state, webhookConfigured: Boolean(webhookUrl) };
+  } catch (error) {
+    const status = error.response?.status;
+    const errPayload = error.response?.data || error.message;
+    logger.error({ instance, status, err: errPayload }, '[Evolution] Erro ao criar instância');
+    // A Evolution recusa nome já em uso com 403 (e 409 nalgumas versões).
+    return { ok: false, conflict: status === 403 || status === 409, error: errPayload };
+  }
+};
+
+/**
+ * Obtém o QR code / pairing code para ligar o dispositivo a uma instância.
+ *
+ * O payload é uma credencial de sessão: nunca é logado nem auditado — só chega
+ * ao operador, na resposta.
+ *
+ * @param {string} instanceName
+ * @returns {Promise<{ok:true,qrBase64:string|null,pairingCode:string|null}
+ *                  |{ok:false,notFound?:boolean,unreachable?:boolean,error:*}>}
+ */
+export const getConnectQR = async (instanceName) => {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return missingConfig();
+
+  const instance = String(instanceName || '').trim();
+  if (!instance) return { ok: false, error: 'instanceName obrigatório' };
+
+  try {
+    const response = await axios.get(
+      `${EVOLUTION_API_URL}/instance/connect/${encodeURIComponent(instance)}`,
+      { headers: { apikey: EVOLUTION_API_KEY }, timeout: INSTANCE_TIMEOUT_MS },
+    );
+    return {
+      ok: true,
+      qrBase64: response.data?.base64 ?? null,
+      pairingCode: response.data?.pairingCode ?? null,
+    };
+  } catch (error) {
+    const status = error.response?.status;
+    // Só o status é logado — o corpo de erro da Evolution pode ecoar o `code`.
+    logger.error({ instance, status }, '[Evolution] Erro ao obter QR');
+    return { ok: false, notFound: status === 404, error: error.response?.data || error.message };
+  }
+};
+
+// Achata a mensagem de erro da Evolution — que pode vir em `response.message`
+// (string OU array), `message`, ou ser o próprio corpo — para uma string única
+// pesquisável. Usado para detectar o caso "instância não conectada" no logout.
+const flattenEvolutionError = (data) => {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  const parts = [data.message, data.error, data.response?.message];
+  return parts
+    .flat()
+    .filter((p) => typeof p === 'string')
+    .join(' ');
+};
+
+/**
+ * Termina a sessão WhatsApp de uma instância (logout do dispositivo).
+ *
+ * NÃO remove a instância da Evolution — o registo e o webhook sobrevivem, e a
+ * mesma instância volta a ligar-se com um novo QR. É deliberado: `instanceName`
+ * continua a resolver o tenant no webhook (ADR-021).
+ *
+ * Idempotência (spec F21: "logging out a disconnected instance succeeds"): a
+ * Evolution rejeita o logout de uma instância que já não está conectada. Esse
+ * caso — e o 404 (instância inexistente) — é sinalizado (`alreadyOff` /
+ * `notFound`) para o controller o tratar como sucesso idempotente, em vez de
+ * confundir "já estava desligada" com "Evolution em baixo".
+ *
+ * ⚠️ A doc oficial v2 (context7) só documenta o 200 e o 404 do logout; a
+ * resposta de "não conectada" não está no contrato e o deployado é v2.3.7. A
+ * detecção por mensagem é, por isso, defensiva (heurística sobre o corpo do
+ * erro) — e exige um status 4xx: "já desligada" é sempre um erro de CLIENTE,
+ * nunca um 5xx (esse é um bug de servidor genuíno, que tem de dar 502 mesmo que
+ * o corpo por acaso contenha "not connected"). Pior caso: um 502 espúrio num
+ * segundo logout, nunca um falso sucesso.
+ *
+ * @param {string} instanceName
+ * @returns {Promise<{ok:true}
+ *   |{ok:false,notFound?:boolean,alreadyOff?:boolean,unreachable?:boolean,error:*}>}
+ */
+export const logoutInstance = async (instanceName) => {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return missingConfig();
+
+  const instance = String(instanceName || '').trim();
+  if (!instance) return { ok: false, error: 'instanceName obrigatório' };
+
+  try {
+    await axios.delete(`${EVOLUTION_API_URL}/instance/logout/${encodeURIComponent(instance)}`, {
+      headers: { apikey: EVOLUTION_API_KEY },
+      timeout: INSTANCE_TIMEOUT_MS,
+    });
+    logger.info({ instance }, '[Evolution] Sessão terminada');
+    return { ok: true };
+  } catch (error) {
+    const status = error.response?.status;
+    const errPayload = error.response?.data || error.message;
+    // "não conectada" = sessão já terminada → idempotente, não é falha. Só conta
+    // como 4xx (erro de cliente): um 5xx com "not connected" no corpo é um bug de
+    // servidor genuíno. `status` undefined (sem resposta, ex.: ECONNREFUSED) faz
+    // `undefined < 500` === false → cai em falha genuína (502), como deve.
+    const alreadyOff =
+      status < 500 &&
+      /not\s+connected|is\s+not\s+connected|logout\s+is\s+not\s+available/i.test(
+        flattenEvolutionError(error.response?.data),
+      );
+    logger.error({ instance, status, err: errPayload }, '[Evolution] Erro ao terminar sessão');
+    return { ok: false, notFound: status === 404, alreadyOff, error: errPayload };
   }
 };

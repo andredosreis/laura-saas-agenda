@@ -126,3 +126,27 @@ export const listarTenantsSchema = z.object({
   plano: planoTipoSchema.optional(),
   status: planoStatusSchema.optional(),
 });
+
+// ---------------------------------------------------------------------------
+// F21 — Per-Tenant WhatsApp/Evolution Management
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /admin/tenants/:id/whatsapp/instancia
+ * Body: { instanceName? } — slug da instância Evolution. Omisso ⇒ o controller
+ * deriva do slug do tenant.
+ *
+ * O regex espelha o `match` de `Tenant.whatsapp.instanceName` (ADR-021): o nome
+ * viaja num path da Evolution e é a chave de resolução de tenant no webhook —
+ * qualquer coisa fora de `[a-z0-9-]` é rejeitada aqui, antes de chegar à rede.
+ */
+export const criarInstanciaWhatsappSchema = z.object({
+  instanceName: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9-]+$/, 'instanceName deve conter apenas minúsculas, números e hífenes')
+    .min(3, 'instanceName deve ter no mínimo 3 caracteres')
+    .max(50, 'instanceName deve ter no máximo 50 caracteres')
+    .optional(),
+});

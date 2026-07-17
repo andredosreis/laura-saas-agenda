@@ -5,6 +5,7 @@ import { Avatar, ConsoleCard, PlanBadge, StatusPill, formatLimite, FEATURE_FLAG_
 import { CopyIdButton } from '../../components/admin/CopyIdButton';
 import { EditPlanLimitsForm } from '../../components/admin/EditPlanLimitsForm';
 import { SuspendReactivateControls } from '../../components/admin/SuspendReactivateControls';
+import { WhatsAppCard } from '../../components/admin/WhatsAppCard';
 
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -143,6 +144,9 @@ export default function TenantDetailPage() {
               </div>
             </div>
           </ConsoleCard>
+
+          {/* F21 — gestão da instância WhatsApp/Evolution deste tenant */}
+          <WhatsAppCard tenantId={t._id} tenantNome={t.nome} />
 
           <ConsoleCard className="p-5 md:col-span-2">
             <h3 className="font-console-mono text-[11px] uppercase tracking-[.1em] text-dark-400 mb-3.5">

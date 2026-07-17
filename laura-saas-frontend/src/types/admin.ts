@@ -116,3 +116,46 @@ export interface TenantStats {
   porStatus: Record<PlanoStatus, number>;
   porTipo: Record<PlanoTipo, number>;
 }
+
+// ---------------------------------------------------------------------------
+// F21 — Per-Tenant WhatsApp/Evolution Management
+// ---------------------------------------------------------------------------
+
+// Estados devolvidos pela Evolution v2 (`/instance/connectionState`) + o nosso
+// `unknown`, usado quando ela não é alcançável ou não há instância para consultar.
+export type WhatsAppConnectionState = 'open' | 'connecting' | 'close' | 'unknown';
+
+/**
+ * GET /admin/tenants/:id/whatsapp
+ *
+ * `instanceToken` não existe neste tipo por desenho — o backend nunca o devolve
+ * (é a credencial da instância na Evolution). Não o acrescentar aqui.
+ *
+ * `evolutionReachable: false` significa "não confirmado": ou a Evolution está em
+ * baixo, ou não há instância para consultar. `instanceName === null` distingue
+ * os dois casos.
+ */
+export interface TenantWhatsApp {
+  provider: string;
+  instanceName: string | null;
+  numeroWhatsapp: string | null;
+  webhookConfigured: boolean;
+  connectionState: WhatsAppConnectionState;
+  evolutionReachable: boolean;
+}
+
+/** GET /admin/tenants/:id/whatsapp/qr — credencial de sessão, nunca persistida. */
+export interface TenantWhatsAppQR {
+  qrBase64: string | null;
+  pairingCode: string | null;
+}
+
+/** POST /admin/tenants/:id/whatsapp/instancia */
+export interface CreateWhatsAppInstanceInput {
+  instanceName?: string;
+}
+
+export interface CreateWhatsAppInstanceResult {
+  instanceName: string;
+  connectionState: WhatsAppConnectionState;
+}

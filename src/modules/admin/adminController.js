@@ -8,6 +8,16 @@ import { getModels } from '../../models/registry.js';
 import { getTenantDBAdmin } from './getTenantDBAdmin.js';
 import { sendEmailVerificationEmail } from '../../services/emailService.js';
 import { PLANO_STATUSES, PLANO_TIPOS } from './adminSchemas.js';
+import { adminMutation } from './adminMutation.js';
+import logger from '../../utils/logger.js';
+// Namespace import (mesma razão que em modules/messaging/controllers/webhookController.js):
+// vários testes de webhook/lembretes substituem este módulo por um mock PARCIAL
+// (só sendWhatsAppMessage/getMediaBase64) e importam `src/app.js`, que monta o
+// adminRouter. Com import nomeado, o link ESM rebentava nesses testes com
+// "does not provide an export named 'createInstance'"; com namespace, um nome em
+// falta é apenas undefined — e só seria acedido nestas rotas, que esses testes
+// não exercem.
+import * as evolutionClient from '../../utils/evolutionClient.js';
 
 const loadSuperadminWith2FA = (userId, session) =>
   User.findById(userId).select('+twoFactor.secret').session(session);
@@ -611,4 +621,340 @@ export const listarAudit = async (req, res) => {
     data,
     pagination: { total, page, pages: Math.ceil(total / limit), limit },
   });
+};
+
+// ---------------------------------------------------------------------------
+// F21 — Per-Tenant WhatsApp/Evolution Management (ADR-021 + ADR-024 Fase 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Allowlist do subdocumento `whatsapp` exposto por estas rotas.
+ *
+ * Por INCLUSÃO, como TENANT_DETAIL_FIELDS: um campo novo em `Tenant.whatsapp`
+ * (ex.: um segundo token) nasce privado. `whatsapp.instanceToken` NUNCA entra —
+ * é a credencial da instância na Evolution e não tem uso no painel.
+ */
+const WHATSAPP_VIEW_FIELDS = [
+  'whatsapp.provider',
+  'whatsapp.instanceName',
+  'whatsapp.numeroWhatsapp',
+  'whatsapp.webhookConfigured',
+];
+
+/**
+ * Diff auditado destas rotas — `{ instanceName, webhookConfigured }` e nada mais.
+ * O token e o QR são credenciais: não vão para `before`/`after`/`metadata`.
+ */
+const whatsappAuditState = (whatsapp) => ({
+  instanceName: whatsapp?.instanceName ?? null,
+  webhookConfigured: Boolean(whatsapp?.webhookConfigured),
+});
+
+/**
+ * URL pública de `/webhook/evolution` (montado em `src/app.js`).
+ *
+ * `PUBLIC_API_URL` é a base pública do backend. Sem ela não há webhook a
+ * configurar e a instância nasceria muda (recebe mensagens, não as entrega) —
+ * por isso a criação falha ANTES de tocar na Evolution, em vez de deixar uma
+ * instância inútil para trás.
+ */
+const resolveWebhookUrl = () => {
+  const base = process.env.PUBLIC_API_URL;
+  if (!base) return null;
+  return `${base.replace(/\/+$/, '')}/webhook/evolution`;
+};
+
+/** Traduz o resultado de `getConnectionState` para o contrato da resposta. */
+const CONNECTION_STATE_UNKNOWN = 'unknown';
+
+/**
+ * GET /admin/tenants/:id/whatsapp — estado da integração WhatsApp de um tenant.
+ *
+ * Junta os campos allowlisted do Tenant (control-plane) ao estado VIVO da
+ * Evolution. A Evolution é infra externa: se estiver em baixo, a resposta é
+ * na mesma 200 com `connectionState: 'unknown'` + `evolutionReachable: false` —
+ * o painel mostra o que sabe em vez de rebentar com 500.
+ *
+ * Sem instância configurada não há nada a perguntar à Evolution: devolve
+ * `evolutionReachable: false` sem a contactar (não é "está em baixo", é "não foi
+ * consultada"; o card distingue os dois casos por `instanceName === null`).
+ */
+export const obterWhatsappTenant = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'ID inválido' });
+  }
+
+  const tenant = await Tenant.findById(id).select(WHATSAPP_VIEW_FIELDS.join(' '));
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+  }
+
+  const { provider, instanceName, numeroWhatsapp, webhookConfigured } = tenant.whatsapp ?? {};
+
+  let connectionState = CONNECTION_STATE_UNKNOWN;
+  let evolutionReachable = false;
+
+  if (instanceName) {
+    const live = await evolutionClient.getConnectionState(instanceName);
+    if (live.ok) {
+      connectionState = live.state || CONNECTION_STATE_UNKNOWN;
+      evolutionReachable = true;
+    }
+  }
+
+  req.audit.set({
+    action: 'tenant.whatsapp.view',
+    targetTenantId: id,
+    metadata: { instanceName: instanceName ?? null, connectionState, evolutionReachable },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      provider: provider ?? 'evolution',
+      instanceName: instanceName ?? null,
+      numeroWhatsapp: numeroWhatsapp ?? null,
+      webhookConfigured: Boolean(webhookConfigured),
+      connectionState,
+      evolutionReachable,
+    },
+  });
+};
+
+/**
+ * POST /admin/tenants/:id/whatsapp/instancia — cria a instância Evolution do tenant.
+ *
+ * Ordem deliberada: **Evolution primeiro, DB depois**. O `instanceToken` só
+ * existe depois de a Evolution criar a instância, por isso não há forma de
+ * persistir antes. Uma instância órfã na Evolution é lixo recuperável; um Tenant
+ * a apontar para uma instância que não existe é um tenant partido.
+ *
+ * A chamada externa fica FORA de `work()` — `session.withTransaction` pode
+ * re-executar o callback em erro transiente e criaria duas instâncias.
+ *
+ * Compensação: se a mutação falhar depois da criação, faz logout best-effort e
+ * loga o nome da instância órfã para limpeza manual no Manager.
+ */
+export const criarInstanciaWhatsapp = async (req, res, next) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'ID inválido' });
+  }
+
+  const tenant = await Tenant.findById(id).select('slug whatsapp.instanceName whatsapp.webhookConfigured');
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+  }
+  if (tenant.whatsapp?.instanceName) {
+    return res.status(409).json({ success: false, error: 'Tenant já tem uma instância WhatsApp configurada' });
+  }
+
+  const instanceName = req.body.instanceName || tenant.slug;
+  if (!/^[a-z0-9-]+$/.test(instanceName || '')) {
+    // Só alcançável quando o slug do tenant não é slug-válido (dados legados):
+    // o body já passou pelo Zod.
+    return res.status(400).json({
+      success: false,
+      error: 'instanceName inválido — indique um nome com apenas minúsculas, números e hífenes',
+    });
+  }
+
+  // `whatsapp.instanceName` é unique sparse (ADR-021). O índice é a garantia
+  // real; este pré-check evita criar na Evolution uma instância que a DB depois
+  // recusaria (que seria logo uma órfã a compensar).
+  const nomeEmUso = await Tenant.findOne({ 'whatsapp.instanceName': instanceName }).select('_id');
+  if (nomeEmUso) {
+    return res.status(409).json({ success: false, error: 'Já existe um tenant com esta instância' });
+  }
+
+  const webhookUrl = resolveWebhookUrl();
+  if (!webhookUrl) {
+    logger.error('[F21] PUBLIC_API_URL não configurado — criação de instância abortada antes da Evolution');
+    return res.status(500).json({
+      success: false,
+      error: 'Webhook público não configurado no servidor',
+    });
+  }
+
+  // Fail-fast, ANTES de tocar na Evolution (evita órfã): o payload do webhook
+  // leva `apikey: EVOLUTION_WEBHOOK_SECRET` (evolutionClient.createInstance) e é
+  // esse o valor que `webhookAuth.js` compara. Se o secret estiver vazio, a
+  // instância nasceria com `webhookConfigured:true` mas o webhook recusaria TODAS
+  // as mensagens ("sem secret configurado, recusa sempre") — uma instância muda.
+  if (!process.env.EVOLUTION_WEBHOOK_SECRET) {
+    logger.error('[F21] EVOLUTION_WEBHOOK_SECRET vazio — criação de instância abortada antes da Evolution');
+    return res.status(500).json({
+      success: false,
+      error: 'Webhook não configurado no servidor',
+    });
+  }
+
+  const created = await evolutionClient.createInstance(instanceName, { webhookUrl });
+  if (!created.ok) {
+    // Nunca ecoar `created.error` — pode conter URLs/detalhes internos da Evolution.
+    return created.conflict
+      ? res.status(409).json({ success: false, error: 'Já existe uma instância com este nome na Evolution' })
+      : res.status(502).json({ success: false, error: 'Não foi possível criar a instância na Evolution' });
+  }
+
+  const work = async (_req, { session }) => {
+    const fresh = await Tenant.findById(id).session(session);
+    if (!fresh) {
+      req.res.status(404);
+      throw new Error('Tenant não encontrado');
+    }
+    if (fresh.whatsapp?.instanceName) {
+      req.res.status(409);
+      throw new Error('Tenant já tem uma instância WhatsApp configurada');
+    }
+
+    const before = whatsappAuditState(fresh.whatsapp);
+
+    await Tenant.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          'whatsapp.provider': 'evolution',
+          'whatsapp.instanceName': instanceName,
+          'whatsapp.instanceToken': created.instanceToken,
+          'whatsapp.webhookConfigured': true,
+          'whatsapp.webhookUrl': webhookUrl,
+        },
+      },
+      { returnDocument: 'after', session },
+    );
+
+    // Criação de recurso → 201. O res.json() da factory preserva o statusCode
+    // já definido aqui (mesmo mecanismo do `req.res.status(4xx); throw` usado
+    // acima). Ver o padrão em criarTenant.
+    req.res.status(201);
+
+    return {
+      data: { instanceName, connectionState: created.state || 'connecting' },
+      targetTenantId: id,
+      before,
+      after: { instanceName, webhookConfigured: true },
+    };
+  };
+
+  // A mutação passa pela factory (audit transacional). O `next` é embrulhado
+  // para a compensação correr no único ponto em que a factory sinaliza falha.
+  return adminMutation('tenant.whatsapp.create', work)(req, res, async (err) => {
+    if (err) {
+      const undo = await evolutionClient.logoutInstance(instanceName);
+      logger.error(
+        { tenantId: id, instanceName, compensada: undo.ok },
+        '[F21] mutação falhou após criar a instância na Evolution — instância ÓRFÃ, ' +
+          'requer remoção manual no Evolution Manager antes de repetir a criação',
+      );
+    }
+    return next(err);
+  });
+};
+
+/**
+ * GET /admin/tenants/:id/whatsapp/qr — QR / pairing code para ligar o dispositivo.
+ *
+ * Leitura pura (não muta nada). O payload é uma credencial de sessão: chega ao
+ * operador na resposta, mas NUNCA aos metadados de auditoria — quem lê o audit
+ * log não pode ganhar acesso ao WhatsApp do cliente.
+ *
+ * Ao contrário do `view`, aqui uma Evolution em baixo é 502: o QR não tem
+ * fallback possível — sem Evolution não há nada para mostrar.
+ */
+export const qrInstanciaWhatsapp = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'ID inválido' });
+  }
+
+  const tenant = await Tenant.findById(id).select('whatsapp.instanceName');
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+  }
+
+  const instanceName = tenant.whatsapp?.instanceName;
+  if (!instanceName) {
+    return res.status(404).json({ success: false, error: 'Tenant não tem instância WhatsApp configurada' });
+  }
+
+  const qr = await evolutionClient.getConnectQR(instanceName);
+  if (!qr.ok) {
+    return res.status(502).json({ success: false, error: 'Não foi possível obter o QR code da Evolution' });
+  }
+
+  // metadata sem QR/pairingCode — deliberado.
+  req.audit.set({ action: 'tenant.whatsapp.qr', targetTenantId: id, metadata: { instanceName } });
+
+  res.json({ success: true, data: { qrBase64: qr.qrBase64, pairingCode: qr.pairingCode } });
+};
+
+/**
+ * POST /admin/tenants/:id/whatsapp/logout — termina a sessão WhatsApp do tenant.
+ *
+ * Evolution primeiro, DB depois (mesma razão que a criação: o efeito externo não
+ * pode viver dentro da transação). Idempotente: terminar a sessão de uma
+ * instância já desligada sucede e fica auditado.
+ *
+ * NÃO limpa `whatsapp.numeroWhatsapp`: a spec condicionava-o a "se a descoberta
+ * mostrar que deriva da sessão" — não deriva. É configurado pelo dono da conta
+ * (`authController` /configuracoes) e serve de destino dos alertas à equipa
+ * (`notificationWorker`, `leadInternalRoutes`); limpá-lo no logout apagava
+ * config do cliente e silenciava alertas por causa de uma reconexão.
+ *
+ * Também não toca em `whatsapp.health.*` — esse subdocumento é do
+ * `evolutionHealthService` (cron), que reconcilia o estado real em minutos.
+ * Escrever 'down' aqui dispararia o e-mail de "ligação em baixo" para um logout
+ * deliberado.
+ *
+ * Sobra uma mutação sem alteração de campos: o efeito é externo e a entrada de
+ * AuditLog é, ela própria, a escrita transacional. A factory continua a ser o
+ * caminho obrigatório de qualquer POST do painel (Gate 2).
+ */
+export const logoutInstanciaWhatsapp = async (req, res, next) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'ID inválido' });
+  }
+
+  const tenant = await Tenant.findById(id).select('whatsapp.instanceName whatsapp.webhookConfigured');
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+  }
+
+  const instanceName = tenant.whatsapp?.instanceName;
+  if (!instanceName) {
+    return res.status(404).json({ success: false, error: 'Tenant não tem instância WhatsApp configurada' });
+  }
+
+  const out = await evolutionClient.logoutInstance(instanceName);
+  // Idempotente (spec F21): uma instância já desligada (`alreadyOff`) ou já
+  // inexistente na Evolution (`notFound`) é sucesso — o estado desejado (sem
+  // sessão) já foi alcançado. Só um erro genuíno (Evolution em baixo, 5xx)
+  // é 502.
+  const idempotente = out.notFound || out.alreadyOff;
+  if (!out.ok && !idempotente) {
+    return res.status(502).json({ success: false, error: 'Não foi possível terminar a sessão na Evolution' });
+  }
+
+  const work = async (_req, { session }) => {
+    const fresh = await Tenant.findById(id).session(session);
+    if (!fresh) {
+      req.res.status(404);
+      throw new Error('Tenant não encontrado');
+    }
+
+    const state = whatsappAuditState(fresh.whatsapp);
+
+    return {
+      data: { connectionState: 'close' },
+      targetTenantId: id,
+      before: state,
+      after: state, // logout não altera a configuração — ver docblock
+      metadata: { instanceName },
+    };
+  };
+
+  return adminMutation('tenant.whatsapp.logout', work)(req, res, next);
 };
