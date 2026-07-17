@@ -958,3 +958,52 @@ export const logoutInstanciaWhatsapp = async (req, res, next) => {
 
   return adminMutation('tenant.whatsapp.logout', work)(req, res, next);
 };
+
+// ---------------------------------------------------------------------------
+// F19 — Tenant Users Listing
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /admin/tenants/:id/users — lista os utilizadores de um tenant (F19).
+ *
+ * Control-plane: `User` vive na DB partilhada `laura-saas` com um campo
+ * `tenantId` — a mesma classe de leitura que `obterTenant`, NÃO envolve
+ * `getTenantDBAdmin` (isso é só para dados de negócio dentro de `tenant_<id>`).
+ *
+ * Allowlist explícita por `.select()` — nunca `passwordHash`, `refreshTokens`,
+ * `permissoes`, `twoFactor`, `authVersion`, `dadosBancarios` nem qualquer outro
+ * campo de segurança/PII fora da lista. Ordenado `createdAt: 1` para que o
+ * primeiro admin criado (o dono da conta) apareça em primeiro lugar.
+ */
+export const listarUsersTenant = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'ID inválido' });
+  }
+
+  const tenant = await Tenant.findById(id);
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: 'Tenant não encontrado' });
+  }
+
+  // Coerção, defaults e cap vêm já feitos do `listarUsersTenantSchema`.
+  const { page, limit } = req.query;
+  const skip = (page - 1) * limit;
+
+  const [data, total] = await Promise.all([
+    User.find({ tenantId: id })
+      .select('nome email role ativo emailVerificado ultimoLogin createdAt')
+      .sort({ createdAt: 1 })
+      .skip(skip)
+      .limit(limit),
+    User.countDocuments({ tenantId: id }),
+  ]);
+
+  req.audit.set({ action: 'tenant.users', targetTenantId: id });
+
+  res.json({
+    success: true,
+    data,
+    pagination: { total, page, pages: Math.ceil(total / limit), limit },
+  });
+};

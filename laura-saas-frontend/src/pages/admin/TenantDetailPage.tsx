@@ -6,6 +6,7 @@ import { CopyIdButton } from '../../components/admin/CopyIdButton';
 import { EditPlanLimitsForm } from '../../components/admin/EditPlanLimitsForm';
 import { SuspendReactivateControls } from '../../components/admin/SuspendReactivateControls';
 import { WhatsAppCard } from '../../components/admin/WhatsAppCard';
+import { UsersCard } from '../../components/admin/UsersCard';
 
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -171,6 +172,8 @@ export default function TenantDetailPage() {
           </ConsoleCard>
         </div>
       </ConsoleCard>
+
+      <UsersCard tenantId={t._id} />
 
       {showEdit && (
         <EditPlanLimitsForm tenant={t} onClose={() => setShowEdit(false)} onSaved={refetch} />
