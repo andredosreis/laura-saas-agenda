@@ -10,7 +10,9 @@ Frontend-only refactor, **last feature of the phase** (it touches files F17/F18/
 
 ## Component Overview
 New `laura-saas-frontend/src/components/admin/ui/`:
-- `Modal.tsx` — the shell duplicated 3× (`fixed inset-0 z-50 … bg-black/60` overlay + console card, title, close, `aria-modal`, Escape-to-close).
+- `Modal.tsx` — the shell duplicated **4×** (`fixed inset-0 z-50 … bg-black/60` overlay + console card, title, close, `aria-modal`, Escape-to-close).
+  - ⚠️ Corrigido 2026-07-17: esta spec foi escrita a 2026-07-08 e dizia 3×. Os sites reais hoje são `CreateTenantForm.tsx`, `EditPlanLimitsForm.tsx`, `SuspendReactivateControls.tsx` **e `pages/admin/SecurityPage.tsx`** (o diálogo de desactivar 2FA, criado a 2026-07-14 pelo F16 — posterior a esta spec). O `SecurityPage` já traz focus-trap + Escape próprios: é o candidato mais rico e a melhor referência para a API do `Modal`.
+  - Depois do F21, o `WhatsAppCard.tsx` também entra no âmbito de adopção (QR/confirmação de logout) — confirmar o que ele trouxe antes de começar.
 - `PaginationFooter.tsx` — the footer duplicated between `TenantsListPage` and `AuditLogPage` (props: `pagination`, `onPageChange`).
 - `Spinner.tsx` — the `border-primary-500 border-t-transparent animate-spin` block from the 3 pages.
 - Form-field primitives: export `inputClass`/`labelClass` (or a `Field` component) from ONE place — extend `ConsoleUI.tsx` or add `ui/Field.tsx`; delete the 4 copies.
@@ -42,4 +44,4 @@ None new.
 ## Assumptions / Decisions
 - **[Key]** Flat wins over glass **inside the console only** — the product keeps glassmorphism; the console keeps its deliberate operator identity, now consistently.
 - **[Auto-Accept]** Primitives live under `components/admin/ui/` (console-scoped), NOT `components/` — they encode console styling and must not leak into product pages.
-- **[Auto-Accept]** No new dependencies (no headless-ui/radix) — the 3 existing modals are simple; a 40-line `Modal.tsx` covers them.
+- **[Auto-Accept]** No new dependencies (no headless-ui/radix) — the 4 existing modals are simple; a 40-line `Modal.tsx` covers them.

@@ -36,6 +36,7 @@ The console loads at most 100 tenants in one fetch (`useAdminTenants.ts:15`) and
   - Add two selects (Plano, Estado) beside the search input, console-styled.
   - Pagination footer switches to server `pagination` (same component shape as `AuditLogPage`; F22 will extract the shared component later).
   - KPI strip + `PlanDistributionBar` consume `useAdminTenantStats` (`GET /admin/tenants/stats`); delete `computeTenantStats`, `adminStats.ts` and the `total > tenants.length` warning banner (`TenantsListPage.tsx:66-70`).
+  - ⚠️ Nota 2026-07-17: `adminStats.ts` **não é só** `computeTenantStats` — exporta também o tipo `TenantStats`, importado por `components/admin/ConsoleUI.tsx:2` e usado na assinatura de `PlanDistributionBar` (`:122`). Apagar o ficheiro sem mais parte o build. Mover `TenantStats` para `src/types/admin.ts` (onde esta spec já manda acrescentar o tipo da resposta de stats) e actualizar o import do `ConsoleUI.tsx` — que passa a ser ficheiro tocado por esta feature, apesar de a spec não o listar.
 - Update `src/types/admin.ts` with the `TenantStats` response type.
 
 ## API Contracts
