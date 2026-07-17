@@ -69,19 +69,29 @@ export const forgotPasswordLimiter = rateLimit({
 
 Verificar que `app.set('trust proxy', 1)` está em `app.js` (necessário atrás do nginx reverse proxy no VPS Contabo).
 
-## validateWebhook (WhatsApp Z-API)
+## validateWebhook (WhatsApp Evolution API)
+
+O webhook do WhatsApp usa o header **`apikey`** — herança da Evolution API, não da
+Z-API (descontinuada). A fonte de verdade é `src/middlewares/webhookAuth.js`, e a
+Evolution envia este mesmo header ao configurar a instância (ver `EVOLUTION_WEBHOOK_SECRET`
+em `evolutionClient.js`). **Não** é `x-api-token`/`ZAPI_WEBHOOK_TOKEN` — usar isso faz a
+instância nascer muda (recebe mensagens, o backend recusa-as todas).
 
 ```javascript
+// src/middlewares/webhookAuth.js
 export const validateWebhook = (req, res, next) => {
-  const token = req.headers['x-api-token'];
-  if (!token || token !== process.env.ZAPI_WEBHOOK_TOKEN) {
+  const token = req.headers['apikey'] || req.body?.apikey;
+  const expected = process.env.EVOLUTION_WEBHOOK_SECRET;
+  // Sem secret configurado, recusa sempre — nunca aceitar por omissão.
+  if (!expected || !token || !safeEqual(String(token), expected)) {
     return res.status(401).json({ success: false, error: 'Webhook não autorizado' });
   }
   next();
 };
 ```
 
-Sempre usar header `x-api-token` — nunca query string (query params são logados por proxies).
+Header `apikey`, nunca query string (query params são logados por proxies). A comparação
+é constant-time (`safeEqual` / `crypto.timingSafeEqual`), não `===`.
 
 ## Hardening global em `app.js`
 

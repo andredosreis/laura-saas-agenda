@@ -48,16 +48,17 @@
       "name": "Server-Side Tenant Search, Filters & Stats",
       "priority": 2,
       "wave": 2,
-      "status": "in-progress",
+      "status": "done",
       "spec": "docs/produto/features/features-super_admin/F18-tenants-server-search-stats/spec.md",
-      "note": "backend landed 2026-07-14 (GET /admin/tenants/stats + search/plano/status server-side, with tests); frontend still client-side (useAdminTenants fetches limit=100, computeTenantStats) — endpoint has no consumer until that is wired"
+      "note": "done — server-side search/filters/stats, frontend wired; merged in PR #93"
     },
     "F19": {
       "name": "Tenant Users Listing",
       "priority": 2,
       "wave": 2,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F19-tenant-detail-users/spec.md"
+      "status": "done",
+      "spec": "docs/produto/features/features-super_admin/F19-tenant-detail-users/spec.md",
+      "note": "done — GET /admin/tenants/:id/users (allowlist .lean, owner-first); merged in PR #95"
     },
     "F20": {
       "name": "Environment Badge & 404 Catch-All",
@@ -71,9 +72,9 @@
       "name": "Per-Tenant WhatsApp/Evolution Management (ADR-024 Fase 4)",
       "priority": 2,
       "wave": 3,
-      "status": "todo",
+      "status": "done",
       "spec": "docs/produto/features/features-super_admin/F21-whatsapp-per-tenant/spec.md",
-      "note": "same-files sequencing after F19 (TenantDetailPage); mandatory Evolution API discovery step"
+      "note": "done — WhatsApp/Evolution per tenant (view/create/qr/logout, token never leaks, idempotent logout); merged in PR #94. Deploy needs PUBLIC_API_URL + EVOLUTION_WEBHOOK_SECRET"
     },
     "F22": {
       "name": "Console UI Consolidation",
