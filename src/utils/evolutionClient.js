@@ -265,7 +265,9 @@ const flattenEvolutionError = (data) => {
  * ⚠️ A doc oficial v2 (context7) só documenta o 200 e o 404 do logout; a
  * resposta de "não conectada" não está no contrato e o deployado é v2.3.7. A
  * detecção por mensagem é, por isso, defensiva (heurística sobre o corpo do
- * erro) — se a Evolution mudar o texto, o pior caso é um 502 espúrio num
+ * erro) — e exige um status 4xx: "já desligada" é sempre um erro de CLIENTE,
+ * nunca um 5xx (esse é um bug de servidor genuíno, que tem de dar 502 mesmo que
+ * o corpo por acaso contenha "not connected"). Pior caso: um 502 espúrio num
  * segundo logout, nunca um falso sucesso.
  *
  * @param {string} instanceName
@@ -288,10 +290,15 @@ export const logoutInstance = async (instanceName) => {
   } catch (error) {
     const status = error.response?.status;
     const errPayload = error.response?.data || error.message;
-    // "não conectada" = sessão já terminada → idempotente, não é falha.
-    const alreadyOff = /not\s+connected|is\s+not\s+connected|logout\s+is\s+not\s+available/i.test(
-      flattenEvolutionError(error.response?.data),
-    );
+    // "não conectada" = sessão já terminada → idempotente, não é falha. Só conta
+    // como 4xx (erro de cliente): um 5xx com "not connected" no corpo é um bug de
+    // servidor genuíno. `status` undefined (sem resposta, ex.: ECONNREFUSED) faz
+    // `undefined < 500` === false → cai em falha genuína (502), como deve.
+    const alreadyOff =
+      status < 500 &&
+      /not\s+connected|is\s+not\s+connected|logout\s+is\s+not\s+available/i.test(
+        flattenEvolutionError(error.response?.data),
+      );
     logger.error({ instance, status, err: errPayload }, '[Evolution] Erro ao terminar sessão');
     return { ok: false, notFound: status === 404, alreadyOff, error: errPayload };
   }

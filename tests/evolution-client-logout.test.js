@@ -65,9 +65,23 @@ describe('logoutInstance — classificação de erros (F21)', () => {
     expect(res.notFound).toBe(false);
   });
 
-  it('"not connected" no corpo (string em message) → alreadyOff:true', async () => {
+  it('500 + "not connected" → NÃO alreadyOff (5xx é erro de servidor genuíno, não idempotente)', async () => {
+    // "já desligada" é sempre um erro de CLIENTE (4xx). Um 5xx cujo corpo por
+    // acaso contenha "not connected" é um bug de servidor e TEM de dar 502.
     axios.delete.mockRejectedValue(axiosError(500, { message: 'The instance is not connected' }));
     const res = await logoutInstance('inst-c');
+    expect(res.alreadyOff).toBe(false);
+  });
+
+  it('503 + "not connected" → NÃO alreadyOff (prova a fronteira 5xx)', async () => {
+    axios.delete.mockRejectedValue(axiosError(503, { response: { message: ['instance is not connected'] } }));
+    const res = await logoutInstance('inst-c2');
+    expect(res.alreadyOff).toBe(false);
+  });
+
+  it('"not connected" com status 4xx (string em message) → alreadyOff:true', async () => {
+    axios.delete.mockRejectedValue(axiosError(400, { message: 'The instance is not connected' }));
+    const res = await logoutInstance('inst-c3');
     expect(res.alreadyOff).toBe(true);
   });
 
