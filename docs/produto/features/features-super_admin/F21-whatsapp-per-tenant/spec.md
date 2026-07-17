@@ -6,13 +6,14 @@ ADR-024 Phase 4 (never implemented) + ADR-021 (Evolution instance per tenant). O
 
 ## Mandatory reading (Step 0 — discovery)
 - `docs/adrs/generated/ADR-021-evolution-instance-per-tenant.md` and `ADR-016-evolution-api-v2-upgrade.md`
-- `src/utils/evolutionClient.js` — **currently exposes ONLY `sendWhatsAppMessage` and `getMediaBase64`**; all instance-management functions are new. Copy its auth/base-URL conventions (`EVOLUTION_API_URL`, API-key header) exactly.
+- `src/utils/evolutionClient.js` — exposes `sendWhatsAppMessage`, `getMediaBase64`, `registerSendFailureHandler` and **`getConnectionState(instanceName)`**. Copy its auth/base-URL conventions (`EVOLUTION_API_URL`, API-key header) exactly.
+  - ⚠️ Corrigido 2026-07-17: esta linha dizia que o cliente só expunha `sendWhatsAppMessage` e `getMediaBase64` e que TODAS as funções de gestão de instância eram novas. Falso — `getConnectionState` já existe (evolutionClient.js:101), acrescentado pelo alerta de saúde da Evolution (PR #89). **Reutiliza-a, não a reimplementes.** Só `createInstance`, `getConnectQR` e `logoutInstance` são novas.
 - `src/models/Tenant.js:116-140` — the `whatsapp` subdocument (`provider`, `instanceName` unique+sparse slug, `instanceToken`, `numeroWhatsapp`, `webhookConfigured`, `webhookUrl`)
 - How the webhook is configured for existing instances: search `scripts/tools/` + `src/modules/ia/` for `webhook` + Evolution instance provisioning; mirror whatever production instances use (webhook URL + token header), or the new instance will be mute.
 - Evolution API v2 instance endpoints via context7/official docs: `POST /instance/create`, `GET /instance/connectionState/{name}`, `GET /instance/connect/{name}` (QR/pairing), `DELETE /instance/logout/{name}` — **verify exact paths/payloads against the deployed Evolution version in `docker-compose.prod.yml` before coding.**
 
 ## Component Overview
-- `src/utils/evolutionClient.js` — new functions: `createInstance(instanceName, opts)`, `getConnectionState(instanceName)`, `getConnectQR(instanceName)`, `logoutInstance(instanceName)` (shared util — the IA module and workers may reuse them later).
+- `src/utils/evolutionClient.js` — funções NOVAS: `createInstance(instanceName, opts)`, `getConnectQR(instanceName)`, `logoutInstance(instanceName)`. `getConnectionState(instanceName)` **já existe — reutilizar** (shared util — the IA module and workers may reuse them later).
 - `src/modules/admin/adminController.js` + `adminRoutes.js` + `adminSchemas.js` — 4 routes below.
 - Frontend: `WhatsAppCard.tsx` in `components/admin/` rendered by `TenantDetailPage`; `useAdminTenantWhatsApp.ts` hook.
 

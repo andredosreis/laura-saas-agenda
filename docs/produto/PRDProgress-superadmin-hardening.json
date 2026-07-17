@@ -2,7 +2,7 @@
   "project": "Marcai Super-Admin Panel — Hardening & Operations (Phase 2)",
   "prd": "docs/produto/PRD-superadmin-hardening.md",
   "audit": "docs/operacoes/auditoria-superadmin-2026-07-07.md",
-  "as_of": "2026-07-14",
+  "as_of": "2026-07-17",
   "features": {
     "F13": {
       "name": "Dedicated Admin Rate Limiting",
@@ -40,9 +40,9 @@
       "name": "Complete Audit Viewer",
       "priority": 2,
       "wave": 1,
-      "status": "in-progress",
+      "status": "done",
       "spec": "docs/produto/features/features-super_admin/F17-audit-viewer-complete/spec.md",
-      "note": "Wave 1 implementation started 2026-07-14"
+      "note": "implemented and verified in PR #91 (merged 2026-07-17): date filters, expandable before/after, copy-ID, duplicate toast removed"
     },
     "F18": {
       "name": "Server-Side Tenant Search, Filters & Stats",
@@ -63,9 +63,9 @@
       "name": "Environment Badge & 404 Catch-All",
       "priority": 2,
       "wave": 1,
-      "status": "in-progress",
+      "status": "done",
       "spec": "docs/produto/features/features-super_admin/F20-environment-badge-404/spec.md",
-      "note": "Wave 1 implementation started 2026-07-14"
+      "note": "implemented and verified in PR #91 (merged 2026-07-17): env badge (PROD/PRODUCTION/Produção all red), /admin redirect, 404 catch-all"
     },
     "F21": {
       "name": "Per-Tenant WhatsApp/Evolution Management (ADR-024 Fase 4)",
