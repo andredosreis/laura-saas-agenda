@@ -43,9 +43,12 @@ interface UsersCardProps {
 }
 
 export function UsersCard({ tenantId }: UsersCardProps) {
-  // limit=100 (o máximo do backend) — equipas de um tenant done-for-you são
-  // pequenas; evita paginação na UI para uma listagem que cabe sempre numa página.
-  const { users, loading, error } = useAdminTenantUsers(tenantId, 1, 100);
+  // limit=100 (o máximo do backend) — equipas de um tenant done-for-you cabem
+  // quase sempre numa página. Quando NÃO cabem, o rodapé abaixo diz-lo: uma
+  // tabela truncada em silêncio faria o operador ler 100 como o total real.
+  const { users, pagination, loading, error } = useAdminTenantUsers(tenantId, 1, 100);
+  // `undefined` quando a tabela mostra tudo — narrowing directo no JSX, sem `!`.
+  const totalOculto = pagination && pagination.total > users.length ? pagination.total : undefined;
 
   return (
     <ConsoleCard className="mt-4 overflow-hidden">
@@ -112,6 +115,12 @@ export function UsersCard({ tenantId }: UsersCardProps) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {totalOculto !== undefined && (
+        <div className="p-3.5 px-[18px] border-t border-white/10 bg-white/5 text-[12.5px] text-dark-400">
+          A mostrar {users.length} de {totalOculto} utilizadores
         </div>
       )}
     </ConsoleCard>

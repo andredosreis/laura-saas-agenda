@@ -150,7 +150,7 @@ describe('GET /api/v1/admin/tenants/:id/users', () => {
     expect(res.body.data[0].role).toBe('admin');
   });
 
-  it('allowlist — nunca expõe passwordHash/refreshTokens/permissoes/twoFactor/dadosBancarios', async () => {
+  it('allowlist — nunca expõe passwordHash/refreshTokens/permissoes/twoFactor/dadosBancarios/tokens de reset', async () => {
     const tenant = await Tenant.create({
       nome: 'Salão Seguro',
       slug: 'salao-seguro-users',
@@ -165,6 +165,10 @@ describe('GET /api/v1/admin/tenants/:id/users', () => {
       emailVerificado: true,
       dadosBancarios: { titular: 'Perigoso Lda', iban: 'PT50000201231234567890154', banco: 'Banco Sekret' },
       twoFactor: { enabled: true, secret: 'sekret-totp-secret' },
+      // Os dois piores campos da lista: um reset token vazado é takeover directo
+      // da conta do admin do tenant. Semeados para o canário `sekret` os cobrir.
+      resetPasswordToken: 'sekret-reset-token',
+      emailVerificationToken: 'sekret-verify-token',
     });
 
     const res = await request(app)
@@ -179,7 +183,10 @@ describe('GET /api/v1/admin/tenants/:id/users', () => {
     expect(body).not.toMatch(/twoFactor/i);
     expect(body).not.toMatch(/dadosBancarios/i);
     expect(body).not.toMatch(/authVersion/i);
-    // O secret TOTP + IBAN semeados nunca podem transbordar para a resposta.
+    expect(body).not.toMatch(/resetPasswordToken/i);
+    expect(body).not.toMatch(/emailVerificationToken/i);
+    // O secret TOTP + IBAN + tokens de reset/verificação semeados nunca podem
+    // transbordar para a resposta.
     expect(body).not.toContain('sekret');
 
     const user = res.body.data[0];

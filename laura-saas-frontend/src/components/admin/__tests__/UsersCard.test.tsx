@@ -27,6 +27,30 @@ describe('UsersCard', () => {
     expect(screen.getByText('A carregar utilizadores...')).toBeInTheDocument();
   });
 
+  // Acima do cap de 100 a tabela trunca — sem este indicador o operador leria
+  // as 100 linhas como o total real do tenant.
+  it('avisa quando a tabela está truncada (total > utilizadores carregados)', () => {
+    (useAdminTenantUsers as any).mockReturnValue({
+      users: [mkUser({ _id: 'u1' }), mkUser({ _id: 'u2', email: 'b@salao.pt' })],
+      pagination: { total: 150, page: 1, pages: 2, limit: 100 },
+      loading: false,
+      error: null,
+    });
+    render(<UsersCard tenantId="t1" />);
+    expect(screen.getByText('A mostrar 2 de 150 utilizadores')).toBeInTheDocument();
+  });
+
+  it('não mostra o aviso de truncagem quando a tabela mostra tudo', () => {
+    (useAdminTenantUsers as any).mockReturnValue({
+      users: [mkUser({ _id: 'u1' })],
+      pagination: { total: 1, page: 1, pages: 1, limit: 100 },
+      loading: false,
+      error: null,
+    });
+    render(<UsersCard tenantId="t1" />);
+    expect(screen.queryByText(/A mostrar/)).not.toBeInTheDocument();
+  });
+
   it('mostra o erro inline', () => {
     (useAdminTenantUsers as any).mockReturnValue({ users: [], loading: false, error: 'Tenant não encontrado' });
     render(<UsersCard tenantId="t1" />);
