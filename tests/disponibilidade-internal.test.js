@@ -33,6 +33,16 @@ const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
 const WEEK_LABELS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
+// Data-alvo do teste, sempre no futuro. O Agendamento recusa datas no passado,
+// por isso uma data fixa transforma isto numa bomba-relógio: estava '2026-07-15'
+// em hardcode e o CI passou a falhar sozinho a 16/07, sem nada ter mudado no
+// código. `seedWeek` activa os 7 dias da semana, logo o dia da semana é
+// indiferente e basta empurrar a data para a frente.
+const DIA = DateTime.now().setZone('Europe/Lisbon').plus({ days: 7 });
+const D0 = DIA.toISODate();
+const D1 = DIA.plus({ days: 1 }).toISODate();
+const D2 = DIA.plus({ days: 2 }).toISODate();
+
 async function criarTenant(slug, planoStatus = 'ativo') {
   const tenant = await Tenant.create({
     nome: `Salão ${slug}`,
@@ -94,9 +104,9 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
   it('C1 — devolve os mesmos slots que /schedules/available-slots (paridade)', async () => {
     const { tenant, token } = await criarTenant('f03-c1');
     await seedWeek(tenant._id);
-    await seedBooking(tenant._id, '2026-07-15T10:00'); // ocupa 10:00
+    await seedBooking(tenant._id, `${D0}T10:00`); // ocupa 10:00
 
-    const date = '2026-07-15';
+    const date = D0;
     const legacy = await request(app)
       .get(`/api/v1/schedules/available-slots?date=${date}&duration=60`)
       .set(auth(token));
@@ -137,10 +147,10 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
   it('C3 — excepção "fechado" → slots:[] (isException:true, exceptionType:fechado)', async () => {
     const { tenant } = await criarTenant('f03-c3a');
     await seedWeek(tenant._id);
-    await seedException(tenant._id, { data: '2026-07-15', tipo: 'fechado' });
+    await seedException(tenant._id, { data: D0, tipo: 'fechado' });
 
     const res = await request(app)
-      .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=2026-07-15`)
+      .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=${D0}`)
       .set(svc());
 
     expect(res.status).toBe(200);
@@ -152,10 +162,10 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
   it('C3b — excepção "horas-extra" → slots dentro da janela da excepção', async () => {
     const { tenant } = await criarTenant('f03-c3b');
     await seedWeek(tenant._id);
-    await seedException(tenant._id, { data: '2026-07-15', tipo: 'horas-extra', inicio: '14:00', fim: '18:00' });
+    await seedException(tenant._id, { data: D0, tipo: 'horas-extra', inicio: '14:00', fim: '18:00' });
 
     const res = await request(app)
-      .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=2026-07-15`)
+      .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=${D0}`)
       .set(svc());
 
     const day = res.body.data.days[0];
@@ -169,7 +179,7 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
   it('C4 — tenant sem Schedule → scheduleConfigured:false, days:[] (200)', async () => {
     const { tenant } = await criarTenant('f03-c4');
     const res = await request(app)
-      .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=2026-07-15`)
+      .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=${D0}`)
       .set(svc());
 
     expect(res.status).toBe(200);
@@ -183,14 +193,14 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
     const { tenant: b } = await criarTenant('f03-c5b');
     await seedWeek(a._id);
     await seedWeek(b._id);
-    await seedException(a._id, { data: '2026-07-15', tipo: 'fechado' });
-    await seedBooking(a._id, '2026-07-15T09:00'); // ocupa 09:00 SÓ no tenant A
+    await seedException(a._id, { data: D0, tipo: 'fechado' });
+    await seedBooking(a._id, `${D0}T09:00`); // ocupa 09:00 SÓ no tenant A
 
     const resA = await request(app)
-      .get(`/api/internal/disponibilidade?tenantId=${a._id}&date=2026-07-15`)
+      .get(`/api/internal/disponibilidade?tenantId=${a._id}&date=${D0}`)
       .set(svc());
     const resB = await request(app)
-      .get(`/api/internal/disponibilidade?tenantId=${b._id}&date=2026-07-15`)
+      .get(`/api/internal/disponibilidade?tenantId=${b._id}&date=${D0}`)
       .set(svc());
 
     expect(resA.body.data.days[0].slots).toEqual([]); // A fechado
@@ -204,19 +214,19 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
       const { tenant } = await criarTenant('f03-c9a');
       await seedWeek(tenant._id);
       const res = await request(app)
-        .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=2026-07-15`)
+        .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=${D0}`)
         .set(svc());
       expect(res.body.data.days).toHaveLength(1);
-      expect(res.body.data.days[0].date).toBe('2026-07-15');
+      expect(res.body.data.days[0].date).toBe(D0);
     });
 
     it('from/to → intervalo inclusivo', async () => {
       const { tenant } = await criarTenant('f03-c9b');
       await seedWeek(tenant._id);
       const res = await request(app)
-        .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&from=2026-07-15&to=2026-07-17`)
+        .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&from=${D0}&to=${D2}`)
         .set(svc());
-      expect(res.body.data.days.map((d) => d.date)).toEqual(['2026-07-15', '2026-07-16', '2026-07-17']);
+      expect(res.body.data.days.map((d) => d.date)).toEqual([D0, D1, D2]);
     });
 
     it('sem date/from/to → janela today..today+days (default 7 → 8 dias)', async () => {
@@ -256,7 +266,7 @@ describe('F03 — GET /api/internal/disponibilidade', () => {
     it('plano inactivo → 403', async () => {
       const { tenant } = await criarTenant('f03-c9g', 'suspenso');
       const res = await request(app)
-        .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=2026-07-15`)
+        .get(`/api/internal/disponibilidade?tenantId=${tenant._id}&date=${D0}`)
         .set(svc());
       expect(res.status).toBe(403);
     });
