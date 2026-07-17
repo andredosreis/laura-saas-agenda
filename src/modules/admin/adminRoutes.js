@@ -3,9 +3,9 @@ import { authenticate } from '../../middlewares/auth.js';
 import { adminLimiter } from '../../middlewares/rateLimiter.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenantStats, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit, setup2FA, activate2FA, disable2FA } from './adminController.js';
+import { listarTenants, obterTenantStats, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit, setup2FA, activate2FA, disable2FA, obterWhatsappTenant, criarInstanciaWhatsapp, qrInstanciaWhatsapp, logoutInstanciaWhatsapp } from './adminController.js';
 import { validate } from '../../middlewares/validate.js';
-import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema, listarAuditSchema, listarTenantsSchema, setup2FASchema, activate2FASchema } from './adminSchemas.js';
+import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema, listarAuditSchema, listarTenantsSchema, setup2FASchema, activate2FASchema, criarInstanciaWhatsappSchema } from './adminSchemas.js';
 import { adminMutation } from './adminMutation.js';
 import { require2FA } from './require2FA.js';
 
@@ -66,5 +66,19 @@ router.put('/tenants/:id/limites', validate(atualizarLimitesSchema), adminMutati
 router.post('/tenants/:id/suspender', validate(suspenderTenantSchema), adminMutation('tenant.suspend', suspenderTenant));
 // eslint-disable-next-line no-restricted-syntax
 router.post('/tenants/:id/reactivar', adminMutation('tenant.reactivate', reactivarTenant));
+
+// F21 — Per-Tenant WhatsApp/Evolution Management (ADR-021 Fase 4)
+//
+// As duas mutações abaixo NÃO passam `adminMutation` directamente à rota: a
+// Evolution tem de ser chamada ANTES da transação (o instanceToken só existe
+// depois de ela criar a instância) e a criação precisa de compensar a instância
+// órfã se a mutação falhar. Os handlers invocam `adminMutation` internamente —
+// o audit transacional do Gate 2 mantém-se; muda só onde a factory é composta.
+router.get('/tenants/:id/whatsapp', obterWhatsappTenant);
+router.get('/tenants/:id/whatsapp/qr', qrInstanciaWhatsapp);
+// eslint-disable-next-line no-restricted-syntax -- mutação via adminMutation dentro do handler (ver acima)
+router.post('/tenants/:id/whatsapp/instancia', validate(criarInstanciaWhatsappSchema), criarInstanciaWhatsapp);
+// eslint-disable-next-line no-restricted-syntax -- mutação via adminMutation dentro do handler (ver acima)
+router.post('/tenants/:id/whatsapp/logout', logoutInstanciaWhatsapp);
 
 export default router;
