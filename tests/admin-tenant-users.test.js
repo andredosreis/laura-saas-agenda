@@ -163,6 +163,10 @@ describe('GET /api/v1/admin/tenants/:id/users', () => {
       password: 'Senha@Segura123',
       role: 'admin',
       emailVerificado: true,
+      // ultimoLogin semeado para que TODOS os 8 campos allowlisted estejam
+      // presentes na resposta — a asserção de chaves exactas abaixo cobre então
+      // o allowlist completo, não só os 7 campos que um utilizador nunca-logado teria.
+      ultimoLogin: new Date('2026-07-10T10:00:00.000Z'),
       dadosBancarios: { titular: 'Perigoso Lda', iban: 'PT50000201231234567890154', banco: 'Banco Sekret' },
       twoFactor: { enabled: true, secret: 'sekret-totp-secret' },
       // Os dois piores campos da lista: um reset token vazado é takeover directo
@@ -189,9 +193,13 @@ describe('GET /api/v1/admin/tenants/:id/users', () => {
     // transbordar para a resposta.
     expect(body).not.toContain('sekret');
 
+    // Chaves EXACTAS — não `arrayContaining`, que só verifica presença e
+    // deixaria passar campos a mais (ex.: virtuals `id`/`initials`/`isLocked`,
+    // ou um vazamento futuro). O `.lean()` no controller garante os 7 campos
+    // do select + `_id`, sem virtuals.
     const user = res.body.data[0];
-    expect(Object.keys(user)).toEqual(
-      expect.arrayContaining(['nome', 'email', 'role', 'ativo', 'emailVerificado', 'createdAt'])
+    expect(Object.keys(user).sort()).toEqual(
+      ['_id', 'ativo', 'createdAt', 'email', 'emailVerificado', 'nome', 'role', 'ultimoLogin'].sort()
     );
   });
 

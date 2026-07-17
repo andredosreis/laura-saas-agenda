@@ -995,7 +995,13 @@ export const listarUsersTenant = async (req, res) => {
       .select('nome email role ativo emailVerificado ultimoLogin createdAt')
       .sort({ createdAt: 1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      // .lean() devolve POJOs sem virtuals. Sem isto, o `toJSON: { virtuals: true }`
+      // do UserSchema injectaria `id`, `initials` e `isLocked` na resposta — e o
+      // `isLocked` (lê `lockUntil`, que NÃO é seleccionado) daria sempre `false`,
+      // uma mentira sobre o estado de bloqueio. Assim a resposta é exactamente os
+      // 7 campos do select (+ `_id`).
+      .lean(),
     User.countDocuments({ tenantId: id }),
   ]);
 
