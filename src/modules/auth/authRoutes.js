@@ -2,6 +2,7 @@ import express from 'express';
 import {
     register,
     login,
+    login2FA,
     refreshToken,
     logout,
     logoutAll,
@@ -20,6 +21,7 @@ import { loginLimiter, registerLimiter, forgotPasswordLimiter, refreshLimiter } 
 import {
     registerSchema,
     loginSchema,
+    login2FASchema,
     refreshTokenSchema,
     forgotPasswordSchema,
     resetPasswordSchema,
@@ -35,6 +37,7 @@ const router = express.Router();
 // Rotas públicas
 router.post('/register', registerLimiter, validate(registerSchema), register);
 router.post('/login', loginLimiter, validate(loginSchema), login);
+router.post('/login/2fa', loginLimiter, validate(login2FASchema), login2FA);
 router.post('/refresh', refreshLimiter, validate(refreshTokenSchema), refreshToken);
 router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), forgotPassword);
 router.post('/reset-password', validate(resetPasswordSchema), resetPassword);

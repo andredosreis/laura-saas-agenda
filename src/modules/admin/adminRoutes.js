@@ -3,10 +3,11 @@ import { authenticate } from '../../middlewares/auth.js';
 import { adminLimiter } from '../../middlewares/rateLimiter.js';
 import { requireSuperadmin } from './requireSuperadmin.js';
 import { auditMiddleware } from './auditMiddleware.js';
-import { listarTenants, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit } from './adminController.js';
+import { listarTenants, obterTenantStats, obterTenant, usoTenant, criarTenant, atualizarPlano, atualizarLimites, suspenderTenant, reactivarTenant, listarAudit, setup2FA, activate2FA, disable2FA } from './adminController.js';
 import { validate } from '../../middlewares/validate.js';
-import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema, listarAuditSchema } from './adminSchemas.js';
+import { criarTenantSchema, atualizarPlanoSchema, atualizarLimitesSchema, suspenderTenantSchema, listarAuditSchema, listarTenantsSchema, setup2FASchema, activate2FASchema } from './adminSchemas.js';
 import { adminMutation } from './adminMutation.js';
+import { require2FA } from './require2FA.js';
 
 /**
  * adminRouter — painel super-admin (ADR-024).
@@ -30,8 +31,20 @@ router.use(adminLimiter);
 router.use(authenticate, requireSuperadmin);
 router.use(auditMiddleware);
 
+// F16 — self-service deliberadamente antes do enforcement: um operador ainda
+// não enrolado precisa de alcançar setup mesmo com a flag ligada.
+// eslint-disable-next-line no-restricted-syntax
+router.post('/2fa/setup', validate(setup2FASchema), adminMutation('superadmin.2fa.setup', setup2FA));
+// eslint-disable-next-line no-restricted-syntax
+router.post('/2fa/activate', validate(activate2FASchema), adminMutation('superadmin.2fa.activate', activate2FA));
+// eslint-disable-next-line no-restricted-syntax
+router.post('/2fa/disable', validate(activate2FASchema), adminMutation('superadmin.2fa.disable', disable2FA));
+
+router.use(require2FA);
+
 // Fase 2 — leitura
-router.get('/tenants', listarTenants);
+router.get('/tenants', validate(listarTenantsSchema, 'query'), listarTenants);
+router.get('/tenants/stats', obterTenantStats);
 router.get('/tenants/:id', obterTenant);
 router.get('/tenants/:id/uso', usoTenant); // métricas cross-tenant via getTenantDBAdmin (RO)
 

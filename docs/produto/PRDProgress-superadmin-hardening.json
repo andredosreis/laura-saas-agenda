@@ -2,50 +2,55 @@
   "project": "Marcai Super-Admin Panel — Hardening & Operations (Phase 2)",
   "prd": "docs/produto/PRD-superadmin-hardening.md",
   "audit": "docs/operacoes/auditoria-superadmin-2026-07-07.md",
-  "as_of": "2026-07-07",
+  "as_of": "2026-07-14",
   "features": {
     "F13": {
       "name": "Dedicated Admin Rate Limiting",
       "priority": 1,
       "wave": 1,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F13-admin-rate-limiting/spec.md"
+      "status": "done",
+      "spec": "docs/produto/features/features-super_admin/F13-admin-rate-limiting/spec.md",
+      "note": "implemented and verified in PR #90"
     },
     "F14": {
       "name": "Read-Only Connection Runtime Verification",
       "priority": 1,
       "wave": 1,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F14-ro-connection-verification/spec.md"
+      "status": "done",
+      "spec": "docs/produto/features/features-super_admin/F14-ro-connection-verification/spec.md",
+      "note": "implemented and verified in PR #90"
     },
     "F15": {
       "name": "Tenant Detail Allowlist Projection",
       "priority": 1,
       "wave": 1,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F15-tenant-detail-allowlist/spec.md"
+      "status": "done",
+      "spec": "docs/produto/features/features-super_admin/F15-tenant-detail-allowlist/spec.md",
+      "note": "implemented and verified in PR #90"
     },
     "F16": {
       "name": "Super-Admin 2FA (TOTP)",
       "priority": 1,
       "wave": 2,
-      "status": "todo",
+      "status": "done",
       "spec": "docs/produto/features/features-super_admin/F16-superadmin-2fa-totp/spec.md",
-      "note": "after merge: enrol the operator, then set SUPERADMIN_REQUIRE_2FA=true on the VPS"
+      "note": "implemented and verified 2026-07-14; rollout: deploy with SUPERADMIN_REQUIRE_2FA=false, enrol the operator, sign in again with TOTP, then set the flag to true on the VPS"
     },
     "F17": {
       "name": "Complete Audit Viewer",
       "priority": 2,
       "wave": 1,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F17-audit-viewer-complete/spec.md"
+      "status": "in-progress",
+      "spec": "docs/produto/features/features-super_admin/F17-audit-viewer-complete/spec.md",
+      "note": "Wave 1 implementation started 2026-07-14"
     },
     "F18": {
       "name": "Server-Side Tenant Search, Filters & Stats",
       "priority": 2,
       "wave": 2,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F18-tenants-server-search-stats/spec.md"
+      "status": "in-progress",
+      "spec": "docs/produto/features/features-super_admin/F18-tenants-server-search-stats/spec.md",
+      "note": "backend landed 2026-07-14 (GET /admin/tenants/stats + search/plano/status server-side, with tests); frontend still client-side (useAdminTenants fetches limit=100, computeTenantStats) — endpoint has no consumer until that is wired"
     },
     "F19": {
       "name": "Tenant Users Listing",
@@ -58,8 +63,9 @@
       "name": "Environment Badge & 404 Catch-All",
       "priority": 2,
       "wave": 1,
-      "status": "todo",
-      "spec": "docs/produto/features/features-super_admin/F20-environment-badge-404/spec.md"
+      "status": "in-progress",
+      "spec": "docs/produto/features/features-super_admin/F20-environment-badge-404/spec.md",
+      "note": "Wave 1 implementation started 2026-07-14"
     },
     "F21": {
       "name": "Per-Tenant WhatsApp/Evolution Management (ADR-024 Fase 4)",

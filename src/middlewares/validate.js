@@ -34,17 +34,16 @@ export const validate = (schema, location = 'body') => (req, res, next) => {
       error: `${path}${first.message}`,
     });
   }
-  // Express 5: req.query é getter-only, não pode ser atribuído. Mutamos em vez.
-  // Para body/params a atribuição directa funciona.
-  try {
-    req[location] = result.data;
-  } catch (err) {
-    if (req[location] && typeof req[location] === 'object') {
-      Object.keys(req[location]).forEach((k) => { delete req[location][k]; });
-      Object.assign(req[location], result.data);
-    } else {
-      throw err;
-    }
-  }
+  // Express 5 define `query` como getter no prototype de req e re-parseia o URL a
+  // CADA acesso, devolvendo um objecto novo de cada vez. Atribuir rebenta (getter
+  // sem setter, ESM é strict) e mutar o que o getter devolve escreve num objecto
+  // descartável — era assim que os defaults/coerções do Zod se perdiam a caminho
+  // do controller. Definir uma propriedade própria sombreia o getter.
+  Object.defineProperty(req, location, {
+    value: result.data,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
   next();
 };

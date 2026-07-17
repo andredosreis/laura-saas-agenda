@@ -1,11 +1,104 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import { generateSecret, generateURI, verify } from 'otplib';
 import Tenant from '../../models/Tenant.js';
 import User from '../../models/User.js';
 import AuditLog from '../../models/AuditLog.js';
 import { getModels } from '../../models/registry.js';
 import { getTenantDBAdmin } from './getTenantDBAdmin.js';
 import { sendEmailVerificationEmail } from '../../services/emailService.js';
+import { PLANO_STATUSES, PLANO_TIPOS } from './adminSchemas.js';
+
+const loadSuperadminWith2FA = (userId, session) =>
+  User.findById(userId).select('+twoFactor.secret').session(session);
+
+/**
+ * POST /admin/2fa/setup — cria/substitui o segredo enquanto o enrolamento ainda
+ * não foi activado. O URI e o segredo só existem no payload desta resposta;
+ * auditoria recebe exclusivamente o estado booleano.
+ */
+export const setup2FA = async (req, { session }) => {
+  const user = await loadSuperadminWith2FA(req.user.userId || req.user._id, session);
+  if (!user || user.role !== 'superadmin') {
+    req.res.status(404);
+    throw new Error('Recurso não encontrado');
+  }
+  if (user.twoFactor?.enabled) {
+    req.res.status(409);
+    throw new Error('2FA já está activo');
+  }
+
+  const secret = generateSecret();
+  const otpauthUri = generateURI({
+    issuer: 'Marcai Admin',
+    label: user.email,
+    secret,
+  });
+
+  user.twoFactor = { enabled: false, secret, confirmedAt: null };
+  await user.save({ session });
+
+  return {
+    data: { otpauthUri, secret },
+    before: { enabled: false },
+    after: { enabled: false },
+    metadata: { enabled: false },
+  };
+};
+
+/** POST /admin/2fa/activate — confirma o primeiro TOTP e activa o factor. */
+export const activate2FA = async (req, { session }) => {
+  const user = await loadSuperadminWith2FA(req.user.userId || req.user._id, session);
+  const secret = user?.twoFactor?.secret;
+  if (!user || user.role !== 'superadmin' || !secret) {
+    req.res.status(400);
+    throw new Error('Inicie a configuração de 2FA antes de activar');
+  }
+
+  const { valid } = await verify({ secret, token: req.body.token, epochTolerance: 30 });
+  if (!valid) {
+    req.res.status(400);
+    throw new Error('Código inválido');
+  }
+
+  const before = { enabled: !!user.twoFactor.enabled };
+  user.twoFactor.enabled = true;
+  user.twoFactor.confirmedAt = new Date();
+  await user.save({ session });
+
+  return {
+    data: { enabled: true },
+    before,
+    after: { enabled: true },
+    metadata: { enabled: true },
+  };
+};
+
+/** POST /admin/2fa/disable — exige prova TOTP actual antes de apagar o factor. */
+export const disable2FA = async (req, { session }) => {
+  const user = await loadSuperadminWith2FA(req.user.userId || req.user._id, session);
+  const secret = user?.twoFactor?.secret;
+  if (!user || user.role !== 'superadmin' || !user.twoFactor?.enabled || !secret) {
+    req.res.status(400);
+    throw new Error('2FA não está activo');
+  }
+
+  const { valid } = await verify({ secret, token: req.body.token, epochTolerance: 30 });
+  if (!valid) {
+    req.res.status(400);
+    throw new Error('Código inválido');
+  }
+
+  user.twoFactor = undefined;
+  await user.save({ session });
+
+  return {
+    data: { enabled: false },
+    before: { enabled: true },
+    after: { enabled: false },
+    metadata: { enabled: false },
+  };
+};
 
 /**
  * GET /admin/tenants — lista todos os tenants.
@@ -15,25 +108,78 @@ import { sendEmailVerificationEmail } from '../../services/emailService.js';
  * de todo o resto do sistema. A guarda é o `requireSuperadmin` no router.
  */
 export const listarTenants = async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
+  // Coerção, defaults e trim vêm já feitos do `listarTenantsSchema`.
+  const { page, limit, search, plano, status } = req.query;
   const skip = (page - 1) * limit;
 
+  const filter = {};
+  if (search) {
+    // A colecção de controlo tem centenas de registos; regex sem índice é
+    // aceitável. Considerar um índice em `nome` apenas acima de ~10k tenants.
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp(escaped, 'i');
+    filter.$or = [{ nome: rx }, { slug: rx }];
+  }
+  if (plano) filter['plano.tipo'] = plano;
+  if (status) filter['plano.status'] = status;
+
   const [data, total] = await Promise.all([
-    Tenant.find()
+    Tenant.find(filter)
       .select('nome slug plano createdAt')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 }),
-    Tenant.countDocuments(),
+    Tenant.countDocuments(filter),
   ]);
 
-  req.audit.set({ action: 'tenant.list', metadata: { page, limit, returned: data.length } });
+  req.audit.set({
+    action: 'tenant.list',
+    metadata: { page, limit, search, plano, status, returned: data.length },
+  });
 
   res.json({
     success: true,
     data,
     pagination: { total, page, pages: Math.ceil(total / limit), limit },
+  });
+};
+
+/**
+ * GET /admin/tenants/stats — totais globais do control-plane numa agregação.
+ *
+ * Um collection scan é deliberado: o universo esperado é de centenas de
+ * tenants e o `$facet` evita várias viagens à base de dados.
+ */
+export const obterTenantStats = async (req, res) => {
+  const [stats = {}] = await Tenant.aggregate([
+    {
+      $facet: {
+        total: [{ $count: 'n' }],
+        porStatus: [{ $group: { _id: '$plano.status', n: { $sum: 1 } } }],
+        porTipo: [{ $group: { _id: '$plano.tipo', n: { $sum: 1 } } }],
+      },
+    },
+  ]);
+
+  const porStatus = Object.fromEntries(PLANO_STATUSES.map((value) => [value, 0]));
+  const porTipo = Object.fromEntries(PLANO_TIPOS.map((value) => [value, 0]));
+
+  for (const row of stats.porStatus ?? []) {
+    if (row._id) porStatus[row._id] = row.n;
+  }
+  for (const row of stats.porTipo ?? []) {
+    if (row._id) porTipo[row._id] = row.n;
+  }
+
+  req.audit.set({ action: 'tenant.stats' });
+
+  res.json({
+    success: true,
+    data: {
+      total: stats.total?.[0]?.n ?? 0,
+      porStatus,
+      porTipo,
+    },
   });
 };
 
@@ -433,9 +579,9 @@ export const reactivarTenant = async (req, { session }) => {
  * Paginação: page, limit. Ordenação fixa: createdAt DESC.
  */
 export const listarAudit = async (req, res) => {
-  const { targetTenantId, actorUserId, action, status, from, to } = req.query;
-  const page = Number(req.query.page);
-  const limit = Number(req.query.limit);
+  // page/limit chegam já numéricos e com default do `listarAuditSchema`. Sem isso
+  // eram NaN quando o cliente os omitia, e `.limit(NaN)` devolvia a colecção toda.
+  const { targetTenantId, actorUserId, action, status, from, to, page, limit } = req.query;
 
   const filter = {};
   if (targetTenantId) filter.targetTenantId = targetTenantId;

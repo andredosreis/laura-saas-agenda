@@ -73,6 +73,51 @@ describe('api.js — request interceptor', () => {
   });
 });
 
+describe('api.js — enforcement 2FA', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.resetModules();
+  });
+
+  it('notifica a consola quando o backend devolve o 403 de enrolamento obrigatório', async () => {
+    server.use(
+      http.get('*/api/admin/tenants', () => HttpResponse.json(
+        {
+          success: false,
+          error: '2FA obrigatório. Configure em Segurança antes de usar o painel.',
+          code: 'TWO_FACTOR_SETUP_REQUIRED',
+        },
+        { status: 403 }
+      ))
+    );
+    const onRequired = vi.fn();
+    window.addEventListener('marcai:two-factor-setup-required', onRequired);
+
+    const { default: api } = await import('../api');
+    await expect(api.get('/admin/tenants')).rejects.toBeDefined();
+
+    expect(onRequired).toHaveBeenCalledTimes(1);
+    window.removeEventListener('marcai:two-factor-setup-required', onRequired);
+  });
+
+  it('ignora outros 403 — o banner só reage ao code de enrolamento', async () => {
+    server.use(
+      http.get('*/api/admin/tenants', () => HttpResponse.json(
+        { success: false, error: 'Empresa suspensa ou plano inactivo' },
+        { status: 403 }
+      ))
+    );
+    const onRequired = vi.fn();
+    window.addEventListener('marcai:two-factor-setup-required', onRequired);
+
+    const { default: api } = await import('../api');
+    await expect(api.get('/admin/tenants')).rejects.toBeDefined();
+
+    expect(onRequired).not.toHaveBeenCalled();
+    window.removeEventListener('marcai:two-factor-setup-required', onRequired);
+  });
+});
+
 describe('api.js — response interceptor (401 + TOKEN_EXPIRED → refresh + retry)', () => {
   beforeEach(() => {
     localStorage.clear();

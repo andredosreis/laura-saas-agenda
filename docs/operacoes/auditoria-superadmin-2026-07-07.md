@@ -4,6 +4,10 @@ Auditoria completa do painel super-admin (ADR-024, PRs #34–#43) em `main`, cob
 
 **Conclusão:** o painel faz sentido e a fundação é acima da média — os problemas são de **hardening por concluir** (Fase 5 do ADR-024 nunca foi feita) e **gaps funcionais/UX**, não de arquitectura. O plano de correcção está em `docs/produto/PRD-superadmin-hardening.md` (features F13–F22).
 
+> **Actualização — 2026-07-14:** os riscos P0 F13 (rate limiting dedicado), F14 (verificação read-only em runtime) e F15 (allowlist do detalhe de tenant) foram implementados e verificados no PR #90. A Wave 1 prossegue com F17 e F20; o estado operacional actualizado vive em `docs/produto/PRDProgress-superadmin-hardening.json`.
+>
+> **Actualização F16 — 2026-07-14:** o 2FA TOTP do super-admin foi implementado e verificado no backend e frontend. O enforcement permanece atrás de `SUPERADMIN_REQUIRE_2FA` para rollout seguro: deploy com a flag desligada, enrolar o operador, voltar a iniciar sessão com TOTP e só depois activar a flag na VPS.
+
 ---
 
 ## 1. O que está bem (preservar tal como está)

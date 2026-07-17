@@ -185,6 +185,29 @@ describe('F09 — Audit Log Viewer', () => {
       expect(res.body.data[0].action).toBe('tenant.reactivate');
       expect(res.body.data[1].action).toBe('tenant.suspend');
     });
+
+    // Regressão: sem page/limit no URL, os defaults do Zod têm de chegar ao
+    // controller. Quando não chegavam, `limit` era NaN e o Mongo devolvia a
+    // colecção inteira — o log de auditoria todo numa resposta.
+    it('aplica o default de 20 por página quando page/limit são omitidos', async () => {
+      await AuditLog.insertMany(
+        Array.from({ length: 25 }, (_, i) => ({
+          actorUserId: new mongoose.Types.ObjectId(),
+          actorEmail: 'super@marcai.pt',
+          action: `bulk.${i}`,
+          status: 'ok',
+          ip: '127.0.0.1',
+        }))
+      );
+
+      const res = await request(app)
+        .get('/api/admin/audit')
+        .set('Authorization', `Bearer ${await superToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.length).toBe(20);
+      expect(res.body.pagination).toMatchObject({ total: 25, page: 1, limit: 20, pages: 2 });
+    });
   });
 
   describe('C2 — Filters', () => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAdminTenantDetail } from '../../hooks/useAdminTenants';
 import { Avatar, ConsoleCard, PlanBadge, StatusPill, formatLimite, FEATURE_FLAG_LABELS } from '../../components/admin/ConsoleUI';
+import { CopyIdButton } from '../../components/admin/CopyIdButton';
 import { EditPlanLimitsForm } from '../../components/admin/EditPlanLimitsForm';
 import { SuspendReactivateControls } from '../../components/admin/SuspendReactivateControls';
 
@@ -55,6 +56,10 @@ export default function TenantDetailPage() {
                 <StatusPill status={t.plano.status} />
               </div>
               <p className="font-console-mono text-[12.5px] text-dark-400 mt-1">{t.slug}</p>
+              <div className="mt-0.5 flex items-center gap-1 font-console-mono text-[11.5px] text-dark-500">
+                <span>{t._id}</span>
+                <CopyIdButton id={t._id} label={`Copiar ID do tenant ${t.nome}`} />
+              </div>
               <p className="text-dark-400 text-[12.5px] mt-0.5">
                 Criado em {new Date(t.createdAt).toLocaleDateString('pt-PT')}
               </p>

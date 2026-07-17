@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -14,6 +14,7 @@ import { ConsoleChrome } from './components/admin/ConsoleChrome';
 
 // Login eager: rota de entrada, precisa pintar imediatamente
 import Login from './pages/Login';
+import NotFoundPage from './pages/NotFoundPage';
 
 // Restantes rotas públicas em lazy — utilizador entra via /login na maioria dos casos
 const Register = lazy(() => import('./pages/Register'));
@@ -51,6 +52,7 @@ const Conversas = lazy(() => import('./pages/Conversas'));
 const TenantsListPage = lazy(() => import('./pages/admin/TenantsListPage'));
 const TenantDetailPage = lazy(() => import('./pages/admin/TenantDetailPage'));
 const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
+const SecurityPage = lazy(() => import('./pages/admin/SecurityPage'));
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -191,6 +193,7 @@ const App = () => {
             } />
 
             {/* 👑 Painel Super-Admin (F10) */}
+            <Route path="/admin" element={<Navigate to="/admin/tenants" replace />} />
             <Route path="/admin/tenants" element={
               <AdminLayout><TenantsListPage /></AdminLayout>
             } />
@@ -200,6 +203,12 @@ const App = () => {
             <Route path="/admin/audit" element={
               <AdminLayout><AuditLogPage /></AdminLayout>
             } />
+            <Route path="/admin/security" element={
+              <AdminLayout><SecurityPage /></AdminLayout>
+            } />
+
+            {/* Catch-all público: não expõe estado de autenticação */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </Suspense>
 

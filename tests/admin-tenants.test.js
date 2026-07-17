@@ -5,6 +5,7 @@ import app from '../src/app.js';
 import { setupTestDB, teardownTestDB, clearDB } from './setup.js';
 import Tenant from '../src/models/Tenant.js';
 import User from '../src/models/User.js';
+import AuditLog from '../src/models/AuditLog.js';
 import { TENANT_DETAIL_FIELDS } from '../src/modules/admin/adminController.js';
 
 beforeAll(setupTestDB);
@@ -71,6 +72,16 @@ async function seedTenants(n) {
   );
 }
 
+async function waitForAudit(action, timeoutMs = 1500) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const audit = await AuditLog.findOne({ action }).lean();
+    if (audit) return audit;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return null;
+}
+
 describe('GET /api/v1/admin/tenants', () => {
   it('401 sem token', async () => {
     const res = await request(app).get('/api/v1/admin/tenants');
@@ -96,11 +107,139 @@ describe('GET /api/v1/admin/tenants', () => {
     expect(res.body.pagination.total).toBe(3);
   });
 
+  it('pagina 120 tenants no servidor e pesquisa nome/slug sem distinguir maiúsculas', async () => {
+    await seedTenants(120);
+
+    const list = await request(app)
+      .get('/api/v1/admin/tenants')
+      .set('Authorization', `Bearer ${superToken()}`);
+
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(20);
+    expect(list.body.pagination).toMatchObject({ total: 120, page: 1, pages: 6, limit: 20 });
+
+    const byName = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ search: 'SALÃO 42' })
+      .set('Authorization', `Bearer ${superToken()}`);
+    expect(byName.status).toBe(200);
+    expect(byName.body.data.map((tenant) => tenant.slug)).toEqual(['salao-42']);
+    expect(byName.body.pagination.total).toBe(1);
+
+    const bySlug = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ search: 'SALAO-77' })
+      .set('Authorization', `Bearer ${superToken()}`);
+    expect(bySlug.status).toBe(200);
+    expect(bySlug.body.data.map((tenant) => tenant.nome)).toEqual(['Salão 77']);
+    expect(bySlug.body.pagination.total).toBe(1);
+  });
+
+  it('escapa metacaracteres regex da pesquisa', async () => {
+    await seedTenants(2);
+
+    const res = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ search: 'a+b(' })
+      .set('Authorization', `Bearer ${superToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.pagination.total).toBe(0);
+  });
+
+  it('aplica filtros plano/status e combina-os com AND no find e count', async () => {
+    await Tenant.insertMany([
+      { nome: 'Pro Ativo', slug: 'pro-ativo', plano: { tipo: 'pro', status: 'ativo' } },
+      { nome: 'Pro Trial', slug: 'pro-trial', plano: { tipo: 'pro', status: 'trial' } },
+      { nome: 'Elite Ativo', slug: 'elite-ativo', plano: { tipo: 'elite', status: 'ativo' } },
+      { nome: 'Elite Suspenso', slug: 'elite-suspenso', plano: { tipo: 'elite', status: 'suspenso' } },
+    ]);
+
+    const byPlan = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ plano: 'pro' })
+      .set('Authorization', `Bearer ${superToken()}`);
+    expect(byPlan.status).toBe(200);
+    expect(byPlan.body.data).toHaveLength(2);
+    expect(byPlan.body.pagination.total).toBe(2);
+    expect(byPlan.body.data.every((tenant) => tenant.plano.tipo === 'pro')).toBe(true);
+
+    const byStatus = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ status: 'ativo' })
+      .set('Authorization', `Bearer ${superToken()}`);
+    expect(byStatus.status).toBe(200);
+    expect(byStatus.body.data).toHaveLength(2);
+    expect(byStatus.body.pagination.total).toBe(2);
+    expect(byStatus.body.data.every((tenant) => tenant.plano.status === 'ativo')).toBe(true);
+
+    const combined = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ plano: 'elite', status: 'ativo' })
+      .set('Authorization', `Bearer ${superToken()}`);
+    expect(combined.status).toBe(200);
+    expect(combined.body.data.map((tenant) => tenant.slug)).toEqual(['elite-ativo']);
+    expect(combined.body.pagination.total).toBe(1);
+  });
+
+  it.each([
+    ['plano', 'premium'],
+    ['status', 'pausado'],
+    ['limit', '101'],
+  ])('rejeita query inválida: %s=%s', async (key, value) => {
+    const res = await request(app)
+      .get('/api/v1/admin/tenants')
+      .query({ [key]: value })
+      .set('Authorization', `Bearer ${superToken()}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(typeof res.body.error).toBe('string');
+  });
+
   it('responde também no alias legacy /api/admin/tenants', async () => {
     const res = await request(app)
       .get('/api/admin/tenants')
       .set('Authorization', `Bearer ${superToken()}`);
     expect(res.status).toBe(200);
+  });
+});
+
+describe('GET /api/v1/admin/tenants/stats', () => {
+  it('devolve total e contagens exactas por status/tipo, incluindo zeros, e audita', async () => {
+    await Tenant.insertMany([
+      { nome: 'Básico Trial', slug: 'basico-trial', plano: { tipo: 'basico', status: 'trial' } },
+      { nome: 'Pro Ativo 1', slug: 'pro-ativo-1', plano: { tipo: 'pro', status: 'ativo' } },
+      { nome: 'Pro Ativo 2', slug: 'pro-ativo-2', plano: { tipo: 'pro', status: 'ativo' } },
+      { nome: 'Elite Suspenso', slug: 'elite-suspenso-stats', plano: { tipo: 'elite', status: 'suspenso' } },
+      { nome: 'Custom Cancelado', slug: 'custom-cancelado', plano: { tipo: 'custom', status: 'cancelado' } },
+    ]);
+
+    const res = await request(app)
+      .get('/api/v1/admin/tenants/stats')
+      .set('Authorization', `Bearer ${superToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        total: 5,
+        porStatus: { trial: 1, ativo: 2, suspenso: 1, cancelado: 1, expirado: 0 },
+        porTipo: { basico: 1, pro: 2, elite: 1, custom: 1 },
+      },
+    });
+
+    const audit = await waitForAudit('tenant.stats');
+    expect(audit).toMatchObject({ action: 'tenant.stats', status: 'ok' });
+  });
+
+  it('404 para não-superadmin — não revela a rota', async () => {
+    const res = await request(app)
+      .get('/api/v1/admin/tenants/stats')
+      .set('Authorization', `Bearer ${await tenantToken('admin')}`);
+
+    expect(res.status).toBe(404);
   });
 });
 

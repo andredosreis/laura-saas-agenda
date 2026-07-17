@@ -9,6 +9,7 @@ import api from '../services/api';
  * @property {string} email
  * @property {string} role
  * @property {string} avatar
+ * @property {boolean} [twoFactorEnabled]
  */
 
 /**
@@ -28,6 +29,7 @@ import api from '../services/api';
  * @property {boolean} isAuthenticated
  * @property {boolean} isLoading
  * @property {function} login
+ * @property {function} complete2FALogin
  * @property {function} register
  * @property {function} logout
  * @property {function} refreshAuth
@@ -129,28 +131,32 @@ export function AuthProvider({ children }) {
         return false;
     }, [clearAuth]);
 
+    const persistSession = useCallback(({ user, tenant, tokens }) => {
+        localStorage.setItem(TOKEN_KEY, tokens.accessToken);
+        localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        localStorage.setItem(TENANT_KEY, JSON.stringify(tenant));
+        api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+        setUser(user);
+        setTenant(tenant);
+        return { success: true, user, tenant };
+    }, []);
+
     // Login
     const login = useCallback(async (email, password) => {
         try {
             const response = await api.post('/auth/login', { email, password });
 
             if (response.data.success) {
+                if (response.data.data.requires2FA) {
+                    return {
+                        success: true,
+                        requires2FA: true,
+                        challengeToken: response.data.data.challengeToken,
+                    };
+                }
                 const { user, tenant, tokens } = response.data.data;
-
-                // Salvar tokens
-                localStorage.setItem(TOKEN_KEY, tokens.accessToken);
-                localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-                localStorage.setItem(USER_KEY, JSON.stringify(user));
-                localStorage.setItem(TENANT_KEY, JSON.stringify(tenant));
-
-                // Configurar axios
-                api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
-
-                // Atualizar estado
-                setUser(user);
-                setTenant(tenant);
-
-                return { success: true, user, tenant };
+                return persistSession({ user, tenant, tokens });
             }
 
             return { success: false, error: response.data.error };
@@ -161,7 +167,23 @@ export function AuthProvider({ children }) {
                 error: error.response?.data?.error || 'Erro ao fazer login'
             };
         }
-    }, []);
+    }, [persistSession]);
+
+    const complete2FALogin = useCallback(async (challengeToken, token) => {
+        try {
+            const response = await api.post('/auth/login/2fa', { challengeToken, token });
+            if (response.data.success) {
+                return persistSession(response.data.data);
+            }
+            return { success: false, error: response.data.error };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.response?.data?.error || 'Erro ao validar o código',
+                code: error.response?.data?.code,
+            };
+        }
+    }, [persistSession]);
 
     // Registro
     const register = useCallback(async (data) => {
@@ -231,6 +253,7 @@ export function AuthProvider({ children }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        complete2FALogin,
         register,
         logout,
         refreshAuth,

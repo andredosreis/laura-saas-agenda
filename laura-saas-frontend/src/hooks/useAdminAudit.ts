@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiHelpers } from '../services/api';
 import { PaginatedResponse, AuditLogEntry } from '../types/admin';
-import { toast } from 'react-toastify';
 
 export interface AuditFilters {
   targetTenantId?: string;
@@ -12,7 +11,9 @@ export interface AuditFilters {
   to?: string;
 }
 
-export function useAdminAudit(initialPage = 1, initialLimit = 20, initialFilters: AuditFilters = {}) {
+const EMPTY_FILTERS: AuditFilters = {};
+
+export function useAdminAudit(initialPage = 1, initialLimit = 20, initialFilters: AuditFilters = EMPTY_FILTERS) {
   const [data, setData] = useState<PaginatedResponse<AuditLogEntry> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +37,7 @@ export function useAdminAudit(initialPage = 1, initialLimit = 20, initialFilters
       setData(response as PaginatedResponse<AuditLogEntry>);
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Erro ao carregar logs de auditoria';
-      setError(msg);
-      toast.error(msg);
+      setError(msg); // toast tratado pelo interceptor central de api.js
     } finally {
       setLoading(false);
     }
@@ -45,14 +45,15 @@ export function useAdminAudit(initialPage = 1, initialLimit = 20, initialFilters
 
   useEffect(() => {
     fetchAudit(initialPage, initialLimit, initialFilters);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchAudit]); // Refetch triggers will be handled manually via the returned refetch function
+  }, [fetchAudit, initialPage, initialLimit, initialFilters]);
 
+  // Sem `refetch`: o fetch é conduzido pelo efeito acima. Quem precisar de
+  // recarregar muda page/limit/filters — expor um refetch recriado a cada render
+  // era o convite ao loop de deps que este hook acabou de deixar de ter.
   return {
     data: data?.data || [],
     pagination: data?.pagination,
     loading,
     error,
-    refetch: (page: number, limit: number, filters: AuditFilters) => fetchAudit(page, limit, filters)
   };
 }
