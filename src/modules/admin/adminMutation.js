@@ -25,7 +25,6 @@ import logger from '../../utils/logger.js';
  * AuditLog.
  */
 export const adminMutation = (action, work) => async (req, res, next) => {
-  const session = await mongoose.startSession();
   const base = {
     actorUserId: req.user.userId || req.user._id,
     actorEmail: req.user.email,
@@ -33,10 +32,16 @@ export const adminMutation = (action, work) => async (req, res, next) => {
     ip: req.ip,
   };
   let targetTenantId = null;
+  // startSession() DENTRO do try: se o Mongo estiver indisponível, a rejeição
+  // tem de chegar ao catch → next(err), senão o middleware rejeita silenciosamente
+  // e um `next` compensatório (ex.: logout da instância órfã no F21) nunca corre.
+  let session;
 
   try {
     let payload;
     let afterCommit = null;
+
+    session = await mongoose.startSession();
 
     await session.withTransaction(async () => {
       const ctx = await work(req, { session });
@@ -85,7 +90,8 @@ export const adminMutation = (action, work) => async (req, res, next) => {
     req.audit.committed = true;
     next(err);
   } finally {
-    await session.endSession();
+    // session pode não existir se o próprio startSession() rejeitou.
+    if (session) await session.endSession();
   }
 };
 

@@ -777,6 +777,19 @@ export const criarInstanciaWhatsapp = async (req, res, next) => {
     });
   }
 
+  // Fail-fast, ANTES de tocar na Evolution (evita órfã): o payload do webhook
+  // leva `apikey: EVOLUTION_WEBHOOK_SECRET` (evolutionClient.createInstance) e é
+  // esse o valor que `webhookAuth.js` compara. Se o secret estiver vazio, a
+  // instância nasceria com `webhookConfigured:true` mas o webhook recusaria TODAS
+  // as mensagens ("sem secret configurado, recusa sempre") — uma instância muda.
+  if (!process.env.EVOLUTION_WEBHOOK_SECRET) {
+    logger.error('[F21] EVOLUTION_WEBHOOK_SECRET vazio — criação de instância abortada antes da Evolution');
+    return res.status(500).json({
+      success: false,
+      error: 'Webhook não configurado no servidor',
+    });
+  }
+
   const created = await evolutionClient.createInstance(instanceName, { webhookUrl });
   if (!created.ok) {
     // Nunca ecoar `created.error` — pode conter URLs/detalhes internos da Evolution.
@@ -916,7 +929,12 @@ export const logoutInstanciaWhatsapp = async (req, res, next) => {
   }
 
   const out = await evolutionClient.logoutInstance(instanceName);
-  if (!out.ok) {
+  // Idempotente (spec F21): uma instância já desligada (`alreadyOff`) ou já
+  // inexistente na Evolution (`notFound`) é sucesso — o estado desejado (sem
+  // sessão) já foi alcançado. Só um erro genuíno (Evolution em baixo, 5xx)
+  // é 502.
+  const idempotente = out.notFound || out.alreadyOff;
+  if (!out.ok && !idempotente) {
     return res.status(502).json({ success: false, error: 'Não foi possível terminar a sessão na Evolution' });
   }
 

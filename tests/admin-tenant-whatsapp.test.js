@@ -15,6 +15,10 @@ import { jest } from '@jest/globals';
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
 process.env.PUBLIC_API_URL = 'https://api.test.marcai.pt';
+// A criação de instância faz fail-fast se este secret estiver vazio (senão o
+// webhook nasceria a recusar todas as mensagens). Presente por defeito; o teste
+// dedicado remove-o para exercitar o 500.
+process.env.EVOLUTION_WEBHOOK_SECRET = 'webhook-secret-de-teste';
 
 jest.unstable_mockModule('../src/utils/evolutionClient.js', () => ({
   createInstance: jest.fn(),
@@ -484,6 +488,50 @@ describe('F21 — POST /tenants/:id/whatsapp/instancia', () => {
     expect(erro).toBeTruthy();
   });
 
+  it('falha do startSession após criar na Evolution → compensação corre (fix na factory)', async () => {
+    const tenant = await seedTenant({ slug: 'clinica-startsession' });
+    okCreate();
+    logoutInstance.mockResolvedValue({ ok: true });
+    // startSession rejeita (Mongo indisponível) DEPOIS de a instância já ter sido
+    // criada na Evolution. Antes do fix, o startSession estava fora do try da
+    // factory: rejeitava, o middleware rejeitava silenciosamente e o next
+    // compensatório nunca corria → instância órfã sem rasto.
+    jest.spyOn(mongoose, 'startSession').mockRejectedValueOnce(new Error('Mongo indisponível'));
+
+    const res = await request(app)
+      .post(`/api/admin/tenants/${tenant._id}/whatsapp/instancia`)
+      .set('Authorization', `Bearer ${superToken()}`)
+      .send({});
+
+    expect(res.status).toBe(500);
+    // next(err) foi chamado → a compensação da instância órfã correu.
+    expect(logoutInstance).toHaveBeenCalledWith('clinica-startsession');
+
+    const unchanged = await Tenant.findById(tenant._id);
+    expect(unchanged.whatsapp.instanceName).toBeUndefined();
+  });
+
+  it('EVOLUTION_WEBHOOK_SECRET vazio → 500 antes de tocar na Evolution', async () => {
+    const tenant = await seedTenant({ slug: 'clinica-sem-secret' });
+    okCreate();
+    const original = process.env.EVOLUTION_WEBHOOK_SECRET;
+    delete process.env.EVOLUTION_WEBHOOK_SECRET;
+    try {
+      const res = await request(app)
+        .post(`/api/admin/tenants/${tenant._id}/whatsapp/instancia`)
+        .set('Authorization', `Bearer ${superToken()}`)
+        .send({});
+
+      expect(res.status).toBe(500);
+      // Fail-fast: a Evolution nunca é tocada — evita a instância órfã/muda.
+      expect(createInstance).not.toHaveBeenCalled();
+      const unchanged = await Tenant.findById(tenant._id);
+      expect(unchanged.whatsapp.instanceName).toBeUndefined();
+    } finally {
+      process.env.EVOLUTION_WEBHOOK_SECRET = original;
+    }
+  });
+
   it('ID inválido → 400', async () => {
     const res = await request(app)
       .post('/api/admin/tenants/xpto/whatsapp/instancia')
@@ -599,9 +647,14 @@ describe('F21 — POST /tenants/:id/whatsapp/logout', () => {
     expect(JSON.stringify(audits[0].toObject())).not.toContain(INSTANCE_TOKEN);
   });
 
-  it('idempotente — desligar uma instância já desligada sucede', async () => {
+  it('idempotente — 2º logout, com a Evolution a recusar "não conectada", ainda dá 200', async () => {
     const tenant = await seedTenantComInstancia();
-    logoutInstance.mockResolvedValue({ ok: true });
+    // 1º: sessão activa → sucesso. 2º: a Evolution rejeita porque já não está
+    // conectada — o caso REAL que a idempotência tem de tratar (não um ok:true
+    // forçado). alreadyOff → sucesso idempotente.
+    logoutInstance
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, alreadyOff: true, error: 'Instance is not connected' });
 
     const primeiro = await request(app)
       .post(`/api/admin/tenants/${tenant._id}/whatsapp/logout`)
@@ -614,7 +667,23 @@ describe('F21 — POST /tenants/:id/whatsapp/logout', () => {
 
     expect(primeiro.status).toBe(200);
     expect(segundo.status).toBe(200);
-    expect(await AuditLog.countDocuments({ action: 'tenant.whatsapp.logout' })).toBe(2);
+    expect(segundo.body.data).toEqual({ connectionState: 'close' });
+    // Ambos ficam auditados com sucesso — a idempotência não perde rasto.
+    expect(await AuditLog.countDocuments({ action: 'tenant.whatsapp.logout', status: 'ok' })).toBe(2);
+  });
+
+  it('idempotente — instância inexistente na Evolution (404/notFound) também dá 200', async () => {
+    const tenant = await seedTenantComInstancia();
+    logoutInstance.mockResolvedValue({ ok: false, notFound: true, error: 'does not exist' });
+
+    const res = await request(app)
+      .post(`/api/admin/tenants/${tenant._id}/whatsapp/logout`)
+      .set('Authorization', `Bearer ${superToken()}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ connectionState: 'close' });
+    expect(await AuditLog.countDocuments({ action: 'tenant.whatsapp.logout', status: 'ok' })).toBe(1);
   });
 
   it('preserva instanceName e numeroWhatsapp (logout ≠ desconfigurar)', async () => {

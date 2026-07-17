@@ -106,7 +106,11 @@ export const getConnectionState = async (instanceName) => {
   try {
     const response = await axios.get(
       `${EVOLUTION_API_URL}/instance/connectionState/${instance}`,
-      { headers: { apikey: EVOLUTION_API_KEY } },
+      // timeout explícito: é o caminho que o painel (GET .../whatsapp) usa para
+      // degradar para `unknown`. Sem ele, uma ligação pendurada mantinha o GET do
+      // painel aberto até ao timeout do SO. INSTANCE_TIMEOUT_MS está definido no
+      // bloco de gestão de instância, abaixo.
+      { headers: { apikey: EVOLUTION_API_KEY }, timeout: INSTANCE_TIMEOUT_MS },
     );
     const state = response.data?.instance?.state || response.data?.state || null;
     return { ok: true, state };
@@ -232,6 +236,19 @@ export const getConnectQR = async (instanceName) => {
   }
 };
 
+// Achata a mensagem de erro da Evolution — que pode vir em `response.message`
+// (string OU array), `message`, ou ser o próprio corpo — para uma string única
+// pesquisável. Usado para detectar o caso "instância não conectada" no logout.
+const flattenEvolutionError = (data) => {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  const parts = [data.message, data.error, data.response?.message];
+  return parts
+    .flat()
+    .filter((p) => typeof p === 'string')
+    .join(' ');
+};
+
 /**
  * Termina a sessão WhatsApp de uma instância (logout do dispositivo).
  *
@@ -239,8 +256,21 @@ export const getConnectQR = async (instanceName) => {
  * mesma instância volta a ligar-se com um novo QR. É deliberado: `instanceName`
  * continua a resolver o tenant no webhook (ADR-021).
  *
+ * Idempotência (spec F21: "logging out a disconnected instance succeeds"): a
+ * Evolution rejeita o logout de uma instância que já não está conectada. Esse
+ * caso — e o 404 (instância inexistente) — é sinalizado (`alreadyOff` /
+ * `notFound`) para o controller o tratar como sucesso idempotente, em vez de
+ * confundir "já estava desligada" com "Evolution em baixo".
+ *
+ * ⚠️ A doc oficial v2 (context7) só documenta o 200 e o 404 do logout; a
+ * resposta de "não conectada" não está no contrato e o deployado é v2.3.7. A
+ * detecção por mensagem é, por isso, defensiva (heurística sobre o corpo do
+ * erro) — se a Evolution mudar o texto, o pior caso é um 502 espúrio num
+ * segundo logout, nunca um falso sucesso.
+ *
  * @param {string} instanceName
- * @returns {Promise<{ok:true}|{ok:false,notFound?:boolean,unreachable?:boolean,error:*}>}
+ * @returns {Promise<{ok:true}
+ *   |{ok:false,notFound?:boolean,alreadyOff?:boolean,unreachable?:boolean,error:*}>}
  */
 export const logoutInstance = async (instanceName) => {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return missingConfig();
@@ -258,7 +288,11 @@ export const logoutInstance = async (instanceName) => {
   } catch (error) {
     const status = error.response?.status;
     const errPayload = error.response?.data || error.message;
+    // "não conectada" = sessão já terminada → idempotente, não é falha.
+    const alreadyOff = /not\s+connected|is\s+not\s+connected|logout\s+is\s+not\s+available/i.test(
+      flattenEvolutionError(error.response?.data),
+    );
     logger.error({ instance, status, err: errPayload }, '[Evolution] Erro ao terminar sessão');
-    return { ok: false, notFound: status === 404, error: errPayload };
+    return { ok: false, notFound: status === 404, alreadyOff, error: errPayload };
   }
 };
