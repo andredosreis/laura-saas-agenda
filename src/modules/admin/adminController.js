@@ -812,6 +812,11 @@ export const criarInstanciaWhatsapp = async (req, res, next) => {
       { returnDocument: 'after', session },
     );
 
+    // Criação de recurso → 201. O res.json() da factory preserva o statusCode
+    // já definido aqui (mesmo mecanismo do `req.res.status(4xx); throw` usado
+    // acima). Ver o padrão em criarTenant.
+    req.res.status(201);
+
     return {
       data: { instanceName, connectionState: created.state || 'connecting' },
       targetTenantId: id,

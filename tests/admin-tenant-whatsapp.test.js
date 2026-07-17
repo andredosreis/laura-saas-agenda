@@ -320,7 +320,7 @@ describe('F21 — POST /tenants/:id/whatsapp/instancia', () => {
       .set('Authorization', `Bearer ${superToken()}`)
       .send({});
 
-    expect(res.status).toBe(200); // adminMutation responde 200 (ver relatório: spec pedia 201)
+    expect(res.status).toBe(201);
     expect(res.body.data).toEqual({ instanceName: 'clinica-nova', connectionState: 'connecting' });
 
     const updated = await Tenant.findById(tenant._id);
@@ -354,7 +354,7 @@ describe('F21 — POST /tenants/:id/whatsapp/instancia', () => {
       .set('Authorization', `Bearer ${superToken()}`)
       .send({ instanceName: 'nome-escolhido' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(createInstance).toHaveBeenCalledWith('nome-escolhido', expect.any(Object));
   });
 
