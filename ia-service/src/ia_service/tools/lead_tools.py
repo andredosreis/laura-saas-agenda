@@ -248,16 +248,18 @@ def make_create_appointment_tool(tenant_id: str, lead_id: str):
 
 
 def make_avisar_equipa_tool(tenant_id: str, lead_id: str):
-    """Alerta REAL à equipa — sem isto "vou deixar com a Laura" é promessa vazia."""
+    """Alerta REAL à equipa — sem isto o handoff é uma promessa vazia."""
+
+    owner_name = tenant_knowledge.load_clinica_config(tenant_id)["dona"]
 
     @tool
     async def avisar_equipa(motivo: str) -> str:
         """Envia um alerta REAL à equipa da clínica com um motivo.
 
         Usa esta tool SEMPRE que prometeres ao lead que vais passar o
-        contacto dele à equipa/Laura, pedir para verificarem algo, ou
+        contacto dele à equipa/responsável, pedir para verificarem algo, ou
         avisar de desistências/encaixes. NUNCA digas "vou deixar o seu
-        contacto com a Laura" sem chamar esta tool — sem ela o aviso não
+        contacto com a responsável" sem chamar esta tool — sem ela o aviso não
         chega a ninguém e o lead fica à espera de um contacto que nunca vem.
 
         Chama UMA única vez por assunto.
@@ -288,12 +290,13 @@ def make_avisar_equipa_tool(tenant_id: str, lead_id: str):
                     "imediato nem prazos."
                 )
             return (
-                "OK — equipa avisada (WhatsApp + notificação). O recado é "
-                "UNIDIRECCIONAL: não falaste com ninguém da equipa nem "
-                "sabes quando respondem. Diz que deixaste o recado e que "
-                "entram em contacto assim que possível — NUNCA prometas "
-                "prazos ('ainda hoje') nem digas que reforçaste algo "
-                "pessoalmente. Continua a conversa normalmente."
+                "OK — equipa avisada (WhatsApp + notificação). Ainda não "
+                "falaste com ninguém da equipa nem sabes quando respondem. "
+                f"Se {owner_name} responder ao alerta, o recado será "
+                "encaminhado ao lead. Diz que deixaste o pedido e que entram "
+                "em contacto assim que possível — NUNCA prometas prazos "
+                "('ainda hoje') nem digas que reforçaste algo pessoalmente. "
+                "Continua a conversa normalmente."
             )
         except Exception as exc:
             return (

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from langchain.tools import tool
 
-from ..services import marcai_client
+from ..services import marcai_client, tenant_knowledge
 
 
 def make_get_my_packages_tool(tenant_id: str, cliente_id: str):
@@ -412,15 +412,16 @@ def make_registar_presenca_tool(tenant_id: str, cliente_id: str, agendamento_id:
 
 
 def make_avisar_equipa_tool(tenant_id: str, cliente_id: str):
+    owner_name = tenant_knowledge.load_clinica_config(tenant_id)["dona"]
 
     @tool
     async def avisar_equipa(motivo: str) -> str:
         """Envia um alerta REAL a equipa da clinica com um motivo.
 
         Usa esta tool SEMPRE que prometeres ao cliente que vais pedir ou
-        confirmar algo com a equipa/Laura (ex: cliente contesta os dados
+        confirmar algo com a equipa/responsável (ex: cliente contesta os dados
         da ficha, pedido que so a equipa pode resolver). NUNCA digas
-        "vou pedir a Laura" sem chamar esta tool — sem ela o aviso nao
+        "vou pedir à responsável" sem chamar esta tool — sem ela o aviso nao
         chega a ninguem.
 
         Chama UMA unica vez por assunto — nao repitas para o mesmo motivo.
@@ -448,12 +449,13 @@ def make_avisar_equipa_tool(tenant_id: str, cliente_id: str):
                     "imediato nem prazos."
                 )
             return (
-                "OK — equipa avisada. O recado e UNIDIRECCIONAL: nao "
-                "falaste com ninguem da equipa nem sabes quando respondem. "
-                "Diz que deixaste o recado e que entram em contacto assim "
-                "que possivel — NUNCA prometas prazos ('ainda hoje') nem "
-                "digas que reforcaste algo pessoalmente. Continua a "
-                "conversa normalmente — isto NAO bloqueia marcacoes."
+                "OK — equipa avisada. Ainda nao falaste com ninguem da "
+                f"equipa nem sabes quando respondem. Se {owner_name} responder "
+                "ao alerta, o recado sera encaminhado ao cliente. Diz "
+                "que deixaste o pedido e que entram em contacto assim que "
+                "possivel — NUNCA prometas prazos ('ainda hoje') nem digas "
+                "que reforcaste algo pessoalmente. Continua a conversa "
+                "normalmente — isto NAO bloqueia marcacoes."
             )
         except Exception as exc:
             return (

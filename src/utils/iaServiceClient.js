@@ -107,6 +107,26 @@ export const transcribeAudio = async ({ audioBase64, mimeType = 'audio/ogg' }) =
   return data;
 };
 
+/**
+ * Interpreta uma resposta do número pessoal da equipa.
+ * O ia-service devolve apenas destinatário/texto; a resolução do contacto
+ * e o envio permanecem no backend tenant-scoped.
+ */
+export const parseTeamReply = async ({ tenantId, message, pendingRequests = [] }) => {
+  if (!_client) throw new Error('IA_SERVICE_URL não configurado — defina no .env');
+  const { data } = await withRetry(() =>
+    _client.post('/parse-team-reply', {
+      tenant_id: tenantId,
+      message,
+      pending_requests: pendingRequests.slice(0, 10).map((request) => ({
+        name: String(request.name || '').slice(0, 200),
+        reason: String(request.reason || '').slice(0, 500),
+      })),
+    })
+  );
+  return data;
+};
+
 export const checkHealth = async () => {
   if (!_client) return { reachable: false, reason: 'IA_SERVICE_URL not set' };
   try {

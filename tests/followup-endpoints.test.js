@@ -134,7 +134,7 @@ describe('GET /followup-pendente', () => {
 
 describe('POST /renovacao-interesse', () => {
   it('com número de admin → envia WhatsApp com a instância do tenant', async () => {
-    const { tenant, cliente } = await seed('ri-a', {
+    const { tenant, models, cliente } = await seed('ri-a', {
       whatsapp: { instanceName: 'clinica-ri-a', numeroWhatsapp: '351930000000' },
     });
 
@@ -150,7 +150,18 @@ describe('POST /renovacao-interesse', () => {
     expect(numero).toBe('351930000000');
     expect(texto).toMatch(/[Rr]enova/);
     expect(texto).toContain('Maria');
+    expect(texto).toContain('Podes responder por texto ou áudio');
     expect(instancia).toBe('clinica-ri-a');
+
+    const pedido = await models.PedidoEquipa.findOne({
+      tenantId: tenant._id,
+      contactoId: cliente._id,
+    }).lean();
+    expect(pedido).toMatchObject({
+      contactoTipo: 'cliente',
+      contactoNome: 'Maria',
+      status: 'pendente',
+    });
   });
 
   it('sem número de admin → whatsappEnviado false, sem erro', async () => {

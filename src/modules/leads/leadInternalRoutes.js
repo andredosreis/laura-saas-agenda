@@ -24,6 +24,7 @@ import { DateTime } from 'luxon';
 import { resolveAvailableSlots } from '../../controllers/scheduleController.js';
 import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
 import { sendPushNotification } from '../../services/pushService.js';
+import { registerTeamRequest } from '../../services/teamRequestService.js';
 import User from '../../models/User.js';
 import UserSubscription from '../../models/UserSubscription.js';
 
@@ -508,7 +509,7 @@ router.post('/:id/agendamento', async (req, res) => {
 // =====================================================================
 // POST /api/internal/leads/:id/alerta-equipa
 // Body: { tenantId, motivo }
-// Torna real o "vou deixar o seu contacto com a Laura" da IA: alerta a
+// Torna real o handoff prometido pela IA: alerta a
 // equipa (WhatsApp admin + push best-effort) — caso Hayzel 2026-07-06:
 // lead quente com prazo prometida à espera de contacto que nunca saiu.
 // =====================================================================
@@ -560,16 +561,35 @@ router.post('/:id/alerta-equipa', async (req, res) => {
       `A IA precisa da tua ajuda com o lead, olhe no telefone da empresa ou no sistema *${lead.nome || 'sem nome'}*:\n\n` +
       `${motivoTxt}\n\n` +
       (extras ? `${extras}\n\n` : '') +
-      `📱 Contacto: ${lead.telefone || 'sem telefone registado'}`;
+      `📱 Contacto: ${lead.telefone || 'sem telefone registado'}\n\n` +
+      `↩️ Podes responder por texto ou áudio, por exemplo: ` +
+      `"Diga à ${lead.nome || 'pessoa'} que..."`;
 
     let whatsappEnviado = false;
-    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp;
     if (numeroAdmin) {
       const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
       whatsappEnviado = Boolean(resultado?.success);
+      if (whatsappEnviado) {
+        try {
+          await registerTeamRequest({
+            models,
+            tenantId,
+            contactType: 'lead',
+            contactId: lead._id,
+            contactName: lead.nome,
+            contactPhone: lead.telefone,
+            reason: motivoTxt,
+          });
+        } catch (requestErr) {
+          console.warn(
+            `[alerta-equipa-lead] registo do pedido pendente falhou: ${requestErr.message}`,
+          );
+        }
+      }
     } else {
       console.warn(
-        `[alerta-equipa-lead] tenant ${tenantId} sem whatsapp.numeroWhatsapp/contato.telefone — alerta NÃO entregue por WhatsApp (lead ${leadId})`
+        `[alerta-equipa-lead] tenant ${tenantId} sem whatsapp.numeroWhatsapp — alerta NÃO entregue por WhatsApp (lead ${leadId})`
       );
     }
 

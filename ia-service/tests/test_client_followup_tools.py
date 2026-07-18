@@ -1,6 +1,6 @@
 """Tools de alerta à equipa (registar_presenca, sinalizar_renovacao, avisar_equipa)."""
 
-from ia_service.services import marcai_client
+from ia_service.services import marcai_client, tenant_knowledge
 from ia_service.tools.client_tools import (
     make_avisar_equipa_tool,
     make_registar_presenca_tool,
@@ -101,12 +101,22 @@ async def test_avisar_equipa_envia_motivo(monkeypatch):
         return {"whatsappEnviado": True, "pushEnviado": False}
 
     monkeypatch.setattr(marcai_client, "alertar_equipa", fake_alertar)
+    monkeypatch.setattr(
+        tenant_knowledge,
+        "load_clinica_config",
+        lambda _tenant_id: {
+            "nome": "Clínica",
+            "dona": "Marta",
+            "profissao": "profissional",
+        },
+    )
 
     tool = make_avisar_equipa_tool("t1", "c1")
     result = await tool.ainvoke({"motivo": "Cliente diz ter 3 sessoes; ficha mostra 1"})
 
     assert "OK" in result
     assert "NAO bloqueia" in result
+    assert "Se Marta responder" in result
     assert calls == {
         "tenant_id": "t1",
         "cliente_id": "c1",

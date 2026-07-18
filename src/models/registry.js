@@ -24,6 +24,7 @@ import { ScheduleSchema }             from './Schedule.js';
 import { ScheduleExceptionSchema }    from './ScheduleException.js';
 import { FechamentoMensalSchema }     from './FechamentoMensal.js';
 import { LeadSchema }                 from './Lead.js';
+import { PedidoEquipaSchema }         from './PedidoEquipa.js';
 
 /**
  * @param {import('mongoose').Connection} db  — conexão específica do tenant
@@ -46,5 +47,6 @@ export function getModels(db) {
     ScheduleException:    db.model('ScheduleException',    ScheduleExceptionSchema),
     FechamentoMensal:     db.model('FechamentoMensal',     FechamentoMensalSchema),
     Lead:                 db.model('Lead',                 LeadSchema),
+    PedidoEquipa:         db.model('PedidoEquipa',         PedidoEquipaSchema),
   };
 }
