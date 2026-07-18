@@ -198,6 +198,18 @@ describe('POST /api/internal/clientes/:id/alerta-equipa', () => {
     expect(numero).toBe('351910376276');
     expect(alerta).toContain('Maria Teste');
     expect(alerta).toContain('Cliente diz ter 3 sessões; ficha mostra 1');
+    expect(alerta).toContain('Podes responder por texto ou áudio');
+
+    const models = getModels(getTenantDB(String(tenant._id)));
+    const pedido = await models.PedidoEquipa.findOne({
+      tenantId: tenant._id,
+      contactoId: cliente._id,
+    }).lean();
+    expect(pedido).toMatchObject({
+      contactoTipo: 'cliente',
+      contactoNome: 'Maria Teste',
+      status: 'pendente',
+    });
   });
 
   it('cliente de outro tenant → 404 (isolamento)', async () => {
@@ -224,6 +236,28 @@ describe('POST /api/internal/clientes/:id/alerta-equipa', () => {
     expect(res.status).toBe(400);
   });
 
+  it('contato.telefone público não recebe alerta nem cria pedido pendente', async () => {
+    const { tenant, cliente } = await seed('alerta-publico');
+    await Tenant.updateOne(
+      { _id: tenant._id },
+      {
+        $unset: { 'whatsapp.numeroWhatsapp': 1 },
+        $set: { 'contato.telefone': '351910376276' },
+      },
+    );
+
+    const res = await request(app)
+      .post(`/api/internal/clientes/${cliente._id}/alerta-equipa`)
+      .set(svc)
+      .send({ tenantId: String(tenant._id), motivo: 'Pedido privado' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.whatsappEnviado).toBe(false);
+    expect(sendMock).not.toHaveBeenCalled();
+    const models = getModels(getTenantDB(String(tenant._id)));
+    expect(await models.PedidoEquipa.countDocuments({ tenantId: tenant._id })).toBe(0);
+  });
+
   it('lead: alerta-equipa envia WhatsApp com urgência e notas da ficha', async () => {
     const { tenant } = await seed('alerta-lead');
     const models = getModels(getTenantDB(String(tenant._id)));
@@ -248,6 +282,16 @@ describe('POST /api/internal/clientes/:id/alerta-equipa', () => {
     expect(alerta).toContain('verificar desistências');
     expect(alerta).toContain('alta');
     expect(alerta).toContain('15 de julho');
+
+    const pedido = await models.PedidoEquipa.findOne({
+      tenantId: tenant._id,
+      contactoId: lead._id,
+    }).lean();
+    expect(pedido).toMatchObject({
+      contactoTipo: 'lead',
+      contactoNome: 'Hayzel Teste',
+      status: 'pendente',
+    });
   });
 
   it('2º alerta do mesmo cliente em <10 min é deduplicado (anti-spam)', async () => {

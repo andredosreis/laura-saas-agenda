@@ -40,6 +40,7 @@ import { handle as handleManualSilent } from '../handlers/manualSilent.js';
 import { handle as handleNoPendingAppointmentReply } from '../handlers/noPendingAppointmentReply.js';
 import { handle as handleClientLifecycle } from '../handlers/iaClientLifecycle.js';
 import { persistManualOutbound } from '../handlers/manualOutbound.js';
+import { handleTeamReply, isTeamAdminPhone } from '../teamRelayService.js';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
@@ -353,6 +354,47 @@ async function processInbound({
     instanceName,
     telefoneNormalizado,
   });
+
+  // Canal interno da equipa: o número pessoal configurado do admin responde
+  // aos pedidos da IA. Interceptar ANTES do router impede que a responsável
+  // seja criada como lead ou receba o prompt comercial/férias. Áudio já chega
+  // aqui transcrito pelo mesmo pipeline.
+  if (tenant && isTeamAdminPhone(tenant, telefoneNormalizado)) {
+    if (tenant.configuracoes?.iaGlobalAtiva === false) {
+      logger.info(
+        {
+          route: 'TEAM_RELAY_DISABLED',
+          reason: 'ia_global_disabled',
+          tenant_id: tenantId,
+          telefone_hash: telefoneHash(telefoneNormalizado),
+          message_id: messageId,
+          elapsed_ms: Date.now() - startMs,
+        },
+        'webhook_routed',
+      );
+      return { delivered: false, reason: 'ia_global_disabled' };
+    }
+    logger.info(
+      {
+        route: 'TEAM_RELAY',
+        tenant_id: tenantId,
+        telefone_hash: telefoneHash(telefoneNormalizado),
+        message_id: messageId,
+        elapsed_ms: Date.now() - startMs,
+      },
+      'webhook_routed',
+    );
+    return handleTeamReply({
+      tenant,
+      models,
+      tenantId,
+      telefoneNormalizado,
+      mensagem,
+      messageId,
+      timestamp,
+      instanceName,
+    });
+  }
 
   // 2) Build env snapshot for the router
   const env = {

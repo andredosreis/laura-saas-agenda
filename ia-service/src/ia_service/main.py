@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from .config import settings
-from .routers import health, process, transcribe
+from .routers import health, process, team_reply, transcribe
 
 logger = structlog.get_logger()
 
@@ -35,6 +35,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(process.router)
 app.include_router(transcribe.router)
+app.include_router(team_reply.router)
 
 
 @app.exception_handler(Exception)

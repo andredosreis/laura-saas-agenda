@@ -58,7 +58,7 @@ def test_sem_tools_e_false():
 
 
 async def test_avisar_equipa_lead_envia_motivo(monkeypatch):
-    from ia_service.services import marcai_client
+    from ia_service.services import marcai_client, tenant_knowledge
     from ia_service.tools.lead_tools import make_avisar_equipa_tool
 
     calls = {}
@@ -68,11 +68,21 @@ async def test_avisar_equipa_lead_envia_motivo(monkeypatch):
         return {"whatsappEnviado": True, "pushEnviado": False}
 
     monkeypatch.setattr(marcai_client, "alertar_equipa_lead", fake_alertar)
+    monkeypatch.setattr(
+        tenant_knowledge,
+        "load_clinica_config",
+        lambda _tenant_id: {
+            "nome": "Clínica",
+            "dona": "Marta",
+            "profissao": "profissional",
+        },
+    )
 
     tool = make_avisar_equipa_tool("t1", "l1")
     result = await tool.ainvoke({"motivo": "Lead só até 15/07; sem vagas antes"})
 
     assert "OK" in result
+    assert "Se Marta responder" in result
     assert calls == {
         "tenant_id": "t1",
         "lead_id": "l1",

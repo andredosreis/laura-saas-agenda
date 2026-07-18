@@ -30,6 +30,7 @@ import logger from '../../utils/logger.js';
 import { resolveAvailableSlots } from '../../controllers/scheduleController.js';
 import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
 import { sendPushNotification } from '../../services/pushService.js';
+import { registerTeamRequest } from '../../services/teamRequestService.js';
 import User from '../../models/User.js';
 import UserSubscription from '../../models/UserSubscription.js';
 
@@ -573,17 +574,37 @@ router.post('/:id/renovacao-interesse', async (req, res) => {
     const alerta =
       `💜 *Interesse em Renovação*\n\n` +
       `A cliente *${cliente.nome}* terminou o pacote e demonstrou interesse em renovar.\n\n` +
-      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}`;
+      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}\n\n` +
+      `↩️ Podes responder por texto ou áudio, por exemplo: ` +
+      `"Diga à ${cliente.nome} que..."`;
 
     let whatsappEnviado = false;
-    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp;
     if (numeroAdmin) {
       const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
       whatsappEnviado = Boolean(resultado?.success);
+      if (whatsappEnviado) {
+        try {
+          await registerTeamRequest({
+            models,
+            tenantId,
+            contactType: 'cliente',
+            contactId: cliente._id,
+            contactName: cliente.nome,
+            contactPhone: cliente.telefone,
+            reason: 'Cliente demonstrou interesse em renovar o pacote.',
+          });
+        } catch (requestErr) {
+          logger.warn(
+            { err: requestErr.message, tenantId, clienteId },
+            '[renovacao-interesse] registo do pedido pendente falhou',
+          );
+        }
+      }
     } else {
       logger.warn(
         { tenantId, clienteId },
-        '[alerta-equipa] tenant sem whatsapp.numeroWhatsapp/contato.telefone — alerta NÃO entregue por WhatsApp'
+        '[renovacao-interesse] tenant sem whatsapp.numeroWhatsapp — alerta NÃO entregue por WhatsApp'
       );
     }
 
@@ -625,7 +646,7 @@ router.post('/:id/renovacao-interesse', async (req, res) => {
 // =====================================================================
 // POST /api/internal/clientes/:id/alerta-equipa
 // Body: { tenantId, motivo }
-// Torna real o "vou pedir à Laura" da IA: alerta a equipa (WhatsApp admin
+// Torna real o handoff prometido pela IA: alerta a equipa (WhatsApp admin
 // + push best-effort) com o motivo — ex: cliente contesta dados da ficha.
 // =====================================================================
 
@@ -672,17 +693,37 @@ router.post('/:id/alerta-equipa', async (req, res) => {
       `📋 *Pedido de Verificação (IA)*\n\n` +
       `A IA precisa da tua ajuda com a cliente *${cliente.nome}*:\n\n` +
       `${motivoTxt}\n\n` +
-      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}`;
+      `📱 Contacto: ${cliente.telefone || 'sem telefone registado'}\n\n` +
+      `↩️ Podes responder por texto ou áudio, por exemplo: ` +
+      `"Diga à ${cliente.nome} que..."`;
 
     let whatsappEnviado = false;
-    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp || tenant?.contato?.telefone;
+    const numeroAdmin = tenant?.whatsapp?.numeroWhatsapp;
     if (numeroAdmin) {
       const resultado = await sendWhatsAppMessage(numeroAdmin, alerta, tenant?.whatsapp?.instanceName);
       whatsappEnviado = Boolean(resultado?.success);
+      if (whatsappEnviado) {
+        try {
+          await registerTeamRequest({
+            models,
+            tenantId,
+            contactType: 'cliente',
+            contactId: cliente._id,
+            contactName: cliente.nome,
+            contactPhone: cliente.telefone,
+            reason: motivoTxt,
+          });
+        } catch (requestErr) {
+          logger.warn(
+            { err: requestErr.message, tenantId, clienteId },
+            '[alerta-equipa] registo do pedido pendente falhou',
+          );
+        }
+      }
     } else {
       logger.warn(
         { tenantId, clienteId },
-        '[alerta-equipa] tenant sem whatsapp.numeroWhatsapp/contato.telefone — alerta NÃO entregue por WhatsApp'
+        '[alerta-equipa] tenant sem whatsapp.numeroWhatsapp — alerta NÃO entregue por WhatsApp'
       );
     }
 
