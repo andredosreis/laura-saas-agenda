@@ -116,6 +116,53 @@ async def test_pair_do_mesmo_pacote_usa_a_mesma_compra(monkeypatch):
     assert calls["par"]["compraPacoteId"] == "cp-dren"
 
 
+async def test_pair_tratamentos_distinguem_as_sessoes(monkeypatch):
+    # Review PR #101: com o mesmo pacote nos dois lados, os labels que a
+    # cliente ve tem de distinguir os tratamentos (rosto vs corpo).
+    calls = {}
+
+    async def fake_packages(**kwargs):
+        return [
+            {"_id": "cp-dren", "pacoteNome": "Pacote 10 sessoes de drenagem", "sessoesRestantes": 8}
+        ]
+
+    async def fake_create(**kwargs):
+        calls.update(kwargs)
+        return {"par": True}
+
+    monkeypatch.setattr(marcai_client, "get_client_packages", fake_packages)
+    monkeypatch.setattr(marcai_client, "create_client_appointment", fake_create)
+
+    tool = make_create_client_appointment_pair_tool("t1", "c1")
+    result = await tool.ainvoke(
+        {
+            "data": "2026-08-04",
+            "hora": "10:00",
+            "servico_primeira": "Pacote 10 sessoes de drenagem",
+            "servico_segunda": "Pacote 10 sessoes de drenagem",
+            "tratamento_primeira": "Drenagem de corpo",
+            "tratamento_segunda": "Drenagem de rosto",
+        }
+    )
+
+    assert result.startswith("OK")
+    assert calls["servico_nome"] == "Drenagem de corpo"
+    assert calls["par"]["servicoNome"] == "Drenagem de rosto"
+    assert calls["compra_pacote_id"] == "cp-dren"
+    assert calls["par"]["compraPacoteId"] == "cp-dren"
+    assert "Drenagem de corpo" in result and "Drenagem de rosto" in result
+
+
+def test_pair_slots_docstring_cobre_pacote_unico():
+    # Review PR #101: a descricao exposta ao modelo nao pode manter a
+    # precondicao antiga "dois pacotes activos" — senao o modelo nunca chama
+    # a tool no cenario do pacote unico com 2+ sessoes.
+    tool = make_get_pair_slots_tool("t1")
+    descricao = " ".join(tool.description.split())
+    assert "UM pacote com 2 ou mais sessoes restantes" in descricao
+    assert "e tem dois pacotes activos." not in descricao
+
+
 async def test_pair_pacote_em_falta_nao_marca(monkeypatch):
     async def fake_packages(**kwargs):
         return [PACOTES[0]]  # so tem o de rosto

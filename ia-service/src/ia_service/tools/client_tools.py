@@ -132,6 +132,7 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
 
 
 def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
+    owner_name = tenant_knowledge.load_clinica_config(tenant_id)["dona"]
 
     @tool
     async def create_client_appointment(data: str, hora: str, servico: str | None = None) -> str:
@@ -238,14 +239,25 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
                             )
                 except Exception:
                     pass
-            if "max_pending" in msg or "agendamento pendente" in msg.lower():
+            if "requer_pacote" in msg or "tem de indicar o pacote" in msg.lower():
                 return (
-                    "ERRO: o cliente ja tem um agendamento pendente. "
-                    "NAO tentes marcar outro. Diz ao cliente: "
-                    "'Ja tem uma sessao marcada. Por aqui so consigo ter uma "
-                    "marcacao de cada vez — mas na sessao presencial pode "
-                    "combinar as proximas directamente com a Laura. Quer "
-                    "reagendar a existente?'"
+                    "ERRO: a segunda marcacao futura tem de ficar ligada a um "
+                    "pacote. Chama get_my_packages e repete com `servico` = "
+                    "nome exacto do pacote a usar."
+                )
+            limite = (
+                "max_pending" in msg
+                or "limite de marca" in msg.lower()
+                or "agendamento pendente" in msg.lower()
+            )
+            if limite:
+                return (
+                    "ERRO: o cliente ja atingiu o limite de marcacoes futuras. "
+                    "NAO tentes marcar outra. Diz ao cliente: "
+                    "'Ja atingiu o limite de marcacoes que consigo fazer por "
+                    "aqui — nas suas sessoes presenciais pode combinar as "
+                    f"proximas directamente com a {owner_name}. Quer "
+                    "reagendar alguma das existentes?'"
                 )
             if "409" in msg or "slot_taken" in msg:
                 return (
@@ -288,9 +300,11 @@ def make_get_pair_slots_tool(tenant_id: str):
         """Devolve os horarios onde cabem DUAS sessoes seguidas (par emendado).
 
         Usa esta tool APENAS quando a cliente quer marcar dois tratamentos
-        no mesmo dia, um a seguir ao outro (ex: rosto + corpo) e tem dois
-        pacotes activos. Cada inicio devolvido comporta 2 horas continuas:
-        a 1a sessao comeca a essa hora e a 2a comeca 60 minutos depois.
+        no mesmo dia, um a seguir ao outro (ex: rosto + corpo) e tem sessoes
+        de pacote para as duas — DOIS pacotes activos, ou UM pacote com 2 ou
+        mais sessoes restantes (ex: pacote de 10 de drenagem). Cada inicio
+        devolvido comporta 2 horas continuas: a 1a sessao comeca a essa hora
+        e a 2a comeca 60 minutos depois.
 
         NAO uses get_available_slots para propor pares — os inicios de par
         sao calculados com a duracao dupla e podem ser diferentes.
@@ -347,7 +361,12 @@ def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
 
     @tool
     async def create_client_appointment_pair(
-        data: str, hora: str, servico_primeira: str, servico_segunda: str
+        data: str,
+        hora: str,
+        servico_primeira: str,
+        servico_segunda: str,
+        tratamento_primeira: str | None = None,
+        tratamento_segunda: str | None = None,
     ) -> str:
         """Marca DUAS sessoes seguidas para a cliente (par emendado).
 
@@ -355,8 +374,9 @@ def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
         via get_pair_slots E tem pacotes activos para os dois tratamentos.
         A 1a sessao comeca em `hora`; a 2a comeca 60 minutos depois.
         Se as duas sessoes saem do MESMO pacote (ex: corpo e rosto do pacote
-        de 10 de drenagem, com 2+ sessoes restantes), passa o mesmo nome nos
-        dois argumentos.
+        de 10 de drenagem, com 2+ sessoes restantes), passa o mesmo nome de
+        pacote nos dois `servico_*` e distingue os tratamentos nos
+        `tratamento_*` — e o que a cliente ve nas confirmacoes.
 
         Args:
             data: Data no formato YYYY-MM-DD (ex: '2026-08-04').
@@ -365,6 +385,11 @@ def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
                 devolvido por get_my_packages (ex: 'Drenagem Rosto').
             servico_segunda: Nome do pacote da 2a sessao (ex: 'Drenagem Corpo';
                 pode ser o mesmo da primeira).
+            tratamento_primeira: O tratamento concreto da 1a sessao como a
+                cliente o disse (ex: 'Drenagem de corpo'). Se omitido, usa o
+                nome do pacote.
+            tratamento_segunda: O tratamento concreto da 2a sessao (ex:
+                'Drenagem de rosto'). Se omitido, usa o nome do pacote.
         """
         from datetime import datetime
         from zoneinfo import ZoneInfo
@@ -383,6 +408,11 @@ def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
                     "Se a cliente nao tem os dois pacotes, nao podes marcar o par."
                 )
 
+            # O label que a cliente ve (confirmacao/lembretes) e o tratamento
+            # concreto quando distinguido; o pacote e so o selector de consumo.
+            label1 = (tratamento_primeira or "").strip() or pkg1.get("pacoteNome")
+            label2 = (tratamento_segunda or "").strip() or pkg2.get("pacoteNome")
+
             local = datetime.fromisoformat(f"{data}T{hora}:00").replace(
                 tzinfo=ZoneInfo("Europe/Lisbon")
             )
@@ -392,16 +422,16 @@ def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
                 cliente_id=cliente_id,
                 data_hora_iso=iso_utc,
                 tipo="Sessao",
-                servico_nome=pkg1.get("pacoteNome"),
+                servico_nome=label1,
                 compra_pacote_id=str(pkg1.get("_id") or "") or None,
                 par={
-                    "servicoNome": pkg2.get("pacoteNome"),
+                    "servicoNome": label2,
                     "compraPacoteId": str(pkg2.get("_id") or "") or None,
                 },
             )
             return (
-                f"OK — par marcado: {servico_primeira} as {hora} e "
-                f"{servico_segunda} logo a seguir (60 min depois), em {data}. "
+                f"OK — par marcado: {label1} as {hora} e "
+                f"{label2} logo a seguir (60 min depois), em {data}. "
                 "O sistema ja enviou as confirmacoes automaticas ao cliente; "
                 "a tua resposta NAO sera enviada. Responde apenas 'OK'."
             )

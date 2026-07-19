@@ -266,6 +266,18 @@ router.post('/:id/agendamentos', async (req, res) => {
     const compra1 = await resolverCompra(compraPacoteId);
     const compra2 = par ? await resolverCompra(par.compraPacoteId) : null;
 
+    // O 2º lugar do limite existe por causa dos pacotes — usá-lo exige ligar
+    // a marcação a uma compra elegível, senão duas marcações "livres" nunca
+    // consumiriam as sessões que justificam a excepção (review PR #101).
+    // O par já exige os dois IDs acima; isto cobre a 2ª marcação singular.
+    if (pendingCount + aCriar > 1 && !compra1) {
+      return res.status(400).json({
+        success: false,
+        error: 'A segunda marcação futura tem de indicar o pacote (compraPacoteId)',
+        code: 'requer_pacote',
+      });
+    }
+
     // Capacidade: sessões restantes ≥ marcações futuras já ligadas + as deste
     // pedido (1 ou 2 quando o par usa a mesma compra).
     const usosPorCompra = new Map();
@@ -343,6 +355,17 @@ router.post('/:id/agendamentos', async (req, res) => {
       }
     }
 
+    // servicoNome (opcional): tratamento/serviço enviado pela IA — vai para o
+    // template de confirmação, lembretes E fica persistido nas observações de
+    // cada sessão (no par, distingue "qual sessão é qual": rosto vs corpo,
+    // mesmo quando ambas saem do mesmo pacote — review PR #101).
+    const labelDe = (nome, fallback) => (typeof nome === 'string' && nome.trim())
+      ? nome.trim().slice(0, 120)
+      : fallback;
+    const fallbackLabel = tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão';
+    const label1 = labelDe(servicoNome, fallbackLabel);
+    const label2 = par ? labelDe(par?.servicoNome, fallbackLabel) : null;
+
     const validTipos = ['Sessao', 'Retorno', 'Avaliacao'];
     const baseDoc = {
       tenantId,
@@ -354,7 +377,9 @@ router.post('/:id/agendamentos', async (req, res) => {
     const agendamento = await models.Agendamento.create({
       ...baseDoc,
       dataHora,
-      observacoes: 'Marcação criada automaticamente pelo agent IA — confirmar com cliente.',
+      observacoes: par
+        ? `Marcação criada automaticamente pelo agent IA — 1ª sessão do par: ${label1}.`
+        : 'Marcação criada automaticamente pelo agent IA — confirmar com cliente.',
       ...(compra1 ? { compraPacote: compra1._id, servicoTipo: 'pacote' } : {}),
     });
 
@@ -364,7 +389,7 @@ router.post('/:id/agendamentos', async (req, res) => {
         agendamentoPar = await models.Agendamento.create({
           ...baseDoc,
           dataHora: new Date(dataHora.getTime() + 60 * 60 * 1000),
-          observacoes: 'Marcação criada automaticamente pelo agent IA — 2ª sessão do par (sessões seguidas).',
+          observacoes: `Marcação criada automaticamente pelo agent IA — 2ª sessão do par (seguida à 1ª): ${label2}.`,
           ...(compra2 ? { compraPacote: compra2._id, servicoTipo: 'pacote' } : {}),
         });
       } catch (err) {
@@ -381,13 +406,6 @@ router.post('/:id/agendamentos', async (req, res) => {
       }
     }
 
-    // servicoNome (opcional): nome do pacote activo enviado pela IA — o
-    // template de confirmação e os lembretes mostram o serviço real em vez
-    // do genérico "Sessão". No par, cada sessão tem o seu label.
-    const labelDe = (nome, fallback) => (typeof nome === 'string' && nome.trim())
-      ? nome.trim().slice(0, 120)
-      : fallback;
-    const fallbackLabel = tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão';
     const notificar = (doc, label, opts = {}) => scheduleNotifications({
       agendamentoId: doc._id,
       tenantId,
@@ -401,10 +419,9 @@ router.post('/:id/agendamentos', async (req, res) => {
     // No par: a 1ª sessão não agenda follow-up (a visita só acaba no fim da
     // 2ª) e a 2ª não agenda lembretes (o de 1h dispararia durante a 1ª,
     // com a cliente já no salão). Confirmação sai para as duas.
-    notificar(agendamento, labelDe(servicoNome, fallbackLabel),
-      agendamentoPar ? { incluirFollowUp: false } : {});
+    notificar(agendamento, label1, agendamentoPar ? { incluirFollowUp: false } : {});
     if (agendamentoPar) {
-      notificar(agendamentoPar, labelDe(par?.servicoNome, fallbackLabel), { incluirLembretes: false });
+      notificar(agendamentoPar, label2, { incluirLembretes: false });
     }
 
     res.status(201).json({
