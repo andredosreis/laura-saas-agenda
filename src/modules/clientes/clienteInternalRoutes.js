@@ -106,19 +106,28 @@ router.get('/:id/agendamentos', async (req, res) => {
 
 // =====================================================================
 // POST /api/internal/clientes/:id/agendamentos
-// Body: { tenantId, dataHoraISO, tipo? }
-// Creates appointment for existing client.
+// Body: { tenantId, dataHoraISO, tipo?, servicoNome?, compraPacoteId?,
+//         par?: { servicoNome?, compraPacoteId? } }
+// Creates appointment for existing client. Com `par`, cria também a 2ª
+// sessão emendada (+60 min, sem arrumação entre elas) — ex.: rosto + corpo.
 // =====================================================================
 router.post('/:id/agendamentos', async (req, res) => {
   try {
     const clienteId = req.params.id;
-    const { tenantId, dataHoraISO, tipo, servicoNome } = req.body || {};
+    const { tenantId, dataHoraISO, tipo, servicoNome, compraPacoteId, par } = req.body || {};
 
     if (!tenantId || !dataHoraISO) {
       return res.status(400).json({ success: false, error: 'tenantId e dataHoraISO são obrigatórios' });
     }
     if (!mongoose.Types.ObjectId.isValid(clienteId)) {
       return res.status(400).json({ success: false, error: 'clienteId inválido' });
+    }
+    // par (opcional): 2ª sessão EMENDADA logo a seguir à primeira (mesma sala,
+    // sem arrumação entre elas — a arrumação fica só no fim do par). Caso de
+    // uso: cliente com dois pacotes (rosto + corpo) marca as duas de seguida.
+    // Shape: { servicoNome?, compraPacoteId? }
+    if (par !== undefined && (typeof par !== 'object' || par === null || Array.isArray(par))) {
+      return res.status(400).json({ success: false, error: 'par inválido' });
     }
 
     const dataHoraDT = DateTime.fromISO(dataHoraISO, { zone: 'Europe/Lisbon' });
@@ -139,34 +148,91 @@ router.post('/:id/agendamentos', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
     }
 
-    // Rule 3: max 1 pending appointment per client
+    // Rule 3 dinâmica: por defeito máx 1 agendamento pendente; com ≥2 pacotes
+    // activos com sessões disponíveis o limite sobe para 2 (ex.: pacote de
+    // rosto + pacote de corpo — decisão 2026-07-19). Um par conta como 2.
     const cancelledStatus = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
-    const pendingCount = await models.Agendamento.countDocuments({
-      tenantId,
-      cliente: clienteId,
-      status: { $nin: cancelledStatus },
-      'confirmacao.tipo': { $ne: 'rejeitado' },
-      dataHora: { $gte: DateTime.now().setZone('Europe/Lisbon').toJSDate() },
-    });
-    if (pendingCount >= 1) {
+    const [pendingCount, pacotesAtivos] = await Promise.all([
+      models.Agendamento.countDocuments({
+        tenantId,
+        cliente: clienteId,
+        status: { $nin: cancelledStatus },
+        'confirmacao.tipo': { $ne: 'rejeitado' },
+        dataHora: { $gte: DateTime.now().setZone('Europe/Lisbon').toJSDate() },
+      }),
+      models.CompraPacote.countDocuments({
+        tenantId,
+        cliente: clienteId,
+        status: 'Ativo',
+        sessoesRestantes: { $gt: 0 },
+      }),
+    ]);
+    const maxPendentes = pacotesAtivos >= 2 ? 2 : 1;
+    const aCriar = par ? 2 : 1;
+    if (pendingCount + aCriar > maxPendentes) {
       return res.status(409).json({
         success: false,
-        error: 'Cliente já tem um agendamento pendente. Aguarde a sessão actual antes de marcar outra.',
+        error: 'Cliente já atingiu o limite de marcações futuras. Aguarde a sessão actual antes de marcar outra.',
         code: 'max_pending_reached',
+      });
+    }
+
+    // Ligação ao pacote (opcional): valida que a compra pertence ao cliente e
+    // tenant, está activa e tem sessões — o consumo ao Realizado usa
+    // exactamente esta compra (updateStatusAgendamento → usarSessao).
+    const resolverCompra = async (id) => {
+      if (id === undefined || id === null) return null;
+      if (!mongoose.Types.ObjectId.isValid(String(id))) {
+        const err = new Error('compraPacoteId inválido');
+        err.statusCode = 400;
+        throw err;
+      }
+      const compra = await models.CompraPacote.findOne({
+        _id: id,
+        tenantId,
+        cliente: clienteId,
+        status: 'Ativo',
+        sessoesRestantes: { $gt: 0 },
+      }).select('_id sessoesRestantes').lean();
+      if (!compra) {
+        const err = new Error('Pacote não encontrado');
+        err.statusCode = 404;
+        throw err;
+      }
+      return compra;
+    };
+    const compra1 = await resolverCompra(compraPacoteId);
+    const compra2 = par ? await resolverCompra(par.compraPacoteId) : null;
+    if (compra1 && compra2
+      && String(compra1._id) === String(compra2._id)
+      && compra1.sessoesRestantes < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'O pacote só tem uma sessão disponível',
+        code: 'sessoes_insuficientes',
       });
     }
 
     const gapMin = 60 + (tenant?.configuracoes?.intervaloEntreSessoes || 0);
     const halfMs = (gapMin * 60 * 1000) - 1;
-    const windowStart = new Date(dataHora.getTime() - halfMs);
-    const windowEnd = new Date(dataHora.getTime() + halfMs);
-    const conflict = await models.Agendamento.findOne({
-      tenantId,
-      dataHora: { $gte: windowStart, $lte: windowEnd },
-      status: { $nin: cancelledStatus },
-      'confirmacao.tipo': { $ne: 'rejeitado' },
-    });
-    if (conflict) {
+    // Com par, valida a janela de conflito para os DOIS inícios (a 2ª sessão
+    // arranca 60 min depois da 1ª, emendada). Nenhuma vê a "irmã" — ainda não
+    // foram criadas.
+    const inicios = par
+      ? [dataHora, new Date(dataHora.getTime() + 60 * 60 * 1000)]
+      : [dataHora];
+    const conflicts = await Promise.all(inicios.map((inicio) =>
+      models.Agendamento.findOne({
+        tenantId,
+        dataHora: {
+          $gte: new Date(inicio.getTime() - halfMs),
+          $lte: new Date(inicio.getTime() + halfMs),
+        },
+        status: { $nin: cancelledStatus },
+        'confirmacao.tipo': { $ne: 'rejeitado' },
+      })
+    ));
+    if (conflicts.some(Boolean)) {
       return res.status(409).json({
         success: false,
         error: 'Slot já ocupado por outro agendamento',
@@ -188,7 +254,9 @@ router.post('/:id/agendamentos', async (req, res) => {
         Agendamento: models.Agendamento,
         tenantId,
         date: dataHoraDT.toFormat('yyyy-MM-dd'),
-        duration: 60,
+        // Par emendado ocupa 120 min contínuos — a grelha de 120 valida o span
+        // completo contra pausa, fecho e marcações vivas (arrumação só no fim).
+        duration: par ? 120 : 60,
         // Fase A — mesma grelha ancorada (com arrumação) que o picker/IA mostram.
         interval: tenant?.configuracoes?.intervaloEntreSessoes || 0,
       });
@@ -204,33 +272,68 @@ router.post('/:id/agendamentos', async (req, res) => {
     }
 
     const validTipos = ['Sessao', 'Retorno', 'Avaliacao'];
-    const agendamento = await models.Agendamento.create({
+    const baseDoc = {
       tenantId,
       tipo: validTipos.includes(tipo) ? tipo : 'Sessao',
       cliente: clienteId,
-      dataHora,
       status: 'Agendado',
       criadoPorIA: true,
+    };
+    const agendamento = await models.Agendamento.create({
+      ...baseDoc,
+      dataHora,
       observacoes: 'Marcação criada automaticamente pelo agent IA — confirmar com cliente.',
+      ...(compra1 ? { compraPacote: compra1._id, servicoTipo: 'pacote' } : {}),
     });
+
+    let agendamentoPar = null;
+    if (par) {
+      try {
+        agendamentoPar = await models.Agendamento.create({
+          ...baseDoc,
+          dataHora: new Date(dataHora.getTime() + 60 * 60 * 1000),
+          observacoes: 'Marcação criada automaticamente pelo agent IA — 2ª sessão do par (sessões seguidas).',
+          ...(compra2 ? { compraPacote: compra2._id, servicoTipo: 'pacote' } : {}),
+        });
+      } catch (err) {
+        // Sem transacções aqui (o test harness corre Mongo standalone) —
+        // compensação: o par é atómico para o cliente; a 1ª sessão não pode
+        // ficar órfã se a 2ª falhar (ex.: corrida no índice único de slot).
+        await models.Agendamento.deleteOne({ _id: agendamento._id, tenantId }).catch((cleanupErr) => {
+          logger.error(
+            { err: cleanupErr.message, agendamentoId: String(agendamento._id) },
+            '[ia-client-appointment] limpeza da 1ª sessão do par falhou',
+          );
+        });
+        throw err;
+      }
+    }
 
     // servicoNome (opcional): nome do pacote activo enviado pela IA — o
     // template de confirmação e os lembretes mostram o serviço real em vez
-    // do genérico "Sessão".
-    const servicoLabel = (typeof servicoNome === 'string' && servicoNome.trim())
-      ? servicoNome.trim().slice(0, 120)
-      : (tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão');
-    scheduleNotifications({
-      agendamentoId: agendamento._id,
+    // do genérico "Sessão". No par, cada sessão tem o seu label.
+    const labelDe = (nome, fallback) => (typeof nome === 'string' && nome.trim())
+      ? nome.trim().slice(0, 120)
+      : fallback;
+    const fallbackLabel = tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão';
+    const notificar = (doc, label) => scheduleNotifications({
+      agendamentoId: doc._id,
       tenantId,
-      dataHora: agendamento.dataHora,
+      dataHora: doc.dataHora,
       clienteNome: cliente.nome || 'Cliente',
       clienteTelefone: cliente.telefone,
-      servicoNome: servicoLabel,
+      servicoNome: label,
       duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-appointment] scheduleNotifications falhou'));
+    notificar(agendamento, labelDe(servicoNome, fallbackLabel));
+    if (agendamentoPar) {
+      notificar(agendamentoPar, labelDe(par?.servicoNome, fallbackLabel));
+    }
 
-    res.status(201).json({ success: true, data: agendamento });
+    res.status(201).json({
+      success: true,
+      data: agendamentoPar ? { par: true, agendamento, agendamentoPar } : agendamento,
+    });
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({

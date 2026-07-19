@@ -139,7 +139,11 @@ async def _format_upcoming_appointments(tenant_id: str, cliente_id: str, log) ->
         return "Erro ao consultar agendamentos."
 
 
-_SYSTEM_CONFIRMED_TOOLS = {"create_client_appointment", "reschedule_appointment"}
+_SYSTEM_CONFIRMED_TOOLS = {
+    "create_client_appointment",
+    "create_client_appointment_pair",
+    "reschedule_appointment",
+}
 
 
 def _booking_created_this_turn(messages: list) -> bool:
@@ -280,9 +284,7 @@ async def run(payload) -> dict:
             from . import mongo_reader
 
             db = mongo_reader.get_tenant_db(tenant_id)
-            doc = db.clientes.find_one(
-                {"_id": ObjectId(cliente_id)}, {"_id": 1, "observacoes": 1}
-            )
+            doc = db.clientes.find_one({"_id": ObjectId(cliente_id)}, {"_id": 1, "observacoes": 1})
             if doc is None:
                 log.warning("cliente_tenant_mismatch", cliente_id=cliente_id)
                 return {
