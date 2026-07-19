@@ -63,6 +63,10 @@ const minutesToTime = (totalMinutes) => {
  * @param {number}  args.interval   — minutos de arrumação reservados após cada sessão (default 0)
  * @returns {Promise<{ slots: string[], isException: boolean, exceptionType: (string|null), hasBaseSchedule: boolean, baseActive: boolean }>}
  */
+// Unidade de sessão dos 3 caminhos de booking (painel, IA cliente, IA lead) —
+// o Agendamento não persiste duração, por isso o revival assume este span.
+const SESSAO_PADRAO_MIN = 60;
+
 export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agendamento, tenantId, date, duration = 60, interval = 0 }) => {
   const targetDate = DateTime.fromISO(date, { zone: 'Europe/Lisbon' });
   const dayOfWeek = targetDate.weekday === 7 ? 0 : targetDate.weekday; // Luxon: 1=Seg..7=Dom → Mongoose: 0=Dom..6=Sab
@@ -111,15 +115,36 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
     endWorkMinutes = timeToMinutes(schedule.endTime);
   }
 
-  const existingAgendamentos = await Agendamento.find({
-    tenantId,
-    dataHora: {
-      $gte: targetDate.startOf('day').toJSDate(),
-      $lte: targetDate.endOf('day').toJSDate(),
-    },
-    status: { $in: ['Agendado', 'Confirmado'] },
-    'confirmacao.tipo': { $ne: 'rejeitado' }
-  });
+  const dayRange = {
+    $gte: targetDate.startOf('day').toJSDate(),
+    $lte: targetDate.endOf('day').toJSDate(),
+  };
+  const [existingAgendamentos, canceladosPeloCliente] = await Promise.all([
+    Agendamento.find({
+      tenantId,
+      dataHora: dayRange,
+      status: { $in: ['Agendado', 'Confirmado'] },
+      'confirmacao.tipo': { $ne: 'rejeitado' }
+    }),
+    // Só cancelamentos PELO CLIENTE revivem. O painel grava
+    // confirmacao.tipo='rejeitado' também no "Cancelado Pelo Salão"
+    // (getConfirmacaoPatchForStatus), por isso o termo do rejeitado exige o
+    // actor cliente e nunca um cancelamento do salão. Encaixes forçados por
+    // admin são excepções pontuais — cancelados, não voltam à montra pública.
+    Agendamento.find({
+      tenantId,
+      dataHora: dayRange,
+      'encaixe.forcado': { $ne: true },
+      $or: [
+        { status: 'Cancelado Pelo Cliente' },
+        {
+          status: { $ne: 'Cancelado Pelo Salão' },
+          'confirmacao.tipo': 'rejeitado',
+          'confirmacao.respondidoPor': 'cliente',
+        },
+      ],
+    }).select('dataHora').lean(),
+  ]);
 
   // Cada agendamento reserva a sessão + a arrumação a seguir.
   const dur = Number(duration);
@@ -170,6 +195,32 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
       cursor += step;
     }
   }
+
+  // Revival de cancelamentos pelo cliente: a grelha ancorada reancora nos
+  // agendamentos vivos, por isso o início de uma marcação cancelada pode nunca
+  // voltar a ser gerado — e a pausa configurada pode nem o permitir. Mas esse
+  // span já foi uma marcação real aceite: cancelar não pode deixar o dia mais
+  // fechado do que estava. Volta à lista se couber na janela do dia e não
+  // conflituar com marcações vivas (sessão + arrumação). A pausa não o bloqueia
+  // (a marcação original podia atravessá-la); excepção `fechado` e dia inactivo
+  // continuam a vencer (early-returns acima). Cancelado pelo salão NÃO revive —
+  // pode significar que a profissional deixou de trabalhar a essa hora.
+  // A legitimidade herdada limita-se ao span da sessão padrão (o Agendamento
+  // não persiste duração; 60 min é a unidade dos 3 caminhos de booking) — um
+  // pedido mais longo não pode usar o horário cancelado para atravessar a
+  // pausa além do que a marcação original ocupava.
+  if (dur <= SESSAO_PADRAO_MIN) {
+    for (const ag of canceladosPeloCliente) {
+      const start = timeToMinutes(DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm'));
+      const revived = minutesToTime(start);
+      if (slots.includes(revived)) continue;
+      if (start < startWorkMinutes || start + dur > endWorkMinutes) continue;
+      if (nowMinutes !== null && start <= nowMinutes) continue;
+      if (reserved.some((r) => start < r.end && (start + dur + gap) > r.start)) continue;
+      slots.push(revived);
+    }
+  }
+  slots.sort();
 
   return { slots, isException, exceptionType, hasBaseSchedule, baseActive };
 };

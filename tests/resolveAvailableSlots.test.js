@@ -81,6 +81,111 @@ describe('resolveAvailableSlots — intervalo de arrumação', () => {
   });
 });
 
+describe('resolveAvailableSlots — revival de horários cancelados pelo cliente', () => {
+  async function seedCancelled(tenantId, isoLocal, {
+    status = 'Cancelado Pelo Cliente',
+    confirmacao = { tipo: 'rejeitado', respondidoPor: 'cliente' },
+    encaixe = undefined,
+  } = {}) {
+    const { Agendamento } = models(tenantId);
+    await Agendamento.create({
+      tenantId,
+      dataHora: DateTime.fromISO(isoLocal, { zone: 'Europe/Lisbon' }).toJSDate(),
+      status,
+      confirmacao,
+      ...(encaixe ? { encaixe } : {}),
+    });
+  }
+
+  it('horário cancelado pelo cliente volta à lista mesmo atravessando a pausa (caso real 30/07)', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedBooking(tenantId, `${DATE}T10:00`);   // reserva 10:00–11:15 (sessão+arrumação)
+    await seedCancelled(tenantId, `${DATE}T11:30`); // 11:30–12:30 atravessa a pausa
+    const { slots } = await call(tenantId, 15);
+    // A grelha ancorada nunca geraria 11:30 (11:15 não cabe antes da pausa),
+    // mas o span cancelado era uma marcação real → reaparece tal como estava.
+    expect(slots).toContain('11:30');
+    // Ordem cronológica mantida com o revivido inserido.
+    expect(slots).toEqual([...slots].sort());
+  });
+
+  it('cancelado pelo salão NÃO revive (estado real do controller: rejeitado + respondidoPor laura)', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedBooking(tenantId, `${DATE}T10:00`);
+    // getConfirmacaoPatchForStatus grava rejeitado também no cancelamento
+    // pelo salão — o revival não pode confundir o actor.
+    await seedCancelled(tenantId, `${DATE}T11:30`, {
+      status: 'Cancelado Pelo Salão',
+      confirmacao: { tipo: 'rejeitado', respondidoPor: 'laura' },
+    });
+    const { slots } = await call(tenantId, 15);
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('cancelado pelo salão com rejeição prévia do cliente TAMBÉM não revive', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedCancelled(tenantId, `${DATE}T11:30`, {
+      status: 'Cancelado Pelo Salão',
+      confirmacao: { tipo: 'rejeitado', respondidoPor: 'cliente' },
+    });
+    const { slots } = await call(tenantId, 15);
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('encaixe forçado por admin NÃO revive ao ser cancelado', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedCancelled(tenantId, `${DATE}T11:30`, { encaixe: { forcado: true } });
+    const { slots } = await call(tenantId, 15);
+    // Excepção administrativa pontual não vira disponibilidade pública.
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('pedido mais longo que a sessão padrão NÃO herda o horário cancelado', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedCancelled(tenantId, `${DATE}T11:30`); // marcação original: sessão de 60 min
+    const { Schedule, ScheduleException, Agendamento } = models(tenantId);
+    const { slots } = await resolveAvailableSlots({
+      Schedule, ScheduleException, Agendamento, tenantId, date: DATE, duration: 120, interval: 15,
+    });
+    // 120 min às 11:30 atravessariam a pausa inteira — legitimidade herdada
+    // limita-se ao span da sessão padrão.
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('cancelado que agora conflita com marcação viva NÃO revive', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId); // 09-18, pausa 12-13
+    await seedCancelled(tenantId, `${DATE}T11:30`);
+    await seedBooking(tenantId, `${DATE}T11:45`); // marcação viva ocupa o span 11:30–12:45
+    const { slots } = await call(tenantId, 15);
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('cancelado fora da janela do dia NÃO revive', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId); // 09-18
+    await seedCancelled(tenantId, `${DATE}T08:00`);  // antes da abertura
+    await seedCancelled(tenantId, `${DATE}T17:30`);  // 17:30–18:30 passa do fecho
+    const { slots } = await call(tenantId, 0);
+    expect(slots).not.toContain('08:00');
+    expect(slots).not.toContain('17:30');
+  });
+
+  it('cancelado num horário que a grelha já oferece → sem duplicado', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId); // 09-18, pausa 12-13
+    await seedCancelled(tenantId, `${DATE}T10:00`);
+    const { slots } = await call(tenantId, 0);
+    expect(slots.filter((s) => s === '10:00')).toHaveLength(1);
+    expect(slots).toEqual(['09:00','10:00','11:00','13:00','14:00','15:00','16:00','17:00']);
+  });
+});
+
 describe('resolveAvailableSlots — pausa parcialmente sobreposta à janela', () => {
   it('pausa que ultrapassa o fecho continua a excluir os slots dentro da pausa', async () => {
     const tenantId = new mongoose.Types.ObjectId();

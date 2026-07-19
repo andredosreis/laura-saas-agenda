@@ -70,18 +70,31 @@ export function buildMensagem(job) {
 /**
  * Regista um lembrete/notificação enviado ao cliente como Mensagem (direcao
  * saida, geradoPor 'sistema') para aparecer na thread do inbox de Conversas.
+ * Liga sempre a Mensagem à Conversa do telefone: o histórico que a IA lê
+ * (GET /clientes/:id/messages) filtra por `conversa`, e um template sem o
+ * link fica invisível para o agente — a cliente responde ao lembrete e a IA
+ * cumprimenta como primeiro contacto (caso Cris, 2026-07-15).
  * Best-effort: uma falha aqui não deve quebrar o envio (já feito com sucesso).
  */
-async function registarNaThread(Mensagem, { tenantId, telefone, mensagem }) {
+export async function registarNaThread(Mensagem, Conversa, { tenantId, telefone, mensagem }) {
   if (!Mensagem || !telefone || !mensagem) return;
   try {
+    const tel = String(telefone).replace(/\D/g, '');
+    const variants = [...new Set([tel, `351${tel}`, tel.replace(/^351/, '')])];
+    let conversa = Conversa
+      ? await Conversa.findOne({ tenantId, telefone: { $in: variants } }).select('_id').lean()
+      : null;
+    if (!conversa && Conversa) {
+      conversa = await Conversa.create({ tenantId, telefone: tel, estado: 'aguardando_agendamento' });
+    }
     await Mensagem.create({
       tenantId,
-      telefone: String(telefone).replace(/\D/g, ''),
+      telefone: tel,
       mensagem,
       origem: 'laura',
       direcao: 'saida',
       geradoPor: 'sistema',
+      conversa: conversa?._id,
     });
   } catch (err) {
     logger.warn({ err: err.message }, '[Worker] falha a registar lembrete na thread (envio OK)');
@@ -98,7 +111,7 @@ async function processJob(job) {
 
   // Resolver DB do tenant para queries isoladas
   const tenantDb = getTenantDB(tenantId);
-  const { Agendamento, Mensagem } = getModels(tenantDb);
+  const { Agendamento, Mensagem, Conversa } = getModels(tenantDb);
 
   // Lógica especial para lembrete de 1h: verifica estado da confirmação
   if (tipo === 'lembrete-1h') {
@@ -122,7 +135,7 @@ async function processJob(job) {
     if (!resultado.success) {
       throw new Error(`Falha ao enviar lembrete 1h para ${clienteNome}: ${JSON.stringify(resultado.error)}`);
     }
-    await registarNaThread(Mensagem, { tenantId, telefone: clienteTelefone, mensagem });
+    await registarNaThread(Mensagem, Conversa, { tenantId, telefone: clienteTelefone, mensagem });
 
     // Se confirmação ainda pendente, agenda alerta ao admin com 5 minutos de delay
     if (agendamento.confirmacao?.tipo === 'pendente') {
@@ -198,7 +211,7 @@ async function processJob(job) {
   if (!resultado.success) {
     throw new Error(`Falha ao enviar WhatsApp para ${clienteNome}: ${JSON.stringify(resultado.error)}`);
   }
-  await registarNaThread(Mensagem, { tenantId, telefone: clienteTelefone, mensagem });
+  await registarNaThread(Mensagem, Conversa, { tenantId, telefone: clienteTelefone, mensagem });
 
   logger.info({ jobId: job.id, tipo, clienteNome }, '[Worker] Notificação enviada');
 }
