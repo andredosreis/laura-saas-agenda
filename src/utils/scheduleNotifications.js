@@ -21,7 +21,14 @@ Até breve! 💆‍♀️✨
 _LA Estética Avançada_`;
 }
 
-export async function scheduleNotifications({ agendamentoId, tenantId, dataHora, clienteNome, clienteTelefone, servicoNome, duracaoSessaoMin = 60 }) {
+/**
+ * `incluirLembretes` / `incluirFollowUp` (default true) existem para o par de
+ * sessões emendadas (PR #100): a 2ª sessão não agenda lembretes próprios (o
+ * lembrete de 1h dispararia durante a 1ª sessão, com a cliente já no salão) e
+ * a 1ª não agenda follow-up (a visita só termina no fim da 2ª). A confirmação
+ * é sempre agendada.
+ */
+export async function scheduleNotifications({ agendamentoId, tenantId, dataHora, clienteNome, clienteTelefone, servicoNome, duracaoSessaoMin = 60, incluirLembretes = true, incluirFollowUp = true }) {
   if (!clienteTelefone) {
     logger.warn({ agendamentoId }, '[Notifications] Sem telefone — jobs não agendados');
     return { queued: false, reason: 'missing_phone' };
@@ -88,7 +95,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
   await queue.add('confirmacao', { ...baseData, tipo: 'confirmacao' }, { jobId: jobIdConfirmacao });
 
   // 2. Lembrete antecipado
-  if (diasAte > 7) {
+  if (incluirLembretes && diasAte > 7) {
     const delay = agendamento.minus({ days: 2 }).diff(agora).milliseconds;
     if (delay > 0) {
       await queue.add(
@@ -97,7 +104,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
         { delay, jobId: jobIdAntecipado }
       );
     }
-  } else if (diasAte >= 2) {
+  } else if (incluirLembretes && diasAte >= 2) {
     const delay = agendamento.minus({ days: 1 }).diff(agora).milliseconds;
     if (delay > 0) {
       await queue.add(
@@ -110,7 +117,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
 
   // 3. Lembrete 1h antes
   const delay1h = agendamento.minus({ hours: 1 }).diff(agora).milliseconds;
-  if (delay1h > 0) {
+  if (incluirLembretes && delay1h > 0) {
     await queue.add(
       'lembrete-1h',
       { ...baseData, tipo: 'lembrete-1h' },
@@ -123,7 +130,7 @@ export async function scheduleNotifications({ agendamentoId, tenantId, dataHora,
   const delayFollowUp = agendamento
     .plus({ minutes: duracaoSessaoMin + 5 })
     .diff(agora).milliseconds;
-  if (delayFollowUp > 0) {
+  if (incluirFollowUp && delayFollowUp > 0) {
     await queue.add(
       'follow-up-pos-sessao',
       { ...baseData, tipo: 'follow-up-pos-sessao' },

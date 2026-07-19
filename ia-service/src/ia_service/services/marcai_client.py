@@ -336,15 +336,26 @@ async def create_client_appointment(
     data_hora_iso: str,
     tipo: str = "Sessao",
     servico_nome: str | None = None,
+    compra_pacote_id: str | None = None,
+    par: dict | None = None,
 ) -> dict:
     """Creates a new appointment for an existing client.
 
     servico_nome: label do servico (ex: nome do pacote activo) usado pelo
     backend no template de confirmacao e nos lembretes.
+    compra_pacote_id: liga a sessao ao CompraPacote certo — o consumo ao
+    Realizado desconta desse pacote.
+    par: 2a sessao EMENDADA (+60 min, sem arrumacao entre elas). Shape:
+    {"servicoNome": str | None, "compraPacoteId": str | None}. O backend
+    valida o span completo (120 min) contra a grelha e cria as duas sessoes.
     """
     payload = {"tenantId": tenant_id, "dataHoraISO": data_hora_iso, "tipo": tipo}
     if servico_nome:
         payload["servicoNome"] = servico_nome
+    if compra_pacote_id:
+        payload["compraPacoteId"] = compra_pacote_id
+    if par is not None:
+        payload["par"] = par
     resp = await _post_with_retry(
         f"{settings.marcai_api_url}/api/internal/clientes/{cliente_id}/agendamentos",
         json=payload,

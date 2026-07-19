@@ -134,7 +134,7 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
 def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
 
     @tool
-    async def create_client_appointment(data: str, hora: str) -> str:
+    async def create_client_appointment(data: str, hora: str, servico: str | None = None) -> str:
         """Marca uma sessao para a cliente.
 
         Chama esta tool APENAS quando a cliente aceita explicitamente
@@ -144,26 +144,44 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
         Args:
             data: Data no formato YYYY-MM-DD (ex: '2026-06-01').
             hora: Hora no formato HH:MM (ex: '11:00').
+            servico: Nome do pacote a usar, EXACTAMENTE como devolvido por
+                get_my_packages. OBRIGATORIO quando a cliente tem mais de um
+                pacote activo — sem ele a sessao nao fica ligada a pacote
+                nenhum e o consumo nao e descontado.
         """
         from datetime import datetime
         from zoneinfo import ZoneInfo
 
         try:
-            # Nome do servico do pacote activo → o template de confirmacao do
-            # backend mostra "Drenagem Linfatica Avancada" em vez do generico
-            # "Sessao" (best-effort: sem pacote resolvido, o backend usa o
-            # label por defeito).
-            servico_nome = None
+            # Nome + id do pacote → o template de confirmacao mostra o servico
+            # real e o agendamento fica LIGADO ao CompraPacote (o consumo ao
+            # Realizado desconta do pacote certo). Com VARIOS pacotes activos
+            # a escolha nunca e adivinhada: ou vem em `servico`, ou a sessao
+            # fica sem ligacao (review PR #100 — ligar "o primeiro" descontava
+            # do pacote errado).
+            packages: list[dict] = []
             try:
                 packages = await marcai_client.get_client_packages(
                     tenant_id=tenant_id, cliente_id=cliente_id
                 )
-                for pkg in packages:
-                    if pkg.get("sessoesRestantes", 0) > 0:
-                        servico_nome = pkg.get("pacoteNome")
-                        break
             except Exception:
                 pass
+
+            servico_nome = None
+            compra_pacote_id = None
+            com_sessoes = [p for p in packages if p.get("sessoesRestantes", 0) > 0]
+            if servico:
+                pkg = _match_pacote(packages, servico)
+                if not pkg:
+                    return (
+                        f"ERRO: nao encontrei o pacote activo '{servico}'. "
+                        "Chama get_my_packages e usa o nome EXACTO do pacote."
+                    )
+                servico_nome = pkg.get("pacoteNome")
+                compra_pacote_id = str(pkg.get("_id") or "") or None
+            elif len(com_sessoes) == 1:
+                servico_nome = com_sessoes[0].get("pacoteNome")
+                compra_pacote_id = str(com_sessoes[0].get("_id") or "") or None
 
             local = datetime.fromisoformat(f"{data}T{hora}:00").replace(
                 tzinfo=ZoneInfo("Europe/Lisbon")
@@ -175,6 +193,7 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
                 data_hora_iso=iso_utc,
                 tipo="Sessao",
                 servico_nome=servico_nome,
+                compra_pacote_id=compra_pacote_id,
             )
             return (
                 f"OK — sessao marcada para {data} as {hora}. O sistema ja "
@@ -236,6 +255,183 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
             return f"ERRO ao marcar: {msg}. Diz ao cliente que vais passar a recepcao."
 
     return create_client_appointment
+
+
+def _normaliza_nome(raw: str) -> str:
+    import unicodedata
+
+    decomposto = unicodedata.normalize("NFD", str(raw or "").casefold())
+    return "".join(c for c in decomposto if unicodedata.category(c) != "Mn").strip()
+
+
+def _match_pacote(packages: list[dict], nome: str) -> dict | None:
+    """Encontra o pacote activo cujo nome casa com `nome` (sem acentos/caixa).
+
+    Igualdade primeiro; depois containment. Ambiguidade → None (o agente deve
+    usar os nomes exactos devolvidos por get_my_packages).
+    """
+    alvo = _normaliza_nome(nome)
+    if not alvo:
+        return None
+    com_sessoes = [p for p in packages if p.get("sessoesRestantes", 0) > 0]
+    exactos = [p for p in com_sessoes if _normaliza_nome(p.get("pacoteNome")) == alvo]
+    if len(exactos) == 1:
+        return exactos[0]
+    parciais = [p for p in com_sessoes if alvo in _normaliza_nome(p.get("pacoteNome"))]
+    return parciais[0] if len(parciais) == 1 else None
+
+
+def make_get_pair_slots_tool(tenant_id: str):
+
+    @tool
+    def get_pair_slots(dia: str | None = None) -> str:
+        """Devolve os horarios onde cabem DUAS sessoes seguidas (par emendado).
+
+        Usa esta tool APENAS quando a cliente quer marcar dois tratamentos
+        no mesmo dia, um a seguir ao outro (ex: rosto + corpo) e tem dois
+        pacotes activos. Cada inicio devolvido comporta 2 horas continuas:
+        a 1a sessao comeca a essa hora e a 2a comeca 60 minutos depois.
+
+        NAO uses get_available_slots para propor pares — os inicios de par
+        sao calculados com a duracao dupla e podem ser diferentes.
+
+        Args:
+            dia: Data YYYY-MM-DD para ver so esse dia, ou None para o
+                proximo dia com espaco para um par.
+        """
+        from ..services import mongo_reader
+
+        all_slots = mongo_reader.find_available_slots(
+            tenant_id, dias_a_frente=30, slot_duration_min=120
+        )
+        if not all_slots:
+            return (
+                "Nao ha espaco para duas sessoes seguidas nos proximos dias. "
+                "Propoe marcar as duas sessoes em dias separados."
+            )
+
+        by_date: dict[str, list[dict]] = {}
+        for s in all_slots:
+            by_date.setdefault(s["date"], []).append(s)
+
+        if dia:
+            day_slots = by_date.get(dia)
+            if not day_slots:
+                future = [d for d in by_date if d >= dia]
+                if future:
+                    return (
+                        f"Nao ha espaco para um par no dia {dia}. "
+                        f"O proximo dia com espaco e {future[0]}."
+                    )
+                return (
+                    f"Nao ha espaco para um par no dia {dia} nem nos seguintes. "
+                    "Propoe dias separados."
+                )
+            target, to_show = dia, day_slots
+        else:
+            target = next(iter(by_date))
+            to_show = by_date[target]
+
+        weekday = to_show[0]["weekday"]
+        inicios = ", ".join(s["time"] for s in to_show)
+        return (
+            f"Inicios possiveis para DUAS sessoes seguidas em {weekday} {target}: {inicios}.\n"
+            "A 2a sessao comeca 60 minutos depois da 1a (seguidas, na mesma sala).\n"
+            "Propoe um inicio; com o OK da cliente chama create_client_appointment_pair."
+        )
+
+    return get_pair_slots
+
+
+def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
+
+    @tool
+    async def create_client_appointment_pair(
+        data: str, hora: str, servico_primeira: str, servico_segunda: str
+    ) -> str:
+        """Marca DUAS sessoes seguidas para a cliente (par emendado).
+
+        Usa APENAS quando a cliente aceitou explicitamente um inicio proposto
+        via get_pair_slots E tem pacotes activos para os dois tratamentos.
+        A 1a sessao comeca em `hora`; a 2a comeca 60 minutos depois.
+
+        Args:
+            data: Data no formato YYYY-MM-DD (ex: '2026-08-04').
+            hora: Hora da 1a sessao no formato HH:MM (ex: '10:00').
+            servico_primeira: Nome do pacote da 1a sessao, EXACTAMENTE como
+                devolvido por get_my_packages (ex: 'Drenagem Rosto').
+            servico_segunda: Nome do pacote da 2a sessao (ex: 'Drenagem Corpo').
+        """
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        try:
+            packages = await marcai_client.get_client_packages(
+                tenant_id=tenant_id, cliente_id=cliente_id
+            )
+            pkg1 = _match_pacote(packages, servico_primeira)
+            pkg2 = _match_pacote(packages, servico_segunda)
+            if not pkg1 or not pkg2:
+                em_falta = servico_primeira if not pkg1 else servico_segunda
+                return (
+                    f"ERRO: nao encontrei o pacote activo '{em_falta}'. "
+                    "Chama get_my_packages e usa os nomes EXACTOS dos pacotes. "
+                    "Se a cliente nao tem os dois pacotes, nao podes marcar o par."
+                )
+
+            local = datetime.fromisoformat(f"{data}T{hora}:00").replace(
+                tzinfo=ZoneInfo("Europe/Lisbon")
+            )
+            iso_utc = local.astimezone(ZoneInfo("UTC")).isoformat()
+            await marcai_client.create_client_appointment(
+                tenant_id=tenant_id,
+                cliente_id=cliente_id,
+                data_hora_iso=iso_utc,
+                tipo="Sessao",
+                servico_nome=pkg1.get("pacoteNome"),
+                compra_pacote_id=str(pkg1.get("_id") or "") or None,
+                par={
+                    "servicoNome": pkg2.get("pacoteNome"),
+                    "compraPacoteId": str(pkg2.get("_id") or "") or None,
+                },
+            )
+            return (
+                f"OK — par marcado: {servico_primeira} as {hora} e "
+                f"{servico_segunda} logo a seguir (60 min depois), em {data}. "
+                "O sistema ja enviou as confirmacoes automaticas ao cliente; "
+                "a tua resposta NAO sera enviada. Responde apenas 'OK'."
+            )
+        except Exception as exc:
+            msg = str(exc)
+            limite = (
+                "max_pending" in msg
+                or "agendamento pendente" in msg.lower()
+                or "limite de marca" in msg.lower()
+            )
+            if limite:
+                return (
+                    "ERRO: o cliente ja atingiu o limite de marcacoes futuras. "
+                    "Verifica com get_my_appointments o que ja esta marcado "
+                    "antes de tentar de novo."
+                )
+            if "sessoes_insuficientes" in msg:
+                return (
+                    "ERRO: o pacote indicado nao tem sessoes suficientes para "
+                    "duas marcacoes. Confirma os pacotes com get_my_packages."
+                )
+            if "409" in msg or "slot_taken" in msg:
+                return (
+                    "ERRO: esse espaco ja foi ocupado. Chama get_pair_slots "
+                    "de novo e propoe outro inicio."
+                )
+            if "fora_disponibilidade" in msg or "400" in msg:
+                return (
+                    "ERRO: esse inicio nao comporta duas sessoes seguidas. "
+                    "Chama get_pair_slots e propoe um dos inicios devolvidos."
+                )
+            return f"ERRO ao marcar o par: {msg}. Diz ao cliente que vais passar a recepcao."
+
+    return create_client_appointment_pair
 
 
 def make_reschedule_appointment_tool(tenant_id: str, cliente_id: str):

@@ -146,7 +146,10 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
     }).select('dataHora').lean(),
   ]);
 
-  // Cada agendamento reserva a sessão + a arrumação a seguir.
+  // Cada agendamento reserva a sessão + a arrumação a seguir. As marcações
+  // REAIS duram sempre a sessão padrão (o Agendamento não persiste duração) —
+  // nunca a duração do candidato: um pedido de 120 min não pode inflar uma
+  // marcação vizinha de 60 min para 2h (review PR #100).
   const dur = Number(duration);
   const gap = Number(interval) || 0;
   const step = dur + gap;
@@ -154,7 +157,7 @@ export const resolveAvailableSlots = async ({ Schedule, ScheduleException, Agend
   const reserved = existingAgendamentos
     .map((ag) => {
       const start = timeToMinutes(DateTime.fromJSDate(ag.dataHora, { zone: 'Europe/Lisbon' }).toFormat('HH:mm'));
-      return { start, end: start + dur + gap };
+      return { start, end: start + SESSAO_PADRAO_MIN + gap };
     })
     .sort((a, b) => a.start - b.start);
 

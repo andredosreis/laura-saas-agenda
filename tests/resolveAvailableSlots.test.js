@@ -186,6 +186,22 @@ describe('resolveAvailableSlots — revival de horários cancelados pelo cliente
   });
 });
 
+describe('resolveAvailableSlots — duração do candidato não infla as marcações vivas', () => {
+  it('pedido de 120 min: marcação real de 60 min não bloqueia as 2h seguintes (review PR #100)', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    // Sem pausa (bStart=bEnd) nem intervalo — réplica do repro do review.
+    await seedWeek(tenantId, { start: '09:00', end: '18:00', bStart: '13:00', bEnd: '13:00' });
+    await seedBooking(tenantId, `${DATE}T10:00`); // sessão real de 60 min
+    const { Schedule, ScheduleException, Agendamento } = models(tenantId);
+    const { slots } = await resolveAvailableSlots({
+      Schedule, ScheduleException, Agendamento, tenantId, date: DATE, duration: 120, interval: 0,
+    });
+    // 11:00–13:00 está fisicamente livre: a reserva das 10:00 termina às
+    // 11:00 (sessão padrão), não às 12:00 (duração do candidato).
+    expect(slots).toContain('11:00');
+  });
+});
+
 describe('resolveAvailableSlots — pausa parcialmente sobreposta à janela', () => {
   it('pausa que ultrapassa o fecho continua a excluir os slots dentro da pausa', async () => {
     const tenantId = new mongoose.Types.ObjectId();
