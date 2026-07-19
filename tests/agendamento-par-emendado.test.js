@@ -52,10 +52,10 @@ async function seedCliente(tenantId, telefone) {
 
 async function seedCompra(tenantId, clienteId, nome, sessoesRestantes = 5) {
   const { Pacote, CompraPacote } = tenantModels(tenantId);
-  const pacote = await Pacote.create({ tenantId, nome, categoria: 'Estética', sessoes: 5, valor: 100 });
+  const pacote = await Pacote.create({ tenantId, nome, categoria: 'Estética', sessoes: 10, valor: 100 });
   return CompraPacote.create({
     tenantId, cliente: clienteId, pacote: pacote._id,
-    sessoesContratadas: 5, sessoesUsadas: 5 - sessoesRestantes, sessoesRestantes,
+    sessoesContratadas: 10, sessoesUsadas: 10 - sessoesRestantes, sessoesRestantes,
     valorTotal: 100, valorPendente: 100,
   });
 }
@@ -148,11 +148,50 @@ describe('par emendado — POST /api/internal/clientes/:id/agendamentos', () => 
     expect(await Agendamento.countDocuments({ tenantId: tenant._id })).toBe(1); // só o pré-existente
   });
 
-  it('par com 1 só pacote activo → 409 max_pending_reached', async () => {
-    const tenant = await criarTenant('par-1pacote');
+  it('par do MESMO pacote (≥2 sessões restantes) → 201, ambas ligadas à compra (caso Sílvia)', async () => {
+    const tenant = await criarTenant('par-mesmo-pacote');
     await seedWeek(tenant._id);
     const cliente = await seedCliente(tenant._id, '910000004');
-    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto');
+    const drenagem = await seedCompra(tenant._id, cliente._id, 'Pacote 10 sessões de drenagem', 8);
+
+    const res = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T13:00:00`,
+      compraPacoteId: String(drenagem._id),
+      par: { compraPacoteId: String(drenagem._id) },
+    });
+    expect(res.status).toBe(201);
+
+    const { Agendamento } = tenantModels(tenant._id);
+    const docs = await Agendamento.find({ tenantId: tenant._id }).lean();
+    expect(docs).toHaveLength(2);
+    expect(docs.every((d) => String(d.compraPacote) === String(drenagem._id))).toBe(true);
+  });
+
+  it('par persiste o tratamento de cada sessão nas observações (rosto vs corpo)', async () => {
+    const tenant = await criarTenant('par-tratamentos');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '910000011');
+    const dren = await seedCompra(tenant._id, cliente._id, 'Pacote 10 drenagem', 8);
+
+    const res = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T13:00:00`,
+      servicoNome: 'Drenagem de corpo',
+      compraPacoteId: String(dren._id),
+      par: { servicoNome: 'Drenagem de rosto', compraPacoteId: String(dren._id) },
+    });
+    expect(res.status).toBe(201);
+
+    const { Agendamento } = tenantModels(tenant._id);
+    const docs = await Agendamento.find({ tenantId: tenant._id }).sort({ dataHora: 1 }).lean();
+    expect(docs[0].observacoes).toContain('Drenagem de corpo');
+    expect(docs[1].observacoes).toContain('Drenagem de rosto');
+  });
+
+  it('par com 1 pacote de apenas 1 sessão → 409 max_pending_reached', async () => {
+    const tenant = await criarTenant('par-1sessao-so');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '910000010');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto', 1);
 
     const res = await post(cliente, tenant._id, {
       dataHoraISO: `${D}T13:00:00`,
@@ -216,11 +255,11 @@ describe('par emendado — POST /api/internal/clientes/:id/agendamentos', () => 
 });
 
 describe('Rule 3 dinâmica — limite de marcações futuras', () => {
-  it('1 pacote activo: 2ª marcação → 409 (comportamento actual mantido)', async () => {
+  it('1 pacote com apenas 1 sessão: 2ª marcação → 409', async () => {
     const tenant = await criarTenant('r3-um');
     await seedWeek(tenant._id);
     const cliente = await seedCliente(tenant._id, '920000001');
-    await seedCompra(tenant._id, cliente._id, 'Rosto');
+    await seedCompra(tenant._id, cliente._id, 'Rosto', 1);
 
     expect((await post(cliente, tenant._id, { dataHoraISO: `${D}T09:00:00` })).status).toBe(201);
     const segunda = await post(cliente, tenant._id, { dataHoraISO: `${D}T15:00:00` });
@@ -228,16 +267,50 @@ describe('Rule 3 dinâmica — limite de marcações futuras', () => {
     expect(segunda.body.code).toBe('max_pending_reached');
   });
 
-  it('2 pacotes activos: 2 marcações singulares → 201+201; 3ª → 409', async () => {
+  it('1 pacote com ≥2 sessões restantes: 2ª marcação (ligada) → 201; 3ª → 409', async () => {
+    const tenant = await criarTenant('r3-um-grande');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '920000004');
+    const dren = await seedCompra(tenant._id, cliente._id, 'Pacote 10 drenagem', 8);
+
+    expect((await post(cliente, tenant._id, { dataHoraISO: `${D}T09:00:00` })).status).toBe(201);
+    expect((await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T15:00:00`, compraPacoteId: String(dren._id),
+    })).status).toBe(201);
+    const terceira = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T17:00:00`, compraPacoteId: String(dren._id),
+    });
+    expect(terceira.status).toBe(409);
+    expect(terceira.body.code).toBe('max_pending_reached');
+  });
+
+  it('2ª marcação singular SEM pacote ligado → 400 requer_pacote', async () => {
+    const tenant = await criarTenant('r3-requer');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '920000005');
+    await seedCompra(tenant._id, cliente._id, 'Pacote 10 drenagem', 8);
+
+    expect((await post(cliente, tenant._id, { dataHoraISO: `${D}T09:00:00` })).status).toBe(201);
+    // O 2º lugar do limite existe por causa do pacote — usá-lo exige ligá-lo.
+    const segunda = await post(cliente, tenant._id, { dataHoraISO: `${D}T15:00:00` });
+    expect(segunda.status).toBe(400);
+    expect(segunda.body.code).toBe('requer_pacote');
+  });
+
+  it('2 pacotes activos: 2 marcações singulares (2ª ligada) → 201+201; 3ª → 409', async () => {
     const tenant = await criarTenant('r3-dois');
     await seedWeek(tenant._id);
     const cliente = await seedCliente(tenant._id, '920000002');
     await seedCompra(tenant._id, cliente._id, 'Rosto');
-    await seedCompra(tenant._id, cliente._id, 'Corpo');
+    const corpo = await seedCompra(tenant._id, cliente._id, 'Corpo');
 
     expect((await post(cliente, tenant._id, { dataHoraISO: `${D}T09:00:00` })).status).toBe(201);
-    expect((await post(cliente, tenant._id, { dataHoraISO: `${D}T15:00:00` })).status).toBe(201);
-    const terceira = await post(cliente, tenant._id, { dataHoraISO: `${D}T17:00:00` });
+    expect((await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T15:00:00`, compraPacoteId: String(corpo._id),
+    })).status).toBe(201);
+    const terceira = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T17:00:00`, compraPacoteId: String(corpo._id),
+    });
     expect(terceira.status).toBe(409);
     expect(terceira.body.code).toBe('max_pending_reached');
   });
