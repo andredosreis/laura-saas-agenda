@@ -84,6 +84,38 @@ async def test_pair_match_tolera_acentos_e_caixa(monkeypatch):
     assert calls["par"]["compraPacoteId"] == "cp2"
 
 
+async def test_pair_do_mesmo_pacote_usa_a_mesma_compra(monkeypatch):
+    # Caso Sílvia: um pacote de 10 sessoes cobre corpo E rosto — o par sai
+    # da mesma compra, passando o mesmo nome nos dois argumentos.
+    calls = {}
+
+    async def fake_packages(**kwargs):
+        return [
+            {"_id": "cp-dren", "pacoteNome": "Pacote 10 sessoes de drenagem", "sessoesRestantes": 8}
+        ]
+
+    async def fake_create(**kwargs):
+        calls.update(kwargs)
+        return {"par": True}
+
+    monkeypatch.setattr(marcai_client, "get_client_packages", fake_packages)
+    monkeypatch.setattr(marcai_client, "create_client_appointment", fake_create)
+
+    tool = make_create_client_appointment_pair_tool("t1", "c1")
+    result = await tool.ainvoke(
+        {
+            "data": "2026-08-04",
+            "hora": "10:00",
+            "servico_primeira": "Pacote 10 sessoes de drenagem",
+            "servico_segunda": "Pacote 10 sessoes de drenagem",
+        }
+    )
+
+    assert result.startswith("OK")
+    assert calls["compra_pacote_id"] == "cp-dren"
+    assert calls["par"]["compraPacoteId"] == "cp-dren"
+
+
 async def test_pair_pacote_em_falta_nao_marca(monkeypatch):
     async def fake_packages(**kwargs):
         return [PACOTES[0]]  # so tem o de rosto

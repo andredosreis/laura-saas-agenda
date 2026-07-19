@@ -193,11 +193,13 @@ router.post('/:id/agendamentos', async (req, res) => {
     // passarem ambos as contagens (review PR #100).
     unlockCliente = await acquireClienteLock(`${tenantId}:${clienteId}`);
 
-    // Rule 3 dinâmica: por defeito máx 1 agendamento pendente; com ≥2 pacotes
-    // activos com sessões disponíveis o limite sobe para 2 (ex.: pacote de
-    // rosto + pacote de corpo — decisão 2026-07-19). Um par conta como 2.
+    // Rule 3 dinâmica: por defeito máx 1 agendamento pendente; sobe para 2
+    // quando o cliente tem ≥2 pacotes activos (rosto + corpo — decisão
+    // 2026-07-19) OU um pacote com ≥2 sessões restantes (par do MESMO
+    // pacote, ex.: corpo e rosto do pacote de 10 de drenagem — caso Sílvia,
+    // decisão 2026-07-19). Um par conta como 2.
     const cancelledStatus = ['Cancelado Pelo Cliente', 'Cancelado Pelo Salão'];
-    const [pendingCount, pacotesAtivos] = await Promise.all([
+    const [pendingCount, pacotesAtivos, pacotesComDuasSessoes] = await Promise.all([
       models.Agendamento.countDocuments({
         tenantId,
         cliente: clienteId,
@@ -210,8 +212,14 @@ router.post('/:id/agendamentos', async (req, res) => {
         cliente: clienteId,
         ...compraElegivelFiltro(),
       }),
+      models.CompraPacote.countDocuments({
+        tenantId,
+        cliente: clienteId,
+        ...compraElegivelFiltro(),
+        sessoesRestantes: { $gt: 1 },
+      }),
     ]);
-    const maxPendentes = pacotesAtivos >= 2 ? 2 : 1;
+    const maxPendentes = (pacotesAtivos >= 2 || pacotesComDuasSessoes >= 1) ? 2 : 1;
     const aCriar = par ? 2 : 1;
     if (pendingCount + aCriar > maxPendentes) {
       return res.status(409).json({

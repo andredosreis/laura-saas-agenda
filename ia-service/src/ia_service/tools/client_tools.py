@@ -354,13 +354,17 @@ def make_create_client_appointment_pair_tool(tenant_id: str, cliente_id: str):
         Usa APENAS quando a cliente aceitou explicitamente um inicio proposto
         via get_pair_slots E tem pacotes activos para os dois tratamentos.
         A 1a sessao comeca em `hora`; a 2a comeca 60 minutos depois.
+        Se as duas sessoes saem do MESMO pacote (ex: corpo e rosto do pacote
+        de 10 de drenagem, com 2+ sessoes restantes), passa o mesmo nome nos
+        dois argumentos.
 
         Args:
             data: Data no formato YYYY-MM-DD (ex: '2026-08-04').
             hora: Hora da 1a sessao no formato HH:MM (ex: '10:00').
             servico_primeira: Nome do pacote da 1a sessao, EXACTAMENTE como
                 devolvido por get_my_packages (ex: 'Drenagem Rosto').
-            servico_segunda: Nome do pacote da 2a sessao (ex: 'Drenagem Corpo').
+            servico_segunda: Nome do pacote da 2a sessao (ex: 'Drenagem Corpo';
+                pode ser o mesmo da primeira).
         """
         from datetime import datetime
         from zoneinfo import ZoneInfo
