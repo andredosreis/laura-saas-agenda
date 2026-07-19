@@ -162,11 +162,11 @@ def test_pair_slots_usa_duracao_120(monkeypatch):
 # ─────────────── single: ligacao do compraPacote (gap antigo) ───────────────
 
 
-async def test_single_envia_compra_pacote_id(monkeypatch):
+def _hook_single(monkeypatch, packages):
     calls = {}
 
     async def fake_packages(**kwargs):
-        return PACOTES
+        return packages
 
     async def fake_create(**kwargs):
         calls.update(kwargs)
@@ -174,12 +174,46 @@ async def test_single_envia_compra_pacote_id(monkeypatch):
 
     monkeypatch.setattr(marcai_client, "get_client_packages", fake_packages)
     monkeypatch.setattr(marcai_client, "create_client_appointment", fake_create)
+    return calls
 
+
+async def test_single_com_servico_liga_o_pacote_certo(monkeypatch):
+    calls = _hook_single(monkeypatch, PACOTES)
+    tool = make_create_client_appointment_tool("t1", "c1")
+    result = await tool.ainvoke(
+        {"data": "2026-08-04", "hora": "10:00", "servico": "Drenagem Corpo"}
+    )
+    assert result.startswith("OK")
+    assert calls["compra_pacote_id"] == "cp-corpo"
+    assert calls["servico_nome"] == "Drenagem Corpo"
+
+
+async def test_single_com_varios_pacotes_sem_servico_nao_adivinha(monkeypatch):
+    # Review PR #100: ligar "o primeiro" descontava do pacote errado.
+    calls = _hook_single(monkeypatch, PACOTES)
     tool = make_create_client_appointment_tool("t1", "c1")
     result = await tool.ainvoke({"data": "2026-08-04", "hora": "10:00"})
+    assert result.startswith("OK")
+    assert calls["compra_pacote_id"] is None
+    assert calls["servico_nome"] is None
 
+
+async def test_single_com_um_so_pacote_liga_sem_servico(monkeypatch):
+    calls = _hook_single(monkeypatch, [PACOTES[0]])
+    tool = make_create_client_appointment_tool("t1", "c1")
+    result = await tool.ainvoke({"data": "2026-08-04", "hora": "10:00"})
     assert result.startswith("OK")
     assert calls["compra_pacote_id"] == "cp-rosto"
+
+
+async def test_single_com_servico_desconhecido_nao_marca(monkeypatch):
+    calls = _hook_single(monkeypatch, PACOTES)
+    tool = make_create_client_appointment_tool("t1", "c1")
+    result = await tool.ainvoke(
+        {"data": "2026-08-04", "hora": "10:00", "servico": "Massagem Inexistente"}
+    )
+    assert result.startswith("ERRO")
+    assert calls == {}  # nunca chegou a criar
 
 
 # ───────────────── orchestrator: supressao da resposta ─────────────────

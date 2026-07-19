@@ -134,7 +134,7 @@ def make_get_my_appointments_tool(tenant_id: str, cliente_id: str):
 def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
 
     @tool
-    async def create_client_appointment(data: str, hora: str) -> str:
+    async def create_client_appointment(data: str, hora: str, servico: str | None = None) -> str:
         """Marca uma sessao para a cliente.
 
         Chama esta tool APENAS quando a cliente aceita explicitamente
@@ -144,28 +144,44 @@ def make_create_client_appointment_tool(tenant_id: str, cliente_id: str):
         Args:
             data: Data no formato YYYY-MM-DD (ex: '2026-06-01').
             hora: Hora no formato HH:MM (ex: '11:00').
+            servico: Nome do pacote a usar, EXACTAMENTE como devolvido por
+                get_my_packages. OBRIGATORIO quando a cliente tem mais de um
+                pacote activo — sem ele a sessao nao fica ligada a pacote
+                nenhum e o consumo nao e descontado.
         """
         from datetime import datetime
         from zoneinfo import ZoneInfo
 
         try:
-            # Nome + id do pacote activo → o template de confirmacao mostra o
-            # servico real e o agendamento fica LIGADO ao CompraPacote (o
-            # consumo ao Realizado desconta do pacote certo). Best-effort:
-            # sem pacote resolvido, o backend usa o label por defeito.
-            servico_nome = None
-            compra_pacote_id = None
+            # Nome + id do pacote → o template de confirmacao mostra o servico
+            # real e o agendamento fica LIGADO ao CompraPacote (o consumo ao
+            # Realizado desconta do pacote certo). Com VARIOS pacotes activos
+            # a escolha nunca e adivinhada: ou vem em `servico`, ou a sessao
+            # fica sem ligacao (review PR #100 — ligar "o primeiro" descontava
+            # do pacote errado).
+            packages: list[dict] = []
             try:
                 packages = await marcai_client.get_client_packages(
                     tenant_id=tenant_id, cliente_id=cliente_id
                 )
-                for pkg in packages:
-                    if pkg.get("sessoesRestantes", 0) > 0:
-                        servico_nome = pkg.get("pacoteNome")
-                        compra_pacote_id = str(pkg.get("_id") or "") or None
-                        break
             except Exception:
                 pass
+
+            servico_nome = None
+            compra_pacote_id = None
+            com_sessoes = [p for p in packages if p.get("sessoesRestantes", 0) > 0]
+            if servico:
+                pkg = _match_pacote(packages, servico)
+                if not pkg:
+                    return (
+                        f"ERRO: nao encontrei o pacote activo '{servico}'. "
+                        "Chama get_my_packages e usa o nome EXACTO do pacote."
+                    )
+                servico_nome = pkg.get("pacoteNome")
+                compra_pacote_id = str(pkg.get("_id") or "") or None
+            elif len(com_sessoes) == 1:
+                servico_nome = com_sessoes[0].get("pacoteNome")
+                compra_pacote_id = str(com_sessoes[0].get("_id") or "") or None
 
             local = datetime.fromisoformat(f"{data}T{hora}:00").replace(
                 tzinfo=ZoneInfo("Europe/Lisbon")

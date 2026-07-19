@@ -95,14 +95,33 @@ describe('par emendado — POST /api/internal/clientes/:id/agendamentos', () => 
     expect(docs.every((d) => d.servicoTipo === 'pacote' && d.criadoPorIA)).toBe(true);
   });
 
+  it('par sem os dois compraPacoteId → 400 par_sem_pacote (nunca cria sessões sem ligação)', async () => {
+    const tenant = await criarTenant('par-sem-ids');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '910000008');
+    await seedCompra(tenant._id, cliente._id, 'Rosto');
+    await seedCompra(tenant._id, cliente._id, 'Corpo');
+
+    const res = await post(cliente, tenant._id, { dataHoraISO: `${D}T13:00:00`, par: {} });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('par_sem_pacote');
+
+    const { Agendamento } = tenantModels(tenant._id);
+    expect(await Agendamento.countDocuments({ tenantId: tenant._id })).toBe(0);
+  });
+
   it('par que atravessa a pausa (11:00–13:00) → 400 fora_disponibilidade', async () => {
     const tenant = await criarTenant('par-pausa');
     await seedWeek(tenant._id);
     const cliente = await seedCliente(tenant._id, '910000002');
-    await seedCompra(tenant._id, cliente._id, 'Rosto');
-    await seedCompra(tenant._id, cliente._id, 'Corpo');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto');
+    const corpo = await seedCompra(tenant._id, cliente._id, 'Corpo');
 
-    const res = await post(cliente, tenant._id, { dataHoraISO: `${D}T11:00:00`, par: {} });
+    const res = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T11:00:00`,
+      compraPacoteId: String(rosto._id),
+      par: { compraPacoteId: String(corpo._id) },
+    });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('fora_disponibilidade');
 
@@ -114,12 +133,16 @@ describe('par emendado — POST /api/internal/clientes/:id/agendamentos', () => 
     const tenant = await criarTenant('par-conflito');
     await seedWeek(tenant._id);
     const cliente = await seedCliente(tenant._id, '910000003');
-    await seedCompra(tenant._id, cliente._id, 'Rosto');
-    await seedCompra(tenant._id, cliente._id, 'Corpo');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto');
+    const corpo = await seedCompra(tenant._id, cliente._id, 'Corpo');
     const { Agendamento } = tenantModels(tenant._id);
     await Agendamento.create({ tenantId: tenant._id, dataHora: lisboa(`${D}T14:00:00`), status: 'Agendado' });
 
-    const res = await post(cliente, tenant._id, { dataHoraISO: `${D}T13:00:00`, par: {} });
+    const res = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T13:00:00`,
+      compraPacoteId: String(rosto._id),
+      par: { compraPacoteId: String(corpo._id) },
+    });
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('slot_taken');
     expect(await Agendamento.countDocuments({ tenantId: tenant._id })).toBe(1); // só o pré-existente
@@ -129,11 +152,35 @@ describe('par emendado — POST /api/internal/clientes/:id/agendamentos', () => 
     const tenant = await criarTenant('par-1pacote');
     await seedWeek(tenant._id);
     const cliente = await seedCliente(tenant._id, '910000004');
-    await seedCompra(tenant._id, cliente._id, 'Rosto');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto');
 
-    const res = await post(cliente, tenant._id, { dataHoraISO: `${D}T13:00:00`, par: {} });
+    const res = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T13:00:00`,
+      compraPacoteId: String(rosto._id),
+      par: { compraPacoteId: String(rosto._id) },
+    });
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('max_pending_reached');
+  });
+
+  it('dois pares concorrentes do mesmo cliente → apenas um passa (lock por cliente)', async () => {
+    const tenant = await criarTenant('par-corrida');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '910000009');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto');
+    const corpo = await seedCompra(tenant._id, cliente._id, 'Corpo');
+
+    const par = (hora) => post(cliente, tenant._id, {
+      dataHoraISO: `${D}T${hora}:00`,
+      compraPacoteId: String(rosto._id),
+      par: { compraPacoteId: String(corpo._id) },
+    });
+    const [a, b] = await Promise.all([par('09:00'), par('13:00')]);
+
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const { Agendamento } = tenantModels(tenant._id);
+    expect(await Agendamento.countDocuments({ tenantId: tenant._id })).toBe(2);
   });
 
   it('par com o MESMO pacote e só 1 sessão restante → 400 sessoes_insuficientes', async () => {
@@ -211,5 +258,54 @@ describe('Rule 3 dinâmica — limite de marcações futuras', () => {
     const doc = await Agendamento.findOne({ tenantId: tenant._id }).lean();
     expect(String(doc.compraPacote)).toBe(String(rosto._id));
     expect(doc.servicoTipo).toBe('pacote');
+  });
+});
+
+describe('capacidade do pacote e expiração', () => {
+  it('marcações futuras reservam sessões: 2ª ligação à compra com 1 sessão → 400', async () => {
+    const tenant = await criarTenant('cap-reserva');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '930000001');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto', 1); // 1 sessão restante
+    await seedCompra(tenant._id, cliente._id, 'Corpo'); // 2º pacote → maxPendentes=2
+
+    const primeira = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T09:00:00`,
+      compraPacoteId: String(rosto._id),
+    });
+    expect(primeira.status).toBe(201);
+
+    // A sessão restante já está "reservada" pela marcação futura.
+    const segunda = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T15:00:00`,
+      compraPacoteId: String(rosto._id),
+    });
+    expect(segunda.status).toBe(400);
+    expect(segunda.body.code).toBe('sessoes_insuficientes');
+  });
+
+  it('compra expirada com status ainda Ativo (stale) não é elegível → 404', async () => {
+    const tenant = await criarTenant('cap-expirada');
+    await seedWeek(tenant._id);
+    const cliente = await seedCliente(tenant._id, '930000002');
+    const rosto = await seedCompra(tenant._id, cliente._id, 'Rosto');
+    // Simula a expiração "natural" (sem save): update raw deixa status 'Ativo'.
+    const { CompraPacote } = tenantModels(tenant._id);
+    await CompraPacote.collection.updateOne(
+      { _id: rosto._id },
+      { $set: { dataExpiracao: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+    );
+
+    const res = await post(cliente, tenant._id, {
+      dataHoraISO: `${D}T09:00:00`,
+      compraPacoteId: String(rosto._id),
+    });
+    expect(res.status).toBe(404);
+
+    // E também não conta para o limite dinâmico (pacotesAtivos=0 → máx 1).
+    const semId = await post(cliente, tenant._id, { dataHoraISO: `${D}T09:00:00` });
+    expect(semId.status).toBe(201);
+    const segunda = await post(cliente, tenant._id, { dataHoraISO: `${D}T15:00:00` });
+    expect(segunda.status).toBe(409);
   });
 });

@@ -94,6 +94,41 @@ describe('lembreteObsoleto — auto-validação na hora de disparar', () => {
   });
 });
 
+describe('scheduleNotifications — incluirLembretes/incluirFollowUp (par emendado, PR #100)', () => {
+  beforeEach(() => {
+    addCalls.length = 0;
+    removeCalls.length = 0;
+    jest.clearAllMocks();
+  });
+
+  const base = (agId) => ({
+    agendamentoId: agId,
+    tenantId: 't1',
+    dataHora: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    clienteNome: 'Cliente X',
+    clienteTelefone: '351900000000',
+    servicoNome: 'Sessão',
+  });
+
+  it('incluirFollowUp:false (1ª sessão do par) → sem follow-up; lembretes mantidos', async () => {
+    await scheduleNotifications({ ...base('6a33bfa02d990b533792e001'), incluirFollowUp: false });
+    const tipos = addCalls.map((c) => c.name);
+    expect(tipos).toContain('confirmacao');
+    expect(tipos).toContain('lembrete-antecipado');
+    expect(tipos).toContain('lembrete-1h');
+    expect(tipos).not.toContain('follow-up-pos-sessao');
+  });
+
+  it('incluirLembretes:false (2ª sessão do par) → só confirmação + follow-up', async () => {
+    await scheduleNotifications({ ...base('6a33bfa02d990b533792e002'), incluirLembretes: false });
+    const tipos = addCalls.map((c) => c.name);
+    expect(tipos).toContain('confirmacao');
+    expect(tipos).toContain('follow-up-pos-sessao');
+    expect(tipos).not.toContain('lembrete-antecipado');
+    expect(tipos).not.toContain('lembrete-1h');
+  });
+});
+
 describe('scheduleNotifications — jobIds determinísticos + remoção dos antigos', () => {
   beforeEach(() => {
     addCalls.length = 0;

@@ -272,6 +272,10 @@ ja e conhecida. Foco: atendimento rapido e eficiente.
 
 2. **Tipo de sessao**: Se tem pacote activo, assume o servico do pacote
    (ex: "Drenagem Linfatica"). Se nao tem pacote, marca generico "Sessao".
+   Se a cliente tem MAIS de um pacote activo, passa SEMPRE `servico` ao
+   `create_client_appointment` com o nome exacto do pacote do tratamento
+   pedido (confirma com `get_my_packages`) — senao a sessao nao desconta
+   de pacote nenhum.
 
 3. **Limite de marcacoes**: Por defeito, maximo 1 agendamento pendente por
    vez. EXCEPCAO: se a cliente tem DOIS pacotes activos com sessoes (ex:

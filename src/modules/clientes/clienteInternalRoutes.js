@@ -38,6 +38,35 @@ const router = express.Router();
 
 router.use(requireServiceToken);
 
+// Serialização por tenant+cliente (review PR #100): o limite dinâmico de
+// marcações e a reserva de capacidade do pacote são check-then-act — dois
+// pedidos concorrentes do mesmo cliente podiam ambos passar as contagens.
+// Produção corre UMA instância do backend (container marcai-backend), por
+// isso um mutex in-process fecha a corrida; multi-instância exigiria um
+// lock distribuído (Redis) — decisão a tomar nesse dia, não agora.
+const clienteLocks = new Map();
+function acquireClienteLock(key) {
+  const prev = clienteLocks.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const tail = prev.then(() => gate).then(() => {
+    if (clienteLocks.get(key) === tail) clienteLocks.delete(key);
+  });
+  clienteLocks.set(key, tail);
+  // Resolve para a função de release assim que o pedido anterior terminar.
+  return prev.then(() => release);
+}
+
+// Compra elegível para novas marcações: activa, com sessões e não expirada.
+// O status 'Expirado' só se materializa num save do documento — uma compra
+// cuja data passou "naturalmente" pode continuar 'Ativo' na BD, e o
+// usarSessao rejeitá-la-ia ao Realizado (review PR #100).
+const compraElegivelFiltro = () => ({
+  status: 'Ativo',
+  sessoesRestantes: { $gt: 0 },
+  $or: [{ dataExpiracao: null }, { dataExpiracao: { $gt: new Date() } }],
+});
+
 async function resolveTenantContext(tenantId) {
   if (!tenantId || !mongoose.Types.ObjectId.isValid(String(tenantId))) {
     const err = new Error('tenantId inválido');
@@ -112,6 +141,7 @@ router.get('/:id/agendamentos', async (req, res) => {
 // sessão emendada (+60 min, sem arrumação entre elas) — ex.: rosto + corpo.
 // =====================================================================
 router.post('/:id/agendamentos', async (req, res) => {
+  let unlockCliente = null;
   try {
     const clienteId = req.params.id;
     const { tenantId, dataHoraISO, tipo, servicoNome, compraPacoteId, par } = req.body || {};
@@ -128,6 +158,16 @@ router.post('/:id/agendamentos', async (req, res) => {
     // Shape: { servicoNome?, compraPacoteId? }
     if (par !== undefined && (typeof par !== 'object' || par === null || Array.isArray(par))) {
       return res.status(400).json({ success: false, error: 'par inválido' });
+    }
+    // O par existe para consumo correcto por pacote — sem os dois IDs, as
+    // sessões ficariam sem ligação e o Realizado não descontaria nada
+    // (review PR #100). A tool da IA envia sempre ambos.
+    if (par && (!compraPacoteId || !par.compraPacoteId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Par requer compraPacoteId da 1ª sessão e de par.compraPacoteId',
+        code: 'par_sem_pacote',
+      });
     }
 
     const dataHoraDT = DateTime.fromISO(dataHoraISO, { zone: 'Europe/Lisbon' });
@@ -148,6 +188,11 @@ router.post('/:id/agendamentos', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
     }
 
+    // A partir daqui é check-then-act (limites + capacidade do pacote):
+    // serializa por tenant+cliente para dois pedidos concorrentes não
+    // passarem ambos as contagens (review PR #100).
+    unlockCliente = await acquireClienteLock(`${tenantId}:${clienteId}`);
+
     // Rule 3 dinâmica: por defeito máx 1 agendamento pendente; com ≥2 pacotes
     // activos com sessões disponíveis o limite sobe para 2 (ex.: pacote de
     // rosto + pacote de corpo — decisão 2026-07-19). Um par conta como 2.
@@ -163,8 +208,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       models.CompraPacote.countDocuments({
         tenantId,
         cliente: clienteId,
-        status: 'Ativo',
-        sessoesRestantes: { $gt: 0 },
+        ...compraElegivelFiltro(),
       }),
     ]);
     const maxPendentes = pacotesAtivos >= 2 ? 2 : 1;
@@ -177,9 +221,12 @@ router.post('/:id/agendamentos', async (req, res) => {
       });
     }
 
-    // Ligação ao pacote (opcional): valida que a compra pertence ao cliente e
-    // tenant, está activa e tem sessões — o consumo ao Realizado usa
-    // exactamente esta compra (updateStatusAgendamento → usarSessao).
+    // Ligação ao pacote (opcional no single, obrigatória no par): valida que
+    // a compra pertence ao cliente e tenant, está activa, tem sessões e não
+    // expirou — o consumo ao Realizado usa exactamente esta compra
+    // (updateStatusAgendamento → usarSessao). `ligados` conta os agendamentos
+    // futuros já apontados à mesma compra: cada marcação futura reserva uma
+    // sessão, senão duas marcações esgotariam um pacote com 1 sessão restante.
     const resolverCompra = async (id) => {
       if (id === undefined || id === null) return null;
       if (!mongoose.Types.ObjectId.isValid(String(id))) {
@@ -191,26 +238,43 @@ router.post('/:id/agendamentos', async (req, res) => {
         _id: id,
         tenantId,
         cliente: clienteId,
-        status: 'Ativo',
-        sessoesRestantes: { $gt: 0 },
+        ...compraElegivelFiltro(),
       }).select('_id sessoesRestantes').lean();
       if (!compra) {
         const err = new Error('Pacote não encontrado');
         err.statusCode = 404;
         throw err;
       }
+      compra.ligados = await models.Agendamento.countDocuments({
+        tenantId,
+        cliente: clienteId,
+        compraPacote: compra._id,
+        status: { $nin: cancelledStatus },
+        'confirmacao.tipo': { $ne: 'rejeitado' },
+        dataHora: { $gte: DateTime.now().setZone('Europe/Lisbon').toJSDate() },
+      });
       return compra;
     };
     const compra1 = await resolverCompra(compraPacoteId);
     const compra2 = par ? await resolverCompra(par.compraPacoteId) : null;
-    if (compra1 && compra2
-      && String(compra1._id) === String(compra2._id)
-      && compra1.sessoesRestantes < 2) {
-      return res.status(400).json({
-        success: false,
-        error: 'O pacote só tem uma sessão disponível',
-        code: 'sessoes_insuficientes',
-      });
+
+    // Capacidade: sessões restantes ≥ marcações futuras já ligadas + as deste
+    // pedido (1 ou 2 quando o par usa a mesma compra).
+    const usosPorCompra = new Map();
+    for (const compra of [compra1, compra2].filter(Boolean)) {
+      const key = String(compra._id);
+      const entrada = usosPorCompra.get(key) || { compra, usos: 0 };
+      entrada.usos += 1;
+      usosPorCompra.set(key, entrada);
+    }
+    for (const { compra, usos } of usosPorCompra.values()) {
+      if (compra.sessoesRestantes < compra.ligados + usos) {
+        return res.status(400).json({
+          success: false,
+          error: 'O pacote não tem sessões disponíveis suficientes para esta marcação',
+          code: 'sessoes_insuficientes',
+        });
+      }
     }
 
     const gapMin = 60 + (tenant?.configuracoes?.intervaloEntreSessoes || 0);
@@ -316,7 +380,7 @@ router.post('/:id/agendamentos', async (req, res) => {
       ? nome.trim().slice(0, 120)
       : fallback;
     const fallbackLabel = tipo === 'Avaliacao' ? 'Avaliação' : 'Sessão';
-    const notificar = (doc, label) => scheduleNotifications({
+    const notificar = (doc, label, opts = {}) => scheduleNotifications({
       agendamentoId: doc._id,
       tenantId,
       dataHora: doc.dataHora,
@@ -324,10 +388,15 @@ router.post('/:id/agendamentos', async (req, res) => {
       clienteTelefone: cliente.telefone,
       servicoNome: label,
       duracaoSessaoMin: tenant?.configuracoes?.duracaoSessaoPadrao || 60,
+      ...opts,
     }).catch((e) => logger.warn({ err: e.message }, '[ia-client-appointment] scheduleNotifications falhou'));
-    notificar(agendamento, labelDe(servicoNome, fallbackLabel));
+    // No par: a 1ª sessão não agenda follow-up (a visita só acaba no fim da
+    // 2ª) e a 2ª não agenda lembretes (o de 1h dispararia durante a 1ª,
+    // com a cliente já no salão). Confirmação sai para as duas.
+    notificar(agendamento, labelDe(servicoNome, fallbackLabel),
+      agendamentoPar ? { incluirFollowUp: false } : {});
     if (agendamentoPar) {
-      notificar(agendamentoPar, labelDe(par?.servicoNome, fallbackLabel));
+      notificar(agendamentoPar, labelDe(par?.servicoNome, fallbackLabel), { incluirLembretes: false });
     }
 
     res.status(201).json({
@@ -347,6 +416,8 @@ router.post('/:id/agendamentos', async (req, res) => {
     }
     logger.error({ err: err.message, stack: err.stack }, '[internal] POST /clientes/:id/agendamentos');
     res.status(500).json({ success: false, error: 'Erro interno' });
+  } finally {
+    if (unlockCliente) unlockCliente();
   }
 });
 
@@ -929,10 +1000,15 @@ router.get('/:id/pacotes', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Cliente não encontrado' });
     }
 
+    // Uma compra expirada cujo status ficou 'Ativo' na BD não pode ser
+    // oferecida/resolvida pela IA (mesma regra das marcações). Pacotes
+    // esgotados (0 sessões) continuam listados — o agente usa-os para
+    // responder "já usou as sessões do seu pacote".
     const pacotes = await models.CompraPacote.find({
       tenantId,
       cliente: clienteId,
       status: 'Ativo',
+      $or: [{ dataExpiracao: null }, { dataExpiracao: { $gt: new Date() } }],
     })
       .populate('pacote', 'nome')
       .select('pacote sessoesContratadas sessoesUsadas sessoesRestantes dataExpiracao status')
