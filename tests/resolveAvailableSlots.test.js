@@ -82,12 +82,18 @@ describe('resolveAvailableSlots — intervalo de arrumação', () => {
 });
 
 describe('resolveAvailableSlots — revival de horários cancelados pelo cliente', () => {
-  async function seedCancelled(tenantId, isoLocal, status = 'Cancelado Pelo Cliente') {
+  async function seedCancelled(tenantId, isoLocal, {
+    status = 'Cancelado Pelo Cliente',
+    confirmacao = { tipo: 'rejeitado', respondidoPor: 'cliente' },
+    encaixe = undefined,
+  } = {}) {
     const { Agendamento } = models(tenantId);
     await Agendamento.create({
       tenantId,
       dataHora: DateTime.fromISO(isoLocal, { zone: 'Europe/Lisbon' }).toJSDate(),
       status,
+      confirmacao,
+      ...(encaixe ? { encaixe } : {}),
     });
   }
 
@@ -104,12 +110,50 @@ describe('resolveAvailableSlots — revival de horários cancelados pelo cliente
     expect(slots).toEqual([...slots].sort());
   });
 
-  it('cancelado pelo salão NÃO revive', async () => {
+  it('cancelado pelo salão NÃO revive (estado real do controller: rejeitado + respondidoPor laura)', async () => {
     const tenantId = new mongoose.Types.ObjectId();
     await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
     await seedBooking(tenantId, `${DATE}T10:00`);
-    await seedCancelled(tenantId, `${DATE}T11:30`, 'Cancelado Pelo Salão');
+    // getConfirmacaoPatchForStatus grava rejeitado também no cancelamento
+    // pelo salão — o revival não pode confundir o actor.
+    await seedCancelled(tenantId, `${DATE}T11:30`, {
+      status: 'Cancelado Pelo Salão',
+      confirmacao: { tipo: 'rejeitado', respondidoPor: 'laura' },
+    });
     const { slots } = await call(tenantId, 15);
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('cancelado pelo salão com rejeição prévia do cliente TAMBÉM não revive', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedCancelled(tenantId, `${DATE}T11:30`, {
+      status: 'Cancelado Pelo Salão',
+      confirmacao: { tipo: 'rejeitado', respondidoPor: 'cliente' },
+    });
+    const { slots } = await call(tenantId, 15);
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('encaixe forçado por admin NÃO revive ao ser cancelado', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedCancelled(tenantId, `${DATE}T11:30`, { encaixe: { forcado: true } });
+    const { slots } = await call(tenantId, 15);
+    // Excepção administrativa pontual não vira disponibilidade pública.
+    expect(slots).not.toContain('11:30');
+  });
+
+  it('pedido mais longo que a sessão padrão NÃO herda o horário cancelado', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    await seedWeek(tenantId, { start: '09:00', end: '20:00', bStart: '12:00', bEnd: '13:00' });
+    await seedCancelled(tenantId, `${DATE}T11:30`); // marcação original: sessão de 60 min
+    const { Schedule, ScheduleException, Agendamento } = models(tenantId);
+    const { slots } = await resolveAvailableSlots({
+      Schedule, ScheduleException, Agendamento, tenantId, date: DATE, duration: 120, interval: 15,
+    });
+    // 120 min às 11:30 atravessariam a pausa inteira — legitimidade herdada
+    // limita-se ao span da sessão padrão.
     expect(slots).not.toContain('11:30');
   });
 
