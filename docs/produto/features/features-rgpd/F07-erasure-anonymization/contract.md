@@ -1,23 +1,32 @@
 # F07 — Data Subject Erasure & Anonymization · Contract (GWT)
 
-## C1 — Erasure request (grace path) writes a withdrawal entry and marks the client
+> Consolidated 2026-07-20 with [../RECONCILIATION.md](../RECONCILIATION.md) R5/R7/R9 — the previous contract predated the multi-collection erasure scope and still logged the request as a `politica_privacidade` withdrawal. **Terminology (R9):** the operation is legally *pseudonymization*; code identifiers keep their names.
+
+## C1 — Erasure request (grace path) opens a PedidoTitular, withdraws dados_saude and marks the client
 - **GIVEN** an authenticated `admin` and a valid client in the tenant
 - **WHEN** `POST /api/v1/gdpr/clientes/:id/apagar` with no body (or `{ "confirmar": false }`)
 - **THEN** it returns 200 with `pendingDeletion: true` and `deletionRequestedAt` set
-- **AND** exactly one `ConsentLog` entry with `accao: 'withdrawn'` is appended for that client
+- **AND** exactly one `PedidoTitular` exists — `tipo: 'apagamento'`, `estado: 'recebido'`, `prazoLimite ≈ request + 1 month` (Art. 12(3))
+- **AND** exactly one `ConsentLog` entry is appended — `tipo: 'dados_saude'`, `accao: 'withdrawn'`, `actor: 'funcionario'`, `evidencia` referencing the pedido — so the F01 `estadoAtual` yields `withdrawn` (the R4 clinical gate closes during grace)
 - **AND** the client is **not** yet anonymized (`anonimizado: false`).
 
-## C2 — Immediate anonymization on explicit confirmation
+## C2 — Immediate pseudonymization on explicit confirmation
 - **GIVEN** an authenticated `admin` and a valid client in the tenant
 - **WHEN** `POST /api/v1/gdpr/clientes/:id/apagar` with `{ "confirmar": true }`
 - **THEN** it returns 200 with `anonimizado: true`
-- **AND** a `ConsentLog (withdrawn)` entry is appended
+- **AND** the `PedidoTitular (apagamento)` is `estado: 'concluido'` and the `ConsentLog (dados_saude, withdrawn)` entry is appended
 - **AND** erasure completes without any F08 job running.
 
-## C3 — Anonymization clears PII and clinical fields
+## C3 — Pseudonymization clears PII and clinical fields
 - **GIVEN** a client with name, phone, email, birth date and anamnesis fields populated
 - **WHEN** anonymization runs (via `confirmar: true` or `anonimizarCliente`)
-- **THEN** `nome` becomes `'[anonimizado]'`, `telefone` becomes `'ANON-<clienteId>'`, `email` is `null`, `dataNascimento` is `null`, every anamnese/clinical field is empty/false, and `anonimizado` is `true`.
+- **THEN** `nome` becomes `'[anonimizado]'`, `telefone` becomes `'ANON-<clienteId>'`, `email` is `null`, `dataNascimento` is `null`, every anamnese/clinical field is empty/false, `historicoMensagens` is cleared, and `anonimizado` is `true`.
+
+## C3b — Erasure covers the R5/R9 universe
+- **GIVEN** a client with a `Conversa`+`Mensagem` thread (their telefone), a pre-conversion `Lead` (same telefone), a `HistoricoAtendimento`, an `Agendamento` with `observacoes` and another with embedded `leadData`, and `Transacao`/`Pagamento` docs with `observacoes`
+- **WHEN** `anonimizarCliente` runs
+- **THEN** the `Conversa`/`Mensagem` docs are **hard-deleted**; the `Lead` is anonymized in place (`ANON-<leadId>` telefone, null email); `HistoricoAtendimento` free-text/clinical fields are empty while the skeleton (datas, `servico`, `satisfacaoCliente`, `status`) remains; `Agendamento.observacoes` is empty and `leadData` is anonymized while `dataHora`/`status`/refs remain; `Transacao.observacoes`/`Pagamento.observacoes` are empty while `descricao`, amounts, dates and references remain
+- **AND** another client's conversa/lead/histórico in the same tenant is untouched.
 
 ## C4 — Fiscal records preserved (de-identified), never hard-deleted
 - **GIVEN** a client with `Transacao` and `Pagamento` records
@@ -39,7 +48,12 @@
 ## C7 — ObjectId and existence validation
 - **GIVEN** an invalid `:id`, or a `clienteId` that does not exist in the caller's tenant
 - **WHEN** `POST /api/v1/gdpr/clientes/:id/apagar`
-- **THEN** invalid id → 400, unknown client → 404, and no `ConsentLog` entry and no anonymization occur.
+- **THEN** invalid id → 400, unknown client → 404, and no `PedidoTitular`, no `ConsentLog` entry and no anonymization occur.
+
+## C7b — Idempotent re-request
+- **GIVEN** a client already `anonimizado`
+- **WHEN** `POST /api/v1/gdpr/clientes/:id/apagar` again
+- **THEN** it returns 200 with the current state and appends no second `PedidoTitular`/`ConsentLog` and re-scrubs nothing.
 
 ## C8 — Admin-only role gate
 - **GIVEN** a `recepcionista`, `gerente` or `terapeuta` token
@@ -53,7 +67,7 @@
 - **THEN** it returns 404 (never 403), Tenant A's client is never modified, and no entry is written.
 
 ## Prerequisites (the evaluator must ensure these exist)
-- **F01 implemented**: `gdpr` module mounted, `ConsentLog` model + `ConsentLog.record()` available in the tenant registry.
-- `mongodb-memory-server` test environment (no replica set / transactions needed for F07).
-- A seeded `Cliente` (with anamnesis fields) plus `Transacao`/`Pagamento` records in the acting tenant; JWT/auth test helper for roles (`admin`, `gerente`, `recepcionista`, `terapeuta`).
+- **F01 implemented (v2, R7)**: `gdpr` module mounted, `ConsentLog` v2 (`actor`/`evidencia`/`textoHash`) + `record()` and the `estadoAtual` helper available in the tenant registry.
+- `mongodb-memory-server` test environment (no replica set / transactions needed for F07 — every erasure step is idempotent by design).
+- A seeded `Cliente` (with anamnesis fields) plus the full R5/R9 universe in the acting tenant: `Transacao`/`Pagamento` (with `observacoes`), `Conversa`+`Mensagem` (client's telefone), a `Lead` with the same telefone, a `HistoricoAtendimento`, and `Agendamento` docs (one with `observacoes`, one with embedded `leadData`); JWT/auth test helper for roles (`admin`, `gerente`, `recepcionista`, `terapeuta`).
 - External services (email/OpenAI/Evolution) mocked per `.claude/rules/testing.md`.

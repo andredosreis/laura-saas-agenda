@@ -9,7 +9,7 @@
 ## 1. Scope
 
 > **🔗 Reconciliation ([../RECONCILIATION.md](../RECONCILIATION.md), R1+R2+R4) — authoritative over any conflicting text below:**
-> - **R1 (now in scope):** minimization also covers the **direct DB reader** `ia-service/src/ia_service/services/mongo_reader.py` — its `Cliente` projection must exclude the entire clinical/anamnesis block (same list as the HTTP path). The AI never needs clinical data.
+> - **R1 (now in scope; pointer corrected 2026-07-19):** minimization also covers the **direct DB read** of `clientes` in `ia-service` — it lives in `services/client_orchestrator.py` (~line 287), NOT in `mongo_reader.py` (which has no `Cliente` read). Its projection (today `{_id, observacoes}`) must stay free of the entire clinical/anamnesis block (same list as the HTTP path), with a regression assertion in the ia-service test suite. The AI never needs clinical data.
 > - **R2:** base reads `GET /clientes` and `GET /clientes/:id` strip clinical fields for **ALL** roles. The **single** clinical-read endpoint is `GET /clientes/:id/clinico` (this feature) — permitted roles only (`recepcionista` → 403), writes `AcessoClinicoLog`, and returns `consentimentoSaude` via the F01 helper. **F03 consumes this** (no separate clinical fetch). §4/§5 below predate R2 where they describe clinical fields on the base detail read — follow R2.
 > - **R4:** when the F01 helper yields `dados_saude = withdrawn`, `GET /clientes/:id/clinico` **omits the clinical fields for every role** and returns only the consent state (+ date); panel writes to anamnese fields are blocked while withdrawn. `pendente` does **not** block (legacy data stays visible to permitted roles).
 
@@ -26,7 +26,7 @@
 
 **Deferred (other features):** the Clinical tab UI, sensitivity badge and consent-status indicator (F03); writing anamnesis via self-service form (F04); export/erasure of clinical data (F06/F07). F02 is only the access gate + read audit + AI minimization.
 
-**Explicitly out of scope (per PRD §7):** per-assigned-therapist restriction — access is **role-based**, not per-therapist. ~~Direct Mongo reads by the `ia-service` `mongo_reader` are outside this feature~~ — **superseded by R1**: the `mongo_reader.py` `Cliente` projection is IN scope for F02 (exclude the clinical block there too).
+**Explicitly out of scope (per PRD §7):** per-assigned-therapist restriction — access is **role-based**, not per-therapist. ~~Direct Mongo reads by the `ia-service` are outside this feature~~ — **superseded by R1 (pointer corrected 2026-07-19)**: the direct `db.clientes` read in `ia-service` (`services/client_orchestrator.py` ~line 287; `mongo_reader.py` has none) IS in F02's scope — keep the projection clinical-free + regression assertion.
 
 ---
 
@@ -37,13 +37,15 @@
 | `src/models/AcessoClinicoLog.js` | new | Mongoose schema (append-only) + `statics.record()` + indexes (incl. TTL); exports `AcessoClinicoLogSchema` (for registry) + default model |
 | `src/models/registry.js` | edit | register `AcessoClinicoLog: db.model('AcessoClinicoLog', AcessoClinicoLogSchema)` in `getModels` |
 | `src/modules/clientes/clinicalFields.js` | new | `CLINICAL_FIELDS` (the anamnese block), `CLINICAL_ROLES`, `podeLerClinico(role)`, `stripClinicalFields(doc)` — single source of truth |
-| `src/modules/clientes/clienteController.js` | edit | `getCliente`: return clinical only to permitted roles + write one `AcessoClinicoLog` entry; `getAllClientes`: strip clinical (list minimization) |
+| `src/modules/clientes/clienteController.js` | edit | `getCliente`/`getAllClientes`: strip clinical fields for **ALL** roles (R2 — base reads never serve clinical, no audit); new `getClienteClinico`: the single clinical read (role gate → 403, `consentimentoSaude` via the F01 helper, R4 withdrawn handling, one `AcessoClinicoLog` per read) |
+| `src/modules/clientes/clienteRoutes.js` | edit | add `GET /:id/clinico` (authenticate + permitted roles; `recepcionista` → 403) |
+| `ia-service/src/ia_service/services/client_orchestrator.py` | verify + test | R1: the direct `db.clientes` read (~line 287) keeps a clinical-free projection (`{_id, observacoes}` today); add a regression assertion in the ia-service pytest suite |
 | `src/modules/clientes/clienteInternalRoutes.js` | edit | confirm/lock down projections so no clinical field can leak toward `ia-service`; route every cliente-returning response through `stripClinicalFields` as a defensive invariant |
 | `tests/clientes-clinical-access.test.js` | new | integration tests (Jest + supertest + mongodb-memory-server) |
 
 Pattern references: `src/models/AuditLog.js` (append-only idiom + `statics.record()`), `src/models/Cliente.js` (tenant schema export, anamnese fields at lines 68–89), `src/middlewares/auth.js` (`authenticate`/`authorize`, `req.user.role`, superadmin bypass), `src/middlewares/validate.js`, `src/models/ConsentLog.js` (F01 — append-only tenant model + registry registration).
 
-No `src/app.js` change: `/clientes` and `/api/internal/clientes` are already mounted; F02 only changes their response shape.
+No `src/app.js` change: `/clientes` and `/api/internal/clientes` are already mounted; F02 changes their response shape and adds the `/:id/clinico` sub-route on the existing clientes router.
 
 ---
 
@@ -168,8 +170,9 @@ There is **no** route to read, update or delete `AcessoClinicoLog` (append-only;
 `tests/clientes-clinical-access.test.js` (Jest ESM + supertest + `mongodb-memory-server`; mock external services per `.claude/rules/testing.md`).
 
 **Acceptance (from PRD §9 F02):**
-- `recepcionista GET /clientes/:id never includes clinical fields` — assert every `CLINICAL_FIELDS` key is absent; base fields present.
-- `admin/gerente/terapeuta GET /clientes/:id includes clinical fields and writes exactly one AcessoClinicoLog` — assert clinical present + `countDocuments` for that client/user == 1.
+- `GET /clientes/:id never includes clinical fields for ANY role (R2)` — for `recepcionista` **and** `admin`, assert every `CLINICAL_FIELDS` key is absent, base fields present, and **no** `AcessoClinicoLog` is written.
+- `admin/gerente/terapeuta GET /clientes/:id/clinico returns clinical + consentimentoSaude and writes exactly one AcessoClinicoLog` — assert clinical present, `consentimentoSaude` present, `countDocuments` for that client/user == 1 (`origem: 'ficha_clinica'`); `recepcionista` → 403 and no audit.
+- `withdrawn consent blocks clinical serving (R4)` — seed latest `dados_saude = withdrawn`; `/clinico` returns only `consentimentoSaude` (no clinical keys) for a permitted role; a panel write to an anamnese field → 400; `pendente` does **not** block.
 - `internal AI path returns no clinical fields` — call internal cliente endpoints with `X-Service-Token`; assert no `CLINICAL_FIELDS` key in the payload.
 - `read audit cannot be updated or deleted through any route` — assert no PUT/PATCH/DELETE on any `acesso-clinico` path (404/405) and `updatedAt` is not tracked.
 - `GET /clientes (list) strips clinical for all roles` — admin + recepcionista lists both omit clinical fields; no audit written.
@@ -177,8 +180,8 @@ There is **no** route to read, update or delete `AcessoClinicoLog` (append-only;
 **Integration / isolation (mandatory — `.claude/rules/multi-tenant.md`):**
 - `Tenant B cannot read Tenant A's client` → 404, and no `AcessoClinicoLog` is written.
 - `AcessoClinicoLog reads/writes are tenant-scoped` — Tenant B never sees Tenant A's audit entries.
-- `superadmin reads clinical fields` (bypass) → clinical present.
-- `audit write failure does not break the read` — stub/force `record()` to reject; permitted read still returns 200 with clinical fields.
+- `superadmin reads clinical fields via /clinico` (bypass) → clinical present.
+- `audit write failure does not break the read` — stub/force `record()` to reject; permitted `/clinico` read still returns 200 with clinical fields.
 
 **Cross-feature note (verified in later features):** F03 gates the Clinical tab on F02's access decision and triggers the F02 read audit on tab open. Not tested in F02.
 
@@ -187,11 +190,11 @@ There is **no** route to read, update or delete `AcessoClinicoLog` (append-only;
 ## 8. Assumptions / Decisions
 
 - **[Auto-Accept]** `GET /clientes` (list) strips clinical fields for **all** roles, not only `recepcionista` — a list view never renders anamnesis, so this is the stronger data-minimization choice and avoids writing N audit entries per page. Clinical data is only ever served by the single-client detail path.
-- **[Auto-Accept]** The read audit is written **only on single-client detail reads** (`getCliente`) by permitted roles (`origem: 'detalhe'`), not on list reads — keeps the audit meaningful and bounded. F03's clinical-tab open maps to `origem: 'ficha_clinica'`.
-- **[Auto-Accept]** One audit entry is written per successful permitted detail read regardless of whether the clinical fields are empty (the fields are present/returned), matching "request includes clinical fields → one entry".
+- ~~**[Auto-Accept]** The read audit is written **only on single-client detail reads** (`getCliente`) by permitted roles (`origem: 'detalhe'`)~~ — **superseded by R2 (consolidated 2026-07-19)**: the audit is written only by `GET /clientes/:id/clinico` (`origem: 'ficha_clinica'`); base reads never serve clinical and never audit. `'detalhe'` stays in the enum as reserved.
+- **[Auto-Accept]** One audit entry is written per successful permitted `/clinico` read regardless of whether the clinical fields are empty (the fields are present/returned). Under R4 (withdrawn) the entry is still written — the read *attempt* is meaningful.
 - **[Auto-Accept]** Audit write is **best-effort / non-blocking**: a `record()` failure is logged and the read still succeeds, following `AuditLog`'s documented read-path posture (avoid denying legitimate clinical access because logging hiccupped).
 - **[Auto-Accept]** Bounded retention implemented as a **MongoDB TTL index** (`expireAfterSeconds ≈ 365 days`) rather than a bespoke prune job — simplest reliable mechanism; expiry is DB-level so it does not constitute a delete route.
 - **[Auto-Accept]** No HTTP endpoint to read `AcessoClinicoLog` in F02 (PRD defines none); it is append-only storage consumed/triggered by F03. A read endpoint, if needed, gets its own feature/ADR.
 - **[Auto-Accept]** Clinical classification = the anamnese block (Cliente.js lines 68–89). `observacoes` (general note) and `dataNascimento` are treated as ordinary PII, **not** clinical, so they remain visible to `recepcionista`; only `observacoesAdicionaisAnamnese` is clinical.
 - **[Auto-Accept]** Enforcement is centralized in `clinicalFields.js` (`stripClinicalFields` + `podeLerClinico`) and applied as a response transform on `.lean()`/plain objects, rather than a Mongoose `.select('-...')` per query, so the same rule covers controller and internal paths uniformly.
-- ~~**[Auto-Accept]** The `ia-service` Python `mongo_reader` is out of scope for F02~~ — **superseded by Reconciliation R1**: the `mongo_reader.py` `Cliente` projection must exclude the clinical block; this IS in F02's scope (Python-side edit + regression assertion in the ia-service test suite).
+- ~~**[Auto-Accept]** The `ia-service` Python direct DB access is out of scope for F02~~ — **superseded by Reconciliation R1 (pointer corrected 2026-07-19)**: the direct `db.clientes` read lives in `services/client_orchestrator.py` (~line 287), not `mongo_reader.py`; keeping its projection clinical-free IS in F02's scope (verify + regression assertion in the ia-service pytest suite).

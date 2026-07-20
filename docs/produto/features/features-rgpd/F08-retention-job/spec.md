@@ -19,6 +19,8 @@
 
 **Provides (to later features):** none — F08 is a terminal/leaf feature (Wave 3). It completes the erasure lifecycle started by F07 and enforces the retention policy described in PRD §2.
 
+> **Reconciliation R9 (2026-07-20):** F08 inherits F07's expanded erasure universe automatically (Conversa/Mensagem, Lead, HistoricoAtendimento, Agendamento observacoes+leadData, Transacao/Pagamento observacoes — it only calls `anonimizarCliente`). Two additions: (1) when completing a **grace-path** client, F08 marks that client's open `PedidoTitular (tipo: 'apagamento', estado: 'recebido')` as **`concluido`**; (2) **terminology** — the operation is legally *pseudonymization* (docs/DPA wording; code identifiers unchanged). Retention-driven anonymization (set a) is **not** a DSR — it records no `PedidoTitular` and no `ConsentLog`.
+
 **Deferred (other features):**
 - The `anonimizarCliente` service, the `pendingDeletion`/`deletionRequestedAt` flags and the immediate-confirmation erasure path are **F07** — F08 only consumes them.
 - Any admin UI to configure `retencaoMeses` per tenant is out of scope (the field exists; the panel control is a later/non-PRD task). The default (24) applies until set.
@@ -90,7 +92,8 @@ F08 has **no HTTP endpoint** — it is a background sweep. Its "contract" is the
 - **R1.** A weekly repeatable BullMQ job iterates **all active tenants** (`Tenant.find({ ativo: { $ne: false } })` on the shared DB) and processes each with its own tenant DB/models via `getTenantDB` + `getModels`.
 - **R2.** **Set (a) — retention:** a client is eligible when it is **not yet anonymized** and its **last activity** is older than `now − retencaoMeses`. "Last activity" = the latest of: most recent `Agendamento.dataHora` for that client and most recent `Transacao.createdAt` for that client; if the client has **no** appointment and **no** transaction, fall back to `Cliente.createdAt`. `[Auto-Accept]` (precise definition below).
 - **R3.** **Set (b) — erasure grace:** a client is eligible when `pendingDeletion === true` and `deletionRequestedAt <= now − GRACE_PERIOD_DAYS` (F07's constant). Already-anonymized clients are skipped.
-- **R4.** Both sets are anonymized by calling F07's **`anonimizarCliente(models, tenantId, clienteId)`** — F08 never re-implements anonymization and never hard-deletes. The service is idempotent (F07 R4), so overlap between sets or a re-run is safe.
+- **R4.** Both sets are anonymized by calling F07's **`anonimizarCliente(models, tenantId, clienteId)`** — F08 never re-implements the pseudonymization and never hard-deletes beyond what the service does. The service is idempotent (F07 R4), so overlap between sets or a re-run is safe.
+- **R4b.** *(R9)* After anonymizing a **set (b)** client, F08 marks that client's open `PedidoTitular (tipo: 'apagamento', estado: 'recebido')` as `concluido` (via `PedidoTitular.concluir()`); set (a) clients record no `PedidoTitular` (retention is policy, not a DSR).
 - **R5.** **Fiscal records and aggregated statistics are preserved** — guaranteed by F07's service (Transacao/Pagamento kept, de-identified). F08 adds nothing that deletes them.
 - **R6.** The job logs, **per tenant**, the count anonymized **split by reason** (retention vs erasure-grace) and an aggregate summary. No silent caps; the candidate set is never truncated.
 - **R7.** **Per-tenant failure isolation:** one tenant throwing does not stop the others (`Promise.allSettled` over tenants; rejected results counted as `errosTenant` and logged). Failed tenants are simply retried on the next weekly run (the data state is unchanged for them).
