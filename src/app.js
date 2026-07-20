@@ -36,6 +36,7 @@ import leadInternalRoutes from './modules/leads/leadInternalRoutes.js';
 import clienteInternalRoutes from './modules/clientes/clienteInternalRoutes.js';
 import disponibilidadeInternalRoutes from './routes/disponibilidadeInternalRoutes.js'; // 🆕 F03 — IA lê disponibilidade
 import adminRoutes from './modules/admin/adminRoutes.js'; // 🆕 Painel super-admin (ADR-024)
+import gdprRoutes from './modules/gdpr/gdprRoutes.js'; // 🆕 Consentimento e direitos dos titulares (ADR-031)
 
 const app = express();
 
@@ -109,6 +110,7 @@ const apiResources = [
   ['/leads', leadRoutes],
   ['/conversas', conversasRoutes],
   ['/admin', adminRoutes],
+  ['/gdpr', gdprRoutes],
 ];
 
 for (const [path, router] of apiResources) {
