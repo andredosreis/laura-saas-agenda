@@ -1,12 +1,37 @@
-import Agendamento from '../../models/Agendamento.js';
+import Tenant from '../../models/Tenant.js';
 import { sendWhatsAppMessage } from '../../utils/evolutionClient.js';
+
+/**
+ * Resolve a instância Evolution do tenant autenticado.
+ *
+ * Sem isto, `sendWhatsAppMessage` cai para a EVOLUTION_INSTANCE global e a
+ * mensagem sai pelo WhatsApp da clínica errada. Fail-closed: sem instância
+ * configurada não se envia nada (mesmo racional de leadController.manualReply).
+ *
+ * @returns {Promise<string|null>} instanceName do tenant, ou null se não configurada
+ */
+const resolverInstanciaTenant = async (tenantId) => {
+  const tenant = await Tenant.findById(tenantId).select('whatsapp.instanceName').lean();
+  return tenant?.whatsapp?.instanceName || null;
+};
+
+const SEM_LIGACAO = {
+  success: false,
+  error: 'Sem ligação WhatsApp activa. Ligue o WhatsApp da clínica primeiro.',
+};
 
 export const notificarCliente = async (req, res) => {
   const { telefone, mensagem } = req.body;
   if (!telefone || !mensagem) {
     return res.status(400).json({ ok: false, error: 'Telefone e mensagem são obrigatórios.' });
   }
-  const result = await sendWhatsAppMessage(telefone, mensagem);
+
+  const instanceName = await resolverInstanciaTenant(req.tenantId);
+  if (!instanceName) {
+    return res.status(409).json({ ok: false, ...SEM_LIGACAO });
+  }
+
+  const result = await sendWhatsAppMessage(telefone, mensagem, instanceName);
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {
@@ -16,38 +41,16 @@ export const notificarCliente = async (req, res) => {
 
 export const enviarMensagemDireta = async (req, res) => {
   const { to, body } = req.body;
-  const result = await sendWhatsAppMessage(to, body);
+
+  const instanceName = await resolverInstanciaTenant(req.tenantId);
+  if (!instanceName) {
+    return res.status(409).json({ ok: false, ...SEM_LIGACAO });
+  }
+
+  const result = await sendWhatsAppMessage(to, body, instanceName);
   if (result.success) {
     return res.status(200).json({ ok: true, result: result.result });
   } else {
     return res.status(500).json({ ok: false, error: result.error });
-  }
-};
-
-export const notificarAgendamentosAmanha = async (req, res) => {
-  try {
-    const hoje = new Date();
-    const amanha = new Date();
-    amanha.setDate(hoje.getDate() + 1);
-    amanha.setHours(0, 0, 0, 0);
-    const fimAmanha = new Date(amanha);
-    fimAmanha.setHours(23, 59, 59, 999);
-
-    const agendamentos = await Agendamento.find({
-      dataHora: { $gte: amanha, $lte: fimAmanha },
-      status: { $ne: 'Cancelado' }
-    }).populate('cliente');
-
-    const elegiveis = agendamentos.filter((ag) => ag.cliente?.telefone);
-    const resultados = await Promise.all(elegiveis.map(async (ag) => {
-      const hora = new Date(ag.dataHora).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-      const mensagem = `Olá ${ag.cliente.nome}, este é um lembrete do seu atendimento para amanhã às ${hora}.`;
-      const resultado = await sendWhatsAppMessage(ag.cliente.telefone, mensagem);
-      return { cliente: ag.cliente.nome, status: resultado.success };
-    }));
-    return res.status(200).json({ ok: true, enviados: resultados.length, detalhes: resultados });
-  } catch (error) {
-    console.error('Erro ao enviar lembretes:', error);
-    return res.status(500).json({ ok: false, error: 'Erro interno ao enviar lembretes' });
   }
 };
