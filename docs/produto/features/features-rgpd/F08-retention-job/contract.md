@@ -15,11 +15,12 @@
 - **WHEN** the routine runs
 - **THEN** the client is anonymized (it would NOT be under the default 24).
 
-## C3 — Erasure grace completion
-- **GIVEN** a client with `pendingDeletion === true` and `deletionRequestedAt = now − (GRACE_PERIOD_DAYS + 1) days`
+## C3 — Erasure grace completion (and DSR closure — R9)
+- **GIVEN** a client with `pendingDeletion === true`, `deletionRequestedAt = now − (GRACE_PERIOD_DAYS + 1) days` and an open `PedidoTitular (tipo: 'apagamento', estado: 'recebido')` (written by F07)
 - **WHEN** the routine runs
-- **THEN** the client is anonymized
-- **AND** a client with `pendingDeletion === true` still within the grace period is NOT anonymized.
+- **THEN** the client is anonymized **and** that `PedidoTitular` becomes `estado: 'concluido'`
+- **AND** a client with `pendingDeletion === true` still within the grace period is NOT anonymized (pedido stays `recebido`)
+- **AND** a retention-driven (set a) anonymization records **no** `PedidoTitular` and no `ConsentLog`.
 
 ## C4 — Fiscal records & aggregated stats preserved
 - **GIVEN** an eligible client with `Transacao`/`Pagamento` records

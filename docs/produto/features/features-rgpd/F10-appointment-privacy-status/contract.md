@@ -1,9 +1,11 @@
 # F10 — Privacy Status & Note on Appointment · Contract (GWT)
 
+> Consolidated 2026-07-20 with [../RECONCILIATION.md](../RECONCILIATION.md) R10 — the note is the new `Cliente.notaOperacional`, never `observacoes` (which is injected into the AI prompt).
+
 ## C1 — Appointment shows a non-clinical privacy badge
 - **GIVEN** an authenticated staff user and an appointment whose client has a submitted anamnesis form (`FichaToken.status === 'usado'`) and a `dados_saude` consent `granted`
 - **WHEN** the appointment surface (agenda card / detail modal) loads the client's status
-- **THEN** it shows the form as **✓ preenchida** and the health-consent as **Dado**, plus the client's note (`Cliente.observacoes`)
+- **THEN** it shows the form as **✓ preenchida** and the health-consent as **Dado**, plus the client's note (`Cliente.notaOperacional`)
 - **AND** it renders/returns **no** clinical/anamnese content.
 
 ## C2 — Pending form shows the alert
@@ -33,15 +35,20 @@
 - **THEN** it returns a map keyed by `clienteId` with each client's `fichaPreenchida`/`fichaEnviada`/`consentimentoSaude`
 - **AND** unknown or cross-tenant ids are silently omitted from the map (no enumeration, no 404).
 
-## C7 — Note reuses Cliente.observacoes (no new field)
+## C7 — Note is the new `notaOperacional` with guidance (R10)
 - **GIVEN** staff editing the client record (or closing a lead)
-- **WHEN** they save a free-text observation
-- **THEN** it persists to the existing `Cliente.observacoes` via `PUT /clientes/:id` (no new backend field) and the saved note appears on the appointment/record status.
+- **WHEN** they save the operational note
+- **THEN** it persists to the new `Cliente.notaOperacional` (max 200 — longer → 400) via `PUT /clientes/:id`, the input carries the label **"Nota operacional — sem dados de saúde"**, the saved note appears on the appointment/record status, and the legacy `Cliente.observacoes` is unchanged.
+
+## C7b — `notaOperacional` never reaches the AI (R10)
+- **GIVEN** a client with a saved `notaOperacional`
+- **WHEN** any `/api/internal/clientes/*` endpoint returns that client, or the ia-service direct `db.clientes` read runs
+- **THEN** the payload/projection contains no `notaOperacional` key (regression-asserted in the Jest and pytest suites) — and `/clinico` (F02) does not return it either.
 
 ## C8 — Lead-closing observation + send action
 - **GIVEN** a lead being closed and converted to a client
 - **WHEN** staff fill the observation and click "Enviar ficha de consentimento"
-- **THEN** the observation is written to the **converted** client's `Cliente.observacoes`
+- **THEN** the observation is written to the **converted** client's `Cliente.notaOperacional`
 - **AND** the send invokes F05's `POST /gdpr/clientes/:id/enviar-ficha` for the converted client (F10 adds no new send logic and writes no `ConsentLog`).
 
 ## C9 — Lead-only appointments have no badge
@@ -65,6 +72,6 @@
 - **THEN** appointments still render (the badge shows a neutral/loading state); privacy status never blocks the agenda; errors surface via toast, never `alert()`.
 
 ## Prerequisites (the evaluator must ensure these exist)
-- F01 (`ConsentLog` + latest-by-type index), F04 (`FichaToken` with `status` lifecycle), F05 (`POST /gdpr/clientes/:id/enviar-ficha`) implemented and registered.
+- F01 (`ConsentLog` v2 + `estadoAtual` helper), F04 (`FichaToken` with `status` lifecycle), F05 (`POST /gdpr/clientes/:id/enviar-ficha`) implemented and registered; `Cliente.notaOperacional` added with the update allow-list + agendamento populate changes (Phase 0).
 - `mongodb-memory-server` test environment; seeded `Cliente`, `FichaToken`, and `ConsentLog` rows in the acting tenant; JWT/auth test helper for roles (`admin`, `gerente`, `recepcionista`, `terapeuta`).
 - Frontend: design-system tokens available; `api.js`, `useAuth`, `react-toastify`, luxon present. External services (Evolution/WhatsApp for the F05 send) mocked per `.claude/rules/testing.md`.

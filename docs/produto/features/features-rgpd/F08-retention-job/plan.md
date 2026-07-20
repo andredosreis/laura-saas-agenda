@@ -16,7 +16,7 @@
    - `processarTenantRetencao(tenant)` — resolve `getModels(getTenantDB(tenant._id))`; read `retencaoMeses` (default 24); compute cutoffs with Luxon (Europe/Lisbon).
      - **Set (a) retention:** find non-anonymized clients whose last activity (latest of most-recent `Agendamento.dataHora`, most-recent `Transacao.createdAt`, else `Cliente.createdAt`) is older than `now − retencaoMeses`.
      - **Set (b) grace:** find non-anonymized clients with `pendingDeletion === true` and `deletionRequestedAt <= now − GRACE_PERIOD_DAYS`.
-     - Anonymize each via F07's `anonimizarCliente(models, tenant._id, clienteId)` with `Promise.all` (per-client errors caught → `falhados`).
+     - Anonymize each via F07's `anonimizarCliente(models, tenant._id, clienteId)` with `Promise.all` (per-client errors caught → `falhados`); for set (b) successes, mark the client's open `PedidoTitular (apagamento, recebido)` as `concluido` (R9 — `PedidoTitular.concluir()`); set (a) records no pedido.
      - Return `{ tenantId, anonimizadosRetencao, anonimizadosGraca, falhados }`.
    - `executarRetencao()` — `Tenant.find({ ativo: { $ne: false } })` on shared DB; process in **bounded chunks** (concurrency from `GDPR_RETENTION_CONCURRENCY`, default 5) with `Promise.allSettled`; aggregate + log summary split by reason; never throw out (top-level try/catch).
 
