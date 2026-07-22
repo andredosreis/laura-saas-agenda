@@ -1,0 +1,43 @@
+{
+  "project": "Marcai Lead Recovery (abandoned cart)",
+  "prd": "docs/produto/PRD-recuperacao-leads.md",
+  "design": "docs/superpowers/specs/2026-07-22-recuperacao-leads-design.md",
+  "as_of": "2026-07-22",
+  "features": {
+    "F01": {
+      "name": "Standardized Loss Reasons Foundation",
+      "priority": 1,
+      "wave": 1,
+      "status": "Specified",
+      "spec": "docs/produto/features/features-recuperacao-leads/F01-loss-reasons-foundation/"
+    },
+    "F02": {
+      "name": "Recovery Report API",
+      "priority": 1,
+      "wave": 2,
+      "status": "Specified",
+      "spec": "docs/produto/features/features-recuperacao-leads/F02-recovery-report-api/"
+    },
+    "F03": {
+      "name": "Recovery CSV Export",
+      "priority": 1,
+      "wave": 3,
+      "status": "Specified",
+      "spec": "docs/produto/features/features-recuperacao-leads/F03-recovery-csv-export/"
+    },
+    "F04": {
+      "name": "Recovery Page UI",
+      "priority": 1,
+      "wave": 4,
+      "status": "Specified",
+      "spec": "docs/produto/features/features-recuperacao-leads/F04-recovery-page-ui/"
+    },
+    "F05": {
+      "name": "WhatsApp Action & Contact Tracking",
+      "priority": 2,
+      "wave": 5,
+      "status": "Specified",
+      "spec": "docs/produto/features/features-recuperacao-leads/F05-whatsapp-contact-tracking/"
+    }
+  }
+}

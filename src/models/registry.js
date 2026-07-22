@@ -25,6 +25,8 @@ import { ScheduleExceptionSchema }    from './ScheduleException.js';
 import { FechamentoMensalSchema }     from './FechamentoMensal.js';
 import { LeadSchema }                 from './Lead.js';
 import { PedidoEquipaSchema }         from './PedidoEquipa.js';
+import { ConsentLogSchema }           from './ConsentLog.js';
+import { NoticeReceiptSchema }        from './NoticeReceipt.js';
 
 /**
  * @param {import('mongoose').Connection} db  — conexão específica do tenant
@@ -48,5 +50,7 @@ export function getModels(db) {
     FechamentoMensal:     db.model('FechamentoMensal',     FechamentoMensalSchema),
     Lead:                 db.model('Lead',                 LeadSchema),
     PedidoEquipa:         db.model('PedidoEquipa',         PedidoEquipaSchema),
+    ConsentLog:           db.model('ConsentLog',           ConsentLogSchema),
+    NoticeReceipt:        db.model('NoticeReceipt',        NoticeReceiptSchema),
   };
 }

@@ -7,7 +7,7 @@
       "name": "Consent Logging Foundation",
       "priority": 1,
       "wave": 1,
-      "status": "Specified",
+      "status": "Implemented",
       "spec": "docs/produto/features/features-rgpd/F01-consent-logging-foundation/"
     },
     "F02": {
