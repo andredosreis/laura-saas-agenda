@@ -29,9 +29,36 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'recepcionista'), ct
 Roles suportados: `superadmin`, `admin`, `gerente`, `recepcionista`, `terapeuta`.
 `superadmin` ignora `authorize` e tem sempre acesso.
 
-O campo `User.permissoes` existe apenas para o frontend mostrar/esconder botões — nunca é verificado no backend. A fonte de verdade de autorização é sempre `req.user.role` + `authorize()`.
+## requirePermission (permissão granular — EM USO)
 
-Não existe `requirePermission`/`hasPermission` — foi removido em 2026-04-24 como código morto. Se precisares de granularidade fina por utilizador, abre ADR antes de adicionar.
+> ⚠️ **Corrigido em 2026-07-20.** Esta secção afirmava que `requirePermission` não existia
+> ("removido em 2026-04-24 como código morto") e que `User.permissoes` nunca era verificado
+> no backend. **Ambas as afirmações eram falsas**: o middleware foi (re)introduzido a
+> 2026-07-11 pela remediação da auditoria de segurança (`a186246`) e é hoje usado em
+> **112 rotas** de **17 ficheiros de rotas**. Remover `requirePermission` a pensar que é
+> código morto derrubaria a autorização em quase toda a API.
+
+```javascript
+// src/middlewares/auth.js
+import { requirePermission } from '../middlewares/auth.js';
+
+router.get('/', requirePermission('verClientes'), ctrl.listar);
+router.post('/', requirePermission('criarClientes'), validate(createClienteSchema), ctrl.criar);
+```
+
+- Verifica `req.user.permissoes[permission] === true` (carregado da BD pelo `authenticate`); caso contrário **403**.
+- `superadmin` faz bypass, tal como no `authorize`.
+- Os defaults por role vivem em `User.getDefaultPermissions(role)` (`src/models/User.js`).
+
+**As duas camadas coexistem e são complementares:**
+
+| Camada | Pergunta que responde | Exemplo |
+|---|---|---|
+| `authorize('admin','gerente')` | O **cargo** pode fazer isto? | só admin/gerente despacham WhatsApp manual |
+| `requirePermission('verClientes')` | **Este utilizador** tem a permissão activa? | recepcionista com `verClientes` desligado |
+
+Em rotas sensíveis usam-se as duas em conjunto (ver `src/modules/ia/whatsappRoutes.js`).
+`User.permissoes` **é** verificado no backend — não é apenas cosmética de frontend.
 
 ## requirePlan (rotas que consomem limite do plano)
 
